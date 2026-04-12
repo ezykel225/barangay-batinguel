@@ -1,0 +1,521 @@
+/* ================================
+   OFFICIALS PAGE STYLES
+   Barangay Batinguel E-System
+================================ */
+
+.officials-page {
+  font-family: 'Poppins', sans-serif;
+}
+
+/* ================================
+   HERO SECTION
+================================ */
+.officials-hero {
+  background: linear-gradient(
+    135deg,
+    #1e3a8a,
+    #1e40af
+  );
+  padding: 48px 40px;
+  color: white;
+}
+
+.officials-hero-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+}
+
+.officials-hero h1 {
+  font-size: 36px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.officials-hero p {
+  font-size: 14px;
+  color: #bfdbfe;
+}
+
+.officials-hero-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: rgba(255, 255, 255, 0.15);
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.officials-hero-badge.available {
+  background-color: rgba(22, 163, 74, 0.3);
+  color: #86efac;
+}
+
+/* ================================
+   KAPITAN SECTION
+================================ */
+.kapitan-section {
+  padding: 60px 40px;
+  background-color: #ffffff;
+}
+
+.kapitan-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.kapitan-card {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.kapitan-left {
+  padding: 40px;
+  background: linear-gradient(
+    135deg,
+    #1e3a8a,
+    #1e40af
+  );
+  color: white;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.kapitan-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  width: fit-content;
+}
+
+.kapitan-status-badge.in-office {
+  background-color: rgba(22, 163, 74, 0.2);
+  color: #86efac;
+  border: 1px solid rgba(22, 163, 74, 0.3);
+}
+
+.kapitan-status-badge.on-field {
+  background-color: rgba(234, 179, 8, 0.2);
+  color: #fde047;
+  border: 1px solid rgba(234, 179, 8, 0.3);
+}
+
+.kapitan-status-badge.unavailable {
+  background-color: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.kapitan-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #86efac;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.4; }
+  100% { opacity: 1; }
+}
+
+.kapitan-left h2 {
+  font-size: 13px;
+  font-weight: 600;
+  color: #bfdbfe;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+.kapitan-left h3 {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.kapitan-left p {
+  font-size: 14px;
+  color: #bfdbfe;
+  margin-bottom: 24px;
+}
+
+.kapitan-quote {
+  font-size: 14px;
+  color: #bfdbfe;
+  font-style: italic;
+  line-height: 1.7;
+  border-left: 3px solid rgba(255,255,255,0.3);
+  padding-left: 16px;
+  margin-top: 16px;
+}
+
+.kapitan-right {
+  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.kapitan-right h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.kapitan-right h4 a {
+  font-size: 13px;
+  color: #1e3a8a;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.consultation-schedule {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.schedule-day {
+  text-align: center;
+  padding: 12px 8px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.schedule-day.available {
+  background-color: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.schedule-day.on-field {
+  background-color: #fefce8;
+  border-color: #fde047;
+}
+
+.schedule-day-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.schedule-day-status {
+  font-size: 11px;
+  color: #1e3a8a;
+  font-weight: 500;
+}
+
+.schedule-day.on-field .schedule-day-status {
+  color: #b45309;
+}
+
+.schedule-time {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 4px;
+}
+
+/* ================================
+   EXECUTIVE COUNCIL
+================================ */
+.council-section {
+  padding: 60px 40px;
+  background-color: #f9fafb;
+}
+
+.council-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.section-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1e3a8a;
+  margin-bottom: 8px;
+}
+
+.section-subtitle {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 32px;
+}
+
+.council-featured {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.council-card {
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: box-shadow 0.2s;
+}
+
+.council-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.council-card-image {
+  width: 100%;
+  height: 200px;
+  background: linear-gradient(
+    135deg,
+    #1e3a8a,
+    #3b82f6
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 64px;
+}
+
+.council-card-body {
+  padding: 20px;
+}
+
+.council-card-role {
+  font-size: 11px;
+  font-weight: 600;
+  color: #1e3a8a;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+
+.council-card-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 4px;
+}
+
+.council-card-desc {
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+
+.council-card-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: #eff6ff;
+  color: #1e3a8a;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background-color 0.2s;
+}
+
+.council-card-btn:hover {
+  background-color: #dbeafe;
+}
+
+.council-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.council-small-card {
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: box-shadow 0.2s;
+}
+
+.council-small-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.council-small-avatar {
+  width: 64px;
+  height: 64px;
+  background: linear-gradient(
+    135deg,
+    #1e3a8a,
+    #3b82f6
+  );
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 24px;
+  margin: 0 auto 12px;
+}
+
+.council-small-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 4px;
+}
+
+.council-small-role {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* ================================
+   HEALTH DEPARTMENT
+================================ */
+.health-dept-section {
+  padding: 60px 40px;
+  background-color: #ffffff;
+}
+
+.health-dept-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.health-dept-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+
+.health-dept-card {
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: box-shadow 0.2s;
+}
+
+.health-dept-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.health-dept-avatar {
+  width: 72px;
+  height: 72px;
+  background: linear-gradient(
+    135deg,
+    #0f766e,
+    #14b8a6
+  );
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 28px;
+  margin: 0 auto 12px;
+}
+
+.health-dept-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 4px;
+}
+
+.health-dept-role {
+  font-size: 11px;
+  font-weight: 600;
+  color: #0f766e;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+.health-dept-desc {
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+
+.health-dept-btn {
+  display: inline-block;
+  background-color: #f0fdf4;
+  color: #16a34a;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background-color 0.2s;
+}
+
+.health-dept-btn:hover {
+  background-color: #dcfce7;
+}
+
+/* ================================
+   RESPONSIVE
+================================ */
+@media (max-width: 768px) {
+  .kapitan-card {
+    grid-template-columns: 1fr;
+  }
+
+  .council-featured {
+    grid-template-columns: 1fr;
+  }
+
+  .council-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .health-dept-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .officials-hero {
+    padding: 32px 20px;
+  }
+
+  .kapitan-section,
+  .council-section,
+  .health-dept-section {
+    padding: 40px 20px;
+  }
+
+  .consultation-schedule {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}  

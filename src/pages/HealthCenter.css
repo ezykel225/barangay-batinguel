@@ -1,0 +1,499 @@
+/* ================================
+   HEALTH CENTER PAGE STYLES
+   Barangay Batinguel E-System
+================================ */
+
+.health-page {
+  font-family: 'Poppins', sans-serif;
+}
+
+/* ================================
+   HERO SECTION
+================================ */
+.health-hero {
+  background: linear-gradient(
+    135deg,
+    #0f766e,
+    #0d9488
+  );
+  padding: 48px 40px;
+  color: white;
+}
+
+.health-hero-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+}
+
+.health-hero-left h1 {
+  font-size: 42px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: 12px;
+}
+
+.health-hero-left h1 span {
+  display: block;
+  color: #99f6e4;
+}
+
+.health-hero-left p {
+  font-size: 14px;
+  color: #99f6e4;
+  max-width: 500px;
+  line-height: 1.7;
+}
+
+.health-emergency-card {
+  background-color: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 12px;
+  padding: 20px 28px;
+  text-align: center;
+  min-width: 200px;
+}
+
+.health-emergency-card p {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+  color: #99f6e4;
+}
+
+.health-emergency-card h3 {
+  font-size: 24px;
+  font-weight: 700;
+  color: white;
+}
+
+.health-emergency-card span {
+  font-size: 12px;
+  color: #99f6e4;
+}
+
+/* ================================
+   MAIN CONTENT
+================================ */
+.health-main {
+  padding: 60px 40px;
+  background-color: #f9fafb;
+}
+
+.health-main-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 32px;
+}
+
+/* ================================
+   LEFT SIDEBAR
+================================ */
+.health-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* On Duty Status Card */
+.health-status-card {
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.health-status-card h4 {
+  font-size: 13px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.health-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #16a34a;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.4; }
+  100% { opacity: 1; }
+}
+
+.health-nurse-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.health-nurse-item:last-child {
+  border-bottom: none;
+}
+
+.health-nurse-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(
+    135deg,
+    #0f766e,
+    #14b8a6
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.health-nurse-info h5 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 2px;
+}
+
+.health-nurse-info p {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.health-nurse-status {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.status-badge.available {
+  background-color: #dcfce7;
+  color: #16a34a;
+}
+
+.status-badge.unavailable {
+  background-color: #fee2e2;
+  color: #dc2626;
+}
+
+.status-badge.on-duty {
+  background-color: #dbeafe;
+  color: #1e3a8a;
+}
+
+.health-consult-btn {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  background-color: #0f766e;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  margin-top: 16px;
+  text-decoration: none;
+  transition: background-color 0.2s;
+  font-family: 'Poppins', sans-serif;
+}
+
+.health-consult-btn:hover {
+  background-color: #0d9488;
+}
+
+/* Clinic Hours Card */
+.health-clinic-card {
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.health-clinic-card h4 {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 16px;
+}
+
+.clinic-hours-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #f3f4f6;
+  font-size: 13px;
+}
+
+.clinic-hours-item:last-child {
+  border-bottom: none;
+}
+
+.clinic-hours-day {
+  color: #374151;
+  font-weight: 500;
+}
+
+.clinic-hours-time {
+  color: #0f766e;
+  font-weight: 600;
+}
+
+.clinic-hours-closed {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+/* ================================
+   RIGHT CONTENT
+================================ */
+.health-content {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* Bakuna Events */
+.health-bakuna-card {
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.health-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.health-card-header h4 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.health-card-header a {
+  font-size: 13px;
+  color: #0f766e;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.health-card-header a:hover {
+  text-decoration: underline;
+}
+
+.bakuna-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.bakuna-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  overflow: hidden;
+  transition: box-shadow 0.2s;
+}
+
+.bakuna-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.bakuna-card-date {
+  background-color: #0f766e;
+  color: white;
+  padding: 12px;
+  text-align: center;
+}
+
+.bakuna-card-date .month {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.bakuna-card-date .day {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.bakuna-card-body {
+  padding: 14px;
+}
+
+.bakuna-card-body h5 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 6px;
+}
+
+.bakuna-card-body p {
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+
+.bakuna-target {
+  display: inline-block;
+  background-color: #f0fdf4;
+  color: #16a34a;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Patient Resources */
+.health-resources-card {
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.health-resources-card h4 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 16px;
+}
+
+.resource-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.resource-item:hover {
+  background-color: #f9fafb;
+}
+
+.resource-icon {
+  width: 40px;
+  height: 40px;
+  background-color: #f0fdf4;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #16a34a;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.resource-info h5 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 2px;
+}
+
+.resource-info p {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* Community Stats */
+.health-stats-card {
+  background: linear-gradient(
+    135deg,
+    #1e3a8a,
+    #1e40af
+  );
+  border-radius: 12px;
+  padding: 24px;
+  color: white;
+}
+
+.health-stats-card h4 {
+  font-size: 13px;
+  font-weight: 600;
+  color: #bfdbfe;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+.health-stats-number {
+  font-size: 48px;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.health-stats-label {
+  font-size: 13px;
+  color: #bfdbfe;
+}
+
+/* ================================
+   RESPONSIVE
+================================ */
+@media (max-width: 768px) {
+  .health-hero-container {
+    flex-direction: column;
+  }
+
+  .health-main-container {
+    grid-template-columns: 1fr;
+  }
+
+  .bakuna-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .health-hero {
+    padding: 32px 20px;
+  }
+
+  .health-main {
+    padding: 40px 20px;
+  }
+}  

@@ -1,0 +1,570 @@
+/* ================================
+   RESERVATION PAGE STYLES
+   Barangay Batinguel E-System
+================================ */
+
+.reservation-page {
+  font-family: 'Poppins', sans-serif;
+}
+
+/* ================================
+   HERO SECTION
+================================ */
+.reservation-hero {
+  background: linear-gradient(
+    135deg,
+    #1e3a8a,
+    #1e40af
+  );
+  padding: 48px 40px;
+  color: white;
+}
+
+.reservation-hero-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.reservation-hero h1 {
+  font-size: 36px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.reservation-hero p {
+  font-size: 14px;
+  color: #bfdbfe;
+  max-width: 500px;
+}
+
+/* ================================
+   MAIN CONTENT
+================================ */
+.reservation-main {
+  padding: 60px 40px;
+  background-color: #f9fafb;
+}
+
+.reservation-main-container {
+  max-width: 1000px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 32px;
+}
+
+/* ================================
+   FORM CARD
+================================ */
+.reservation-form-card {
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 40px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+/* ================================
+   STEPS INDICATOR
+================================ */
+.reservation-steps {
+  display: flex;
+  align-items: center;
+  margin-bottom: 40px;
+}
+
+.step-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.step-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid #e5e7eb;
+  background-color: #ffffff;
+  color: #9ca3af;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  flex-shrink: 0;
+  transition: all 0.3s;
+}
+
+.step-circle.active {
+  border-color: #1e3a8a;
+  background-color: #1e3a8a;
+  color: white;
+}
+
+.step-circle.completed {
+  border-color: #16a34a;
+  background-color: #16a34a;
+  color: white;
+}
+
+.step-label {
+  font-size: 12px;
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+.step-label.active {
+  color: #1e3a8a;
+  font-weight: 600;
+}
+
+.step-label.completed {
+  color: #16a34a;
+}
+
+.step-divider {
+  flex: 1;
+  height: 2px;
+  background-color: #e5e7eb;
+  margin: 0 8px;
+  transition: background-color 0.3s;
+}
+
+.step-divider.completed {
+  background-color: #16a34a;
+}
+
+/* ================================
+   FORM SECTIONS
+================================ */
+.form-section-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 24px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-group.full-width {
+  grid-column: 1 / -1;
+}
+
+.form-group label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.form-input {
+  padding: 12px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #1f2937;
+  outline: none;
+  transition: border-color 0.2s;
+  font-family: 'Poppins', sans-serif;
+  width: 100%;
+}
+
+.form-input:focus {
+  border-color: #1e3a8a;
+  box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.1);
+}
+
+.form-select {
+  padding: 12px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #1f2937;
+  outline: none;
+  transition: border-color 0.2s;
+  font-family: 'Poppins', sans-serif;
+  width: 100%;
+  background-color: white;
+  cursor: pointer;
+}
+
+.form-select:focus {
+  border-color: #1e3a8a;
+  box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.1);
+}
+
+.form-textarea {
+  padding: 12px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #1f2937;
+  outline: none;
+  transition: border-color 0.2s;
+  font-family: 'Poppins', sans-serif;
+  width: 100%;
+  resize: vertical;
+  min-height: 100px;
+}
+
+.form-textarea:focus {
+  border-color: #1e3a8a;
+  box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.1);
+}
+
+/* Residency Status */
+.residency-options {
+  display: flex;
+  gap: 12px;
+}
+
+.residency-btn {
+  flex: 1;
+  padding: 10px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  background-color: #f9fafb;
+  color: #6b7280;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: 'Poppins', sans-serif;
+}
+
+.residency-btn.active {
+  border-color: #1e3a8a;
+  background-color: #eff6ff;
+  color: #1e3a8a;
+}
+
+/* Time Slots */
+.time-slots {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.time-slot-btn {
+  padding: 10px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  background-color: #f9fafb;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: 'Poppins', sans-serif;
+}
+
+.time-slot-btn.active {
+  border-color: #1e3a8a;
+  background-color: #eff6ff;
+  color: #1e3a8a;
+}
+
+.time-slot-btn.taken {
+  background-color: #f3f4f6;
+  color: #d1d5db;
+  cursor: not-allowed;
+  border-color: #f3f4f6;
+}
+
+/* ================================
+   PAYMENT NOTICE
+================================ */
+.payment-notice {
+  background-color: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.payment-notice-icon {
+  color: #16a34a;
+  font-size: 18px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.payment-notice p {
+  font-size: 13px;
+  color: #15803d;
+  line-height: 1.6;
+}
+
+.payment-notice strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+/* ================================
+   REVIEW SECTION
+================================ */
+.review-section {
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.review-section h4 {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.review-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  font-size: 13px;
+}
+
+.review-item-label {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.review-item-value {
+  color: #1f2937;
+  font-weight: 600;
+  text-align: right;
+}
+
+/* ================================
+   FORM BUTTONS
+================================ */
+.form-buttons {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 32px;
+}
+
+.btn-back {
+  padding: 12px 24px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  background-color: white;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: 'Poppins', sans-serif;
+}
+
+.btn-back:hover {
+  border-color: #1e3a8a;
+  color: #1e3a8a;
+}
+
+.btn-next {
+  padding: 12px 32px;
+  border: none;
+  border-radius: 8px;
+  background-color: #1e3a8a;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  font-family: 'Poppins', sans-serif;
+  margin-left: auto;
+}
+
+.btn-next:hover {
+  background-color: #1e40af;
+}
+
+.btn-submit {
+  padding: 12px 32px;
+  border: none;
+  border-radius: 8px;
+  background-color: #16a34a;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  font-family: 'Poppins', sans-serif;
+  margin-left: auto;
+}
+
+.btn-submit:hover {
+  background-color: #15803d;
+}
+
+.btn-submit:disabled {
+  background-color: #86efac;
+  cursor: not-allowed;
+}
+
+/* ================================
+   SUCCESS MESSAGE
+================================ */
+.reservation-success {
+  text-align: center;
+  padding: 40px;
+}
+
+.reservation-success-icon {
+  width: 80px;
+  height: 80px;
+  background-color: #dcfce7;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #16a34a;
+  font-size: 36px;
+  margin: 0 auto 24px;
+}
+
+.reservation-success h3 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 12px;
+}
+
+.reservation-success p {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 24px;
+  line-height: 1.7;
+}
+
+.btn-home {
+  display: inline-block;
+  padding: 12px 32px;
+  background-color: #1e3a8a;
+  color: white;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background-color 0.2s;
+}
+
+.btn-home:hover {
+  background-color: #1e40af;
+}
+
+/* ================================
+   RIGHT SIDEBAR
+================================ */
+.reservation-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.reservation-info-card {
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.reservation-info-card h4 {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 16px;
+}
+
+.info-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+  font-size: 13px;
+}
+
+.info-item-icon {
+  color: #1e3a8a;
+  font-size: 16px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.info-item p {
+  color: #374151;
+  line-height: 1.5;
+}
+
+.info-item strong {
+  color: #1f2937;
+}
+
+/* ================================
+   LOADING AND EMPTY
+================================ */
+.loading-text {
+  text-align: center;
+  color: #6b7280;
+  font-size: 14px;
+  padding: 20px;
+}
+
+.empty-text {
+  text-align: center;
+  color: #6b7280;
+  font-size: 14px;
+  padding: 20px;
+}
+
+/* ================================
+   RESPONSIVE
+================================ */
+@media (max-width: 768px) {
+  .reservation-main-container {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .time-slots {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .reservation-hero {
+    padding: 32px 20px;
+  }
+
+  .reservation-main {
+    padding: 40px 20px;
+  }
+
+  .reservation-form-card {
+    padding: 24px;
+  }
+}  

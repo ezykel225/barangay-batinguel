@@ -1,0 +1,643 @@
+/* ================================
+   NURSE DASHBOARD STYLES
+   Barangay Batinguel E-System
+================================ */
+
+/* ================================
+   DASHBOARD HEADER
+================================ */
+.nurse-dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 32px;
+}
+
+.nurse-dashboard-header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 4px;
+}
+
+.nurse-dashboard-header p {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+/* Status Badge */
+.nurse-status-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #dcfce7;
+  color: #16a34a;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.nurse-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #16a34a;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.4; }
+  100% { opacity: 1; }
+}
+
+/* ================================
+   DASHBOARD GRID
+================================ */
+.nurse-dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+/* ================================
+   BAKUNA CALENDAR CARD
+================================ */
+.bakuna-calendar-card {
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.bakuna-calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.bakuna-calendar-header h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.bakuna-event-item {
+  display: flex;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.bakuna-event-item:last-child {
+  border-bottom: none;
+}
+
+.bakuna-event-date {
+  background: #0f766e;
+  color: white;
+  border-radius: 8px;
+  padding: 8px 12px;
+  text-align: center;
+  min-width: 56px;
+}
+
+.bakuna-event-date .month {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.bakuna-event-date .day {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.bakuna-event-info h5 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 2px;
+}
+
+.bakuna-event-info p {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.bakuna-add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px;
+  background-color: #1e3a8a;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: 'Poppins', sans-serif;
+  margin-top: 16px;
+  transition: background-color 0.2s;
+}
+
+.bakuna-add-btn:hover {
+  background-color: #1e40af;
+}
+
+/* ================================
+   MEDICAL PROGRAMS CARD
+================================ */
+.programs-card {
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.programs-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.programs-card-header h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.programs-subtitle {
+  font-size: 13px;
+  color: #6b7280;
+  margin-bottom: 16px;
+}
+
+.programs-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.program-item {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 14px;
+  transition: box-shadow 0.2s;
+}
+
+.program-item:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.program-item-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 4px;
+}
+
+.program-item-schedule {
+  font-size: 11px;
+  color: #16a34a;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.program-item-time {
+  font-size: 11px;
+  color: #6b7280;
+  margin-bottom: 8px;
+}
+
+.program-edit-btn {
+  font-size: 11px;
+  color: #1e3a8a;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 500;
+  padding: 0;
+}
+
+.program-edit-btn:hover {
+  text-decoration: underline;
+}
+
+/* ================================
+   OUTREACH STATS CARD
+================================ */
+.outreach-card {
+  background: linear-gradient(
+    135deg,
+    #1e3a8a,
+    #1e40af
+  );
+  border-radius: 12px;
+  padding: 24px;
+  color: white;
+}
+
+.outreach-label {
+  font-size: 13px;
+  color: #bfdbfe;
+  margin-bottom: 8px;
+}
+
+.outreach-number {
+  font-size: 48px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.outreach-sublabel {
+  font-size: 13px;
+  color: #bfdbfe;
+}
+
+/* ================================
+   NURSE STATUS CARD
+================================ */
+.nurse-my-status-card {
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.nurse-my-status-card h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 16px;
+}
+
+.nurse-status-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.nurse-status-option-btn {
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: 'Poppins', sans-serif;
+  transition: all 0.2s;
+  text-align: left;
+}
+
+.nurse-status-option-btn.active {
+  border: 2px solid #16a34a;
+  background-color: #dcfce7;
+  color: #16a34a;
+}
+
+.nurse-status-option-btn.inactive {
+  border: 2px solid #e5e7eb;
+  background-color: white;
+  color: #6b7280;
+}
+
+/* ================================
+   AVAILABILITY PAGE
+================================ */
+.availability-header {
+  margin-bottom: 32px;
+}
+
+.availability-header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 4px;
+}
+
+.availability-header p {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+/* ================================
+   HEALTH EVENTS PAGE
+================================ */
+.health-events-header {
+  margin-bottom: 32px;
+}
+
+.health-events-header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 4px;
+}
+
+.health-events-header p {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+/* ================================
+   SETTINGS PAGE
+================================ */
+.settings-header {
+  margin-bottom: 32px;
+}
+
+.settings-header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 4px;
+}
+
+.settings-header p {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+/* Profile Card */
+.profile-card {
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.profile-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.profile-card-header h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.profile-avatar-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.profile-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(
+    135deg,
+    #0f766e,
+    #14b8a6
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 32px;
+  margin-bottom: 12px;
+}
+
+.profile-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 4px;
+}
+
+.profile-role {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.profile-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.profile-form-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.profile-form-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: 'Poppins', sans-serif;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.profile-form-input:focus {
+  border-color: #1e3a8a;
+  box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.1);
+}
+
+.profile-save-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px;
+  background-color: #1e3a8a;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: 'Poppins', sans-serif;
+  transition: background-color 0.2s;
+}
+
+.profile-save-btn:hover {
+  background-color: #1e40af;
+}
+
+/* Security Card */
+.security-card {
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.security-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.security-card-header h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.security-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.security-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: '#374151';
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.security-desc {
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 12px;
+}
+
+.security-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: 'Poppins', sans-serif;
+  outline: none;
+  margin-bottom: 8px;
+}
+
+.security-toggle-btn {
+  background: none;
+  border: none;
+  color: #1e3a8a;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: 'Poppins', sans-serif;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.notification-section {
+  border-top: 1px solid #e5e7eb;
+  padding-top: 16px;
+}
+
+.notification-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.notification-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.notification-item-label {
+  font-size: 13px;
+  color: #374151;
+}
+
+.notification-toggle {
+  width: 44px;
+  height: 24px;
+  border-radius: 12px;
+  background: #16a34a;
+  cursor: pointer;
+  border: none;
+}
+
+.security-save-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px;
+  background-color: #1e3a8a;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: 'Poppins', sans-serif;
+  transition: background-color 0.2s;
+  margin-top: 16px;
+}
+
+.security-save-btn:hover {
+  background-color: #1e40af;
+}
+
+/* ================================
+   RESPONSIVE
+================================ */
+@media (max-width: 1024px) {
+  .nurse-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .programs-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .nurse-dashboard-header {
+    flex-direction: column;
+    gap: 16px;
+  }
+} 

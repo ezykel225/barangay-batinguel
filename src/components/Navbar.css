@@ -1,0 +1,170 @@
+/* ================================
+   NAVBAR STYLES
+   Barangay Batinguel E-System
+================================ */
+
+/* Main Navbar */
+.navbar {
+  background-color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+/* Navbar Container */
+.navbar-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 40px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Logo Section */
+.navbar-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+}
+
+.navbar-logo-icon {
+  width: 45px;
+  height: 45px;
+  background-color: #1e3a8a;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 20px;
+}
+
+.navbar-logo-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.navbar-logo-text span:first-child {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1e3a8a;
+  line-height: 1.2;
+}
+
+.navbar-logo-text span:last-child {
+  font-size: 11px;
+  color: #6b7280;
+}
+
+/* Desktop Menu */
+.navbar-menu {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.navbar-menu a {
+  color: #374151;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  padding-bottom: 4px;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+}
+
+.navbar-menu a:hover {
+  color: #1e3a8a;
+  border-bottom: 2px solid #1e3a8a;
+}
+
+.navbar-menu a.active {
+  color: #1e3a8a;
+  border-bottom: 2px solid #1e3a8a;
+  font-weight: 600;
+}
+
+/* Login Button */
+.navbar-login-btn {
+  background-color: #1e3a8a;
+  color: white !important;
+  padding: 8px 20px;
+  border-radius: 6px;
+  font-weight: 600 !important;
+  border-bottom: none !important;
+  transition: background-color 0.2s !important;
+}
+
+.navbar-login-btn:hover {
+  background-color: #1e40af !important;
+  color: white !important;
+  border-bottom: none !important;
+}
+
+/* Mobile Menu Button */
+.navbar-toggle {
+  display: none;
+  background: none;
+  border: none;
+  color: #1e3a8a;
+  font-size: 24px;
+  cursor: pointer;
+}
+
+/* Mobile Menu */
+.navbar-mobile {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  background-color: #f9fafb;
+  border-top: 1px solid #e5e7eb;
+  list-style: none;
+  margin: 0;
+}
+
+.navbar-mobile a {
+  color: #374151;
+  text-decoration: none;
+  font-size: 15px;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.navbar-mobile a:hover {
+  color: #1e3a8a;
+}
+
+.navbar-mobile-login {
+  background-color: #1e3a8a;
+  color: white !important;
+  padding: 10px 24px;
+  border-radius: 6px;
+  font-weight: 600 !important;
+}
+
+.navbar-mobile.open {
+  display: flex;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .navbar-menu {
+    display: none;
+  }
+
+  .navbar-toggle {
+    display: block;
+  }
+
+  .navbar-container {
+    padding: 12px 20px;
+  }
+}
