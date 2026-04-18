@@ -15,6 +15,8 @@ import OfficialDashboard from
   './dashboards/OfficialDashboard'
 import NurseDashboard from
   './dashboards/NurseDashboard'
+import AdminDashboard from
+  './dashboards/AdminDashboard'
 
 function App() {
   return (
@@ -41,6 +43,9 @@ function App() {
           />
           <Route path="/nurse"
             element={<NurseDashboard />}
+          />
+          <Route path="/admin"
+            element={<AdminDashboard />}
           />
 
           {/* 404 Route */}

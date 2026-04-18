@@ -11,6 +11,22 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     checkUser()
+
+    // Listen for auth state changes
+    const { data: { subscription } } =
+      supabase.auth.onAuthStateChange(
+        async (_event, session) => {
+          if (session?.user) {
+            setUser(session.user)
+            await fetchRole(session.user.id)
+          } else {
+            setUser(null)
+            setRole(null)
+          }
+        }
+      )
+
+    return () => subscription.unsubscribe()
   }, [])
 
   const checkUser = async () => {

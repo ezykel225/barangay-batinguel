@@ -4,6 +4,7 @@ import {
   FaShieldAlt,
   FaUserTie,
   FaUserNurse,
+  FaUserCog,
   FaIdCard,
   FaKey,
   FaEye,
@@ -18,7 +19,7 @@ import './Login.css'
 
 const Login = () => {
   const navigate = useNavigate()
-  const [role, setRole] = useState('official')
+  const [role, setRole] = useState('admin')
   const [systemId, setSystemId] = useState('')
   const [securityKey, setSecurityKey] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -75,7 +76,9 @@ const Login = () => {
       toast.success('Login successful! Welcome back!')
 
       setTimeout(() => {
-        if (profile.role === 'official') {
+        if (profile.role === 'admin') {
+          navigate('/admin', { replace: true })
+        } else if (profile.role === 'official') {
           navigate('/official', { replace: true })
         } else if (profile.role === 'nurse') {
           navigate('/nurse', { replace: true })
@@ -123,6 +126,34 @@ const Login = () => {
                 Please verify your identity to
                 proceed to your workstation.
               </p>
+
+              {/* Role Info */}
+              <div className="login-left-roles">
+                <div className={`login-left-role-item
+                  ${role === 'admin' ? 'active' : ''}`}>
+                  <FaUserCog />
+                  <div>
+                    <span>Admin</span>
+                    <p>Full System Access</p>
+                  </div>
+                </div>
+                <div className={`login-left-role-item
+                  ${role === 'official' ? 'active' : ''}`}>
+                  <FaUserTie />
+                  <div>
+                    <span>Barangay Official</span>
+                    <p>Operations Access</p>
+                  </div>
+                </div>
+                <div className={`login-left-role-item
+                  ${role === 'nurse' ? 'active' : ''}`}>
+                  <FaUserNurse />
+                  <div>
+                    <span>Nurse</span>
+                    <p>Health Module Access</p>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div className="login-left-footer">
@@ -153,24 +184,59 @@ const Login = () => {
               Authorized Role
             </div>
             <div className="login-role-buttons">
+
+              {/* Admin Role */}
+              <button
+                className={`login-role-btn
+                  ${role === 'admin'
+                    ? 'active-admin' : ''}`}
+                onClick={() => setRole('admin')}
+                type="button">
+                <FaUserCog />
+                Admin
+              </button>
+
+              {/* Official Role */}
               <button
                 className={`login-role-btn
                   ${role === 'official'
-                    ? 'active' : ''}`}
+                    ? 'active-official' : ''}`}
                 onClick={() => setRole('official')}
                 type="button">
                 <FaUserTie />
                 Official
               </button>
+
+              {/* Nurse Role */}
               <button
                 className={`login-role-btn
                   ${role === 'nurse'
-                    ? 'active' : ''}`}
+                    ? 'active-nurse' : ''}`}
                 onClick={() => setRole('nurse')}
                 type="button">
                 <FaUserNurse />
                 Nurse
               </button>
+
+            </div>
+
+            {/* Selected Role Badge */}
+            <div className="login-selected-role">
+              {role === 'admin' && (
+                <span className="role-badge admin-badge">
+                  👨‍💻 Logging in as Admin
+                </span>
+              )}
+              {role === 'official' && (
+                <span className="role-badge official-badge">
+                  👮 Logging in as Barangay Official
+                </span>
+              )}
+              {role === 'nurse' && (
+                <span className="role-badge nurse-badge">
+                  💉 Logging in as Nurse
+                </span>
+              )}
             </div>
 
             {/* Login Form */}
@@ -187,7 +253,7 @@ const Login = () => {
                   </div>
                   <input
                     type="text"
-                    placeholder="BTG-XXXX-2024"
+                    placeholder="Enter your email"
                     value={systemId}
                     onChange={(e) =>
                       setSystemId(e.target.value)
@@ -230,7 +296,13 @@ const Login = () => {
               {/* Submit Button */}
               <button
                 type="submit"
-                className="login-submit-btn"
+                className={`login-submit-btn
+                  ${role === 'admin'
+                    ? 'submit-admin' : ''}
+                  ${role === 'official'
+                    ? 'submit-official' : ''}
+                  ${role === 'nurse'
+                    ? 'submit-nurse' : ''}`}
                 disabled={loading}>
                 <FaShieldAlt />
                 {loading
