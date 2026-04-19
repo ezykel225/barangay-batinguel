@@ -49,11 +49,7 @@ const HealthCenter = () => {
   }
 
   const resources = [
-    {
-      id: 1,
-      title: 'Medical Certificate Request',
-      desc: 'Click here to know how to request a medical certificate.',
-    },
+
     {
       id: 2,
       title: 'Free Medicine Program',
@@ -96,7 +92,7 @@ const HealthCenter = () => {
           {/* Emergency Hotline */}
           <div className="health-emergency-card">
             <p>Emergency Hotline</p>
-            <h3>(035) 000-0000</h3>
+            <h3>(+63) 912 345 6789</h3>
             <span>Available 24/7</span>
           </div>
         </div>
@@ -160,9 +156,6 @@ const HealthCenter = () => {
                   ))
               )}
 
-              <a href="#" className="health-consult-btn">
-                Consult Now
-              </a>
             </div>
 
             {/* Clinic Hours */}

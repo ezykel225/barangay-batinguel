@@ -84,7 +84,7 @@ const Home = () => {
             <Link
               to="/reservation"
               className="hero-btn-primary">
-              Reserve Covered Court
+              Book for Reservation
             </Link>
             <Link
               to="/health-center"

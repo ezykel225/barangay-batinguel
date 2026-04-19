@@ -15,25 +15,25 @@ import './Officials.css'
 const councilMembers = [
   {
     id: 1,
-    name: 'Antonio G. Reyes',
+    name: 'Caroline Catan Amparado',
     role: 'Kagawad',
     committee: 'Peace and Order',
   },
   {
     id: 2,
-    name: 'Lucia B. Castro',
+    name: 'Sheila Mae Flores Bardago',
     role: 'Kagawad',
     committee: 'Health and Sanitation',
   },
   {
     id: 3,
-    name: 'Mark J. Villanueva',
+    name: 'Harold Katada Baroy',
     role: 'Kagawad',
     committee: 'Education',
   },
   {
     id: 4,
-    name: 'Patricia S. Lim',
+    name: 'Moronihea Alcancia Cabrera',
     role: 'Kagawad',
     committee: 'Environment',
   },
@@ -111,7 +111,7 @@ const Officials = () => {
                   In Office
                 </div>
                 <h2>Punong Barangay</h2>
-                <h3>Hon. [Kapitan Name]</h3>
+                <h3>Hon. Frankie Credo</h3>
                 <p>Punong Barangay</p>
                 <p className="kapitan-quote">
                   "Committed to serving every 
@@ -199,7 +199,7 @@ const Officials = () => {
                   Punong Barangay
                 </div>
                 <div className="council-card-name">
-                  Hon. [Kapitan Name]
+                  Hon. Frankie Credo
                 </div>
                 <p className="council-card-desc">
                   Ready to help for all programs 
@@ -222,13 +222,13 @@ const Officials = () => {
                   Barangay Secretary
                 </div>
                 <div className="council-card-name">
-                  Maria Elena C. Reyes
+                  Alexis Tan
                 </div>
                 <p className="council-card-desc">
                   Manages all administrative 
                   documents and official records 
                   of the barangay.
-                </p>
+                </p>  
                 <a href="#" className="council-card-btn">
                   <FaPhone /> Contact Office
                 </a>

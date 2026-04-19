@@ -108,11 +108,14 @@ const Login = () => {
           <div className="login-left">
             <div className="login-left-logo">
               <div className="login-left-logo-icon">
-                <FaShieldAlt />
+                <img
+                  src={require('../assets/images/logo.png')}
+                  alt="Barangay Batinguel Logo"
+                />
               </div>
               <div className="login-left-logo-text">
-                <span>Batinguel Unified</span>
                 <span>Barangay Batinguel</span>
+                <span>E-System</span>
               </div>
             </div>
 

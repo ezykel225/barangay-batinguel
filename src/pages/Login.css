@@ -78,12 +78,20 @@
 .login-left-logo-icon {
   width: 48px;
   height: 48px;
-  background-color: rgba(255, 255, 255, 0.15);
-  border-radius: 12px;
+  border-radius: 50%;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
+  background-color: white;
+  padding: 2px;
+}
+
+.login-left-logo-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
 .login-left-logo-text span:first-child {
