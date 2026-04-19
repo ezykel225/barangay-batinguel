@@ -83,7 +83,7 @@ const Home = () => {
           <div className="hero-buttons">
             <Link
               to="/reservation"
-              className="hero-btngit add .-primary">
+              className="hero-btn-primary">
               Book a Reservation
             </Link>
             <Link
