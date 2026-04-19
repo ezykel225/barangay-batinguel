@@ -33,13 +33,11 @@
 .navbar-logo-icon {
   width: 45px;
   height: 45px;
-  background-color: #1e3a8a;
   border-radius: 50%;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
-  font-size: 20px;
 }
 
 .navbar-logo-text {
@@ -69,6 +67,13 @@
   padding: 0;
 }
 
+/* ALL menu list items centered */
+.navbar-menu li {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .navbar-menu a {
   color: #374151;
   text-decoration: none;
@@ -92,12 +97,19 @@
 
 /* Login Button */
 .navbar-login-btn {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
   background-color: #1e3a8a;
   color: white !important;
-  padding: 8px 20px;
-  border-radius: 6px;
+  padding: 8px 20px !important;
+  border-radius: 6px !important;
   font-weight: 600 !important;
+  font-size: 14px !important;
+  text-decoration: none !important;
   border-bottom: none !important;
+  height: 38px !important;
+  line-height: 1 !important;
   transition: background-color 0.2s !important;
 }
 
@@ -143,11 +155,21 @@
 }
 
 .navbar-mobile-login {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
   background-color: #1e3a8a;
   color: white !important;
-  padding: 10px 24px;
-  border-radius: 6px;
+  padding: 10px 24px !important;
+  border-radius: 6px !important;
   font-weight: 600 !important;
+  height: 38px !important;
+  line-height: 1 !important;
+}
+
+.navbar-mobile-login:hover {
+  background-color: #1e40af !important;
+  color: white !important;
 }
 
 .navbar-mobile.open {

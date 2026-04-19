@@ -20,7 +20,10 @@ const Navbar = () => {
         {/* Logo */}
         <Link to="/" className="navbar-logo">
           <div className="navbar-logo-icon">
-            <FaShieldAlt />
+              <img
+              src={require('../assets/images/logo.png')}
+              alt="Barangay Batinguel Logo"
+              />
           </div>
           <div className="navbar-logo-text">
             <span>Barangay Batinguel</span>
