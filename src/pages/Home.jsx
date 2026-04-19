@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import { 
-  FaBullhorn, 
-  FaCalendarAlt, 
+import {
+  FaBullhorn,
+  FaCalendarAlt,
 } from 'react-icons/fa'
 import { MdAnnouncement } from 'react-icons/md'
 import { supabase } from '../supabase/supabaseClient'
