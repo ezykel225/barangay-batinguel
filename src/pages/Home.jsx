@@ -76,7 +76,7 @@ const Home = () => {
           </span>
           <h1>Welcome to Barangay Batinguel</h1>
           <p>
-            Your digital gateway for civic services,
+            Your digital gateway for
             community updates, and neighborhood
             health wellness.
           </p>
