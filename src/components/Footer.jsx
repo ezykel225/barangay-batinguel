@@ -19,7 +19,7 @@ const Footer = () => {
             health wellness.
           </p>
           <div className="footer-socials">
-            <a href="#"><FaFacebook /></a>
+            <a href="https://www.facebook.com/barangaybatinguel2023/"><FaFacebook /></a>
             <a href="#"><FaTwitter /></a>
           </div>
         </div>
@@ -58,7 +58,7 @@ const Footer = () => {
         <div className="footer-links">
           <h4>Socials</h4>
           <ul>
-            <li><a href="#">Facebook</a></li>
+            <li><a href="https://www.facebook.com/barangaybatinguel2023/">Facebook</a></li>
             <li><a href="#">Twitter</a></li>
           </ul>
         </div>
