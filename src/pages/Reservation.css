@@ -1,0 +1,369 @@
+/* ================================
+   RESERVATION PAGE
+================================ */
+
+.reservation-page {
+  min-height: 100vh;
+  background-color: #f8fafc;
+  font-family: 'Poppins', sans-serif;
+}
+
+.reservation-hero {
+  background: linear-gradient(to right,
+      rgba(15, 23, 80, 0.90),
+      rgba(30, 64, 175, 0.65)),
+    url('../assets/images/reservation-bg.jpg');
+  background-size: cover;
+  background-position: center;
+  min-height: 500px;
+  display: flex;
+  align-items: center;
+  padding: 60px 40px;
+  color: white;
+}
+
+.reservation-hero-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.reservation-badge {
+  display: inline-block;
+  padding: 7px 16px;
+  border-radius: 999px;
+  background-color: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 16px;
+  color: white;
+}
+
+.reservation-hero h1 {
+  font-size: 48px;
+  font-weight: 700;
+  line-height: 1.15;
+  margin-bottom: 16px;
+  max-width: 680px;
+}
+
+.reservation-hero p {
+  font-size: 16px;
+  color: #bfdbfe;
+  max-width: 520px;
+  line-height: 1.7;
+}
+
+.reservation-section {
+  padding: 50px 20px;
+}
+
+.reservation-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.reservation-header {
+  margin-bottom: 28px;
+}
+
+.reservation-header h2 {
+  font-size: 28px;
+  color: #1e3a8a;
+  margin-bottom: 8px;
+}
+
+.reservation-header p {
+  color: #64748b;
+  font-size: 14px;
+}
+
+.reservation-grid {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 24px;
+}
+
+.reservation-form-card,
+.reservation-slots-card {
+  background-color: white;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+
+.reservation-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  font-size: 14px;
+  font-family: 'Poppins', sans-serif;
+  outline: none;
+  transition: 0.2s ease;
+  background-color: white;
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+  border-color: #1d4ed8;
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.08);
+}
+
+.reservation-submit-btn {
+  background-color: #1e3a8a;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 14px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.reservation-submit-btn:hover {
+  background-color: #1d4ed8;
+}
+
+.reservation-submit-btn:disabled {
+  background-color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.reservation-slots-card h3 {
+  font-size: 22px;
+  color: #1e3a8a;
+  margin-bottom: 8px;
+}
+
+.slots-note {
+  font-size: 13px;
+  color: #64748b;
+  margin-bottom: 20px;
+}
+
+.slots-empty {
+  padding: 20px;
+  border-radius: 10px;
+  background-color: #f1f5f9;
+  color: #475569;
+  font-size: 14px;
+}
+
+.slots-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.slot-btn {
+  border: 1px solid #cbd5e1;
+  background-color: #eff6ff;
+  color: #1e3a8a;
+  border-radius: 12px;
+  padding: 14px 10px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+}
+
+.slot-btn:hover {
+  transform: translateY(-1px);
+  background-color: #dbeafe;
+}
+
+.slot-btn.selected {
+  background-color: #1e3a8a;
+  color: white;
+  border-color: #1e3a8a;
+}
+
+.slot-btn.reserved {
+  background-color: #e5e7eb;
+  color: #94a3b8;
+  border-color: #d1d5db;
+  cursor: not-allowed;
+  opacity: 0.85;
+  filter: grayscale(100%);
+}
+
+.slot-status {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.slot-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 22px;
+  margin-bottom: 20px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #475569;
+}
+
+.legend-box {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+}
+
+.legend-box.available {
+  background-color: #dbeafe;
+  border: 1px solid #93c5fd;
+}
+
+.legend-box.selected {
+  background-color: #1e3a8a;
+}
+
+.legend-box.reserved {
+  background-color: #d1d5db;
+}
+
+.selected-slot-box {
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 10px;
+}
+
+.selected-slot-box h4 {
+  font-size: 15px;
+  color: #1e293b;
+  margin-bottom: 10px;
+}
+
+.selected-slot-box p {
+  font-size: 14px;
+  color: #475569;
+  margin-bottom: 6px;
+}
+
+.no-slots-box {
+  margin-top: 16px;
+  background-color: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+  padding: 14px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+.payment-box {
+  margin-top: 10px;
+  padding: 18px;
+  border-radius: 14px;
+  background-color: #eff6ff;
+  border: 1px solid #bfdbfe;
+}
+
+.payment-box h3 {
+  font-size: 18px;
+  color: #1e3a8a;
+  margin-bottom: 10px;
+}
+
+.payment-box p {
+  font-size: 14px;
+  color: #334155;
+  margin-bottom: 8px;
+}
+
+.payment-note {
+  font-size: 12px !important;
+  color: #475569 !important;
+  margin-top: 8px;
+}
+
+.residency-box {
+  background-color: #f0fdf4;
+  border: 1px solid #bbf7d0;
+}
+
+.gcash-qr-box {
+  margin: 16px 0;
+  text-align: center;
+  background-color: white;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.gcash-qr-image {
+  width: 220px;
+  max-width: 100%;
+  height: auto;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+}
+
+.gcash-qr-text {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #475569;
+}
+
+@media (max-width: 900px) {
+  .reservation-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .reservation-hero {
+    padding: 42px 20px;
+    min-height: 460px;
+  }
+
+  .reservation-hero h1 {
+    font-size: 34px;
+  }
+}
+
+@media (max-width: 600px) {
+  .slots-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .reservation-form-card,
+  .reservation-slots-card {
+    padding: 18px;
+  }
+}

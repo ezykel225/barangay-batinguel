@@ -1,0 +1,49 @@
+.events-page-section {
+  min-height: 100vh;
+  background: #f8fafc;
+  padding: 50px 20px;
+}
+
+.events-page-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.back-link {
+  display: inline-block;
+  margin-bottom: 20px;
+  color: #1e3a8a;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.events-page-header {
+  margin-bottom: 28px;
+}
+
+.events-page-header h1 {
+  font-size: 30px;
+  color: #1e3a8a;
+  margin-bottom: 8px;
+}
+
+.events-page-header p {
+  color: #64748b;
+  font-size: 14px;
+}
+
+.events-page-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.event-card-link {
+  text-decoration: none;
+}
+
+@media (max-width: 900px) {
+  .events-page-grid {
+    grid-template-columns: 1fr;
+  }
+}

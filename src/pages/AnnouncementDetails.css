@@ -1,0 +1,43 @@
+.announcement-details-section {
+  min-height: 100vh;
+  background: #f8fafc;
+  padding: 50px 20px;
+}
+
+.announcement-details-container {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.back-link {
+  display: inline-block;
+  margin-bottom: 20px;
+  color: #1f3c88;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.announcement-details-card {
+  background: white;
+  border-radius: 16px;
+  padding: 28px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+
+.announcement-details-card h1 {
+  font-size: 30px;
+  color: #1e293b;
+  margin: 12px 0;
+}
+
+.announcement-date {
+  color: #64748b;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.announcement-details-card p {
+  color: #475569;
+  line-height: 1.8;
+  font-size: 15px;
+}

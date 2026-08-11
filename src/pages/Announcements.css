@@ -1,0 +1,49 @@
+.announcements-page-section {
+  min-height: 100vh;
+  background: #f8fafc;
+  padding: 50px 20px;
+}
+
+.announcements-page-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.back-link {
+  display: inline-block;
+  margin-bottom: 20px;
+  color: #1e3a8a;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.announcements-page-header {
+  margin-bottom: 28px;
+}
+
+.announcements-page-header h1 {
+  font-size: 30px;
+  color: #1e3a8a;
+  margin-bottom: 8px;
+}
+
+.announcements-page-header p {
+  color: #64748b;
+  font-size: 14px;
+}
+
+.announcements-page-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.announcement-card-link {
+  text-decoration: none;
+}
+
+@media (max-width: 900px) {
+  .announcements-page-grid {
+    grid-template-columns: 1fr;
+  }
+}
