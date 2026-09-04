@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useState, useEffect } from 'react'
 import {
   FaFileAlt,
   FaEye,
@@ -6,7 +6,6 @@ import {
   FaLock,
   FaPlus,
   FaUser,
-  FaClipboardList,
 } from 'react-icons/fa'
 import { supabase } from '../supabase/supabaseClient'
 import { useAuth } from '../context/AuthContext'
@@ -64,24 +63,16 @@ const ResidentDashboard = () => {
   const [passwordLoading, setPasswordLoading] = useState(false)
   // ──────────────────────────────────────────────────────
 
-  useEffect(() => {
-    if (user?.id) {
-      fetchUserProfile()
-      fetchMyRequests()
-      fetchMyReservations()
-    }
-  }, [user])
-
-  const fetchUserProfile = async () => {
+  const fetchUserProfile = useCallback(async () => {
     const { data } = await supabase
       .from('profiles')
       .select('full_name, contact_number, purok, photo_url, verification_status, verification_notes, id_document_url')
       .eq('id', user.id)
       .single()
     if (data) setUserProfile(data)
-  }
+  }, [user])
 
-  const fetchMyRequests = async () => {
+  const fetchMyRequests = useCallback(async () => {
     setLoading(true)
     const { data, error } = await supabase
       .from('document_requests')
@@ -91,9 +82,9 @@ const ResidentDashboard = () => {
 
     if (!error) setRequests(data || [])
     setLoading(false)
-  }
+  }, [user])
 
-  const fetchMyReservations = async () => {
+  const fetchMyReservations = useCallback(async () => {
     const { data, error } = await supabase
       .from('reservations')
       .select('*')
@@ -101,7 +92,15 @@ const ResidentDashboard = () => {
       .order('preferred_date', { ascending: false })
 
     if (!error) setMyReservations(data || [])
-  }
+  }, [user])
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchUserProfile()
+      fetchMyRequests()
+      fetchMyReservations()
+    }
+  }, [user, fetchUserProfile, fetchMyRequests, fetchMyReservations])
 
   // An item counts as "unseen" once an official has acted on it
   // (moved it past pending) and the resident hasn't opened that tab

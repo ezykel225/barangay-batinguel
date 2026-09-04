@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   FaUserNurse,
   FaChevronRight,
@@ -46,6 +46,8 @@ const healthTips = [
   },
 ]
 
+const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+
 const HealthCenter = () => {
   const [healthEvents, setHealthEvents] = useState([])
   const [loadingNurse, setLoadingNurse] = useState(true)
@@ -54,15 +56,7 @@ const HealthCenter = () => {
   const [weekSchedule, setWeekSchedule] = useState([])
   const [loadingSchedule, setLoadingSchedule] = useState(true)
 
-  const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-
-  useEffect(() => {
-    fetchNurseAvailability()
-    fetchWeekSchedule()
-    fetchHealthEvents()
-  }, [])
-
-  const fetchNurseAvailability = async () => {
+  const fetchNurseAvailability = useCallback(async () => {
     try {
       const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
       const today = days[new Date().getDay()]
@@ -85,11 +79,11 @@ const HealthCenter = () => {
     } finally {
       setLoadingNurse(false)
     }
-  }
+  }, [])
 
   // Pulls the same weekly schedule the nurse edits in her dashboard's
   // Availability tab, so "Clinic Hours" here is never out of sync.
-  const fetchWeekSchedule = async () => {
+  const fetchWeekSchedule = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('nurse_availability')
@@ -106,7 +100,7 @@ const HealthCenter = () => {
     } finally {
       setLoadingSchedule(false)
     }
-  }
+  }, [])
 
   const formatTime = (time) => {
     if (!time) return ''
@@ -117,7 +111,7 @@ const HealthCenter = () => {
     return `${display}${minute !== '00' ? ':' + minute : ''} ${suffix}`
   }
 
-  const fetchHealthEvents = async () => {
+  const fetchHealthEvents = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('health_events')
@@ -130,7 +124,13 @@ const HealthCenter = () => {
     } finally {
       setEventsLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    fetchNurseAvailability()
+    fetchWeekSchedule()
+    fetchHealthEvents()
+  }, [fetchNurseAvailability, fetchWeekSchedule, fetchHealthEvents])
 
   const isAvailable = nurseStatus === 'available'
 
@@ -279,7 +279,6 @@ const HealthCenter = () => {
             <div className="health-bakuna-card">
               <div className="health-card-header">
                 <h4>💉 Bakuna & Health Events</h4>
-                <a href="#">View Full Calendar</a>
               </div>
 
               {eventsLoading ? (

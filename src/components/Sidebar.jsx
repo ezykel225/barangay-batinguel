@@ -22,7 +22,7 @@ import {
 } from 'react-icons/fa'
 import { supabase } from '../supabase/supabaseClient'
 import { useAuth } from '../context/AuthContext'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import './Sidebar.css'
 
@@ -32,11 +32,7 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {} }) => {
   const [profileName, setProfileName] = useState('')
   const [profilePosition, setProfilePosition] = useState('')
 
-  useEffect(() => {
-    if (user?.id) fetchProfile()
-  }, [user])
-
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     const { data: profile } = await supabase
       .from('profiles')
       .select('full_name')
@@ -67,7 +63,11 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {} }) => {
         setProfilePosition('Resident')
       }
     }
-  }
+  }, [user, role])
+
+  useEffect(() => {
+    if (user?.id) fetchProfile()
+  }, [user, fetchProfile])
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut()

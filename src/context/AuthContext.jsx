@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useCallback, useEffect, useState } from 'react'
 import { supabase } from '../supabase/supabaseClient'
 
 const AuthContext = createContext()
@@ -7,6 +7,20 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
   const [role, setRole] = useState(null)
   const [loading, setLoading] = useState(true)
+
+  const fetchRole = useCallback(async (userId) => {
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .single()
+
+      if (data) setRole(data.role)
+    } catch (error) {
+      console.error('Role error:', error)
+    }
+  }, [])
 
   useEffect(() => {
     // IMPORTANT: this used to ALSO call supabase.auth.getSession()
@@ -37,21 +51,7 @@ export const AuthProvider = ({ children }) => {
     )
 
     return () => subscription.unsubscribe()
-  }, [])
-
-  const fetchRole = async (userId) => {
-    try {
-      const { data } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', userId)
-        .single()
-
-      if (data) setRole(data.role)
-    } catch (error) {
-      console.error('Role error:', error)
-    }
-  }
+  }, [fetchRole])
 
   const login = async (email, password) => {
     const { data, error } = await supabase.auth.signInWithPassword({

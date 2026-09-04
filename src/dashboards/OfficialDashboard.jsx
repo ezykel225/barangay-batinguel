@@ -21,6 +21,8 @@ import { PersonAvatar } from '../utils/officialPhotos'
 import '../components/Sidebar.css'
 import './OfficialDashboard.css'
 
+const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
 const OfficialDashboard = () => {
   const { user } = useAuth()
   const [activeTab, setActiveTab] = useState('dashboard')
@@ -494,7 +496,7 @@ const OfficialDashboard = () => {
         toast.error('Only the Secretary can update document requests.')
         return
       }
-      const { error } = await supabase
+      const { data: updated, error } = await supabase
         .from('document_requests')
         .update({
           status,
@@ -503,9 +505,12 @@ const OfficialDashboard = () => {
           ...(notes !== null ? { reviewer_notes: notes } : {}),
         })
         .eq('id', request.id)
+        .select('id')
 
       if (error) {
         toast.error('Failed to update request!')
+      } else if (!updated || updated.length === 0) {
+        toast.error('Nothing was saved — your account may not be linked to the Secretary record. Contact the admin.')
       } else {
         toast.success('Request updated!')
         logActivity({
@@ -701,13 +706,21 @@ const OfficialDashboard = () => {
         toast.error('Only the Treasurer can approve reservations.')
         return
       }
-      const { error } = await supabase
+      const { data: updated, error } = await supabase
         .from('reservations')
         .update({ status: 'approved', reviewed_by: user?.id ?? null, updated_at: new Date().toISOString() })
         .eq('id', reservation.id)
+        .select('id')
 
       if (error) {
         toast.error('Failed to approve reservation!')
+      } else if (!updated || updated.length === 0) {
+        // RLS matched no row, so nothing was written even though the
+        // request itself succeeded. Usually means this account's
+        // profiles.full_name doesn't exactly match its
+        // barangay_officials.full_name, which is what the Treasurer
+        // policy joins on.
+        toast.error('Nothing was saved — your account may not be linked to the Treasurer record. Contact the admin.')
       } else {
         toast.success('Reservation approved!')
         logActivity({
@@ -727,13 +740,16 @@ const OfficialDashboard = () => {
         toast.error('Only the Treasurer can decline reservations.')
         return
       }
-      const { error } = await supabase
+      const { data: updated, error } = await supabase
         .from('reservations')
         .update({ status: 'declined', reviewed_by: user?.id ?? null, updated_at: new Date().toISOString() })
         .eq('id', reservation.id)
+        .select('id')
 
       if (error) {
         toast.error('Failed to decline reservation!')
+      } else if (!updated || updated.length === 0) {
+        toast.error('Nothing was saved — your account may not be linked to the Treasurer record. Contact the admin.')
       } else {
         toast.success('Reservation declined!')
         logActivity({
@@ -750,18 +766,30 @@ const OfficialDashboard = () => {
   const handleUpdateKapitanStatus = async (status) => {
     if (!isKapitan) return
 
-    const { data } = await supabase
+    // maybeSingle() rather than single(): the kapitan_status table can
+    // legitimately be empty on a fresh database, and single() errors
+    // there, leaving data null and the old code dereferencing it.
+    const { data: current, error: fetchError } = await supabase
       .from('kapitan_status')
       .select('id')
-      .single()
+      .maybeSingle()
 
-    const { error } = await supabase
+    if (fetchError || !current) {
+      console.error('Kapitan status row missing:', fetchError)
+      toast.error('No Kapitan status record exists yet. Ask the admin to create one.')
+      return
+    }
+
+    const { data: updated, error } = await supabase
       .from('kapitan_status')
       .update({ status })
-      .eq('id', data.id)
+      .eq('id', current.id)
+      .select('id')
 
     if (error) {
       toast.error('Failed to update status!')
+    } else if (!updated || updated.length === 0) {
+      toast.error('Nothing was saved — you may not have permission to change this.')
     } else {
       setKapitanStatus(status)
       toast.success('Status updated!')
@@ -988,7 +1016,6 @@ const OfficialDashboard = () => {
 
   // ── Reports: derived entirely from data already fetched, so no
   // extra queries are needed for the charts. ──────────────────────
-  const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
   const monthlyCounts = useMemo(() => {
     // Last 6 months, oldest first.

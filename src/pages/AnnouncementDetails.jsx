@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../supabase/supabaseClient'
 import Navbar from '../components/Navbar'
@@ -10,11 +10,7 @@ const AnnouncementDetails = () => {
   const [announcement, setAnnouncement] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    fetchAnnouncement()
-  }, [id])
-
-  const fetchAnnouncement = async () => {
+  const fetchAnnouncement = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('announcements')
@@ -32,7 +28,12 @@ const AnnouncementDetails = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [id])
+
+  useEffect(() => {
+    fetchAnnouncement()
+  }, [fetchAnnouncement])
+
 
   return (
     <div className="announcement-details-page">

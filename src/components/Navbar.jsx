@@ -1,6 +1,6 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
-import { FaBars, FaTimes, FaShieldAlt, FaUser } from 'react-icons/fa'
+import { FaBars, FaTimes, FaUser } from 'react-icons/fa'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../supabase/supabaseClient'
 import './Navbar.css'

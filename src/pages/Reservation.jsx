@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../supabase/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import Navbar from '../components/Navbar'
@@ -20,6 +20,31 @@ const timeSlots = [
 ]
 
 const MAX_DURATION = 4
+
+// The court closes for lunch, so 11:00 AM and 1:00 PM sit next to each
+// other in the list but are NOT consecutive hours. Everything that
+// walks the slot list has to know that, otherwise a 2-hour booking
+// starting at 11 AM silently reserves 11-12 and 1-2 while telling the
+// resident they have the court from 11 to 1.
+const SLOT_HOURS = {
+  '8:00 AM': 8,
+  '9:00 AM': 9,
+  '10:00 AM': 10,
+  '11:00 AM': 11,
+  '1:00 PM': 13,
+  '2:00 PM': 14,
+  '3:00 PM': 15,
+  '4:00 PM': 16,
+  '5:00 PM': 17,
+}
+
+// Renders the true end of a booking (start hour + duration), which is
+// not the same as the start of its last slot.
+const formatHour = (hour24) => {
+  const suffix = hour24 >= 12 ? 'PM' : 'AM'
+  const display = hour24 % 12 === 0 ? 12 : hour24 % 12
+  return `${display}:00 ${suffix}`
+}
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -126,7 +151,11 @@ const Reservation = () => {
     }
   }
 
-  const getCoveredSlots = (startSlot, duration) => {
+  // Walks forward from the start slot, but stops as soon as the next
+  // slot isn't the very next clock hour — so a booking can never span
+  // the lunch closure. A short return means the duration doesn't fit,
+  // which hasConflict() and canFitDuration() both treat as a refusal.
+  const getCoveredSlots = useCallback((startSlot, duration) => {
     const startIndex = slotIndexMap[startSlot]
     const slots = []
 
@@ -134,13 +163,18 @@ const Reservation = () => {
 
     for (let i = 0; i < Number(duration); i++) {
       const slot = timeSlots[startIndex + i]
-      if (slot) {
-        slots.push(slot)
+      if (!slot) break
+
+      if (i > 0) {
+        const previous = timeSlots[startIndex + i - 1]
+        if (SLOT_HOURS[slot] - SLOT_HOURS[previous] !== 1) break
       }
+
+      slots.push(slot)
     }
 
     return slots
-  }
+  }, [slotIndexMap])
 
   const reservedSlots = useMemo(() => {
     const taken = new Set()
@@ -155,14 +189,14 @@ const Reservation = () => {
     })
 
     return taken
-  }, [reservations, slotIndexMap])
+  }, [reservations, getCoveredSlots])
 
   const selectedSlots = useMemo(() => {
     return getCoveredSlots(
       formData.preferred_time,
       formData.duration_hours
     )
-  }, [formData.preferred_time, formData.duration_hours, slotIndexMap])
+  }, [formData.preferred_time, formData.duration_hours, getCoveredSlots])
 
   const availableSlots = useMemo(() => {
     return timeSlots.filter((slot) => !reservedSlots.has(slot))
@@ -198,15 +232,11 @@ const Reservation = () => {
       const dateKey = res.preferred_date
       if (!map[dateKey]) map[dateKey] = new Set()
 
-      const startIndex = timeSlots.indexOf(res.preferred_time)
-      if (startIndex === -1) return
-      for (let i = 0; i < Number(res.duration_hours || 1); i++) {
-        const slot = timeSlots[startIndex + i]
-        if (slot) map[dateKey].add(slot)
-      }
+      getCoveredSlots(res.preferred_time, res.duration_hours || 1)
+        .forEach((slot) => map[dateKey].add(slot))
     })
     return map
-  }, [monthReservations])
+  }, [monthReservations, getCoveredSlots])
 
   const calendarDays = useMemo(() => {
     const firstWeekday = new Date(calendarYear, calendarMonth, 1).getDay()
@@ -261,16 +291,14 @@ const Reservation = () => {
 
   const calculatedEndTime = useMemo(() => {
     if (!selectedSlots.length) return ''
-    return selectedSlots[selectedSlots.length - 1]
+    // The booking runs until the END of its last slot, an hour after
+    // that slot starts — not until the moment the last slot begins.
+    const lastSlot = selectedSlots[selectedSlots.length - 1]
+    return formatHour(SLOT_HOURS[lastSlot] + 1)
   }, [selectedSlots])
 
-  const canFitDuration = (startSlot, duration) => {
-    const startIndex = slotIndexMap[startSlot]
-    if (startIndex === undefined) return false
-
-    const lastIndex = startIndex + Number(duration) - 1
-    return lastIndex < timeSlots.length
-  }
+  const canFitDuration = (startSlot, duration) =>
+    getCoveredSlots(startSlot, duration).length === Number(duration)
 
   const hasConflict = (startSlot, duration) => {
     const slotsToCheck = getCoveredSlots(startSlot, duration)
@@ -310,7 +338,7 @@ const Reservation = () => {
   const handleTimeSelect = (slot) => {
     if (showPaymentStep) return
     if (!canFitDuration(slot, formData.duration_hours)) {
-      toast.error('Selected duration does not fit in the available schedule.')
+      toast.error('That duration does not fit — the court closes for lunch between 12 NN and 1 PM, and the last slot ends at 6 PM.')
       return
     }
 
@@ -383,7 +411,7 @@ const Reservation = () => {
       return
     }
     if (!canFitDuration(formData.preferred_time, formData.duration_hours)) {
-      toast.error('Selected duration does not fit in the available schedule.')
+      toast.error('That duration does not fit — the court closes for lunch between 12 NN and 1 PM, and the last slot ends at 6 PM.')
       return
     }
     if (hasConflict(formData.preferred_time, formData.duration_hours)) {
@@ -403,7 +431,7 @@ const Reservation = () => {
     }
 
     if (!canFitDuration(formData.preferred_time, formData.duration_hours)) {
-      toast.error('Selected duration does not fit in the available schedule.')
+      toast.error('That duration does not fit — the court closes for lunch between 12 NN and 1 PM, and the last slot ends at 6 PM.')
       return
     }
 
@@ -679,6 +707,7 @@ const Reservation = () => {
                       name="preferred_date"
                       value={formData.preferred_date}
                       onChange={handleChange}
+                      min={toDateString(today.getFullYear(), today.getMonth(), today.getDate())}
                       required
                     />
                   </div>
@@ -691,7 +720,7 @@ const Reservation = () => {
                       onChange={handleChange}
                       required
                     >
-                      {[1, 2, 3, 4].map((hour) => (
+                      {Array.from({ length: MAX_DURATION }, (_, i) => i + 1).map((hour) => (
                         <option key={hour} value={hour}>
                           {hour} Hour{hour > 1 ? 's' : ''}
                         </option>
