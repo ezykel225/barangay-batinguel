@@ -1,9 +1,9 @@
 -- ============================================================
 -- Barangay Batinguel E-System — close privilege escalation
 -- ============================================================
--- STATUS: NOT YET APPLIED. Run this against the live project
--- (mpcyqwasurhtdztzobwg) via the SQL Editor, then change this
--- line to record when it was applied.
+-- STATUS: APPLIED to the live project (mpcyqwasurhtdztzobwg) on
+-- 2026-09-04, as migration `close_privilege_escalation`. Both
+-- changes were verified in pg_policies / pg_proc afterwards.
 --
 -- Two holes, both reachable by anyone with the publishable key —
 -- which is embedded in the deployed JS bundle and is public by
@@ -98,7 +98,8 @@ $$;
 --    an approved request's document_type. Worth locking down to
 --    just resident_viewed_at, but it needs a column-level guard
 --    per table and is a bigger change than these two.
--- 2. barangay_officials is still empty. Until it is seeded, no
---    one matches the Treasurer/Secretary/Punong Barangay joins,
---    so reservation approvals, document requests and Kapitan
---    status stay inert regardless of this migration.
+-- 2. barangay_officials has since been seeded with 11 officials,
+--    and every one of them joins cleanly to their profiles row by
+--    full_name — including a Barangay Treasurer, a Barangay
+--    Secretary and a Punong Barangay — so approvals, document
+--    requests and Kapitan status all resolve to a real person.
