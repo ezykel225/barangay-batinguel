@@ -645,7 +645,20 @@ const OfficialDashboard = () => {
       : officialInfo.position
     : ''
 
+  // Texts the resident that their reservation was approved or declined.
+  // A failed text is never allowed to fail the approval itself — the row
+  // is already updated by this point — but the official does need to know
+  // it didn't arrive, otherwise they assume the resident was told and
+  // nobody follows up.
   const notifyResident = async (reservation, status) => {
+    const cannotReach = (reason) => {
+      console.warn('SMS not sent:', reason)
+      toast('Saved, but the text message could not be sent — please contact the resident directly.', {
+        icon: '📵',
+        duration: 6000,
+      })
+    }
+
     try {
       const { data, error } = await supabase.functions.invoke('notify-reservation-sms', {
         body: {
@@ -656,14 +669,19 @@ const OfficialDashboard = () => {
           preferred_time: reservation.preferred_time,
         },
       })
+
       if (error) {
         console.error('SMS notify error:', error)
-      } else if (data?.skipped) {
-        // SMS not configured yet — this is expected until SEMAPHORE_API_KEY is set.
-        console.warn('SMS skipped:', data.reason)
+        cannotReach(error.message || 'the notification service returned an error')
+        return
+      }
+
+      if (data && data.sent === false) {
+        cannotReach(data.reason || 'unknown reason')
       }
     } catch (err) {
       console.error('SMS notify error:', err)
+      cannotReach(err.message || 'the notification service could not be reached')
     }
   }
 
