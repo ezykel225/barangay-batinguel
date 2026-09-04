@@ -1,15 +1,42 @@
-import { Link, useLocation } from 'react-router-dom'
-import { useState } from 'react'
-import { FaBars, FaTimes, FaShieldAlt } from 'react-icons/fa'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { FaBars, FaTimes, FaShieldAlt, FaUser } from 'react-icons/fa'
+import { useAuth } from '../context/AuthContext'
+import { supabase } from '../supabase/supabaseClient'
 import './Navbar.css'
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false)
   const location = useLocation()
+  const navigate = useNavigate()
+  const { user, role, logout } = useAuth()
+  const [residentProfile, setResidentProfile] = useState(null)
+
+  useEffect(() => {
+    if (role === 'resident' && user?.id) {
+      supabase
+        .from('profiles')
+        .select('full_name, photo_url')
+        .eq('id', user.id)
+        .single()
+        .then(({ data }) => {
+          if (data) setResidentProfile(data)
+        })
+    } else {
+      setResidentProfile(null)
+    }
+  }, [role, user])
 
   const toggleMenu = () => {
     setIsOpen(!isOpen)
   }
+
+  const handleLogout = async () => {
+    await logout()
+    navigate('/')
+  }
+
+  const isLoggedInResident = role === 'resident' && !!user
 
   return (
     <nav className="navbar">
@@ -65,13 +92,30 @@ const Navbar = () => {
               Court Reservation
             </Link>
           </li>
-          <li>
-            <Link
-              to="/login"
-              className="navbar-login-btn">
-              Login
-            </Link>
-          </li>
+          {isLoggedInResident ? (
+            <li className="navbar-profile-item">
+              <Link to="/resident" className="navbar-profile-btn">
+                {residentProfile?.photo_url ? (
+                  <img
+                    src={residentProfile.photo_url}
+                    alt={residentProfile.full_name}
+                    className="navbar-profile-photo"
+                  />
+                ) : (
+                  <span className="navbar-profile-icon"><FaUser /></span>
+                )}
+                <span>{residentProfile?.full_name?.split(' ')[0] || 'My Account'}</span>
+              </Link>
+            </li>
+          ) : (
+            <li>
+              <Link
+                to="/login"
+                className="navbar-login-btn">
+                Login
+              </Link>
+            </li>
+          )}
         </ul>
 
         {/* Mobile Toggle Button */}
@@ -106,14 +150,33 @@ const Navbar = () => {
             Court Reservation
           </Link>
         </li>
-        <li>
-          <Link
-            to="/login"
-            onClick={toggleMenu}
-            className="navbar-mobile-login">
-            Login
-          </Link>
-        </li>
+        {isLoggedInResident ? (
+          <>
+            <li>
+              <Link to="/resident" onClick={toggleMenu}>
+                My Account
+              </Link>
+            </li>
+            <li>
+              <button
+                type="button"
+                className="navbar-mobile-login"
+                onClick={() => { toggleMenu(); handleLogout() }}
+              >
+                Logout
+              </button>
+            </li>
+          </>
+        ) : (
+          <li>
+            <Link
+              to="/login"
+              onClick={toggleMenu}
+              className="navbar-mobile-login">
+              Login
+            </Link>
+          </li>
+        )}
       </ul>
 
     </nav>

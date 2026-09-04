@@ -179,6 +179,144 @@
   gap: 12px;
 }
 
+/* ================================
+   AVAILABILITY CALENDAR
+================================ */
+.availability-calendar {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 14px;
+  background-color: #ffffff;
+}
+
+.calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.calendar-month-label {
+  font-weight: 600;
+  font-size: 15px;
+  color: #1f2937;
+}
+
+.calendar-nav-btn {
+  border: 1px solid #e5e7eb;
+  background: white;
+  color: #1e3a8a;
+  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.calendar-nav-btn:hover {
+  background-color: #eff6ff;
+}
+
+.calendar-weekdays,
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.calendar-weekday {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: #9ca3af;
+  padding: 4px 0;
+}
+
+.calendar-cell {
+  aspect-ratio: 1 / 1;
+  border: 1px solid #cbd5e1;
+  background-color: #eff6ff;
+  color: #1e3a8a;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Poppins', sans-serif;
+}
+
+.calendar-cell:hover:not(:disabled) {
+  background-color: #dbeafe;
+}
+
+.calendar-cell.empty {
+  border: none;
+  background: none;
+  cursor: default;
+}
+
+.calendar-cell.partial {
+  background-color: #fef9c3;
+  border-color: #fde68a;
+  color: #854d0e;
+}
+
+.calendar-cell.unavailable {
+  background-color: #e5e7eb;
+  color: #9ca3af;
+  border-color: #d1d5db;
+  cursor: not-allowed;
+  filter: grayscale(100%);
+}
+
+.calendar-cell.selected {
+  background-color: #1e3a8a;
+  color: white;
+  border-color: #1e3a8a;
+}
+
+.calendar-legend {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.calendar-legend span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+.legend-open {
+  background-color: #eff6ff;
+  border: 1px solid #cbd5e1;
+}
+
+.legend-partial {
+  background-color: #fef9c3;
+  border: 1px solid #fde68a;
+}
+
+.legend-full {
+  background-color: #e5e7eb;
+  border: 1px solid #d1d5db;
+}
+
 .slot-btn {
   border: 1px solid #cbd5e1;
   background-color: #eff6ff;

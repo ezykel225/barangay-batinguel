@@ -650,6 +650,12 @@
 
   .health-hero-container {
     flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .health-emergency-card {
+    align-self: stretch;
+    min-width: 0;
   }
 
   .health-main-container {
@@ -666,5 +672,88 @@
 
   .health-main {
     padding: 40px 20px;
+  }
+}
+
+/* Smaller phones — tighten spacing/type further so cards don't feel
+   cramped or force horizontal scroll on ~360-400px wide screens. */
+@media (max-width: 480px) {
+  .health-hero {
+    padding: 32px 16px;
+    min-height: auto;
+  }
+
+  .health-hero-left h1 {
+    font-size: 26px;
+  }
+
+  .health-hero-left p {
+    font-size: 14px;
+  }
+
+  .health-emergency-card {
+    padding: 16px;
+  }
+
+  .health-emergency-card h3 {
+    font-size: 20px;
+  }
+
+  .health-main {
+    padding: 28px 14px;
+  }
+
+  .health-main-container {
+    gap: 20px;
+  }
+
+  .health-status-card,
+  .health-clinic-card,
+  .health-visit-card,
+  .health-bakuna-card,
+  .health-tips-card,
+  .health-quicklinks-card {
+    padding: 16px;
+  }
+
+  .health-card-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .health-card-header h4 {
+    font-size: 15px;
+  }
+
+  .clinic-hours-item {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .visit-option {
+    align-items: center;
+  }
+
+  .quicklink-item {
+    padding: 12px;
+  }
+
+  .quicklink-info h5 {
+    font-size: 12px;
+  }
+
+  .quicklink-info p {
+    font-size: 11px;
+  }
+
+  .status-badge {
+    font-size: 10px;
+    padding: 3px 8px;
+  }
+
+  .health-nurse-avatar {
+    width: 38px;
+    height: 38px;
+    font-size: 15px;
   }
 }

@@ -32,9 +32,11 @@ export const officialPhotos = {
 
 // Renders a photo if one exists for this name, otherwise falls back to
 // the given icon — so officials added later without a photo yet don't
-// break the layout.
-export const PersonAvatar = ({ name, fallbackIcon, className }) => {
-  const photo = officialPhotos[name]
+// break the layout. `photoUrl` (from barangay_officials.photo_url,
+// set via the dashboard's profile photo upload) takes priority over
+// the static bundled photo map above.
+export const PersonAvatar = ({ name, photoUrl, fallbackIcon, className }) => {
+  const photo = photoUrl || officialPhotos[name]
   return photo ? (
     <img src={photo} alt={name} className={className} />
   ) : (

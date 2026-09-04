@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../supabase/supabaseClient'
+import { useAuth } from '../context/AuthContext'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import toast from 'react-hot-toast'
@@ -18,10 +19,18 @@ const timeSlots = [
   '5:00 PM',
 ]
 
-const HOURLY_RATE = 150
 const MAX_DURATION = 4
 
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
+
+const toDateString = (year, month, day) =>
+  `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+
 const Reservation = () => {
+  const { user, role } = useAuth()
   const [formData, setFormData] = useState({
     full_name: '',
     purok: '',
@@ -43,6 +52,14 @@ const Reservation = () => {
   const [fetchingSlots, setFetchingSlots] = useState(false)
   const [showPaymentStep, setShowPaymentStep] = useState(false)
 
+  // Availability calendar: shows which days in the visible month are
+  // fully booked before the resident has to pick a date, instead of
+  // making them guess and check one date at a time.
+  const today = new Date()
+  const [calendarMonth, setCalendarMonth] = useState(today.getMonth())
+  const [calendarYear, setCalendarYear] = useState(today.getFullYear())
+  const [monthReservations, setMonthReservations] = useState([])
+
   const slotIndexMap = useMemo(() => {
     const map = {}
     timeSlots.forEach((slot, index) => {
@@ -58,6 +75,34 @@ const Reservation = () => {
       setReservations([])
     }
   }, [formData.preferred_date])
+
+  // Pre-fill the form for a logged-in resident so they don't have to
+  // retype their own details. Anonymous/non-resident visitors are
+  // completely unaffected — this only runs when a resident session
+  // exists, and only fills fields the person hasn't already touched.
+  useEffect(() => {
+    if (role !== 'resident' || !user?.id) return
+
+    const prefillFromProfile = async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('full_name, contact_number, purok')
+        .eq('id', user.id)
+        .single()
+
+      if (data) {
+        setFormData((prev) => ({
+          ...prev,
+          full_name: prev.full_name || data.full_name || '',
+          contact_number: prev.contact_number || data.contact_number || '',
+          purok: prev.purok || data.purok || '',
+          email: prev.email || user.email || '',
+        }))
+      }
+    }
+
+    prefillFromProfile()
+  }, [role, user])
 
   const fetchReservationsByDate = async (selectedDate) => {
     try {
@@ -80,8 +125,6 @@ const Reservation = () => {
       setFetchingSlots(false)
     }
   }
-
-  const totalAmount = Number(formData.duration_hours) * HOURLY_RATE
 
   const getCoveredSlots = (startSlot, duration) => {
     const startIndex = slotIndexMap[startSlot]
@@ -124,6 +167,97 @@ const Reservation = () => {
   const availableSlots = useMemo(() => {
     return timeSlots.filter((slot) => !reservedSlots.has(slot))
   }, [reservedSlots])
+
+  // Fetch every held slot for the visible month in one request, so the
+  // calendar can mark fully-booked days without one call per day.
+  useEffect(() => {
+    const fetchMonth = async () => {
+      const start = toDateString(calendarYear, calendarMonth, 1)
+      const lastDay = new Date(calendarYear, calendarMonth + 1, 0).getDate()
+      const end = toDateString(calendarYear, calendarMonth, lastDay)
+
+      const { data, error } = await supabase
+        .rpc('get_reservation_slots_range', { p_start: start, p_end: end })
+
+      if (error) {
+        console.error('Fetch month availability error:', error)
+        return
+      }
+      setMonthReservations(data || [])
+    }
+
+    fetchMonth()
+  }, [calendarMonth, calendarYear])
+
+  // How many of the day's slots are still open. A day counts as fully
+  // booked only when every slot is held — partially booked days stay
+  // selectable so people can still grab the remaining hours.
+  const slotsTakenByDate = useMemo(() => {
+    const map = {}
+    monthReservations.forEach((res) => {
+      const dateKey = res.preferred_date
+      if (!map[dateKey]) map[dateKey] = new Set()
+
+      const startIndex = timeSlots.indexOf(res.preferred_time)
+      if (startIndex === -1) return
+      for (let i = 0; i < Number(res.duration_hours || 1); i++) {
+        const slot = timeSlots[startIndex + i]
+        if (slot) map[dateKey].add(slot)
+      }
+    })
+    return map
+  }, [monthReservations])
+
+  const calendarDays = useMemo(() => {
+    const firstWeekday = new Date(calendarYear, calendarMonth, 1).getDay()
+    const daysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate()
+    const todayMidnight = new Date()
+    todayMidnight.setHours(0, 0, 0, 0)
+
+    const cells = []
+    for (let i = 0; i < firstWeekday; i++) cells.push(null)
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = toDateString(calendarYear, calendarMonth, day)
+      const taken = slotsTakenByDate[dateStr]?.size || 0
+      const isPast = new Date(calendarYear, calendarMonth, day) < todayMidnight
+      cells.push({
+        day,
+        dateStr,
+        isPast,
+        isFull: taken >= timeSlots.length,
+        remaining: timeSlots.length - taken,
+      })
+    }
+    return cells
+  }, [calendarYear, calendarMonth, slotsTakenByDate])
+
+  const goToPreviousMonth = () => {
+    if (calendarMonth === 0) {
+      setCalendarMonth(11)
+      setCalendarYear((y) => y - 1)
+    } else {
+      setCalendarMonth((m) => m - 1)
+    }
+  }
+
+  const goToNextMonth = () => {
+    if (calendarMonth === 11) {
+      setCalendarMonth(0)
+      setCalendarYear((y) => y + 1)
+    } else {
+      setCalendarMonth((m) => m + 1)
+    }
+  }
+
+  const handleCalendarDayClick = (cell) => {
+    if (!cell || cell.isPast || cell.isFull) return
+    setFormData((prev) => ({
+      ...prev,
+      preferred_date: cell.dateStr,
+      preferred_time: '',
+    }))
+  }
 
   const calculatedEndTime = useMemo(() => {
     if (!selectedSlots.length) return ''
@@ -210,7 +344,13 @@ const Reservation = () => {
       .from(bucketName)
       .upload(filePath, file)
 
-    if (error) throw error
+    if (error) {
+      // A failed upload here is almost always: the storage bucket
+      // named `reservation-payments` doesn't exist yet, or its policy
+      // doesn't allow anon/public uploads. Check the console for which.
+      console.error('Payment screenshot upload error:', error)
+      throw error
+    }
 
     const { data } = supabase.storage
       .from(bucketName)
@@ -294,7 +434,15 @@ const Reservation = () => {
         .rpc('get_reservation_slots', { p_date: formData.preferred_date })
 
       if (recheckError) {
-        console.error('Slot recheck error:', recheckError)
+        // If this fires, it usually means the get_reservation_slots RPC
+        // function doesn't exist in the connected Supabase project, or
+        // anon/public access to it is blocked — check the message below.
+        console.error('Slot recheck error:', {
+          message: recheckError.message,
+          details: recheckError.details,
+          hint: recheckError.hint,
+          code: recheckError.code,
+        })
         toast.error('Could not verify slot availability. Please try again.')
         setLoading(false)
         return
@@ -341,20 +489,43 @@ const Reservation = () => {
           purpose: formData.purpose,
           additional_notes: formData.additional_notes,
           payment_method: formData.payment_method,
-          payment_reference: formData.payment_reference,
+          payment_reference: formData.payment_reference || null,
           payment_screenshot: paymentScreenshotUrl,
-          payment_status: 'pending_verification',
-          amount: totalAmount,
+          // Nothing was required, so only mark as "pending verification"
+          // if they actually indicated a donation — otherwise this is a
+          // plain free reservation with no donation, not something
+          // awaiting anyone's review.
+          payment_status: (paymentScreenshotUrl || formData.payment_reference) ? 'pending_verification' : 'unpaid',
+          // Amount is left at 0 rather than assuming a rate: the donation
+          // is voluntary, no fixed figure is shown to the resident
+          // anymore, and it may be in-kind rather than cash. The
+          // Treasurer records the actual value when they verify the
+          // proof, instead of the system inventing a number.
+          amount: 0,
           discount_percentage: 0,
           discount_amount: 0,
-          final_amount: totalAmount,
+          final_amount: 0,
           residency_verification_status: 'not_required',
           status: 'pending',
+          // Only set for a logged-in resident so they can see this
+          // booking under "My Reservations" — null for anonymous/
+          // walk-in bookings, which keep working exactly as before.
+          resident_id: role === 'resident' ? user?.id ?? null : null,
         },
       ])
 
       if (error) {
-        console.error('Insert reservation error:', error)
+        // Logged in full (message/details/hint/code) because a failed
+        // insert here is almost always a schema or RLS mismatch between
+        // this form and the live reservations table — the browser
+        // console is the fastest way to see which column or policy
+        // rejected it.
+        console.error('Insert reservation error:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+        })
         toast.error(error.message || 'Failed to submit reservation.')
         return
       }
@@ -540,13 +711,20 @@ const Reservation = () => {
                   </div>
 
                   <div className="payment-box">
-                    <p><strong>Hourly Rate:</strong> ₱{HOURLY_RATE}</p>
-                    <p><strong>Duration:</strong> {formData.duration_hours} hour(s)</p>
-                    <p><strong>Total Amount:</strong> ₱{totalAmount}</p>
+                    <p style={{ fontStyle: 'italic', color: '#374151', marginBottom: 8 }}>
+                      "Ang tunay na yaman ay hindi sa kung ano ang natatanggap,
+                      kundi sa kung ano ang naibabahagi."
+                    </p>
+                    <p style={{ fontSize: 13, color: '#6b7280' }}>
+                      This covered court is free to use. Any donation — big or small,
+                      in cash or in kind — helps keep it clean and well-maintained for
+                      every family in the barangay. Giving is completely optional and
+                      won't affect whether your reservation is approved.
+                    </p>
                   </div>
 
                   <button type="submit" className="reservation-submit-btn">
-                    Continue to Payment →
+                    Continue →
                   </button>
                 </form>
               ) : (
@@ -560,8 +738,13 @@ const Reservation = () => {
                   </div>
 
                   <div className="payment-box">
-                    <h3>GCash Payment</h3>
-                    <p><strong>Amount to Pay:</strong> ₱{totalAmount}</p>
+                    <h3>Optional Donation</h3>
+                    <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 12 }}>
+                      This court is free to reserve. If you'd like to support its
+                      upkeep, any donation — cash via GCash, or something in kind —
+                      is appreciated but entirely optional. You can skip this and
+                      submit your reservation as-is.
+                    </p>
                     <p><strong>GCash Number:</strong> 09XX XXX XXXX</p>
                     <p><strong>Account Name:</strong> Barangay Batinguel</p>
 
@@ -572,29 +755,28 @@ const Reservation = () => {
                         className="gcash-qr-image"
                       />
                       <p className="gcash-qr-text">
-                        Scan this QR code using GCash to pay ₱{totalAmount}, then fill in the details below.
+                        If donating via GCash, you can scan this QR code, then fill
+                        in the details below. Not donating? Just leave these blank.
                       </p>
                     </div>
 
                     <div className="form-group">
-                      <label>Payment Reference Number</label>
+                      <label>Donation Details (optional)</label>
                       <input
                         type="text"
                         name="payment_reference"
                         value={formData.payment_reference}
                         onChange={handleChange}
-                        placeholder="Enter GCash reference number"
-                        required
+                        placeholder="GCash reference number, or describe an in-kind donation (e.g. snacks, cleaning supplies)"
                       />
                     </div>
 
                     <div className="form-group">
-                      <label>Upload Payment Screenshot</label>
+                      <label>Upload Proof (optional, if donating via GCash)</label>
                       <input
                         type="file"
                         accept="image/*"
                         onChange={handlePaymentFileChange}
-                        required
                       />
                     </div>
                   </div>
@@ -621,14 +803,68 @@ const Reservation = () => {
             </div>
 
             <div className="reservation-slots-card">
-              <h3>Available Time Slots</h3>
+              <h3>Check Availability</h3>
+              <p className="slots-note">
+                Grayed-out dates are fully booked. Pick an open date to see its time slots.
+              </p>
+
+              <div className="availability-calendar">
+                <div className="calendar-header">
+                  <button type="button" onClick={goToPreviousMonth} className="calendar-nav-btn">‹</button>
+                  <span className="calendar-month-label">
+                    {MONTH_NAMES[calendarMonth]} {calendarYear}
+                  </span>
+                  <button type="button" onClick={goToNextMonth} className="calendar-nav-btn">›</button>
+                </div>
+
+                <div className="calendar-weekdays">
+                  {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((d) => (
+                    <div key={d} className="calendar-weekday">{d}</div>
+                  ))}
+                </div>
+
+                <div className="calendar-grid">
+                  {calendarDays.map((cell, idx) => {
+                    if (!cell) return <div key={`empty-${idx}`} className="calendar-cell empty" />
+                    const isSelected = formData.preferred_date === cell.dateStr
+                    const unavailable = cell.isPast || cell.isFull
+                    return (
+                      <button
+                        key={cell.dateStr}
+                        type="button"
+                        className={`calendar-cell
+                          ${unavailable ? 'unavailable' : ''}
+                          ${isSelected ? 'selected' : ''}
+                          ${!unavailable && cell.remaining < timeSlots.length ? 'partial' : ''}`}
+                        onClick={() => handleCalendarDayClick(cell)}
+                        disabled={unavailable}
+                        title={
+                          cell.isPast ? 'Past date'
+                            : cell.isFull ? 'Fully booked'
+                              : `${cell.remaining} slot${cell.remaining === 1 ? '' : 's'} available`
+                        }
+                      >
+                        {cell.day}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                <div className="calendar-legend">
+                  <span><i className="legend-dot legend-open" /> Open</span>
+                  <span><i className="legend-dot legend-partial" /> Partly booked</span>
+                  <span><i className="legend-dot legend-full" /> Fully booked</span>
+                </div>
+              </div>
+
+              <h3 style={{ marginTop: 24 }}>Available Time Slots</h3>
               <p className="slots-note">
                 Pending and approved reservations hold their covered slots.
               </p>
 
               {!formData.preferred_date ? (
                 <div className="slots-empty">
-                  Please select a preferred date first.
+                  Select a date above to see its time slots.
                 </div>
               ) : fetchingSlots ? (
                 <div className="slots-empty">
@@ -679,7 +915,6 @@ const Reservation = () => {
                     <p><strong>Start Time:</strong> {formData.preferred_time || 'Not selected'}</p>
                     <p><strong>Covered Slots:</strong> {selectedSlots.length ? selectedSlots.join(', ') : 'Not selected'}</p>
                     <p><strong>Last Covered Slot:</strong> {calculatedEndTime || 'Not selected'}</p>
-                    <p><strong>Amount to Pay:</strong> ₱{totalAmount}</p>
                   </div>
 
                   {availableSlots.length === 0 && (
