@@ -455,28 +455,8 @@
   border: 1px solid #bbf7d0;
 }
 
-.gcash-qr-box {
-  margin: 16px 0;
-  text-align: center;
-  background-color: white;
-  border: 1px solid #dbeafe;
-  border-radius: 12px;
-  padding: 16px;
-}
 
-.gcash-qr-image {
-  width: 220px;
-  max-width: 100%;
-  height: auto;
-  border-radius: 10px;
-  border: 1px solid #cbd5e1;
-}
 
-.gcash-qr-text {
-  margin-top: 10px;
-  font-size: 13px;
-  color: #475569;
-}
 
 @media (max-width: 900px) {
   .reservation-grid {
