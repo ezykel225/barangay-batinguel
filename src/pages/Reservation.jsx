@@ -4,7 +4,6 @@ import { useAuth } from '../context/AuthContext'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import toast from 'react-hot-toast'
-import gcashQr from '../assets/images/gcash-qr.jpg'
 import './Reservation.css'
 
 const timeSlots = [
@@ -67,11 +66,7 @@ const Reservation = () => {
     duration_hours: 1,
     purpose: '',
     additional_notes: '',
-    payment_method: 'GCash',
-    payment_reference: '',
   })
-
-  const [paymentFile, setPaymentFile] = useState(null)
   const [reservations, setReservations] = useState([])
   const [loading, setLoading] = useState(false)
   const [fetchingSlots, setFetchingSlots] = useState(false)
@@ -353,42 +348,9 @@ const Reservation = () => {
     }))
   }
 
-  const handlePaymentFileChange = (e) => {
-    const file = e.target.files?.[0]
-    if (file) setPaymentFile(file)
-  }
 
-  const uploadFile = async (bucketName, file, folderName) => {
-    if (!file) return null
-
-    const fileExt = file.name.split('.').pop()
-    const fileName = `${Date.now()}-${Math.random()
-      .toString(36)
-      .substring(2)}.${fileExt}`
-
-    const filePath = `${folderName}/${fileName}`
-
-    const { error } = await supabase.storage
-      .from(bucketName)
-      .upload(filePath, file)
-
-    if (error) {
-      // A failed upload here is almost always: the storage bucket
-      // named `reservation-payments` doesn't exist yet, or its policy
-      // doesn't allow anon/public uploads. Check the console for which.
-      console.error('Payment screenshot upload error:', error)
-      throw error
-    }
-
-    const { data } = supabase.storage
-      .from(bucketName)
-      .getPublicUrl(filePath)
-
-    return data.publicUrl
-  }
-
-  // Step 1 -> Step 2. The GCash QR code is only revealed here, once the
-  // reservation details are valid, instead of being shown on page load.
+  // Step 1 -> Step 2. Step 2 is a plain review-and-confirm screen; it
+  // is only reached once the reservation details are valid.
   const handleContinueToPayment = () => {
     if (!formData.full_name || !formData.purok || !formData.contact_number || !formData.email) {
       toast.error('Please fill in all your contact details.')
@@ -440,16 +402,6 @@ const Reservation = () => {
       return
     }
 
-    if (!paymentFile) {
-      toast.error('Please upload your payment screenshot.')
-      return
-    }
-
-    if (!formData.payment_reference) {
-      toast.error('Please enter your GCash reference number.')
-      return
-    }
-
     try {
       setLoading(true)
 
@@ -497,12 +449,6 @@ const Reservation = () => {
         return
       }
 
-      const paymentScreenshotUrl = await uploadFile(
-        'reservation-payments',
-        paymentFile,
-        'proofs'
-      )
-
       const { error } = await supabase.from('reservations').insert([
         {
           full_name: formData.full_name,
@@ -516,19 +462,16 @@ const Reservation = () => {
           duration_hours: Number(formData.duration_hours),
           purpose: formData.purpose,
           additional_notes: formData.additional_notes,
-          payment_method: formData.payment_method,
-          payment_reference: formData.payment_reference || null,
-          payment_screenshot: paymentScreenshotUrl,
-          // Nothing was required, so only mark as "pending verification"
-          // if they actually indicated a donation — otherwise this is a
-          // plain free reservation with no donation, not something
-          // awaiting anyone's review.
-          payment_status: (paymentScreenshotUrl || formData.payment_reference) ? 'pending_verification' : 'unpaid',
-          // Amount is left at 0 rather than assuming a rate: the donation
-          // is voluntary, no fixed figure is shown to the resident
-          // anymore, and it may be in-kind rather than cash. The
-          // Treasurer records the actual value when they verify the
-          // proof, instead of the system inventing a number.
+          // Donations are given in person, so nothing about payment is
+          // captured at booking time. The Treasurer records any donation
+          // against the reservation when it is actually handed over.
+          payment_method: null,
+          payment_reference: null,
+          payment_screenshot: null,
+          payment_status: 'unpaid',
+          // Booking is free, so there is no amount to charge. Any
+          // donation happens in person and is recorded by the Treasurer
+          // against the reservation afterwards.
           amount: 0,
           discount_percentage: 0,
           discount_amount: 0,
@@ -573,11 +516,8 @@ const Reservation = () => {
         duration_hours: 1,
         purpose: '',
         additional_notes: '',
-        payment_method: 'GCash',
-        payment_reference: '',
       })
 
-      setPaymentFile(null)
       setReservations([])
       setShowPaymentStep(false)
     } catch (error) {
@@ -611,7 +551,7 @@ const Reservation = () => {
             <h2>Court Reservation Form</h2>
             <p>
               {showPaymentStep
-                ? 'Step 2 of 2 — complete your GCash payment to confirm your booking.'
+                ? 'Step 2 of 2 — review your details and confirm your booking.'
                 : 'Step 1 of 2 — fill in your details and pick a time slot.'}
             </p>
           </div>
@@ -746,9 +686,10 @@ const Reservation = () => {
                     </p>
                     <p style={{ fontSize: 13, color: '#6b7280' }}>
                       This covered court is free to use. Any donation — big or small,
-                      in cash or in kind — helps keep it clean and well-maintained for
-                      every family in the barangay. Giving is completely optional and
-                      won't affect whether your reservation is approved.
+                      in cash or in kind, given in person at the Barangay Hall — helps
+                      keep it clean and well-maintained for every family in the
+                      barangay. Giving is completely optional and won't affect whether
+                      your reservation is approved.
                     </p>
                   </div>
 
@@ -767,47 +708,14 @@ const Reservation = () => {
                   </div>
 
                   <div className="payment-box">
-                    <h3>Optional Donation</h3>
-                    <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 12 }}>
-                      This court is free to reserve. If you'd like to support its
-                      upkeep, any donation — cash via GCash, or something in kind —
-                      is appreciated but entirely optional. You can skip this and
-                      submit your reservation as-is.
+                    <h3>Reserving the Court is Free</h3>
+                    <p style={{ fontSize: 13, color: '#6b7280' }}>
+                      There is nothing to pay and nothing to upload — just submit
+                      your reservation. If you'd like to support the court's
+                      upkeep, donations are welcome in person at the Barangay
+                      Hall, in cash or in kind. Giving is entirely optional and
+                      has no effect on whether your reservation is approved.
                     </p>
-                    <p><strong>GCash Number:</strong> 09XX XXX XXXX</p>
-                    <p><strong>Account Name:</strong> Barangay Batinguel</p>
-
-                    <div className="gcash-qr-box">
-                      <img
-                        src={gcashQr}
-                        alt="GCash QR Code"
-                        className="gcash-qr-image"
-                      />
-                      <p className="gcash-qr-text">
-                        If donating via GCash, you can scan this QR code, then fill
-                        in the details below. Not donating? Just leave these blank.
-                      </p>
-                    </div>
-
-                    <div className="form-group">
-                      <label>Donation Details (optional)</label>
-                      <input
-                        type="text"
-                        name="payment_reference"
-                        value={formData.payment_reference}
-                        onChange={handleChange}
-                        placeholder="GCash reference number, or describe an in-kind donation (e.g. snacks, cleaning supplies)"
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label>Upload Proof (optional, if donating via GCash)</label>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handlePaymentFileChange}
-                      />
-                    </div>
                   </div>
 
                   <div style={{ display: 'flex', gap: 12 }}>
