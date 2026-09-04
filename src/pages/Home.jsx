@@ -1,21 +1,31 @@
 import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import { FaBullhorn, FaCalendarAlt } from 'react-icons/fa'
+import { FaBullhorn, FaCalendarAlt, FaLeaf, FaRecycle, FaTrashAlt } from 'react-icons/fa'
 import { MdAnnouncement } from 'react-icons/md'
 import { supabase } from '../supabase/supabaseClient'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import './Home.css'
 
+const wasteTypeIcon = (type = '') => {
+  const t = type.toLowerCase()
+  if (t.includes('bio')) return <FaLeaf />
+  if (t.includes('recycl')) return <FaRecycle />
+  return <FaTrashAlt />
+}
+
 const Home = () => {
   const [announcements, setAnnouncements] = useState([])
   const [events, setEvents] = useState([])
+  const [wasteSchedule, setWasteSchedule] = useState([])
   const [loadingAnnouncements, setLoadingAnnouncements] = useState(true)
   const [loadingEvents, setLoadingEvents] = useState(true)
+  const [loadingWaste, setLoadingWaste] = useState(true)
 
   useEffect(() => {
     fetchAnnouncements()
     fetchEvents()
+    fetchWasteSchedule()
   }, [])
 
   const fetchAnnouncements = async () => {
@@ -55,6 +65,25 @@ const Home = () => {
       console.error('Fetch events error:', err)
     } finally {
       setLoadingEvents(false)
+    }
+  }
+
+  const fetchWasteSchedule = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('waste_schedule')
+        .select('*')
+        .order('display_order', { ascending: true })
+
+      if (error) {
+        console.error('Waste schedule error:', error)
+      } else {
+        setWasteSchedule(data || [])
+      }
+    } catch (err) {
+      console.error('Fetch waste schedule error:', err)
+    } finally {
+      setLoadingWaste(false)
     }
   }
 
@@ -250,6 +279,55 @@ const Home = () => {
               ))}
             </div>
           )}
+        </div>
+      </section>
+
+      <section className="waste-schedule-section">
+        <div className="section-container">
+          <div className="section-header">
+            <h2>
+              <FaTrashAlt /> Waste Collection Schedule
+            </h2>
+          </div>
+
+          {loadingWaste ? (
+            <div className="loading-text">Loading schedule...</div>
+          ) : wasteSchedule.length === 0 ? (
+            <div className="empty-text">No waste collection schedule has been posted yet.</div>
+          ) : (
+            <div className="waste-schedule-home-grid">
+              {Object.entries(
+                wasteSchedule.reduce((acc, row) => {
+                  const key = row.purok || 'Other'
+                  if (!acc[key]) acc[key] = []
+                  acc[key].push(row)
+                  return acc
+                }, {})
+              ).map(([purok, rows]) => (
+                <div key={purok} className="waste-schedule-home-card">
+                  <h3>{purok}</h3>
+                  {rows.map((row) => (
+                    <div key={row.id} className="waste-schedule-home-row">
+                      <span className="waste-schedule-home-icon">
+                        {wasteTypeIcon(row.waste_type)}
+                      </span>
+                      <div>
+                        <div className="waste-schedule-home-type">{row.waste_type}</div>
+                        <div className="waste-schedule-home-time">
+                          {row.day_of_week}{row.time_label ? ` — ${row.time_label}` : ''}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="waste-schedule-home-notice">
+            Please segregate your waste at source. Uncollected or unsegregated waste
+            may be left behind by collection trucks.
+          </div>
         </div>
       </section>
 

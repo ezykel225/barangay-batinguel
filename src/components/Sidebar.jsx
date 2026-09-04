@@ -7,29 +7,32 @@ import {
   FaClipboardList,
   FaUserTie,
   FaUsers,
+  FaUserFriends,
+  FaAddressBook,
+  FaChartBar,
+  FaHistory,
+  FaFileAlt,
+  FaTrashAlt,
   FaCog,
   FaSignOutAlt,
   FaUser,
   FaHeartbeat,
   FaNotesMedical,
+  FaHome,
 } from 'react-icons/fa'
 import { supabase } from '../supabase/supabaseClient'
 import { useAuth } from '../context/AuthContext'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import './Sidebar.css'
 
-const Sidebar = ({ role, activeTab, setActiveTab }) => {
+const Sidebar = ({ role, activeTab, setActiveTab, badges = {} }) => {
   const navigate = useNavigate()
   const { user } = useAuth()
   const [profileName, setProfileName] = useState('')
   const [profilePosition, setProfilePosition] = useState('')
 
-  useEffect(() => {
-    if (user?.id) fetchProfile()
-  }, [user])
-
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     const { data: profile } = await supabase
       .from('profiles')
       .select('full_name')
@@ -56,9 +59,15 @@ const Sidebar = ({ role, activeTab, setActiveTab }) => {
         }
       } else if (role === 'nurse') {
         setProfilePosition('Public Health Nurse')
+      } else if (role === 'resident') {
+        setProfilePosition('Resident')
       }
     }
-  }
+  }, [user, role])
+
+  useEffect(() => {
+    if (user?.id) fetchProfile()
+  }, [user, fetchProfile])
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut()
@@ -75,8 +84,14 @@ const Sidebar = ({ role, activeTab, setActiveTab }) => {
     { id: 'announcements', label: 'Announcements', icon: <FaBullhorn /> },
     { id: 'events', label: 'Events', icon: <FaCalendarAlt /> },
     { id: 'reservations', label: 'Reservations', icon: <FaClipboardList /> },
+    { id: 'documents', label: 'Document Requests', icon: <FaFileAlt /> },
+    { id: 'waste', label: 'Waste Management', icon: <FaTrashAlt /> },
     { id: 'kapitan', label: 'Kapitan Status', icon: <FaUserTie /> },
     { id: 'officials', label: 'Officials Directory', icon: <FaUsers /> },
+    { id: 'residents', label: 'Residents', icon: <FaUserFriends /> },
+    { id: 'registry', label: 'Residents Registry', icon: <FaAddressBook /> },
+    { id: 'reports', label: 'Reports', icon: <FaChartBar /> },
+    { id: 'activity', label: 'Activity Log', icon: <FaHistory /> },
     { id: 'settings', label: 'Settings', icon: <FaCog /> },
   ]
 
@@ -87,8 +102,22 @@ const Sidebar = ({ role, activeTab, setActiveTab }) => {
     { id: 'settings', label: 'Settings', icon: <FaCog /> },
   ]
 
-  const navItems = role === 'nurse' ? nurseNavItems : officialNavItems
-  const portalName = role === 'nurse' ? 'Health Portal' : 'Official Portal'
+  const residentNavItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: <FaTachometerAlt /> },
+    { id: 'documents', label: 'Document Requests', icon: <FaFileAlt /> },
+    { id: 'reservations', label: 'My Reservations', icon: <FaClipboardList /> },
+    { id: 'settings', label: 'Settings', icon: <FaCog /> },
+  ]
+
+  const navItems =
+    role === 'nurse' ? nurseNavItems
+      : role === 'resident' ? residentNavItems
+        : officialNavItems
+
+  const portalName =
+    role === 'nurse' ? 'Health Portal'
+      : role === 'resident' ? 'Resident Portal'
+        : 'Official Portal'
 
   return (
     <>
@@ -116,8 +145,21 @@ const Sidebar = ({ role, activeTab, setActiveTab }) => {
             >
               {item.icon}
               {item.label}
+              {badges[item.id] > 0 && (
+                <span className="sidebar-nav-badge">{badges[item.id]}</span>
+              )}
             </button>
           ))}
+
+          {role === 'resident' && (
+            <button
+              className="sidebar-nav-item sidebar-nav-home"
+              onClick={() => navigate('/')}
+            >
+              <FaHome />
+              Back to Home
+            </button>
+          )}
         </nav>
 
         <div className="sidebar-footer">
@@ -148,6 +190,9 @@ const Sidebar = ({ role, activeTab, setActiveTab }) => {
             >
               {item.icon}
               <span>{item.label}</span>
+              {badges[item.id] > 0 && (
+                <span className="sidebar-nav-badge mobile-nav-badge">{badges[item.id]}</span>
+              )}
             </button>
           ))}
           <button className="mobile-nav-logout" onClick={handleLogout}>

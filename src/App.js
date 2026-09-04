@@ -9,6 +9,8 @@ import Reservation from './pages/Reservation'
 import HealthCenter from './pages/HealthCenter'
 import Officials from './pages/Officials'
 import Login from './pages/Login'
+import ResidentSignup from './pages/ResidentSignup'
+import ResetPassword from './pages/ResetPassword'
 import Announcements from './pages/Announcements'
 import AnnouncementDetails from './pages/AnnouncementDetails'
 import Events from './pages/Events'
@@ -17,6 +19,7 @@ import EventDetails from './pages/EventDetails'
 // Dashboards
 import OfficialDashboard from './dashboards/OfficialDashboard'
 import NurseDashboard from './dashboards/NurseDashboard'
+import ResidentDashboard from './dashboards/ResidentDashboard'
 
 function App() {
   return (
@@ -30,6 +33,8 @@ function App() {
           <Route path="/health-center" element={<HealthCenter />} />
           <Route path="/officials" element={<Officials />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<ResidentSignup />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
 
           {/* Announcements Routes */}
           <Route path="/announcements" element={<Announcements />} />
@@ -56,6 +61,14 @@ function App() {
             element={
               <ProtectedRoute allowedRole="nurse">
                 <NurseDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/resident"
+            element={
+              <ProtectedRoute allowedRole="resident">
+                <ResidentDashboard />
               </ProtectedRoute>
             }
           />

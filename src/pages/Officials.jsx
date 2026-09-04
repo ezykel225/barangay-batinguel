@@ -3,7 +3,6 @@ import {
   FaUserTie,
   FaUserNurse,
   FaUser,
-  FaFilePdf,
 } from 'react-icons/fa'
 import { MdVerified } from 'react-icons/md'
 import { supabase } from '../supabase/supabaseClient'
@@ -231,7 +230,6 @@ const Officials = () => {
             <div className="kapitan-right">
               <h4>
                 Consultation Schedule
-                <a href="#"><FaFilePdf /> Download PDF</a>
               </h4>
               {loadingSchedule ? (
                 <p style={{ fontSize: '13px', color: '#6b7280' }}>
@@ -283,6 +281,7 @@ const Officials = () => {
                     <div className="council-card-image">
                       <PersonAvatar
                         name={punong.full_name}
+                        photoUrl={punong.photo_url}
                         fallbackIcon={<FaUserTie />}
                         className="council-card-photo"
                       />
@@ -306,6 +305,7 @@ const Officials = () => {
                       <div className="council-card-image">
                         <PersonAvatar
                           name={official.full_name}
+                          photoUrl={official.photo_url}
                           fallbackIcon={<FaUser />}
                           className="council-card-photo"
                         />
@@ -331,6 +331,7 @@ const Officials = () => {
                       <div className="council-small-avatar">
                         <PersonAvatar
                           name={member.full_name}
+                          photoUrl={member.photo_url}
                           fallbackIcon={getIcon(member.position)}
                           className="council-small-photo"
                         />

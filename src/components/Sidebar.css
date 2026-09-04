@@ -105,6 +105,40 @@
   flex-shrink: 0;
 }
 
+.sidebar-nav-badge {
+  margin-left: auto;
+  background-color: #dc2626;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+}
+
+.mobile-nav-badge {
+  position: absolute;
+  top: 2px;
+  right: 8px;
+  margin-left: 0;
+}
+
+.sidebar-nav-home {
+  margin-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  padding-top: 20px;
+  color: #93c5fd;
+}
+
+.sidebar-nav-home:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
 .sidebar-nav-divider {
   height: 1px;
   background-color: rgba(255, 255, 255, 0.1);
@@ -393,6 +427,12 @@
   color: #dc2626;
 }
 
+.role-restricted-note {
+  font-size: 11px;
+  color: #9ca3af;
+  font-style: italic;
+}
+
 .badge-in-office {
   background-color: #dcfce7;
   color: #16a34a;
@@ -406,6 +446,16 @@
 .badge-unavailable {
   background-color: #fee2e2;
   color: #dc2626;
+}
+
+.badge-ready {
+  background-color: #dbeafe;
+  color: #1d4ed8;
+}
+
+.badge-claimed {
+  background-color: #e5e7eb;
+  color: #4b5563;
 }
 
 /* Action Buttons */
@@ -462,6 +512,15 @@
 
 .btn-add:hover {
   background-color: #1e40af;
+}
+
+.btn-add:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.btn-add:disabled:hover {
+  background-color: #9ca3af;
 }
 
 /* Kapitan Status */
@@ -637,6 +696,7 @@
   transition: all 0.2s;
   font-family: 'Poppins', sans-serif;
   min-width: 60px;
+  position: relative;
 }
 
 .mobile-nav-item.active {

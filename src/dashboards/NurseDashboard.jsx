@@ -25,6 +25,10 @@ const NurseDashboard = () => {
   const [nurseStatus, setNurseStatus] = useState('available')
   const [savingStatus, setSavingStatus] = useState(false)
   const [healthEventFilter, setHealthEventFilter] = useState('all')
+  // Guards Save/Add modal actions against double-fires from fast repeated
+  // clicks (this is what caused entries to silently duplicate or the
+  // Bakuna Calendar to look like it "didn't save").
+  const [submitting, setSubmitting] = useState(false)
 
   const nurseName = 'Maria Elena R. Santos, RN'
 
@@ -126,31 +130,40 @@ const NurseDashboard = () => {
   }
 
   const handleAddEvent = async () => {
+    if (submitting) return
     if (!newEvent.title || !newEvent.event_date) {
       toast.error('Please fill in all required fields!')
       return
     }
-    const date = new Date(newEvent.event_date)
-    const month = date.toLocaleString('en-US', { month: 'short' }).toUpperCase()
-    const day = String(date.getDate()).padStart(2, '0')
+    setSubmitting(true)
+    try {
+      const date = new Date(newEvent.event_date)
+      const month = date.toLocaleString('en-US', { month: 'short' }).toUpperCase()
+      const day = String(date.getDate()).padStart(2, '0')
 
-    const { error } = await supabase.from('health_events').insert([{
-      title: newEvent.title,
-      description: newEvent.description,
-      event_date: newEvent.event_date,
-      event_month: month,
-      event_day: day,
-      location: newEvent.location,
-      target_audience: newEvent.target_audience,
-    }])
+      const { error } = await supabase.from('health_events').insert([{
+        title: newEvent.title,
+        description: newEvent.description,
+        event_date: newEvent.event_date,
+        event_month: month,
+        event_day: day,
+        location: newEvent.location,
+        target_audience: newEvent.target_audience,
+      }])
 
-    if (error) {
-      toast.error('Failed to add health event!')
-    } else {
-      toast.success('Health event added!')
-      setShowEventModal(false)
-      setNewEvent({ title: '', description: '', event_date: '', location: '', target_audience: '' })
-      fetchHealthEvents()
+      if (error) {
+        console.error('Add health event error:', error)
+        toast.error(error.message || 'Failed to add health event!')
+      } else {
+        toast.success('Health event added!')
+        setShowEventModal(false)
+        setNewEvent({ title: '', description: '', event_date: '', location: '', target_audience: '' })
+        // Re-fetch immediately so the calendar reflects the new entry
+        // right away instead of waiting for the next natural refresh.
+        await fetchHealthEvents()
+      }
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -191,42 +204,48 @@ const NurseDashboard = () => {
   }
 
   const handleSaveAvailability = async () => {
+    if (submitting) return
     if (!newAvailability.day_of_week || !newAvailability.time_start || !newAvailability.time_end) {
       toast.error('Please fill in all fields!')
       return
     }
 
-    if (editingAvail) {
-      // UPDATE existing record
-      const { error } = await supabase
-        .from('nurse_availability')
-        .update({
-          time_start: newAvailability.time_start,
-          time_end: newAvailability.time_end,
-          status: newAvailability.status,
-        })
-        .eq('id', editingAvail.id)
+    setSubmitting(true)
+    try {
+      if (editingAvail) {
+        // UPDATE existing record
+        const { error } = await supabase
+          .from('nurse_availability')
+          .update({
+            time_start: newAvailability.time_start,
+            time_end: newAvailability.time_end,
+            status: newAvailability.status,
+          })
+          .eq('id', editingAvail.id)
 
-      if (error) {
-        toast.error('Failed to update availability!')
+        if (error) {
+          toast.error('Failed to update availability!')
+        } else {
+          toast.success('Availability updated!')
+          setShowAvailabilityModal(false)
+          fetchNurseAvailability()
+        }
       } else {
-        toast.success('Availability updated!')
-        setShowAvailabilityModal(false)
-        fetchNurseAvailability()
-      }
-    } else {
-      // INSERT new record
-      const { error } = await supabase
-        .from('nurse_availability')
-        .insert([{ ...newAvailability, nurse_name: nurseName }])
+        // INSERT new record
+        const { error } = await supabase
+          .from('nurse_availability')
+          .insert([{ ...newAvailability, nurse_name: nurseName }])
 
-      if (error) {
-        toast.error('Failed to add availability!')
-      } else {
-        toast.success('Availability added!')
-        setShowAvailabilityModal(false)
-        fetchNurseAvailability()
+        if (error) {
+          toast.error('Failed to add availability!')
+        } else {
+          toast.success('Availability added!')
+          setShowAvailabilityModal(false)
+          fetchNurseAvailability()
+        }
       }
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -266,49 +285,55 @@ const NurseDashboard = () => {
   }
 
   const handleSaveProgram = async () => {
+    if (submitting) return
     if (!newProgram.title || !newProgram.schedule_label || !newProgram.time_label) {
       toast.error('Please fill in all fields!')
       return
     }
 
-    if (editingProgram) {
-      const { error } = await supabase
-        .from('medical_programs')
-        .update({
+    setSubmitting(true)
+    try {
+      if (editingProgram) {
+        const { error } = await supabase
+          .from('medical_programs')
+          .update({
+            title: newProgram.title,
+            schedule_label: newProgram.schedule_label,
+            time_label: newProgram.time_label,
+            display_order: Number(newProgram.display_order) || 0,
+            updated_by: user?.id ?? null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', editingProgram.id)
+
+        if (error) {
+          toast.error('Failed to update program!')
+        } else {
+          toast.success('Program updated!')
+          setShowProgramModal(false)
+          fetchMedicalPrograms()
+        }
+      } else {
+        const { error } = await supabase.from('medical_programs').insert([{
           title: newProgram.title,
           schedule_label: newProgram.schedule_label,
           time_label: newProgram.time_label,
           display_order: Number(newProgram.display_order) || 0,
           updated_by: user?.id ?? null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', editingProgram.id)
+        }])
 
-      if (error) {
-        toast.error('Failed to update program!')
-      } else {
-        toast.success('Program updated!')
-        setShowProgramModal(false)
-        fetchMedicalPrograms()
+        if (error) {
+          toast.error('Failed to add program!')
+        } else {
+          toast.success('Program added!')
+          setShowProgramModal(false)
+          fetchMedicalPrograms()
+        }
       }
-    } else {
-      const { error } = await supabase.from('medical_programs').insert([{
-        title: newProgram.title,
-        schedule_label: newProgram.schedule_label,
-        time_label: newProgram.time_label,
-        display_order: Number(newProgram.display_order) || 0,
-        updated_by: user?.id ?? null,
-      }])
-
-      if (error) {
-        toast.error('Failed to add program!')
-      } else {
-        toast.success('Program added!')
-        setShowProgramModal(false)
-        fetchMedicalPrograms()
-      }
+      setEditingProgram(null)
+    } finally {
+      setSubmitting(false)
     }
-    setEditingProgram(null)
   }
 
   const handleDeleteProgram = async (id) => {
@@ -744,7 +769,9 @@ const NurseDashboard = () => {
             ))}
             <div className="modal-buttons">
               <button className="btn-cancel" onClick={() => setShowEventModal(false)}>Cancel</button>
-              <button className="btn-save" onClick={handleAddEvent}>Save Event</button>
+              <button className="btn-save" onClick={handleAddEvent} disabled={submitting}>
+                {submitting ? 'Saving...' : 'Save Event'}
+              </button>
             </div>
           </div>
         </div>
@@ -808,8 +835,8 @@ const NurseDashboard = () => {
 
             <div className="modal-buttons">
               <button className="btn-cancel" onClick={() => setShowAvailabilityModal(false)}>Cancel</button>
-              <button className="btn-save" onClick={handleSaveAvailability}>
-                {editingAvail ? 'Update' : 'Save'}
+              <button className="btn-save" onClick={handleSaveAvailability} disabled={submitting}>
+                {submitting ? 'Saving...' : editingAvail ? 'Update' : 'Save'}
               </button>
             </div>
           </div>
@@ -841,8 +868,8 @@ const NurseDashboard = () => {
             ))}
             <div className="modal-buttons">
               <button className="btn-cancel" onClick={() => { setShowProgramModal(false); setEditingProgram(null) }}>Cancel</button>
-              <button className="btn-save" onClick={handleSaveProgram}>
-                {editingProgram ? 'Update Program' : 'Save Program'}
+              <button className="btn-save" onClick={handleSaveProgram} disabled={submitting}>
+                {submitting ? 'Saving...' : editingProgram ? 'Update Program' : 'Save Program'}
               </button>
             </div>
           </div>
