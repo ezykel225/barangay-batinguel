@@ -38,6 +38,23 @@ const RESERVATION_STATUS_LABELS = {
   cancelled: { label: 'Cancelled', className: 'badge-claimed' },
 }
 
+// Today's date in Manila as YYYY-MM-DD. 'en-CA' formats that way, and
+// ISO date strings compare correctly with <, so no Date maths needed.
+//
+// Manila specifically, not the browser's timezone: the database rule
+// uses Asia/Manila, and if a resident's laptop is set to another zone
+// the button and the database would disagree about what "today" is.
+const todayInManila = () =>
+  new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila' }).format(new Date())
+
+// Mirrors the protect_reservation_status trigger: a resident may
+// release a booking that is still pending or already approved, as long
+// as its date hasn't passed. The database enforces this for real -- this
+// only decides whether to show a button that would work.
+const canCancel = (r) =>
+  (r.status === 'pending' || r.status === 'approved') &&
+  r.preferred_date >= todayInManila()
+
 const ResidentDashboard = () => {
   const { user } = useAuth()
   const [activeTab, setActiveTab] = useState('dashboard')
@@ -202,6 +219,15 @@ const ResidentDashboard = () => {
 
   const handleCancelReservation = async (reservation) => {
     if (cancellingId) return
+
+    // Releasing an approved booking loses a slot the resident waited
+    // for, so a misclick shouldn't do it silently.
+    const ok = window.confirm(
+      `Cancel your booking for ${reservation.preferred_date} at ${reservation.preferred_time}?\n\n` +
+      'The slot will be released for someone else. Booking again means waiting for approval again.'
+    )
+    if (!ok) return
+
     setCancellingId(reservation.id)
     try {
       const { error } = await supabase
@@ -588,7 +614,7 @@ const ResidentDashboard = () => {
                             {r.payment_status && r.payment_status !== 'unpaid' ? 'Yes, thank you!' : 'None'}
                           </td>
                           <td data-label="Action">
-                            {r.status === 'pending' ? (
+                            {canCancel(r) ? (
                               <button
                                 className="btn-deny"
                                 disabled={cancellingId === r.id}

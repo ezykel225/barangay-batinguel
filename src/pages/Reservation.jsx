@@ -36,6 +36,21 @@ const SLOT_HOURS = {
   '4:00 PM': 16,
   '5:00 PM': 17,
 }
+// The public-facing category for a booking. This appears on the
+// availability calendar for anyone to see, so it can only ever be one
+// of these fixed values -- never anything a resident typed freehand.
+// That's what `purpose` is for, and it stays visible to officials only.
+const ACTIVITY_TYPES = [
+  'Basketball',
+  'Volleyball',
+  'Badminton',
+  'E-sports / Gaming',
+  'Practice / Training',
+  'Meeting / Assembly',
+  'Community Event',
+  'Private Event',
+  'Other',
+]
 
 // Renders the true end of a booking (start hour + duration), which is
 // not the same as the start of its last slot.
@@ -65,6 +80,7 @@ const Reservation = () => {
     preferred_time: '',
     duration_hours: 1,
     purpose: '',
+    activity_type: '',
     additional_notes: '',
   })
   const [reservations, setReservations] = useState([])
@@ -186,6 +202,20 @@ const Reservation = () => {
     return taken
   }, [reservations, getCoveredSlots])
 
+  // Which activity is holding each taken slot, so the slot button can
+  // say "Basketball" instead of just "Reserved". Bookings made before
+  // this feature have no category, so they fall back to "Booked".
+  const slotActivity = useMemo(() => {
+    const map = {}
+    reservations.forEach((reservation) => {
+      getCoveredSlots(reservation.preferred_time, reservation.duration_hours || 1)
+        .forEach((slot) => {
+          map[slot] = reservation.activity_type || 'Booked'
+        })
+    })
+    return map
+  }, [reservations, getCoveredSlots])
+
   const selectedSlots = useMemo(() => {
     return getCoveredSlots(
       formData.preferred_time,
@@ -232,6 +262,24 @@ const Reservation = () => {
     })
     return map
   }, [monthReservations, getCoveredSlots])
+
+  // Distinct activities on each day of the visible month, for the
+  // calendar tooltip. A Set because a day often holds several bookings
+  // of the same kind, and "Basketball, Basketball" reads badly.
+  const activitiesByDate = useMemo(() => {
+    const map = {}
+    monthReservations.forEach((res) => {
+      if (!map[res.preferred_date]) map[res.preferred_date] = new Set()
+      map[res.preferred_date].add(res.activity_type || 'Booked')
+    })
+    return map
+  }, [monthReservations])
+
+  const activityList = (dateStr) => {
+    const activities = activitiesByDate[dateStr]
+    if (!activities || activities.size === 0) return ''
+    return ` — ${[...activities].join(', ')}`
+  }
 
   const calendarDays = useMemo(() => {
     const firstWeekday = new Date(calendarYear, calendarMonth, 1).getDay()
@@ -372,6 +420,10 @@ const Reservation = () => {
       toast.error('Please tell us the purpose of your reservation.')
       return
     }
+    if (!formData.activity_type) {
+      toast.error('Please choose what the court will be used for.')
+      return
+    }
     if (!canFitDuration(formData.preferred_time, formData.duration_hours)) {
       toast.error('That duration does not fit — the court closes for lunch between 12 NN and 1 PM, and the last slot ends at 6 PM.')
       return
@@ -461,6 +513,7 @@ const Reservation = () => {
           end_time: calculatedEndTime,
           duration_hours: Number(formData.duration_hours),
           purpose: formData.purpose,
+          activity_type: formData.activity_type,
           additional_notes: formData.additional_notes,
           // Donations are given in person, so nothing about payment is
           // captured at booking time. The Treasurer records any donation
@@ -515,6 +568,7 @@ const Reservation = () => {
         preferred_time: '',
         duration_hours: 1,
         purpose: '',
+        activity_type: '',
         additional_notes: '',
       })
 
@@ -627,7 +681,24 @@ const Reservation = () => {
                       <option value="non-resident">Non-Resident</option>
                     </select>
                   </div>
-
+                  <div className="form-group">
+                    <label>Type of Activity</label>
+                    <select
+                      name="activity_type"
+                      value={formData.activity_type}
+                      onChange={handleChange}
+                      required
+                    >
+                      <option value="">Select activity</option>
+                      {ACTIVITY_TYPES.map((type) => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
+                    </select>
+                    <p style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>
+                      Shown publicly on the availability calendar so others can see
+                      what the court is booked for. Your name and purpose stay private.
+                    </p>
+                  </div>
                   <div className="form-group">
                     <label>Purpose</label>
                     <input
@@ -705,6 +776,7 @@ const Reservation = () => {
                     <p><strong>Date:</strong> {formData.preferred_date}</p>
                     <p><strong>Time:</strong> {formData.preferred_time} ({formData.duration_hours}h)</p>
                     <p><strong>Purpose:</strong> {formData.purpose}</p>
+                    <p><strong>Activity:</strong> {formData.activity_type}</p>
                   </div>
 
                   <div className="payment-box">
@@ -777,8 +849,8 @@ const Reservation = () => {
                         disabled={unavailable}
                         title={
                           cell.isPast ? 'Past date'
-                            : cell.isFull ? 'Fully booked'
-                              : `${cell.remaining} slot${cell.remaining === 1 ? '' : 's'} available`
+                            : cell.isFull ? `Fully booked${activityList(cell.dateStr)}`
+                              : `${cell.remaining} slot${cell.remaining === 1 ? '' : 's'} available${activityList(cell.dateStr)}`
                         }
                       >
                         {cell.day}
@@ -824,7 +896,7 @@ const Reservation = () => {
                         >
                           {slot}
                           <span className="slot-status">
-                            {isReserved ? 'Reserved' : 'Available'}
+                            {isReserved ? (slotActivity[slot] || 'Reserved') : 'Available'}
                           </span>
                         </button>
                       )
@@ -851,7 +923,7 @@ const Reservation = () => {
                     <p><strong>Date:</strong> {formData.preferred_date || 'Not selected'}</p>
                     <p><strong>Start Time:</strong> {formData.preferred_time || 'Not selected'}</p>
                     <p><strong>Covered Slots:</strong> {selectedSlots.length ? selectedSlots.join(', ') : 'Not selected'}</p>
-                    <p><strong>Last Covered Slot:</strong> {calculatedEndTime || 'Not selected'}</p>
+                    <p><strong>Ends At:</strong> {calculatedEndTime || 'Not selected'}</p>
                   </div>
 
                   {availableSlots.length === 0 && (
