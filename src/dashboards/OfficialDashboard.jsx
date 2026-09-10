@@ -1448,7 +1448,6 @@ const OfficialDashboard = () => {
                         <th>Time</th>
                         <th>Duration</th>
                         <th>Purpose</th>
-                        <th>Donation</th>
                         <th>Submitted</th>
                         <th>Status</th>
                         <th>Action</th>
@@ -1465,30 +1464,6 @@ const OfficialDashboard = () => {
                           <td data-label="Time">{res.preferred_time}</td>
                           <td data-label="Duration">{res.duration_hours}h</td>
                           <td data-label="Purpose">{res.purpose}</td>
-                          <td data-label="Donation">
-                            {res.payment_status === 'unpaid' || !res.payment_status ? (
-                              <span style={{ fontSize: 12, color: '#9ca3af' }}>No donation</span>
-                            ) : (
-                              <span className={`badge badge-${res.payment_status === 'paid' ? 'approved' : res.payment_status === 'rejected' ? 'declined' : 'pending'}`}>
-                                {res.payment_status === 'pending_verification' ? 'pledged' : res.payment_status}
-                              </span>
-                            )}
-                            {res.payment_reference && (
-                              <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
-                                Details: {res.payment_reference}
-                              </div>
-                            )}
-                            {res.payment_screenshot && (
-                              <a
-                                href={res.payment_screenshot}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                style={{ fontSize: 11, color: '#1e3a8a', display: 'block', marginTop: 2 }}
-                              >
-                                View Proof
-                              </a>
-                            )}
-                          </td>
                           <td data-label="Submitted">
                             {res.created_at ? new Date(res.created_at).toLocaleDateString() : '—'}
                           </td>

@@ -515,21 +515,10 @@ const Reservation = () => {
           purpose: formData.purpose,
           activity_type: formData.activity_type,
           additional_notes: formData.additional_notes,
-          // Donations are given in person, so nothing about payment is
-          // captured at booking time. The Treasurer records any donation
-          // against the reservation when it is actually handed over.
-          payment_method: null,
-          payment_reference: null,
-          payment_screenshot: null,
-          payment_status: 'unpaid',
-          // Booking is free, so there is no amount to charge. Any
-          // donation happens in person and is recorded by the Treasurer
-          // against the reservation afterwards.
-          amount: 0,
-          discount_percentage: 0,
-          discount_amount: 0,
-          final_amount: 0,
-          residency_verification_status: 'not_required',
+          // No payment fields are sent, and none exist on the table any
+          // more (migration 006). The court is free to use; donations are
+          // voluntary, handed over in person, and recorded in the
+          // Treasurer's own ledger rather than in this system.
           status: 'pending',
           // Only set for a logged-in resident so they can see this
           // booking under "My Reservations" — null for anonymous/

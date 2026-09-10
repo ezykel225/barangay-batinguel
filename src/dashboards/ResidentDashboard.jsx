@@ -591,7 +591,6 @@ const ResidentDashboard = () => {
                         <th>Time</th>
                         <th>Purpose</th>
                         <th>Status</th>
-                        <th>Donation</th>
                         <th>Action</th>
                       </tr>
                     </thead>
@@ -609,9 +608,6 @@ const ResidentDashboard = () => {
                             <span className={`badge ${RESERVATION_STATUS_LABELS[r.status]?.className || ''}`}>
                               {RESERVATION_STATUS_LABELS[r.status]?.label || r.status}
                             </span>
-                          </td>
-                          <td data-label="Donation">
-                            {r.payment_status && r.payment_status !== 'unpaid' ? 'Yes, thank you!' : 'None'}
                           </td>
                           <td data-label="Action">
                             {canCancel(r) ? (
