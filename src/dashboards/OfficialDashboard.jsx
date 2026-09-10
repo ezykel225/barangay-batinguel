@@ -645,7 +645,20 @@ const OfficialDashboard = () => {
       : officialInfo.position
     : ''
 
+  // Texts the resident that their reservation was approved or declined.
+  // A failed text is never allowed to fail the approval itself — the row
+  // is already updated by this point — but the official does need to know
+  // it didn't arrive, otherwise they assume the resident was told and
+  // nobody follows up.
   const notifyResident = async (reservation, status) => {
+    const cannotReach = (reason) => {
+      console.warn('SMS not sent:', reason)
+      toast('Saved, but the text message could not be sent — please contact the resident directly.', {
+        icon: '📵',
+        duration: 6000,
+      })
+    }
+
     try {
       const { data, error } = await supabase.functions.invoke('notify-reservation-sms', {
         body: {
@@ -656,14 +669,19 @@ const OfficialDashboard = () => {
           preferred_time: reservation.preferred_time,
         },
       })
+
       if (error) {
         console.error('SMS notify error:', error)
-      } else if (data?.skipped) {
-        // SMS not configured yet — this is expected until SEMAPHORE_API_KEY is set.
-        console.warn('SMS skipped:', data.reason)
+        cannotReach(error.message || 'the notification service returned an error')
+        return
+      }
+
+      if (data && data.sent === false) {
+        cannotReach(data.reason || 'unknown reason')
       }
     } catch (err) {
       console.error('SMS notify error:', err)
+      cannotReach(err.message || 'the notification service could not be reached')
     }
   }
 
@@ -1430,7 +1448,6 @@ const OfficialDashboard = () => {
                         <th>Time</th>
                         <th>Duration</th>
                         <th>Purpose</th>
-                        <th>Donation</th>
                         <th>Submitted</th>
                         <th>Status</th>
                         <th>Action</th>
@@ -1447,30 +1464,6 @@ const OfficialDashboard = () => {
                           <td data-label="Time">{res.preferred_time}</td>
                           <td data-label="Duration">{res.duration_hours}h</td>
                           <td data-label="Purpose">{res.purpose}</td>
-                          <td data-label="Donation">
-                            {res.payment_status === 'unpaid' || !res.payment_status ? (
-                              <span style={{ fontSize: 12, color: '#9ca3af' }}>No donation</span>
-                            ) : (
-                              <span className={`badge badge-${res.payment_status === 'paid' ? 'approved' : res.payment_status === 'rejected' ? 'declined' : 'pending'}`}>
-                                {res.payment_status === 'pending_verification' ? 'pledged' : res.payment_status}
-                              </span>
-                            )}
-                            {res.payment_reference && (
-                              <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
-                                Details: {res.payment_reference}
-                              </div>
-                            )}
-                            {res.payment_screenshot && (
-                              <a
-                                href={res.payment_screenshot}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                style={{ fontSize: 11, color: '#1e3a8a', display: 'block', marginTop: 2 }}
-                              >
-                                View Proof
-                              </a>
-                            )}
-                          </td>
                           <td data-label="Submitted">
                             {res.created_at ? new Date(res.created_at).toLocaleDateString() : '—'}
                           </td>
