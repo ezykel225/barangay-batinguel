@@ -37,6 +37,8 @@ const OfficialDashboard = () => {
   const [processingVerificationIds, setProcessingVerificationIds] = useState(new Set())
   const [rejectingResident, setRejectingResident] = useState(null)
   const [rejectNotes, setRejectNotes] = useState('')
+  const [ineligibleResident, setIneligibleResident] = useState(null)
+  const [ineligibleNotes, setIneligibleNotes] = useState('')
   const [decliningRequest, setDecliningRequest] = useState(null)
   const [declineNotes, setDeclineNotes] = useState('')
   const [registryEntries, setRegistryEntries] = useState([])
@@ -471,6 +473,89 @@ const OfficialDashboard = () => {
         setRejectNotes('')
         fetchResidentsList()
       }
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleOpenIneligible = (resident) => {
+    setIneligibleResident(resident)
+    setIneligibleNotes('')
+  }
+
+  // "Not a resident of this barangay" -- a permanent outcome, unlike
+  // Reject, which invites the person to correct something and come
+  // back. The database refuses to let an ineligible account put
+  // itself back in the queue (migration 007).
+  //
+  // The profile row itself is never deleted: an official refused
+  // someone a government service, and that decision has to stay
+  // accountable and reviewable. The uploaded ID is a different
+  // matter -- once someone is established not to be a resident,
+  // there is no longer any purpose for holding a photograph of
+  // their government ID, so it is removed.
+  const handleConfirmIneligible = async () => {
+    if (!ineligibleResident || submitting) return
+    if (!ineligibleNotes.trim()) {
+      toast.error('Please explain why this account is ineligible.')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({
+          verification_status: 'ineligible',
+          verified_by: user?.id ?? null,
+          verified_at: new Date().toISOString(),
+          verification_notes: ineligibleNotes.trim(),
+        })
+        .eq('id', ineligibleResident.id)
+        .select('id')
+
+      if (error) {
+        console.error('Mark ineligible error:', error)
+        toast.error('Failed to mark this account ineligible!')
+        return
+      }
+      // RLS filters rows instead of raising, so a blocked update
+      // would otherwise look like it succeeded.
+      if (!data || data.length === 0) {
+        toast.error('You do not have permission to change this account.')
+        return
+      }
+
+      // Drop the ID image, then clear the column -- in that order, so
+      // a failed delete leaves the path behind to retry rather than
+      // orphaning a file nobody can find any more.
+      if (ineligibleResident.id_document_url) {
+        const { error: removeError } = await supabase.storage
+          .from('id-verification')
+          .remove([ineligibleResident.id_document_url])
+
+        if (removeError) {
+          console.error('ID removal error:', removeError)
+          toast.error('Account marked ineligible, but the ID file could not be deleted.')
+        } else {
+          await supabase
+            .from('profiles')
+            .update({ id_document_url: null })
+            .eq('id', ineligibleResident.id)
+        }
+      }
+
+      toast.success(`${ineligibleResident.full_name} marked ineligible.`)
+      logActivity({
+        action: 'marked ineligible',
+        entityType: 'resident_account',
+        entityId: ineligibleResident.id,
+        subject: ineligibleResident.full_name,
+        details: ineligibleNotes.trim(),
+      })
+      setIneligibleResident(null)
+      setIneligibleNotes('')
+      fetchResidentsList()
     } finally {
       setSubmitting(false)
     }
@@ -1745,12 +1830,15 @@ const OfficialDashboard = () => {
                           <td data-label="Verification">
                             <span className={`badge badge-${
                               resident.verification_status === 'verified' ? 'approved'
-                                : resident.verification_status === 'rejected' ? 'declined'
+                                : resident.verification_status === 'rejected'
+                                  || resident.verification_status === 'ineligible' ? 'declined'
                                   : 'pending'
                             }`}>
                               {resident.verification_status}
                             </span>
-                            {resident.verification_status === 'rejected' && resident.verification_notes && (
+                            {(resident.verification_status === 'rejected'
+                              || resident.verification_status === 'ineligible')
+                              && resident.verification_notes && (
                               <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
                                 {resident.verification_notes}
                               </div>
@@ -1776,16 +1864,28 @@ const OfficialDashboard = () => {
                                 disabled={processingVerificationIds.has(resident.id)}
                                 onClick={() => handleVerifyResident(resident)}
                               >
-                                Verify
+                                {resident.verification_status === 'ineligible' ? 'Reinstate' : 'Verify'}
                               </button>
                             )}
-                            {resident.verification_status !== 'rejected' && (
+                            {resident.verification_status !== 'rejected'
+                              && resident.verification_status !== 'ineligible' && (
                               <button
                                 className="btn-deny"
                                 disabled={processingVerificationIds.has(resident.id)}
                                 onClick={() => handleOpenReject(resident)}
                               >
                                 Reject
+                              </button>
+                            )}
+                            {resident.verification_status !== 'ineligible' && (
+                              <button
+                                className="btn-deny"
+                                style={{ background: '#7f1d1d' }}
+                                disabled={processingVerificationIds.has(resident.id)}
+                                onClick={() => handleOpenIneligible(resident)}
+                                title="Not a resident of this barangay — permanent"
+                              >
+                                Not a Resident
                               </button>
                             )}
                           </td>
@@ -2581,6 +2681,49 @@ const OfficialDashboard = () => {
                 disabled={processingDocRequestIds.has(decliningRequest.id)}
               >
                 {processingDocRequestIds.has(decliningRequest.id) ? 'Declining...' : 'Confirm Decline'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {ineligibleResident && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <h3>Mark {ineligibleResident.full_name} as Not a Resident</h3>
+            <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 8 }}>
+              Use this when the applicant is not a resident of Barangay Batinguel.
+              Unlike Reject, they cannot put themselves back in the queue — only an
+              official can reinstate the account.
+            </p>
+            {ineligibleResident.id_document_url && (
+              <p style={{ fontSize: 12, color: '#b45309', marginBottom: 16 }}>
+                Their uploaded ID will be permanently deleted. The account record and
+                this decision are kept.
+              </p>
+            )}
+
+            <div className="modal-form-group">
+              <label className="modal-form-label">Reason</label>
+              <textarea
+                className="modal-form-textarea"
+                placeholder="e.g. address is in another barangay; not listed in the residents registry"
+                value={ineligibleNotes}
+                onChange={(e) => setIneligibleNotes(e.target.value)}
+              />
+            </div>
+
+            <div className="modal-buttons">
+              <button className="btn-cancel" onClick={() => setIneligibleResident(null)}>
+                Cancel
+              </button>
+              <button
+                className="btn-deny"
+                style={{ background: '#7f1d1d' }}
+                onClick={handleConfirmIneligible}
+                disabled={submitting}
+              >
+                {submitting ? 'Saving...' : 'Confirm'}
               </button>
             </div>
           </div>

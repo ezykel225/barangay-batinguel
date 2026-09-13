@@ -72,6 +72,11 @@ const ResidentDashboard = () => {
     additional_notes: '',
   })
 
+  // ── Settings: My Details ───────────────────────────────
+  // Seeded from the profile once it loads, then owned by the form.
+  const [details, setDetails] = useState(null)
+  const [savingDetails, setSavingDetails] = useState(false)
+
   // ── Settings: Change Password ──────────────────────────
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -86,7 +91,14 @@ const ResidentDashboard = () => {
       .select('full_name, contact_number, purok, photo_url, verification_status, verification_notes, id_document_url')
       .eq('id', user.id)
       .single()
-    if (data) setUserProfile(data)
+    if (data) {
+      setUserProfile(data)
+      setDetails({
+        full_name: data.full_name || '',
+        contact_number: data.contact_number || '',
+        purok: data.purok || '',
+      })
+    }
   }, [user])
 
   const fetchMyRequests = useCallback(async () => {
@@ -311,6 +323,93 @@ const ResidentDashboard = () => {
     }
   }
 
+  // Save name / contact number / purok.
+  //
+  // Until now these were displayed but never editable, so a resident
+  // declined for a misspelled name had no way to correct it -- they
+  // could only re-upload the same ID, and the review loop never
+  // closed.
+  //
+  // Two rules live in the database (migration 007), not here:
+  //   - changing the name on a *verified* account drops it back to
+  //     'pending' automatically, so a name no official ever checked
+  //     cannot sit on a verified account
+  //   - an 'ineligible' account is refused outright
+  // This mirrors both so the resident hears about it beforehand,
+  // rather than being surprised afterwards.
+  const handleSaveDetails = async () => {
+    if (savingDetails || !details) return
+
+    const name = details.full_name.trim()
+    if (!name) {
+      toast.error('Please enter your full name.')
+      return
+    }
+
+    const status = userProfile?.verification_status
+    const nameChanged = name !== (userProfile?.full_name || '')
+
+    if (nameChanged && status === 'verified') {
+      const confirmed = window.confirm(
+        'Changing your name means an official has to check it against your ID again.\n\n' +
+        'Your account will go back to "pending", and you will not be able to request ' +
+        'documents until it has been re-verified.\n\n' +
+        'Continue?'
+      )
+      if (!confirmed) return
+    }
+
+    setSavingDetails(true)
+    try {
+      const payload = {
+        full_name: name,
+        contact_number: details.contact_number.trim() || null,
+        purok: details.purok.trim() || null,
+      }
+
+      // A declined account re-enters the review queue once the
+      // resident has corrected whatever the official objected to.
+      // The trigger permits a resident to set their own status to
+      // 'pending', and to nothing else.
+      if (status === 'rejected') {
+        payload.verification_status = 'pending'
+        payload.verification_notes = null
+      }
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .update(payload)
+        .eq('id', user.id)
+        .select('full_name, contact_number, purok, verification_status, verification_notes')
+
+      if (error) {
+        console.error('Profile save error:', error)
+        toast.error(error.message || 'Could not save your details.')
+        return
+      }
+
+      // RLS filters rows rather than raising, so an update that was
+      // not permitted arrives here as success with nothing changed.
+      // Without this check that reads as a save that worked.
+      if (!data || data.length === 0) {
+        toast.error('Could not save your details. Please try again.')
+        return
+      }
+
+      setUserProfile((prev) => ({ ...prev, ...data[0] }))
+
+      if (nameChanged && status === 'verified') {
+        toast.success('Saved. Your account is pending re-verification.')
+      } else if (status === 'rejected') {
+        toast.success('Saved! Your account is back in the review queue.')
+      } else {
+        toast.success('Details saved!')
+      }
+    } finally {
+      setSavingDetails(false)
+    }
+  }
+
   const handleSubmitRequest = async () => {
     if (submitting) return
     if (userProfile?.verification_status !== 'verified') {
@@ -380,15 +479,28 @@ const ResidentDashboard = () => {
   const readyCount = requests.filter((r) => r.status === 'ready_for_pickup').length
   const isVerified = userProfile?.verification_status === 'verified'
   const isRejected = userProfile?.verification_status === 'rejected'
+  // Terminal: set by an official when the applicant is not a resident
+  // of this barangay at all. Unlike 'rejected' it cannot be cleared by
+  // resubmitting -- the database refuses it (migration 007).
+  const isIneligible = userProfile?.verification_status === 'ineligible'
 
   const VerificationBanner = () => {
     if (isVerified || !userProfile) return null
     return (
-      <div className={`verification-banner ${isRejected ? 'verification-banner-rejected' : ''}`}>
-        {isRejected ? (
+      <div className={`verification-banner ${isRejected || isIneligible ? 'verification-banner-rejected' : ''}`}>
+        {isIneligible ? (
+          <>
+            <strong>This account cannot be verified online.</strong>{' '}
+            {userProfile.verification_notes
+              || 'Our records do not show you as a resident of Barangay Batinguel.'}{' '}
+            If you believe this is a mistake, please visit the Barangay Hall in person and
+            bring a valid ID and proof of residency.
+          </>
+        ) : isRejected ? (
           <>
             <strong>Your ID verification was declined.</strong>{' '}
-            {userProfile.verification_notes || 'Please visit the Barangay Hall for assistance.'}
+            {userProfile.verification_notes || 'Please visit the Barangay Hall for assistance.'}{' '}
+            You can correct your details under Settings and upload a clearer ID.
           </>
         ) : (
           <>
@@ -642,6 +754,75 @@ const ResidentDashboard = () => {
             <div className="dashboard-card" style={{ maxWidth: 480, marginBottom: 20 }}>
               <div className="dashboard-card-header">
                 <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <FaUser style={{ color: '#15803d' }} /> My Details
+                </h3>
+              </div>
+
+              {isIneligible ? (
+                <p style={{ fontSize: 13, color: '#6b7280' }}>
+                  These details can no longer be changed here. Please visit the
+                  Barangay Hall in person.
+                </p>
+              ) : (
+                <>
+                  {isVerified && (
+                    <p style={{ fontSize: 12, color: '#b45309', marginBottom: 14 }}>
+                      Your account is verified. Changing your <strong>name</strong> means an
+                      official has to check it against your ID again, so your account will
+                      return to pending. Your contact number and purok can be updated freely.
+                    </p>
+                  )}
+
+                  <div className="modal-form-group">
+                    <label className="modal-form-label">Full Name</label>
+                    <input
+                      type="text"
+                      className="modal-form-input"
+                      value={details?.full_name ?? ''}
+                      onChange={(e) => setDetails((d) => ({ ...d, full_name: e.target.value }))}
+                      placeholder="Juan Dela Cruz"
+                      disabled={savingDetails}
+                    />
+                  </div>
+
+                  <div className="modal-form-group">
+                    <label className="modal-form-label">Contact Number</label>
+                    <input
+                      type="tel"
+                      className="modal-form-input"
+                      value={details?.contact_number ?? ''}
+                      onChange={(e) => setDetails((d) => ({ ...d, contact_number: e.target.value }))}
+                      placeholder="09171234567"
+                      disabled={savingDetails}
+                    />
+                  </div>
+
+                  <div className="modal-form-group">
+                    <label className="modal-form-label">Purok</label>
+                    <input
+                      type="text"
+                      className="modal-form-input"
+                      value={details?.purok ?? ''}
+                      onChange={(e) => setDetails((d) => ({ ...d, purok: e.target.value }))}
+                      placeholder="Purok 3"
+                      disabled={savingDetails}
+                    />
+                  </div>
+
+                  <button
+                    className="btn-add"
+                    onClick={handleSaveDetails}
+                    disabled={savingDetails || !details}
+                  >
+                    {savingDetails ? 'Saving...' : 'Save Details'}
+                  </button>
+                </>
+              )}
+            </div>
+
+            <div className="dashboard-card" style={{ maxWidth: 480, marginBottom: 20 }}>
+              <div className="dashboard-card-header">
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <FaUser style={{ color: '#15803d' }} /> Profile Photo
                 </h3>
               </div>
@@ -689,9 +870,14 @@ const ResidentDashboard = () => {
                   <FaFileAlt style={{ color: '#15803d' }} /> ID Verification
                 </h3>
               </div>
-              {userProfile?.verification_status === 'verified' ? (
+              {isVerified ? (
                 <p style={{ fontSize: 13, color: '#16a34a' }}>
                   ✓ Your account is verified.
+                </p>
+              ) : isIneligible ? (
+                <p style={{ fontSize: 13, color: '#6b7280' }}>
+                  Uploading another ID will not reopen this account. Please visit the
+                  Barangay Hall in person.
                 </p>
               ) : (
                 <>
