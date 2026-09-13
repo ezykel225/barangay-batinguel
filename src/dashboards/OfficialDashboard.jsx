@@ -39,6 +39,7 @@ const OfficialDashboard = () => {
   const [rejectNotes, setRejectNotes] = useState('')
   const [ineligibleResident, setIneligibleResident] = useState(null)
   const [ineligibleNotes, setIneligibleNotes] = useState('')
+  const [viewingId, setViewingId] = useState(null)
   const [decliningRequest, setDecliningRequest] = useState(null)
   const [declineNotes, setDeclineNotes] = useState('')
   const [registryEntries, setRegistryEntries] = useState([])
@@ -391,7 +392,14 @@ const OfficialDashboard = () => {
       toast.error('Could not load ID image.')
       return
     }
-    window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
+
+    // Shown in a modal rather than window.open(). Two reasons: the
+    // popup runs after an await, so the browser no longer counts it
+    // as click-initiated and blocks it silently — the button simply
+    // did nothing. And a photo of someone's government ID should not
+    // be left sitting in a browser tab or in history; closing the
+    // modal ends it, and the URL expires two minutes later anyway.
+    setViewingId({ resident, url: data.signedUrl })
   }
 
   const withVerificationGuard = async (residentId, action) => {
@@ -2681,6 +2689,42 @@ const OfficialDashboard = () => {
                 disabled={processingDocRequestIds.has(decliningRequest.id)}
               >
                 {processingDocRequestIds.has(decliningRequest.id) ? 'Declining...' : 'Confirm Decline'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {viewingId && (
+        <div className="modal-overlay" onClick={() => setViewingId(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640 }}>
+            <h3>ID — {viewingId.resident.full_name}</h3>
+            <p style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
+              This link expires in 2 minutes. Check that the name and address match
+              what the resident entered.
+            </p>
+            <img
+              src={viewingId.url}
+              alt={`ID submitted by ${viewingId.resident.full_name}`}
+              style={{
+                width: '100%', maxHeight: '60vh', objectFit: 'contain',
+                borderRadius: 8, background: '#f3f4f6',
+              }}
+            />
+            <div className="modal-buttons">
+              {/* A plain anchor, so this one IS click-initiated and
+                  opens normally when an official needs to zoom in. */}
+              <a
+                className="btn-add"
+                href={viewingId.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ textDecoration: 'none' }}
+              >
+                Open full size
+              </a>
+              <button className="btn-cancel" onClick={() => setViewingId(null)}>
+                Close
               </button>
             </div>
           </div>
