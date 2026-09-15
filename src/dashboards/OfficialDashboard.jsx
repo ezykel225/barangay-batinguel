@@ -285,17 +285,38 @@ const OfficialDashboard = () => {
     if (!error) setActivityLog(data || [])
   }
 
-  // Simple case-insensitive substring match on name (and purok when
-  // both are known) — a helper SIGNAL for the official during
-  // verification, not an automatic decision. A no-match doesn't
-  // block anything; the official still decides.
+  // Case-insensitive name lookup against the barangay's own record of
+  // inhabitants. Names only -- purok is shown for comparison but is
+  // deliberately not part of the test, because a resident who has
+  // moved between puroks is still a resident.
+  //
+  // A helper SIGNAL for the official, never an automatic decision. A
+  // match proves only that somebody typed a name that exists, and in
+  // a barangay everyone knows their neighbours' names -- so treating
+  // one as proof of identity would let anyone claim a neighbour's.
+  // The ID and the official settle who the person is; this only says
+  // whether the name is one the barangay already knows.
+  //
+  // Returns { entry, exact } so the two cases can be shown
+  // differently: an exact hit is worth a green badge, a partial one
+  // ("Juan Dela Cruz Jr." against "Juan Dela Cruz", or a bare "Ana"
+  // against "Ana Garcia") is worth a second look, not a tick.
   const findRegistryMatch = (resident) => {
     if (!resident?.full_name) return null
     const nameLower = resident.full_name.trim().toLowerCase()
-    return registryEntries.find((entry) => {
+    if (!nameLower) return null
+
+    const exact = registryEntries.find(
+      (entry) => (entry.full_name || '').trim().toLowerCase() === nameLower
+    )
+    if (exact) return { entry: exact, exact: true }
+
+    const partial = registryEntries.find((entry) => {
       const entryName = (entry.full_name || '').trim().toLowerCase()
-      return entryName === nameLower || entryName.includes(nameLower) || nameLower.includes(entryName)
+      if (!entryName) return false
+      return entryName.includes(nameLower) || nameLower.includes(entryName)
     })
+    return partial ? { entry: partial, exact: false } : null
   }
 
   const handleOpenAddRegistryEntry = () => {
@@ -1827,12 +1848,32 @@ const OfficialDashboard = () => {
                           <td data-label="Contact">{resident.contact_number || '—'}</td>
                           <td data-label="Purok">{resident.purok || '—'}</td>
                           <td data-label="Registry Match">
-                            {registryMatch ? (
-                              <span className="badge badge-approved" title={`Matches: ${registryMatch.full_name} (${registryMatch.purok || 'no purok'})`}>
-                                ✓ Found
+                            {registryMatch?.exact ? (
+                              <span
+                                className="badge badge-approved"
+                                title={`Registry: ${registryMatch.entry.full_name}`
+                                  + ` — ${registryMatch.entry.purok || 'no purok'}`
+                                  + `${registryMatch.entry.household_number ? `, ${registryMatch.entry.household_number}` : ''}`}
+                              >
+                                ✓ In registry
+                              </span>
+                            ) : registryMatch ? (
+                              <span
+                                className="badge badge-pending"
+                                title={`Closest entry: ${registryMatch.entry.full_name}`
+                                  + ` — ${registryMatch.entry.purok || 'no purok'}`
+                                  + `${registryMatch.entry.household_number ? `, ${registryMatch.entry.household_number}` : ''}`
+                                  + '. Not an exact name match — check the ID.'}
+                              >
+                                ~ Similar name
                               </span>
                             ) : (
-                              <span className="badge badge-declined">No match</span>
+                              <span
+                                className="role-restricted-note"
+                                title="This name is not in the barangay's registry. The registry is not complete, so this is not a reason to reject — verify from the ID or in person."
+                              >
+                                Not in registry
+                              </span>
                             )}
                           </td>
                           <td data-label="Verification">
