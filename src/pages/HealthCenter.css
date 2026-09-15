@@ -15,7 +15,7 @@
   background: linear-gradient(to right,
       rgba(15, 23, 80, 0.90),
       rgba(30, 64, 175, 0.65)),
-    url('../assets/images/health-bg.png');
+    url('../assets/images/health-bg.jpg');
   background-size: cover;
   background-position: center;
   min-height: 500px;
