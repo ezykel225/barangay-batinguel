@@ -539,6 +539,24 @@ const Reservation = () => {
           hint: error.hint,
           code: error.code,
         })
+
+        // 23P01 is the exclusion constraint in migration 010 firing:
+        // somebody else's booking already covers one of these hours.
+        // It is the only error here that is a normal outcome rather
+        // than a fault, and it is what the re-check above cannot catch
+        // -- two submissions landing in the same instant both pass that
+        // check, and the database refuses the second one. Postgres's
+        // own wording ("conflicting key value violates exclusion
+        // constraint") means nothing to a resident, so say what
+        // happened and reload the slots so the form shows the truth.
+        if (error.code === '23P01') {
+          toast.error(
+            'Someone else just booked one of those hours. The times below have been refreshed — please pick another slot.'
+          )
+          fetchReservationsByDate(formData.preferred_date)
+          return
+        }
+
         toast.error(error.message || 'Failed to submit reservation.')
         return
       }
