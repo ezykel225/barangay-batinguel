@@ -2,7 +2,22 @@
 -- Barangay Batinguel E-System
 -- 010 — stop two bookings holding the same court hours
 -- ============================================================
--- STATUS: NOT YET APPLIED.
+-- STATUS: APPLIED to the live project (mpcyqwasurhtdztzobwg) on
+-- 2026-09-15 as migration `prevent_overlapping_bookings`.
+--
+-- Verified against live data, each case in a transaction that was
+-- rolled back:
+--   built cleanly over all 21 existing rows            PASS
+--   9 AM 1h refused against an existing 8 AM 2h
+--     ([9,10) conflicts with [8,10))                   PASS
+--   adjacent booking 10 AM after 8 AM 2h accepted      PASS
+--   same slot on a different date accepted             PASS
+--   11 AM and 1 PM both accepted (lunch gap)           PASS
+--   hour rebooked after its holder cancelled           PASS
+--
+-- The four positive cases matter as much as the refusal: a constraint
+-- that rejected everything would pass the overlap test and break every
+-- booking on the site.
 --
 -- WHY
 -- Reservation.jsx re-checks for conflicts immediately before it
