@@ -8,6 +8,7 @@ import {
   FaUser,
 } from 'react-icons/fa'
 import { supabase } from '../supabase/supabaseClient'
+import { pathFromPublicUrl } from '../utils/storagePath'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 import Sidebar from '../components/Sidebar'
@@ -185,6 +186,21 @@ const ResidentDashboard = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
 
+  // Every upload path here builds a fresh timestamped name, so without
+  // this the file being replaced stays in the bucket forever, referenced
+  // by nothing and invisible to any later cleanup. For ID documents that
+  // is a retention problem, not just clutter: photographs of government
+  // IDs accumulating past the purpose they were collected for.
+  //
+  // Never fatal. The upload already succeeded and the profile already
+  // points at the new file; a failed tidy-up is logged, not shown.
+  const removeReplacedFile = async (bucket, previousPath, newPath) => {
+    if (!previousPath || previousPath === newPath) return
+
+    const { error } = await supabase.storage.from(bucket).remove([previousPath])
+    if (error) console.warn(`Could not remove replaced file ${bucket}/${previousPath}:`, error.message)
+  }
+
   const handleAvatarChange = async (e) => {
     const file = e.target.files?.[0]
     if (!file || !user?.id) return
@@ -196,6 +212,7 @@ const ResidentDashboard = () => {
       // Path is prefixed with the resident's own user id — the storage
       // RLS policy requires this exact structure to allow the upload.
       const filePath = `${user.id}/${Date.now()}.${fileExt}`
+      const previousPhotoPath = pathFromPublicUrl(userProfile?.photo_url, 'resident-photos')
 
       const { error: uploadError } = await supabase.storage
         .from('resident-photos')
@@ -223,6 +240,13 @@ const ResidentDashboard = () => {
       }
 
       setUserProfile((prev) => ({ ...prev, photo_url: urlData.publicUrl }))
+
+      // Only now that the row points at the new file is the old one
+      // safe to remove. Doing it in this order means a failed delete
+      // leaves a stray file, while the reverse would leave the profile
+      // pointing at something that no longer exists.
+      await removeReplacedFile('resident-photos', previousPhotoPath, filePath)
+
       toast.success('Profile photo updated!')
     } finally {
       setSubmitting(false)
@@ -282,6 +306,10 @@ const ResidentDashboard = () => {
     try {
       const fileExt = file.name.split('.').pop()
       const filePath = `${user.id}/${Date.now()}.${fileExt}`
+      // A path, not a URL — this column stores the storage path
+      // directly, because the bucket is private and is read through
+      // short-lived signed URLs rather than a public one.
+      const previousIdPath = userProfile?.id_document_url || null
 
       const { error: uploadError } = await supabase.storage
         .from('id-verification')
@@ -317,6 +345,9 @@ const ResidentDashboard = () => {
         verification_status: 'pending',
         verification_notes: null,
       }))
+
+      await removeReplacedFile('id-verification', previousIdPath, filePath)
+
       toast.success('ID uploaded! An official will review it soon.')
     } finally {
       setSubmitting(false)
