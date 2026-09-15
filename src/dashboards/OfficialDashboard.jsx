@@ -764,7 +764,15 @@ const OfficialDashboard = () => {
   // is already updated by this point — but the official does need to know
   // it didn't arrive, otherwise they assume the resident was told and
   // nobody follows up.
-  const notifyResident = async (reservation, status) => {
+  //
+  // Only the reservation id is sent. The Edge Function reads the name,
+  // number, date, time and status from the row itself, so nothing that
+  // reaches the resident's phone comes from this client. That is what
+  // stops anyone holding the publishable key — which ships in this
+  // bundle — from using the function to text arbitrary numbers at the
+  // barangay's expense. The approved/declined wording is decided there
+  // too, from the row's own status, so this no longer passes one.
+  const notifyResident = async (reservation) => {
     const cannotReach = (reason) => {
       console.warn('SMS not sent:', reason)
       toast('Saved, but the text message could not be sent — please contact the resident directly.', {
@@ -775,13 +783,7 @@ const OfficialDashboard = () => {
 
     try {
       const { data, error } = await supabase.functions.invoke('notify-reservation-sms', {
-        body: {
-          contact_number: reservation.contact_number,
-          full_name: reservation.full_name,
-          status,
-          preferred_date: reservation.preferred_date,
-          preferred_time: reservation.preferred_time,
-        },
+        body: { reservation_id: reservation.id },
       })
 
       if (error) {
@@ -861,7 +863,7 @@ const OfficialDashboard = () => {
           entityId: reservation.id,
           subject: `${reservation.full_name} — ${reservation.preferred_date} ${reservation.preferred_time}`,
         })
-        notifyResident(reservation, 'approved')
+        notifyResident(reservation)
         fetchReservations()
       }
     })
@@ -890,7 +892,7 @@ const OfficialDashboard = () => {
           entityId: reservation.id,
           subject: `${reservation.full_name} — ${reservation.preferred_date} ${reservation.preferred_time}`,
         })
-        notifyResident(reservation, 'declined')
+        notifyResident(reservation)
         fetchReservations()
       }
     })
