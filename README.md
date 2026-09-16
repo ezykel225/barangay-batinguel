@@ -95,6 +95,9 @@ Do **not** add `DISABLE_ESLINT_PLUGIN=true`. It was in an earlier `.env`
 and was hiding 14 real warnings, one of them a misplaced block of code
 that would have thrown at runtime.
 
+> New to the project? [`docs/SETUP.md`](docs/SETUP.md) walks through
+> installing Node, cloning, and the traps below in more detail.
+
 ### 3. Run the development server
 
 ```bash
@@ -140,6 +143,16 @@ supabase-migrations/
 there changes nothing — migrations are applied by pasting them into the
 Supabase SQL Editor. Each file's header states whether it has been
 applied, when, and how it was verified.
+
+## Documentation
+
+- [`CLAUDE.md`](CLAUDE.md) — how the system works: roles, the security
+  model, and the decisions that look odd until you know why. Read it
+  before changing anything under `supabase-migrations/`.
+- [`docs/SETUP.md`](docs/SETUP.md) — getting a machine running, and the
+  git workflow.
+- `supabase-migrations/*.sql` — each header records why that change was
+  made and how it was verified.
 
 ## Design decisions
 
