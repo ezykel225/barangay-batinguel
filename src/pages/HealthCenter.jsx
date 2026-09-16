@@ -16,6 +16,10 @@ import {
 import { MdOutlineEventAvailable, MdPersonSearch } from 'react-icons/md'
 import { supabase } from '../supabase/supabaseClient'
 import { MEDICINE_CATEGORIES, statusOf } from '../constants/medicines'
+import { BARANGAY_CONTACT, telHref } from '../constants/barangay'
+import {
+  formatTime, isOnScheduledBreak, manilaWeekday,
+} from '../utils/clinicHours'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import './HealthCenter.css'
@@ -105,14 +109,6 @@ const HealthCenter = () => {
     }
   }, [])
 
-  const formatTime = (time) => {
-    if (!time) return ''
-    const [hour, minute] = time.split(':')
-    const h = parseInt(hour, 10)
-    const suffix = h >= 12 ? 'PM' : 'AM'
-    const display = h > 12 ? h - 12 : h === 0 ? 12 : h
-    return `${display}${minute !== '00' ? ':' + minute : ''} ${suffix}`
-  }
 
   const fetchHealthEvents = useCallback(async () => {
     try {
@@ -183,7 +179,17 @@ const HealthCenter = () => {
     })
   }, [medicines])
 
-  const isAvailable = nurseStatus === 'available'
+  const today = manilaWeekday()
+  const todaySchedule = weekSchedule.find((d) => d.day_of_week === today) || null
+
+  // Two ways of being on break. The scheduled one is worked out from
+  // the clock, so nobody has to remember to press anything at noon;
+  // 'on-break' is the nurse saying so for an unscheduled absence.
+  const onScheduledBreak =
+    todaySchedule?.status === 'available' && isOnScheduledBreak(todaySchedule) === true
+  const onBreakNow = nurseStatus === 'on-break' || onScheduledBreak
+
+  const isAvailable = nurseStatus === 'available' && !onBreakNow
 
   return (
     <div className="health-page">
@@ -223,7 +229,12 @@ const HealthCenter = () => {
 
           <div className="health-emergency-card">
             <p>Emergency Hotline</p>
-            <h3>(+63) 912 345 6789</h3>
+            <h3>
+                <a href={telHref(BARANGAY_CONTACT.landline)}>{BARANGAY_CONTACT.landline}</a>
+              </h3>
+              <h3 style={{ fontSize: '0.95em' }}>
+                <a href={telHref(BARANGAY_CONTACT.mobile)}>{BARANGAY_CONTACT.mobile}</a>
+              </h3>
             <span>Available 24/7</span>
           </div>
         </div>
@@ -269,6 +280,19 @@ const HealthCenter = () => {
             {/* Clinic Hours — pulled live from the nurse's own weekly schedule */}
             <div className="health-clinic-card">
               <h4>Clinic Hours</h4>
+
+              {/* The one line a resident standing outside actually
+                  needs. Shown above the week, because "are they open
+                  right now" beats "what are Thursday's hours". */}
+              {onBreakNow && (
+                <div className="clinic-break-now">
+                  <strong>On lunch break right now.</strong>{' '}
+                  {onScheduledBreak && todaySchedule?.break_end
+                    ? `The clinic reopens at ${formatTime(todaySchedule.break_end)}.`
+                    : 'The nurse has stepped out — please come back shortly.'}
+                </div>
+              )}
+
               {loadingSchedule ? (
                 <p style={{ fontSize: '13px', color: '#6b7280' }}>Loading...</p>
               ) : weekSchedule.length === 0 ? (
@@ -276,20 +300,52 @@ const HealthCenter = () => {
                   Clinic hours have not been set yet.
                 </p>
               ) : (
-                weekSchedule.map((day) => (
-                  <div className="clinic-hours-item" key={day.day_of_week}>
-                    <span className="clinic-hours-day">{day.day_of_week}</span>
-                    {day.status === 'available' && day.time_start && day.time_end ? (
-                      <span className="clinic-hours-time">
-                        {formatTime(day.time_start)} - {formatTime(day.time_end)}
+                weekSchedule.map((day) => {
+                  const isToday = day.day_of_week === today
+                  const open = day.status === 'available' && day.time_start && day.time_end
+                  const hasBreak = Boolean(day.break_start && day.break_end)
+
+                  return (
+                    <div
+                      className={`clinic-hours-item ${isToday ? 'is-today' : ''}`}
+                      key={day.day_of_week}
+                    >
+                      <span className="clinic-hours-day">
+                        {day.day_of_week}
+                        {isToday && <span className="clinic-today-tag">Today</span>}
                       </span>
-                    ) : (
-                      <span className="clinic-hours-closed">
-                        {day.status === 'on-leave' ? 'On Leave' : 'Closed'}
-                      </span>
-                    )}
-                  </div>
-                ))
+
+                      {open ? (
+                        <span className="clinic-hours-time">
+                          {/* Split into two blocks rather than one range,
+                              so the closed hour is visible instead of
+                              implied. */}
+                          {hasBreak ? (
+                            <>
+                              <span className="clinic-hours-block">
+                                {formatTime(day.time_start)} – {formatTime(day.break_start)}
+                              </span>
+                              <span className="clinic-hours-block">
+                                {formatTime(day.break_end)} – {formatTime(day.time_end)}
+                              </span>
+                              <span className="clinic-hours-break">
+                                Lunch {formatTime(day.break_start)} – {formatTime(day.break_end)}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="clinic-hours-block">
+                              {formatTime(day.time_start)} – {formatTime(day.time_end)}
+                            </span>
+                          )}
+                        </span>
+                      ) : (
+                        <span className="clinic-hours-closed">
+                          {day.status === 'on-leave' ? 'On Leave' : 'Closed'}
+                        </span>
+                      )}
+                    </div>
+                  )
+                })
               )}
             </div>
 
@@ -316,7 +372,12 @@ const HealthCenter = () => {
                 </div>
               </div>
               <div className="visit-contact">
-                <span><FaPhoneAlt /> (+63) 912 345 6789</span>
+                <span>
+                  <FaPhoneAlt />{' '}
+                  <a href={telHref(BARANGAY_CONTACT.landline)}>{BARANGAY_CONTACT.landline}</a>
+                  {' · '}
+                  <a href={telHref(BARANGAY_CONTACT.mobile)}>{BARANGAY_CONTACT.mobile}</a>
+                </span>
                 <span><FaMapMarkerAlt /> Barangay Hall, Batinguel</span>
               </div>
             </div>

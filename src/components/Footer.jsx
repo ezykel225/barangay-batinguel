@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { FaFacebook } from 'react-icons/fa'
 import './Footer.css'
+import { BARANGAY_CONTACT, telHref } from '../constants/barangay'
 
 const Footer = () => {
   const [activeModal, setActiveModal] = useState(null)
@@ -13,7 +14,14 @@ const Footer = () => {
         <>
           <p><strong>Address:</strong> Barangay Batinguel, Dumaguete City, Negros Oriental, Philippines</p>
           <p><strong>Office Hours:</strong> Monday - Friday, 8:00 AM - 5:00 PM</p>
-          <p><strong>Contact Number:</strong> +63 XXX XXX XXXX</p>
+          <p>
+            <strong>Landline:</strong>{' '}
+            <a href={telHref(BARANGAY_CONTACT.landline)}>{BARANGAY_CONTACT.landline}</a>
+          </p>
+          <p>
+            <strong>Mobile:</strong>{' '}
+            <a href={telHref(BARANGAY_CONTACT.mobile)}>{BARANGAY_CONTACT.mobile}</a>
+          </p>
           <p><strong>Email Address:</strong> batinguel@dumaguete.gov.ph</p>
 
           <div className="contact-facebook">

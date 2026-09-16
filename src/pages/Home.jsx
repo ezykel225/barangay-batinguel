@@ -3,6 +3,10 @@ import { useEffect, useState } from 'react'
 import { FaBullhorn, FaCalendarAlt, FaLeaf, FaRecycle, FaTrashAlt } from 'react-icons/fa'
 import { MdAnnouncement } from 'react-icons/md'
 import { supabase } from '../supabase/supabaseClient'
+import { BARANGAY_CONTACT, telHref } from '../constants/barangay'
+import {
+  BARANGAY_HISTORY, BARANGAY_PROFILE, BATINGUEL_ELEMENTARY,
+} from '../constants/about'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import './Home.css'
@@ -116,16 +120,16 @@ const Home = () => {
         <div className="about-container">
           <div className="about-content">
             <h2>About Barangay Batinguel</h2>
+
+            <p className="about-lead">{BARANGAY_PROFILE.intro}</p>
+
+            <h3 className="about-subhead">A Brief History</h3>
+            {BARANGAY_HISTORY.map((paragraph) => (
+              <p key={paragraph.slice(0, 32)}>{paragraph}</p>
+            ))}
+
+            <h3 className="about-subhead">Our Mission</h3>
             <p>
-              <strong>Our History</strong>
-              <br />
-              Barangay Batinguel is one of the thriving barangays of
-              Dumaguete City. Our community has grown from a quiet
-              settlement into a thriving community.
-            </p>
-            <p>
-              <strong>Our Mission</strong>
-              <br />
               To provide transparent, efficient, and compassionate public
               service. We are committed to keeping a quality, healthy, and
               digitally-empowered environment where every resident can
@@ -144,6 +148,45 @@ const Home = () => {
               className="about-map-iframe"
               title="Barangay Batinguel Location"
             />
+          </div>
+        </div>
+      </section>
+
+      <section className="barangay-profile">
+        <div className="barangay-profile-container">
+          <div className="profile-card">
+            <h3>Barangay at a Glance</h3>
+            <dl className="profile-facts">
+              {BARANGAY_PROFILE.facts.map((fact) => (
+                <div className="profile-fact" key={fact.label}>
+                  <dt>{fact.label}</dt>
+                  <dd>{fact.value}</dd>
+                </div>
+              ))}
+            </dl>
+
+            <h4 className="profile-subhead">Adjacent Barangays</h4>
+            <ul className="profile-boundaries">
+              {BARANGAY_PROFILE.boundaries.map((edge) => (
+                <li key={edge.direction}>
+                  <span className="boundary-direction">{edge.direction}</span>
+                  <span className="boundary-name">{edge.barangay}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="profile-card">
+            <h3>{BATINGUEL_ELEMENTARY.name}</h3>
+            <p className="profile-description">{BATINGUEL_ELEMENTARY.description}</p>
+            <dl className="profile-facts">
+              {BATINGUEL_ELEMENTARY.facts.map((fact) => (
+                <div className="profile-fact" key={fact.label}>
+                  <dt>{fact.label}</dt>
+                  <dd>{fact.value}</dd>
+                </div>
+              ))}
+            </dl>
           </div>
         </div>
       </section>
@@ -176,7 +219,18 @@ const Home = () => {
             <div className="contact-icon">📞</div>
             <div className="contact-content">
               <h4>Contact Number</h4>
-              <p>+63 XXX XXX XXXX</p>
+              <p>
+                Landline:{' '}
+                <a href={telHref(BARANGAY_CONTACT.landline)}>
+                  {BARANGAY_CONTACT.landline}
+                </a>
+              </p>
+              <p>
+                Mobile:{' '}
+                <a href={telHref(BARANGAY_CONTACT.mobile)}>
+                  {BARANGAY_CONTACT.mobile}
+                </a>
+              </p>
             </div>
           </div>
 
