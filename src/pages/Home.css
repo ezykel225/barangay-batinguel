@@ -585,3 +585,128 @@
     gap: 10px;
   }
 }
+/* ── About: history subheads ─────────────────────────────────── */
+.about-lead {
+  font-size: 15px;
+  line-height: 1.7;
+  color: #374151;
+  margin-bottom: 18px;
+}
+
+.about-subhead {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #15803d;
+  font-weight: 700;
+  margin: 22px 0 8px;
+}
+
+/* ── Barangay profile & school ───────────────────────────────── */
+.barangay-profile {
+  padding: 48px 20px;
+  background: #f9fafb;
+}
+
+.barangay-profile-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: grid;
+  /* auto-fit collapses to one column on a phone without a media
+     query, and the 300px floor stops a card squeezing its labels. */
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.profile-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 26px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.profile-card h3 {
+  font-size: 19px;
+  color: #1e3a8a;
+  margin: 0 0 14px;
+}
+
+.profile-description {
+  font-size: 14px;
+  line-height: 1.7;
+  color: #4b5563;
+  margin: 0 0 18px;
+}
+
+.profile-facts { margin: 0; }
+
+.profile-fact {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 9px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.profile-fact:last-child { border-bottom: none; }
+
+.profile-fact dt {
+  font-size: 13px;
+  color: #6b7280;
+  flex-shrink: 0;
+}
+
+.profile-fact dd {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+  text-align: right;
+}
+
+.profile-subhead {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #15803d;
+  font-weight: 700;
+  margin: 22px 0 10px;
+}
+
+.profile-boundaries {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.profile-boundaries li {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.boundary-direction {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #15803d;
+  font-weight: 700;
+}
+
+.boundary-name { font-size: 13px; color: #374151; }
+
+/* Lunch break sits between the hours and the closed note, styled
+   like a caution rather than a closure — the office reopens. */
+.office-break-text {
+  color: #92400e;
+  font-size: 13px;
+  font-weight: 500;
+}

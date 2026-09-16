@@ -55,6 +55,8 @@ const NurseDashboard = () => {
     day_of_week: '',
     time_start: '',
     time_end: '',
+    break_start: '12:00 PM',
+    break_end: '1:00 PM',
     status: 'available',
   })
 
@@ -189,6 +191,8 @@ const NurseDashboard = () => {
       day_of_week: avail.day_of_week,
       time_start: avail.time_start,
       time_end: avail.time_end,
+      break_start: avail.break_start || '',
+      break_end: avail.break_end || '',
       status: avail.status,
     })
     setShowAvailabilityModal(true)
@@ -202,6 +206,8 @@ const NurseDashboard = () => {
       day_of_week: '',
       time_start: '',
       time_end: '',
+      break_start: '12:00 PM',
+      break_end: '1:00 PM',
       status: 'available',
     })
     setShowAvailabilityModal(true)
@@ -223,6 +229,8 @@ const NurseDashboard = () => {
           .update({
             time_start: newAvailability.time_start,
             time_end: newAvailability.time_end,
+            break_start: newAvailability.break_start || null,
+            break_end: newAvailability.break_end || null,
             status: newAvailability.status,
           })
           .eq('id', editingAvail.id)
@@ -516,12 +524,14 @@ const NurseDashboard = () => {
 
   const getStatusLabel = () => {
     if (nurseStatus === 'available') return 'Available Now'
+    if (nurseStatus === 'on-break') return 'On Break'
     if (nurseStatus === 'on-leave') return 'On Leave'
     return 'Unavailable'
   }
 
   const getStatusStyle = () => {
     if (nurseStatus === 'available') return { background: '#dcfce7', color: '#16a34a' }
+    if (nurseStatus === 'on-break') return { background: '#fef3c7', color: '#92400e' }
     if (nurseStatus === 'on-leave') return { background: '#fef9c3', color: '#b45309' }
     return { background: '#fee2e2', color: '#dc2626' }
   }
@@ -622,6 +632,11 @@ const NurseDashboard = () => {
                 <div className="nurse-status-options">
                   {[
                     { value: 'available', label: '✅ Available Today' },
+                    // For an unscheduled break. The lunch break in the
+                    // weekly schedule already shows itself on the public
+                    // page from the clock, so nobody has to press this
+                    // at noon every day.
+                    { value: 'on-break', label: '🍽️ On Break' },
                     { value: 'on-leave', label: '🏖️ On Leave' },
                     { value: 'unavailable', label: '❌ Not Available Today' },
                   ].map((option) => (
@@ -747,6 +762,7 @@ const NurseDashboard = () => {
                         <th>Day</th>
                         <th>Time Start</th>
                         <th>Time End</th>
+                        <th>Lunch Break</th>
                         <th>Status</th>
                         <th>Action</th>
                       </tr>
@@ -757,6 +773,11 @@ const NurseDashboard = () => {
                           <td data-label="Day">{avail.day_of_week}</td>
                           <td data-label="Time Start">{avail.time_start}</td>
                           <td data-label="Time End">{avail.time_end}</td>
+                          <td data-label="Lunch Break">
+                            {avail.break_start && avail.break_end
+                              ? `${avail.break_start} – ${avail.break_end}`
+                              : '—'}
+                          </td>
                           <td data-label="Status">
                             <span className={`badge ${avail.status === 'available' ? 'badge-approved' : 'badge-declined'}`}>
                               {avail.status}
@@ -1022,6 +1043,8 @@ const NurseDashboard = () => {
             {[
               { label: 'Time Start *', key: 'time_start' },
               { label: 'Time End *', key: 'time_end' },
+              { label: 'Lunch Break Start', key: 'break_start' },
+              { label: 'Lunch Break End', key: 'break_end' },
             ].map((field) => (
               <div key={field.key} style={{ marginBottom: '16px' }}>
                 <label style={{ fontSize: '12px', fontWeight: '600', color: '#374151', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
