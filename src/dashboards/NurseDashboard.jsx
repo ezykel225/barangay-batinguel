@@ -11,6 +11,9 @@ import { supabase } from '../supabase/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 import Sidebar from '../components/Sidebar'
+import {
+  MEDICINE_CATEGORIES, MEDICINE_FORMS, MEDICINE_STATUS, statusOf,
+} from '../constants/medicines'
 import { PersonAvatar } from '../utils/officialPhotos'
 import '../components/Sidebar.css'
 import './NurseDashboard.css'
@@ -74,6 +77,7 @@ const NurseDashboard = () => {
     fetchHealthEvents()
     fetchNurseAvailability()
     fetchMedicalPrograms()
+    fetchMedicines()
   }, [])
 
   const fetchHealthEvents = async () => {
@@ -256,6 +260,143 @@ const NurseDashboard = () => {
     } else {
       toast.success('Deleted!')
       fetchNurseAvailability()
+    }
+  }
+
+  // ── Medicine availability ──────────────────────────────
+  const [medicines, setMedicines] = useState([])
+  const [showMedicineModal, setShowMedicineModal] = useState(false)
+  const [editingMedicine, setEditingMedicine] = useState(null)
+  const [medicineForm, setMedicineForm] = useState({
+    name: '', generic_name: '', form: 'Tablet',
+    category: 'Other', status: 'available', notes: '', display_order: 0,
+  })
+
+  const fetchMedicines = async () => {
+    const { data, error } = await supabase
+      .from('medicine_stock')
+      .select('*')
+      .order('display_order', { ascending: true })
+      .order('name', { ascending: true })
+    if (!error) setMedicines(data || [])
+  }
+
+  const handleOpenAddMedicine = () => {
+    setEditingMedicine(null)
+    setMedicineForm({
+      name: '', generic_name: '', form: 'Tablet',
+      category: 'Other', status: 'available', notes: '',
+      // Put a new medicine at the end rather than silently tying with
+      // an existing row and letting the name break the tie.
+      display_order: medicines.length
+        ? Math.max(...medicines.map((m) => m.display_order || 0)) + 1
+        : 1,
+    })
+    setShowMedicineModal(true)
+  }
+
+  const handleEditMedicine = (medicine) => {
+    setEditingMedicine(medicine)
+    setMedicineForm({
+      name: medicine.name || '',
+      generic_name: medicine.generic_name || '',
+      form: medicine.form || 'Tablet',
+      category: medicine.category || 'Other',
+      status: medicine.status || 'available',
+      notes: medicine.notes || '',
+      display_order: medicine.display_order || 0,
+    })
+    setShowMedicineModal(true)
+  }
+
+  // The one the nurse will actually use day to day: change a status
+  // straight from the row, no modal. Updating a whole list every
+  // morning through a dialog is how a list stops getting updated.
+  const handleQuickStatus = async (medicine, status) => {
+    if (medicine.status === status) return
+
+    const { data, error } = await supabase
+      .from('medicine_stock')
+      .update({ status, updated_by: user?.id ?? null, updated_at: new Date().toISOString() })
+      .eq('id', medicine.id)
+      .select('id')
+
+    if (error) {
+      console.error('Medicine status error:', error)
+      toast.error('Could not update that medicine.')
+      return
+    }
+    // RLS filters rows rather than raising, so a blocked write would
+    // otherwise look like it had saved.
+    if (!data || data.length === 0) {
+      toast.error('You do not have permission to change the medicine list.')
+      return
+    }
+
+    toast.success(`${medicine.name}: ${statusOf(status).label}`)
+    fetchMedicines()
+  }
+
+  const handleSaveMedicine = async () => {
+    if (submitting) return
+    if (!medicineForm.name.trim()) {
+      toast.error('Please enter the medicine name.')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const payload = {
+        name: medicineForm.name.trim(),
+        generic_name: medicineForm.generic_name.trim() || null,
+        form: medicineForm.form || null,
+        category: medicineForm.category || null,
+        status: medicineForm.status,
+        notes: medicineForm.notes.trim() || null,
+        display_order: Number(medicineForm.display_order) || 0,
+        updated_by: user?.id ?? null,
+        updated_at: new Date().toISOString(),
+      }
+
+      const query = editingMedicine
+        ? supabase.from('medicine_stock').update(payload).eq('id', editingMedicine.id).select('id')
+        : supabase.from('medicine_stock').insert([payload]).select('id')
+
+      const { data, error } = await query
+
+      if (error) {
+        console.error('Medicine save error:', error)
+        toast.error('Could not save that medicine.')
+        return
+      }
+      if (!data || data.length === 0) {
+        toast.error('You do not have permission to change the medicine list.')
+        return
+      }
+
+      toast.success(editingMedicine ? 'Medicine updated!' : 'Medicine added!')
+      setShowMedicineModal(false)
+      setEditingMedicine(null)
+      fetchMedicines()
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleDeleteMedicine = async (medicine) => {
+    const ok = window.confirm(
+      `Remove ${medicine.name} from the list?\n\n` +
+      'If it is only out of stock, set it to "Out of stock" instead — ' +
+      'residents can then see it exists and ask when it is expected.'
+    )
+    if (!ok) return
+
+    const { error } = await supabase.from('medicine_stock').delete().eq('id', medicine.id)
+    if (error) {
+      toast.error('Failed to remove medicine.')
+    } else {
+      toast.success('Medicine removed.')
+      fetchMedicines()
     }
   }
 
@@ -504,6 +645,83 @@ const NurseDashboard = () => {
         )}
 
         {/* AVAILABILITY TAB */}
+        {activeTab === 'medicines' && (
+          <div>
+            <div className="nurse-dashboard-header">
+              <h1>Medicine Availability</h1>
+              <p>
+                What the health center has today. This list is public — residents
+                see it on the Health Center page, so they know whether a trip is
+                worth making.
+              </p>
+            </div>
+
+            <div className="dashboard-card" style={{ marginBottom: 20 }}>
+              <div className="dashboard-card-header">
+                <h3>Today&apos;s Stock</h3>
+                <button className="btn-add" onClick={handleOpenAddMedicine}>
+                  + Add Medicine
+                </button>
+              </div>
+
+              <p className="medicine-intro">
+                Tap a status to change it — no need to open anything. Set{' '}
+                <strong>Out of stock</strong> rather than removing a medicine, so
+                residents can still see it exists and ask when it is expected.
+              </p>
+
+              {medicines.length === 0 ? (
+                <p className="dashboard-empty">No medicines listed yet.</p>
+              ) : (
+                <div className="medicine-admin-list">
+                  {medicines.map((medicine) => (
+                    <div key={medicine.id} className="medicine-admin-row">
+                      <div className="medicine-admin-info">
+                        <strong>{medicine.name}</strong>
+                        <span className="medicine-admin-meta">
+                          {[medicine.generic_name, medicine.form, medicine.category]
+                            .filter(Boolean).join(' · ')}
+                        </span>
+                        {medicine.notes && (
+                          <span className="medicine-admin-note">{medicine.notes}</span>
+                        )}
+                      </div>
+
+                      <div className="medicine-status-group" role="group"
+                           aria-label={`Availability of ${medicine.name}`}>
+                        {Object.entries(MEDICINE_STATUS).map(([key, meta]) => (
+                          <button
+                            key={key}
+                            type="button"
+                            className={`medicine-status-btn ${meta.className} ${
+                              medicine.status === key ? 'is-active' : ''
+                            }`}
+                            aria-pressed={medicine.status === key}
+                            onClick={() => handleQuickStatus(medicine, key)}
+                          >
+                            {meta.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="medicine-admin-actions">
+                        <button className="btn-add" style={{ fontSize: 12, padding: '4px 10px' }}
+                                onClick={() => handleEditMedicine(medicine)}>
+                          Edit
+                        </button>
+                        <button className="btn-deny" style={{ fontSize: 12, padding: '4px 10px' }}
+                                onClick={() => handleDeleteMedicine(medicine)}>
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {activeTab === 'availability' && (
           <div>
             <div className="availability-header">
@@ -844,6 +1062,98 @@ const NurseDashboard = () => {
       )}
 
       {/* MEDICAL PROGRAM MODAL */}
+      {showMedicineModal && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <h3>{editingMedicine ? 'Edit Medicine' : 'Add Medicine'}</h3>
+
+            <div className="modal-form-group">
+              <label className="modal-form-label">Medicine Name</label>
+              <input
+                className="modal-form-input"
+                placeholder="e.g. Paracetamol 500mg"
+                value={medicineForm.name}
+                onChange={(e) => setMedicineForm((f) => ({ ...f, name: e.target.value }))}
+              />
+            </div>
+
+            <div className="modal-form-group">
+              <label className="modal-form-label">Generic Name (optional)</label>
+              <input
+                className="modal-form-input"
+                placeholder="e.g. Paracetamol"
+                value={medicineForm.generic_name}
+                onChange={(e) => setMedicineForm((f) => ({ ...f, generic_name: e.target.value }))}
+              />
+              <p className="medicine-field-hint">
+                What a resident checks against their prescription.
+              </p>
+            </div>
+
+            <div className="modal-form-group">
+              <label className="modal-form-label">Form</label>
+              <select
+                className="modal-form-input"
+                value={medicineForm.form}
+                onChange={(e) => setMedicineForm((f) => ({ ...f, form: e.target.value }))}
+              >
+                {MEDICINE_FORMS.map((form) => (
+                  <option key={form} value={form}>{form}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="modal-form-group">
+              <label className="modal-form-label">Category</label>
+              <select
+                className="modal-form-input"
+                value={medicineForm.category}
+                onChange={(e) => setMedicineForm((f) => ({ ...f, category: e.target.value }))}
+              >
+                {MEDICINE_CATEGORIES.map((category) => (
+                  <option key={category} value={category}>{category}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="modal-form-group">
+              <label className="modal-form-label">Availability</label>
+              <select
+                className="modal-form-input"
+                value={medicineForm.status}
+                onChange={(e) => setMedicineForm((f) => ({ ...f, status: e.target.value }))}
+              >
+                {Object.entries(MEDICINE_STATUS).map(([key, meta]) => (
+                  <option key={key} value={key}>{meta.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="modal-form-group">
+              <label className="modal-form-label">Note for residents (optional)</label>
+              <textarea
+                className="modal-form-textarea"
+                placeholder="e.g. Bring your prescription. / Children's dose only."
+                value={medicineForm.notes}
+                onChange={(e) => setMedicineForm((f) => ({ ...f, notes: e.target.value }))}
+              />
+            </div>
+
+            <div className="modal-buttons">
+              <button className="btn-cancel" onClick={() => {
+                setShowMedicineModal(false)
+                setEditingMedicine(null)
+              }}>
+                Cancel
+              </button>
+              <button className="btn-add" onClick={handleSaveMedicine} disabled={submitting}>
+                {submitting ? 'Saving...' : editingMedicine ? 'Save Changes' : 'Add Medicine'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showProgramModal && (
         <div className="modal-overlay">
           <div className="modal">

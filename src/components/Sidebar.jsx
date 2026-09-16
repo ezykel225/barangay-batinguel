@@ -17,6 +17,7 @@ import {
   FaSignOutAlt,
   FaUser,
   FaHeartbeat,
+  FaPills,
   FaNotesMedical,
   FaHome,
 } from 'react-icons/fa'
@@ -97,6 +98,7 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {} }) => {
 
   const nurseNavItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <FaTachometerAlt /> },
+    { id: 'medicines', label: 'Medicines', icon: <FaPills /> },
     { id: 'availability', label: 'Availability', icon: <FaHeartbeat /> },
     { id: 'health-events', label: 'Health Events', icon: <FaNotesMedical /> },
     { id: 'settings', label: 'Settings', icon: <FaCog /> },

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   FaUserNurse,
   FaChevronRight,
@@ -15,6 +15,7 @@ import {
 } from 'react-icons/fa'
 import { MdOutlineEventAvailable, MdPersonSearch } from 'react-icons/md'
 import { supabase } from '../supabase/supabaseClient'
+import { MEDICINE_CATEGORIES, statusOf } from '../constants/medicines'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import './HealthCenter.css'
@@ -55,6 +56,8 @@ const HealthCenter = () => {
   const [nurseStatus, setNurseStatus] = useState('unavailable')
   const [weekSchedule, setWeekSchedule] = useState([])
   const [loadingSchedule, setLoadingSchedule] = useState(true)
+  const [medicines, setMedicines] = useState([])
+  const [medicinesLoading, setMedicinesLoading] = useState(true)
 
   const fetchNurseAvailability = useCallback(async () => {
     try {
@@ -126,11 +129,59 @@ const HealthCenter = () => {
     }
   }, [])
 
+  const fetchMedicines = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('medicine_stock')
+        .select('*')
+        .order('display_order', { ascending: true })
+        .order('name', { ascending: true })
+      if (!error) setMedicines(data || [])
+    } catch (err) {
+      console.error('Error fetching medicines:', err)
+    } finally {
+      setMedicinesLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     fetchNurseAvailability()
     fetchWeekSchedule()
     fetchHealthEvents()
-  }, [fetchNurseAvailability, fetchWeekSchedule, fetchHealthEvents])
+    fetchMedicines()
+  }, [fetchNurseAvailability, fetchWeekSchedule, fetchHealthEvents, fetchMedicines])
+
+  // Grouped in the order the categories are declared, so the list reads
+  // the same way every visit rather than reshuffling as stock changes.
+  const medicinesByCategory = useMemo(() => {
+    const groups = new Map()
+    medicines.forEach((medicine) => {
+      const key = MEDICINE_CATEGORIES.includes(medicine.category)
+        ? medicine.category
+        : 'Other'
+      if (!groups.has(key)) groups.set(key, [])
+      groups.get(key).push(medicine)
+    })
+    return MEDICINE_CATEGORIES
+      .filter((category) => groups.has(category))
+      .map((category) => [category, groups.get(category)])
+  }, [medicines])
+
+  // Stale stock information is worse than none -- a resident who
+  // trusts it and walks for nothing stops trusting the whole site. So
+  // say plainly when it was last touched and let them judge.
+  const lastUpdated = useMemo(() => {
+    const stamps = medicines
+      .map((m) => m.updated_at)
+      .filter(Boolean)
+      .sort()
+    if (!stamps.length) return null
+    return new Date(stamps[stamps.length - 1]).toLocaleString('en-PH', {
+      timeZone: 'Asia/Manila',
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    })
+  }, [medicines])
 
   const isAvailable = nurseStatus === 'available'
 
@@ -274,6 +325,67 @@ const HealthCenter = () => {
 
           {/* Right Content */}
           <div className="health-content">
+
+            {/* Medicine availability — the reason a resident checks this
+                page before walking to the health center. */}
+            <div className="health-medicine-card">
+              <div className="health-card-header">
+                <h4>💊 Medicine Availability</h4>
+                {lastUpdated && (
+                  <span className="medicine-updated">Updated {lastUpdated}</span>
+                )}
+              </div>
+
+              {medicinesLoading ? (
+                <p style={{ fontSize: '13px', color: '#6b7280' }}>Loading medicines...</p>
+              ) : medicines.length === 0 ? (
+                <p style={{ fontSize: '13px', color: '#6b7280' }}>
+                  The medicine list has not been published yet.
+                </p>
+              ) : (
+                <>
+                  <p className="medicine-disclaimer">
+                    Stock changes through the day. This shows what the health
+                    center had when the nurse last updated it — please confirm at
+                    the counter before relying on it.
+                  </p>
+
+                  {medicinesByCategory.map(([category, items]) => (
+                    <div key={category} className="medicine-group">
+                      <h5 className="medicine-group-title">{category}</h5>
+                      <ul className="medicine-list">
+                        {items.map((medicine) => {
+                          const meta = statusOf(medicine.status)
+                          return (
+                            <li key={medicine.id} className="medicine-item">
+                              <div className="medicine-item-main">
+                                <span className="medicine-name">{medicine.name}</span>
+                                {medicine.form && (
+                                  <span className="medicine-form">{medicine.form}</span>
+                                )}
+                              </div>
+                              {medicine.generic_name
+                                && medicine.generic_name !== medicine.name && (
+                                <span className="medicine-generic">{medicine.generic_name}</span>
+                              )}
+                              {medicine.notes && (
+                                <span className="medicine-note">{medicine.notes}</span>
+                              )}
+                              <span
+                                className={`medicine-badge ${meta.className}`}
+                                title={meta.hint}
+                              >
+                                {meta.label}
+                              </span>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
 
             {/* Bakuna Events */}
             <div className="health-bakuna-card">
