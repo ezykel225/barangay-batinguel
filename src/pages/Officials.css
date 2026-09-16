@@ -385,35 +385,45 @@ body {
 
 .council-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
+  /* auto-fit rather than fixed columns, so the grid reflows without
+     media queries to keep in sync. The 250px floor is chosen against
+     the 1200px container: it yields exactly 4 columns on desktop, so
+     the eight kagawads fill two clean rows. A 220px floor allowed a
+     fifth column and left a ragged 5 + 3. */
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
 }
 
 .council-small-card {
   background-color: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
-  padding: 20px;
-  text-align: center;
+  overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  transition: box-shadow 0.2s;
+  transition: box-shadow 0.2s, transform 0.2s;
+  /* The card is a column so every body sits at the same height even
+     when one committee name wraps to two lines and another doesn't. */
+  display: flex;
+  flex-direction: column;
 }
 
 .council-small-card:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
 }
 
-.council-small-avatar {
-  width: 64px;
-  height: 64px;
+.council-small-image {
+  width: 100%;
+  /* Square, matching the featured cards. The portraits are 800x640,
+     so a square crop trims the sides and keeps the full head-to-chest
+     framing the photographer set up. */
+  aspect-ratio: 1 / 1;
   background: linear-gradient(135deg, #1e3a8a, #3b82f6);
-  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
-  font-size: 24px;
-  margin: 0 auto 12px;
+  color: #ffffff;
+  font-size: 48px;
   overflow: hidden;
 }
 
@@ -421,18 +431,39 @@ body {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center;
 }
 
-.council-small-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: #1f2937;
+.council-small-body {
+  padding: 14px 16px 18px;
+  text-align: left;
+  flex: 1;
+}
+
+/* Role first and small, name second and large -- a reader scanning
+   for "who is the Kagawad for Health" is looking for the role, and
+   it matches the featured cards above. */
+.council-small-role-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #15803d;
   margin-bottom: 4px;
 }
 
-.council-small-role {
+.council-small-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1f2937;
+  line-height: 1.3;
+  margin-bottom: 4px;
+}
+
+.council-small-committee {
   font-size: 12px;
   color: #6b7280;
+  line-height: 1.45;
 }
 
 /* ================================
@@ -564,10 +595,6 @@ body {
     grid-template-columns: 1fr;
   }
 
-  .council-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
   .health-dept-grid {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -588,10 +615,6 @@ body {
 }
 
 @media (max-width: 480px) {
-  .council-grid {
-    grid-template-columns: 1fr;
-  }
-
   .health-dept-grid {
     grid-template-columns: 1fr;
   }

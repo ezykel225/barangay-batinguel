@@ -330,7 +330,12 @@ const Officials = () => {
                 <div className="council-grid">
                   {councilMembers.map((member) => (
                     <div key={member.id} className="council-small-card">
-                      <div className="council-small-avatar">
+                      {/* Same anatomy as the featured cards -- photo
+                          block, then body -- so the page reads as one
+                          design at three sizes rather than two
+                          officials with faces and eight with
+                          thumbnails. */}
+                      <div className="council-small-image">
                         <PersonAvatar
                           name={member.full_name}
                           photoUrl={member.photo_url}
@@ -338,11 +343,13 @@ const Officials = () => {
                           className="council-small-photo"
                         />
                       </div>
-                      <div className="council-small-name">{member.full_name}</div>
-                      <div className="council-small-role">{member.position}</div>
-                      {member.committee && (
-                        <div className="council-small-role">{member.committee}</div>
-                      )}
+                      <div className="council-small-body">
+                        <div className="council-small-role-label">{member.position}</div>
+                        <div className="council-small-name">{member.full_name}</div>
+                        {member.committee && (
+                          <div className="council-small-committee">{member.committee}</div>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
