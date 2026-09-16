@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { FaBullhorn, FaCalendarAlt, FaLeaf, FaRecycle, FaTrashAlt } from 'react-icons/fa'
 import { MdAnnouncement } from 'react-icons/md'
 import { supabase } from '../supabase/supabaseClient'
-import { BARANGAY_CONTACT, telHref } from '../constants/barangay'
+import { BARANGAY_CONTACT, BARANGAY_OFFICE_HOURS, telHref } from '../constants/barangay'
 import {
   BARANGAY_HISTORY, BARANGAY_PROFILE, BATINGUEL_ELEMENTARY,
 } from '../constants/about'
@@ -207,11 +207,13 @@ const Home = () => {
             <div className="contact-icon">🕐</div>
             <div className="contact-content">
               <h4>Office Hours</h4>
-              <p>Monday - Friday</p>
-              <p>8:00 AM - 5:00 PM</p>
-              <p className="closed-text">
-                Closed on Weekends & Holidays
-              </p>
+              <p>{BARANGAY_OFFICE_HOURS.days}</p>
+              {/* Two lines rather than one range, so the closed hour is
+                  stated instead of left to be discovered on arrival. */}
+              <p>{BARANGAY_OFFICE_HOURS.morning}</p>
+              <p>{BARANGAY_OFFICE_HOURS.afternoon}</p>
+              <p className="office-break-text">{BARANGAY_OFFICE_HOURS.breakNote}</p>
+              <p className="closed-text">{BARANGAY_OFFICE_HOURS.closedNote}</p>
             </div>
           </div>
 

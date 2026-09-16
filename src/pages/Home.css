@@ -702,3 +702,11 @@
 }
 
 .boundary-name { font-size: 13px; color: #374151; }
+
+/* Lunch break sits between the hours and the closed note, styled
+   like a caution rather than a closure — the office reopens. */
+.office-break-text {
+  color: #92400e;
+  font-size: 13px;
+  font-weight: 500;
+}
