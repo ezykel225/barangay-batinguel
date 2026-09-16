@@ -59,14 +59,24 @@ const json = (body: unknown, status = 200) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   })
 
-// IPROG expects a local mobile number (09XXXXXXXXX). Accepts anything the
-// form might hold — +63 917..., 63917..., 0917 123 4567 — and normalizes.
+// IPROG's documentation gives its example as 639171071234 -- the
+// international form, no plus sign -- so that is what this produces.
+// Accepts whatever the booking form happens to hold (+63 917..., 0917
+// 123 4567, 639171234567) and normalises to one shape.
+//
+// An earlier version emitted the local 09XXXXXXXXX form. That was a
+// guess; this follows the published example. If a live send is rejected
+// for the number rather than the token, the raw provider reply is
+// logged below and this is the first thing to try flipping back.
 const normalizePhilippineNumber = (raw: string): string | null => {
   const digits = String(raw).replace(/\D/g, "")
 
-  if (digits.startsWith("63") && digits.length === 12) return "0" + digits.slice(2)
-  if (digits.startsWith("09") && digits.length === 11) return digits
-  if (digits.startsWith("9") && digits.length === 10) return "0" + digits
+  // 639171234567
+  if (digits.startsWith("63") && digits.length === 12) return digits
+  // 09171234567 -> 639171234567
+  if (digits.startsWith("09") && digits.length === 11) return "63" + digits.slice(1)
+  // 9171234567 -> 639171234567
+  if (digits.startsWith("9") && digits.length === 10) return "63" + digits
 
   return null
 }
@@ -179,9 +189,11 @@ Deno.serve(async (req: Request) => {
         ? `Hi ${name}, your Barangay Batinguel covered court reservation${when ? " on " + when : ""} has been APPROVED. See you there!`
         : `Hi ${name}, your Barangay Batinguel covered court reservation${when ? " on " + when : ""} was DECLINED. Please visit the barangay hall for details.`
 
-    // The published examples disagree on whether IPROG reads these from
-    // the query string or a JSON body, so send both. Whichever it reads,
-    // the other is ignored — and the raw reply is logged below either way.
+    // IPROG documents application/x-www-form-urlencoded, so the body is
+    // form-encoded rather than the JSON an earlier version sent. The
+    // same values also go in the query string: the published examples
+    // are inconsistent about which the endpoint reads, and sending both
+    // costs nothing since whichever is ignored is simply ignored.
     const params = new URLSearchParams({
       api_token: apiToken,
       phone_number: phoneNumber,
@@ -194,12 +206,8 @@ Deno.serve(async (req: Request) => {
     try {
       providerResponse = await fetch(endpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          api_token: apiToken,
-          phone_number: phoneNumber,
-          message,
-        }),
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: params.toString(),
       })
     } catch (networkErr) {
       // Could not reach the provider at all.
