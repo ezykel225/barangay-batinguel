@@ -757,3 +757,101 @@
     font-size: 15px;
   }
 }
+/* ── Medicine availability ──────────────────────────────────── */
+.health-medicine-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  margin-bottom: 24px;
+}
+
+.medicine-updated {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.medicine-disclaimer {
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.6;
+  margin: 0 0 18px;
+}
+
+.medicine-group { margin-bottom: 18px; }
+.medicine-group:last-child { margin-bottom: 0; }
+
+.medicine-group-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #15803d;
+  margin: 0 0 8px;
+  font-weight: 700;
+}
+
+.medicine-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.medicine-item {
+  display: grid;
+  /* Name column flexes, badge column stays its natural width so the
+     statuses line up down the page instead of drifting. */
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f9fafb;
+}
+
+.medicine-item-main {
+  grid-column: 1;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.medicine-name { font-size: 14px; font-weight: 600; color: #111827; }
+.medicine-form { font-size: 12px; color: #6b7280; }
+
+.medicine-generic,
+.medicine-note {
+  grid-column: 1;
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+.medicine-note { font-style: italic; }
+
+.medicine-badge {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  align-self: center;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* Colour is never the only signal — each badge carries its own word,
+   so it still reads correctly in greyscale or to a colour-blind user. */
+.medicine-available   { background: #dcfce7; color: #166534; }
+.medicine-low         { background: #fef3c7; color: #92400e; }
+.medicine-unavailable { background: #fee2e2; color: #991b1b; }
+
+@media (max-width: 480px) {
+  .medicine-item { grid-template-columns: 1fr; }
+  .medicine-badge { grid-column: 1; grid-row: auto; justify-self: start; }
+}
