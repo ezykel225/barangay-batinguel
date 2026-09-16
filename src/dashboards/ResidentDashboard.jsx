@@ -288,9 +288,13 @@ const ResidentDashboard = () => {
       // Append to the audit trail so officials can see who cancelled
       // what and when — a cancellation frees up a slot, so it's worth
       // recording alongside official actions.
+      //
+      // The actor is stamped by the database from this user's own token
+      // (migration 015), so nothing identifying is sent from here. A
+      // resident may only record `cancelled` on `reservation`, and only
+      // on their own booking — entity_id below is what that is checked
+      // against.
       await supabase.from('activity_log').insert([{
-        actor_id: user.id,
-        actor_name: userProfile?.full_name || 'Resident',
         action: 'cancelled',
         entity_type: 'reservation',
         entity_id: reservation.id,

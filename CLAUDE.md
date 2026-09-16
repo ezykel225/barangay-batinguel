@@ -182,7 +182,16 @@ the relevant role in SQL):
   policy that checks `profiles.role` by querying `profiles` causes
   **infinite recursion** in RLS. This actually happened and broke login
   for every user. Never check `profiles` from inside a `profiles` policy.
-- **`activity_log`** has no UPDATE or DELETE policy on purpose.
+- **`activity_log`** has no UPDATE or DELETE policy on purpose, and
+  since migration 015 its contents cannot be forged either. The
+  `stamp_activity_actor` trigger takes `actor_id` and `actor_name` from
+  the caller's own token and profile and discards whatever the client
+  sent; `action` and `entity_type` are constrained to a fixed
+  vocabulary; and a non-official may only record `cancelled` on a
+  `reservation` that is their own. Before that, a resident could file
+  entries reading "Barangay Secretary / verified / Someone Else".
+  `subject` and `details` remain free text, but they hang off a
+  truthful actor performing a real action.
 
 **Allowlist, not denylist.** The protect triggers originally named the
 *forbidden* columns, which fails open: anything unlisted was permitted,
@@ -451,9 +460,6 @@ the real name and photo together when the barangay confirms them.
 
 ## Known gaps
 
-- **The activity log can be forged.** Any signed-in user may insert a row
-  with their own `actor_id` but arbitrary `actor_name` and `action`.
-  They cannot read it back, but they can pollute it.
 - **Leaked-password protection is Pro-only** on Supabase and cannot be
   enabled on this project. The dashboard toggle appears to turn on and
   the save is rejected — don't trust a screenshot of it.

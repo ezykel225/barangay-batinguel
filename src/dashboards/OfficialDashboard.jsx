@@ -820,11 +820,17 @@ const OfficialDashboard = () => {
   // Appends to the append-only audit trail. Deliberately fire-and-
   // forget with its own error handling: a logging failure should never
   // block or roll back the actual action the official just took.
+  //
+  // actor_id and actor_name are NOT sent. The stamp_activity_actor
+  // trigger takes both from the caller's own token and profile and
+  // discards anything the client supplies (migration 015), because a
+  // client-supplied name is one a client can make up -- a resident was
+  // able to file entries reading "Barangay Secretary / verified".
+  // Sending them anyway would just be a value that looks authoritative
+  // and is silently thrown away.
   const logActivity = async ({ action, entityType, entityId, subject, details }) => {
     try {
       await supabase.from('activity_log').insert([{
-        actor_id: user?.id ?? null,
-        actor_name: userProfile?.full_name || 'Official',
         action,
         entity_type: entityType,
         entity_id: entityId ?? null,
