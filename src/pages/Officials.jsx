@@ -6,16 +6,18 @@ import {
 } from 'react-icons/fa'
 import { MdVerified } from 'react-icons/md'
 import { supabase } from '../supabase/supabaseClient'
+import { HEALTH_NURSE_NAME } from '../constants/barangay'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { PersonAvatar } from '../utils/officialPhotos'
 import './Officials.css'
 
-// Health Department — Maria Elena Santos is the barangay's only nurse
+// Health Department — the barangay has one nurse. Named by role, not
+// by person: see HEALTH_NURSE_NAME.
 const healthDept = [
   {
     id: 1,
-    name: 'Maria Elena R. Santos, RN',
+    name: HEALTH_NURSE_NAME,
     role: 'Public Health Nurse',
     desc: 'Oversees local community immunization drives, maternal care programs, and clinical health tracking.',
     liveAvailability: true,

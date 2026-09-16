@@ -65,3 +65,15 @@ export const BARANGAY_OFFICE_HOURS = {
   breakNote: 'Lunch break 12:00 NN – 1:00 PM',
   closedNote: 'Closed on weekends & holidays',
 }
+
+// ── Health centre staff ──────────────────────────────────────
+// A role, not a person. The system previously carried a full
+// invented name ("Maria Elena R. Santos, RN") and a stock photo of
+// somebody unrelated, both presented as barangay staff -- which is
+// a claim about a real workplace that happened not to be true.
+//
+// A role label claims only what is true: the health centre has a
+// nurse. Replace this with the actual name once the barangay
+// confirms it, and add her photo to officialPhotos.jsx at the same
+// time -- name and face should arrive together or not at all.
+export const HEALTH_NURSE_NAME = 'Barangay Health Nurse'

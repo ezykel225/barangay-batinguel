@@ -11,6 +11,7 @@ import { supabase } from '../supabase/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 import Sidebar from '../components/Sidebar'
+import { HEALTH_NURSE_NAME } from '../constants/barangay'
 import {
   MEDICINE_CATEGORIES, MEDICINE_FORMS, MEDICINE_STATUS, statusOf,
 } from '../constants/medicines'
@@ -33,7 +34,7 @@ const NurseDashboard = () => {
   // Bakuna Calendar to look like it "didn't save").
   const [submitting, setSubmitting] = useState(false)
 
-  const nurseName = 'Maria Elena R. Santos, RN'
+  const nurseName = HEALTH_NURSE_NAME
 
   // Modal States
   const [showEventModal, setShowEventModal] = useState(false)

@@ -16,7 +16,7 @@ import {
 import { MdOutlineEventAvailable, MdPersonSearch } from 'react-icons/md'
 import { supabase } from '../supabase/supabaseClient'
 import { MEDICINE_CATEGORIES, statusOf } from '../constants/medicines'
-import { BARANGAY_CONTACT, telHref } from '../constants/barangay'
+import { BARANGAY_CONTACT, HEALTH_NURSE_NAME, telHref } from '../constants/barangay'
 import {
   formatTime, isOnScheduledBreak, manilaWeekday,
 } from '../utils/clinicHours'
@@ -258,13 +258,13 @@ const HealthCenter = () => {
                 <p style={{ fontSize: '13px', color: '#6b7280' }}>Loading...</p>
               ) : (
                 <>
-                  {/* Maria Elena — live from nurse_availability table */}
+                  {/* Status is live from the nurse_availability table */}
                   <div className="health-nurse-item">
                     <div className="health-nurse-avatar">
                       <FaUserNurse />
                     </div>
                     <div className="health-nurse-info">
-                      <h5>Maria Elena R. Santos, RN</h5>
+                      <h5>{HEALTH_NURSE_NAME}</h5>
                       <p>Public Health Nurse</p>
                     </div>
                     <div className="health-nurse-status">
