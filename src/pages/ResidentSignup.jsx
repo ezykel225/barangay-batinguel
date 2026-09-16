@@ -5,18 +5,26 @@ import { supabase } from '../supabase/supabaseClient'
 import toast from 'react-hot-toast'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import { BARANGAY_NAME, PUROKS } from '../constants/barangay'
 import './Login.css'
 
 const ResidentSignup = () => {
   const navigate = useNavigate()
   const [formData, setFormData] = useState({
-    full_name: '',
+    first_name: '',
+    middle_name: '',
+    last_name: '',
+    suffix: '',
     email: '',
     contact_number: '',
     purok: '',
     password: '',
     confirm_password: '',
   })
+  // Not stored. It is an on-the-record declaration at the moment of
+  // signing up, which is what the official relies on when they later
+  // mark an account ineligible for not being a resident.
+  const [confirmsResidency, setConfirmsResidency] = useState(false)
   const [idFile, setIdFile] = useState(null)
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -31,8 +39,20 @@ const ResidentSignup = () => {
     if (loading) return
     setError('')
 
-    if (!formData.full_name || !formData.email || !formData.password) {
-      setError('Please fill in your name, email, and password.')
+    if (!formData.first_name.trim() || !formData.last_name.trim()) {
+      setError('Please enter your first name and last name.')
+      return
+    }
+    if (!formData.email || !formData.password) {
+      setError('Please fill in your email and password.')
+      return
+    }
+    if (!formData.purok) {
+      setError('Please select the purok where you live.')
+      return
+    }
+    if (!confirmsResidency) {
+      setError(`Please confirm that you are a resident of ${BARANGAY_NAME}.`)
       return
     }
     if (formData.password.length < 6) {
@@ -57,7 +77,21 @@ const ResidentSignup = () => {
         password: formData.password,
         options: {
           data: {
-            full_name: formData.full_name,
+            // The parts are what the profile is built from. full_name
+            // goes along as a fallback for the unlikely case that the
+            // parts never arrive; trg_compose_full_name overwrites it
+            // from the parts whenever they are present, so the two
+            // cannot end up disagreeing.
+            first_name: formData.first_name.trim(),
+            middle_name: formData.middle_name.trim() || null,
+            last_name: formData.last_name.trim(),
+            suffix: formData.suffix.trim() || null,
+            full_name: [
+              formData.first_name.trim(),
+              formData.middle_name.trim(),
+              formData.last_name.trim(),
+              formData.suffix.trim(),
+            ].filter(Boolean).join(' '),
             role: 'resident',
             contact_number: formData.contact_number || null,
             purok: formData.purok || null,
@@ -180,22 +214,68 @@ const ResidentSignup = () => {
 
           <div className="login-right">
             <h3>Resident Registration</h3>
-            <p>Fill in your details to create your account.</p>
+            <p>
+              For residents of <strong>{BARANGAY_NAME}</strong> only. Fill in
+              your details as they appear on your valid ID.
+            </p>
 
             {error && <div className="login-error">{error}</div>}
 
             <form className="login-form" onSubmit={handleSignup}>
               <div className="login-form-group">
-                <label>Full Name</label>
+                <label>First Name</label>
                 <div className="login-input-wrapper">
                   <div className="login-input-icon"><FaUser /></div>
                   <input
                     type="text"
-                    name="full_name"
-                    placeholder="Juan Dela Cruz"
-                    value={formData.full_name}
+                    name="first_name"
+                    placeholder="Juan"
+                    value={formData.first_name}
                     onChange={handleChange}
                     required
+                  />
+                </div>
+              </div>
+
+              <div className="login-form-group">
+                <label>Middle Name <span className="field-optional">(optional)</span></label>
+                <div className="login-input-wrapper">
+                  <div className="login-input-icon"><FaUser /></div>
+                  <input
+                    type="text"
+                    name="middle_name"
+                    placeholder="Santos"
+                    value={formData.middle_name}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+
+              <div className="login-form-group">
+                <label>Last Name</label>
+                <div className="login-input-wrapper">
+                  <div className="login-input-icon"><FaUser /></div>
+                  <input
+                    type="text"
+                    name="last_name"
+                    placeholder="Dela Cruz"
+                    value={formData.last_name}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="login-form-group">
+                <label>Suffix <span className="field-optional">(optional)</span></label>
+                <div className="login-input-wrapper">
+                  <div className="login-input-icon"><FaUser /></div>
+                  <input
+                    type="text"
+                    name="suffix"
+                    placeholder="Jr., Sr., III"
+                    value={formData.suffix}
+                    onChange={handleChange}
                   />
                 </div>
               </div>
@@ -233,14 +313,23 @@ const ResidentSignup = () => {
                 <label>Purok</label>
                 <div className="login-input-wrapper">
                   <div className="login-input-icon"><FaMapMarkerAlt /></div>
-                  <input
-                    type="text"
+                  <select
                     name="purok"
-                    placeholder="e.g. Purok 3"
                     value={formData.purok}
                     onChange={handleChange}
-                  />
+                    required
+                  >
+                    <option value="">Select your purok</option>
+                    {PUROKS.map((purok) => (
+                      <option key={purok} value={purok}>{purok}</option>
+                    ))}
+                  </select>
                 </div>
+                <p className="field-hint">
+                  Only puroks within {BARANGAY_NAME} are listed. If you live in
+                  another barangay, request your documents from that barangay
+                  instead.
+                </p>
               </div>
 
               <div className="login-form-group">
@@ -297,6 +386,25 @@ const ResidentSignup = () => {
                   Barangay Hall so an official can verify you in person instead.
                 </p>
               </div>
+
+              {/* Last thing before the button, so it is read after the
+                  address has been entered rather than skimmed past at
+                  the top. Not stored as a column: it is a declaration
+                  made at signup, and what an official relies on when
+                  they later mark an account ineligible for not being a
+                  resident. The account record and the activity log
+                  carry that decision. */}
+              <label className="residency-confirm">
+                <input
+                  type="checkbox"
+                  checked={confirmsResidency}
+                  onChange={(e) => setConfirmsResidency(e.target.checked)}
+                />
+                <span>
+                  I certify that I am a resident of {BARANGAY_NAME}, Dumaguete
+                  City, and that the details above are true and correct.
+                </span>
+              </label>
 
               <button
                 type="submit"

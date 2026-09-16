@@ -577,3 +577,56 @@
     grid-template-columns: 1fr;
   }
 }
+/* ── Resident signup: split name fields, purok list, residency
+   declaration. Lives in Login.css because the signup, login and
+   reset-password pages all share this stylesheet. ── */
+.field-optional {
+  font-weight: 400;
+  color: #9ca3af;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.field-hint {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 6px 0 0;
+  line-height: 1.5;
+}
+
+.login-input-wrapper select {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  color: #111827;
+  padding: 12px 10px 12px 0;
+  cursor: pointer;
+  /* Without this a long purok name can push the select past the
+     rounded wrapper on a narrow phone. */
+  min-width: 0;
+  width: 100%;
+}
+
+.residency-confirm {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 4px 0 18px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #374151;
+  cursor: pointer;
+}
+
+.residency-confirm input[type='checkbox'] {
+  /* 18px keeps the tap target usable on a phone without the checkbox
+     drifting away from the first line of text it belongs to. */
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  flex-shrink: 0;
+  accent-color: #15803d;
+  cursor: pointer;
+}

@@ -9,6 +9,7 @@ import {
 } from 'react-icons/fa'
 import { supabase } from '../supabase/supabaseClient'
 import { pathFromPublicUrl } from '../utils/storagePath'
+import { BARANGAY_NAME, PUROKS } from '../constants/barangay'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 import Sidebar from '../components/Sidebar'
@@ -89,15 +90,22 @@ const ResidentDashboard = () => {
   const fetchUserProfile = useCallback(async () => {
     const { data } = await supabase
       .from('profiles')
-      .select('full_name, contact_number, purok, photo_url, verification_status, verification_notes, id_document_url')
+      .select('full_name, first_name, middle_name, last_name, suffix, contact_number, purok, photo_url, verification_status, verification_notes, id_document_url')
       .eq('id', user.id)
       .single()
     if (data) {
       setUserProfile(data)
       setDetails({
-        full_name: data.full_name || '',
+        first_name: data.first_name || '',
+        middle_name: data.middle_name || '',
+        last_name: data.last_name || '',
+        suffix: data.suffix || '',
         contact_number: data.contact_number || '',
-        purok: data.purok || '',
+        // An account created before the purok list existed may hold a
+        // value that is not in it ('4', 'PUROK 4'). Blanking it forces
+        // a re-pick rather than showing the dropdown silently sitting
+        // on the wrong entry.
+        purok: PUROKS.includes(data.purok) ? data.purok : '',
       })
     }
   }, [user])
@@ -371,14 +379,29 @@ const ResidentDashboard = () => {
   const handleSaveDetails = async () => {
     if (savingDetails || !details) return
 
-    const name = details.full_name.trim()
-    if (!name) {
-      toast.error('Please enter your full name.')
+    const first = details.first_name.trim()
+    const middle = details.middle_name.trim()
+    const last = details.last_name.trim()
+    const suffix = details.suffix.trim()
+
+    if (!first || !last) {
+      toast.error('Please enter your first name and last name.')
+      return
+    }
+    if (!details.purok) {
+      toast.error('Please select the purok where you live.')
       return
     }
 
     const status = userProfile?.verification_status
-    const nameChanged = name !== (userProfile?.full_name || '')
+    // Compared part by part rather than against the composed
+    // full_name, because the database recomposes that itself
+    // (trg_compose_full_name) and the client never sends it.
+    const nameChanged =
+      first !== (userProfile?.first_name || '') ||
+      middle !== (userProfile?.middle_name || '') ||
+      last !== (userProfile?.last_name || '') ||
+      suffix !== (userProfile?.suffix || '')
 
     if (nameChanged && status === 'verified') {
       const confirmed = window.confirm(
@@ -392,10 +415,16 @@ const ResidentDashboard = () => {
 
     setSavingDetails(true)
     try {
+      // full_name is deliberately absent: trg_compose_full_name
+      // rebuilds it from these parts, so sending one would either be
+      // ignored or, worse, look like it had been saved.
       const payload = {
-        full_name: name,
+        first_name: first,
+        middle_name: middle || null,
+        last_name: last,
+        suffix: suffix || null,
         contact_number: details.contact_number.trim() || null,
-        purok: details.purok.trim() || null,
+        purok: details.purok || null,
       }
 
       // A declined account re-enters the review queue once the
@@ -411,7 +440,7 @@ const ResidentDashboard = () => {
         .from('profiles')
         .update(payload)
         .eq('id', user.id)
-        .select('full_name, contact_number, purok, verification_status, verification_notes')
+        .select('full_name, first_name, middle_name, last_name, suffix, contact_number, purok, verification_status, verification_notes')
 
       if (error) {
         console.error('Profile save error:', error)
@@ -805,13 +834,49 @@ const ResidentDashboard = () => {
                   )}
 
                   <div className="modal-form-group">
-                    <label className="modal-form-label">Full Name</label>
+                    <label className="modal-form-label">First Name</label>
                     <input
                       type="text"
                       className="modal-form-input"
-                      value={details?.full_name ?? ''}
-                      onChange={(e) => setDetails((d) => ({ ...d, full_name: e.target.value }))}
-                      placeholder="Juan Dela Cruz"
+                      value={details?.first_name ?? ''}
+                      onChange={(e) => setDetails((d) => ({ ...d, first_name: e.target.value }))}
+                      placeholder="Juan"
+                      disabled={savingDetails}
+                    />
+                  </div>
+
+                  <div className="modal-form-group">
+                    <label className="modal-form-label">Middle Name (optional)</label>
+                    <input
+                      type="text"
+                      className="modal-form-input"
+                      value={details?.middle_name ?? ''}
+                      onChange={(e) => setDetails((d) => ({ ...d, middle_name: e.target.value }))}
+                      placeholder="Santos"
+                      disabled={savingDetails}
+                    />
+                  </div>
+
+                  <div className="modal-form-group">
+                    <label className="modal-form-label">Last Name</label>
+                    <input
+                      type="text"
+                      className="modal-form-input"
+                      value={details?.last_name ?? ''}
+                      onChange={(e) => setDetails((d) => ({ ...d, last_name: e.target.value }))}
+                      placeholder="Dela Cruz"
+                      disabled={savingDetails}
+                    />
+                  </div>
+
+                  <div className="modal-form-group">
+                    <label className="modal-form-label">Suffix (optional)</label>
+                    <input
+                      type="text"
+                      className="modal-form-input"
+                      value={details?.suffix ?? ''}
+                      onChange={(e) => setDetails((d) => ({ ...d, suffix: e.target.value }))}
+                      placeholder="Jr., Sr., III"
                       disabled={savingDetails}
                     />
                   </div>
@@ -830,14 +895,20 @@ const ResidentDashboard = () => {
 
                   <div className="modal-form-group">
                     <label className="modal-form-label">Purok</label>
-                    <input
-                      type="text"
+                    <select
                       className="modal-form-input"
                       value={details?.purok ?? ''}
                       onChange={(e) => setDetails((d) => ({ ...d, purok: e.target.value }))}
-                      placeholder="Purok 3"
                       disabled={savingDetails}
-                    />
+                    >
+                      <option value="">Select your purok</option>
+                      {PUROKS.map((purok) => (
+                        <option key={purok} value={purok}>{purok}</option>
+                      ))}
+                    </select>
+                    <p style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>
+                      Only puroks within {BARANGAY_NAME} are listed.
+                    </p>
                   </div>
 
                   <button
