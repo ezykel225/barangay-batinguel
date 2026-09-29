@@ -644,15 +644,58 @@ the real name and photo together when the barangay confirms them.
 
 ## Not built yet
 
-- **SMS notifications.** `supabase/functions/notify-reservation-sms` is
-  written, deployed and secured — officials only, and the message is
-  built from the reservation row rather than the request body, so a
-  caller can neither choose the recipient nor write the text. It needs an
+- **SMS notifications — a deferred external-service dependency.** SMS
+  notifications are implemented but require activation and configuration
+  of the paid SMS service for production use. Core reservation
+  operations are designed to continue successfully when SMS delivery is
+  unavailable.
+
+  `supabase/functions/notify-reservation-sms` is written, deployed and
+  secured — officials only, and the message is built from the
+  reservation row rather than the request body, so a caller can neither
+  choose the recipient nor write the text. It needs an
   `IPROG_SMS_API_TOKEN` secret; until then it returns
-  `{ sent: false, reason }` and the dashboard tells the official to phone
-  the resident instead. **Never tested against the live provider** — the
-  phone format (`639XXXXXXXXX`) and content type follow IPROG's docs, not
-  an observed response.
+  `{ sent: false, reason }` and the dashboard tells the official to
+  phone the resident instead. **Never tested against the live
+  provider** — the phone format (`639XXXXXXXXX`) and content type
+  follow IPROG's docs, not an observed response.
+
+  ⚠️ **SMS delivery is not part of the approval transaction, and must
+  never be made part of it.** The toast reading *"Saved, but the text
+  message could not be sent — please contact the resident directly"* is
+  **expected** with no token configured, and is **not a defect.** The
+  reservation status change and the Activity Log entry have already
+  completed and been verified by the time any SMS code runs.
+
+  Four separate things keep it that way. Do not undo any of them:
+
+  1. `notifyResident()` is called only inside the success branch of
+     `handleApproveReservation` / `handleDeclineReservation`, after the
+     `.select()` readback has confirmed a row was written.
+  2. It is **not awaited.** Never add `await` to it — that would let a
+     slow or hanging provider stall the per-row processing lock.
+  3. Every failure path inside it ends in `cannotReach()`, which warns
+     to the console and raises a neutral `toast()`. It must never
+     `throw`, become a `toast.error()`, or roll anything back.
+  4. The Edge Function answers **200** with `{ sent: false, reason }`
+     for every delivery problem. A delivery failure must never become a
+     non-2xx.
+
+  The correct fix for the warning is a provider token, not a code
+  change. Do not silence the toast: an official who believes the
+  resident was texted will not phone them, and the resident then hears
+  nothing at all.
+
+  **No re-send button exists, and that is deferred, not a defect.** The
+  Edge Function was deliberately built to allow a re-send — any
+  official may call it, and it requires the reservation to be `approved`
+  or `declined` already, so a re-send can only ever repeat something
+  true. But the dashboard never exposes it: `notifyResident()` has
+  exactly two callers, both decision handlers. So decisions taken while
+  SMS is inactive cannot be texted retroactively from the UI. That is a
+  known gap to revisit **if and when** the service is activated, not a
+  Phase 1 defect — and it is not a reason to remove or redesign any of
+  the existing SMS implementation.
 - **Broadcast SMS by age group** — discussed, not built. Blocked on
   `profiles` having no birthdate, and on cost: ~₱1/SMS against 13,000+
   residents.
