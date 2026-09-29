@@ -16,11 +16,17 @@ import {
   MEDICINE_CATEGORIES, MEDICINE_FORMS, MEDICINE_STATUS, statusOf,
 } from '../constants/medicines'
 import { PersonAvatar } from '../utils/officialPhotos'
+import { logActivity } from '../utils/activityLog'
+import { useConfirm } from '../components/ConfirmDialog'
 import '../components/Sidebar.css'
 import './NurseDashboard.css'
 
 const NurseDashboard = () => {
   const { user } = useAuth()
+  // Destructive actions go through this rather than acting on the first
+  // click. confirm() resolves true/false, so each handler needs one
+  // early return and nothing else changes.
+  const [confirm, confirmDialog] = useConfirm()
   const [activeTab, setActiveTab] = useState('dashboard')
   const [healthEvents, setHealthEvents] = useState([])
   const [nurseAvailability, setNurseAvailability] = useState([])
@@ -148,21 +154,36 @@ const NurseDashboard = () => {
       const month = date.toLocaleString('en-US', { month: 'short' }).toUpperCase()
       const day = String(date.getDate()).padStart(2, '0')
 
-      const { error } = await supabase.from('health_events').insert([{
-        title: newEvent.title,
-        description: newEvent.description,
-        event_date: newEvent.event_date,
-        event_month: month,
-        event_day: day,
-        location: newEvent.location,
-        target_audience: newEvent.target_audience,
-      }])
+      // Readback returns the new id so the audit entry can point at the
+      // row. Safe here: this table's SELECT policy covers whoever may
+      // insert, so a successful insert is always readable by its author.
+      const { data: inserted, error } = await supabase
+        .from('health_events')
+        .insert([{
+          title: newEvent.title,
+          description: newEvent.description,
+          event_date: newEvent.event_date,
+          event_month: month,
+          event_day: day,
+          location: newEvent.location,
+          target_audience: newEvent.target_audience,
+        }])
+        .select('id')
+        .single()
 
       if (error) {
         console.error('Add health event error:', error)
         toast.error(error.message || 'Failed to add health event!')
+      } else if (!inserted?.id) {
+        toast.error('Saved, but the event could not be read back. Refresh to confirm it is there.')
       } else {
         toast.success('Health event added!')
+        logActivity({
+          action: 'added',
+          entityType: 'health_event',
+          entityId: inserted.id,
+          subject: newEvent.title,
+        })
         setShowEventModal(false)
         setNewEvent({ title: '', description: '', event_date: '', location: '', target_audience: '' })
         // Re-fetch immediately so the calendar reflects the new entry
@@ -174,12 +195,36 @@ const NurseDashboard = () => {
     }
   }
 
-  const handleDeleteEvent = async (id) => {
-    const { error } = await supabase.from('health_events').delete().eq('id', id)
+  const handleDeleteEvent = async (event) => {
+    const ok = await confirm({
+      title: 'Delete this health event?',
+      message: `"${event.title}" will be removed from the bakuna calendar shown to `
+        + 'residents, and cannot be recovered.',
+      confirmLabel: 'Delete event',
+    })
+    if (!ok) return
+
+    // .select() matters here: RLS filters rows rather than raising, so a
+    // blocked delete comes back as success with zero rows affected. Without
+    // this check the toast reports a removal that never happened.
+    const { data, error } = await supabase
+      .from('health_events')
+      .delete()
+      .eq('id', event.id)
+      .select('id')
+
     if (error) {
       toast.error('Failed to delete event!')
+    } else if (!data || data.length === 0) {
+      toast.error('Nothing was deleted — you may not have permission to change health events.')
     } else {
       toast.success('Event deleted!')
+      logActivity({
+        action: 'deleted',
+        entityType: 'health_event',
+        entityId: event.id,
+        subject: event.title,
+      })
       fetchHealthEvents()
     }
   }
@@ -262,10 +307,28 @@ const NurseDashboard = () => {
     }
   }
 
-  const handleDeleteAvailability = async (id) => {
-    const { error } = await supabase.from('nurse_availability').delete().eq('id', id)
+  const handleDeleteAvailability = async (avail) => {
+    const ok = await confirm({
+      title: 'Remove this clinic schedule?',
+      message: `${avail.day_of_week} will no longer show clinic hours on the public `
+        + 'Health Center page. Residents checking that day will see nothing scheduled.',
+      confirmLabel: 'Remove schedule',
+    })
+    if (!ok) return
+
+    // .select() matters here: RLS filters rows rather than raising, so a
+    // blocked delete comes back as success with zero rows affected. Without
+    // this check the toast reports a removal that never happened.
+    const { data, error } = await supabase
+      .from('nurse_availability')
+      .delete()
+      .eq('id', avail.id)
+      .select('id')
+
     if (error) {
       toast.error('Failed to delete!')
+    } else if (!data || data.length === 0) {
+      toast.error('Nothing was removed — you may not have permission to change the schedule.')
     } else {
       toast.success('Deleted!')
       fetchNurseAvailability()
@@ -384,6 +447,17 @@ const NurseDashboard = () => {
       }
 
       toast.success(editingMedicine ? 'Medicine updated!' : 'Medicine added!')
+      // Only creation is recorded. Stock status (Available / Low / Out)
+      // changes every day by design, so logging edits here would bury
+      // every other entry in the Activity Log.
+      if (!editingMedicine) {
+        logActivity({
+          action: 'added',
+          entityType: 'medicine',
+          entityId: data[0]?.id ?? null,
+          subject: medicineForm.name.trim(),
+        })
+      }
       setShowMedicineModal(false)
       setEditingMedicine(null)
       fetchMedicines()
@@ -400,11 +474,27 @@ const NurseDashboard = () => {
     )
     if (!ok) return
 
-    const { error } = await supabase.from('medicine_stock').delete().eq('id', medicine.id)
+    // .select() matters here: RLS filters rows rather than raising, so a
+    // blocked delete comes back as success with zero rows affected. Without
+    // this check the toast reports a removal that never happened.
+    const { data, error } = await supabase
+      .from('medicine_stock')
+      .delete()
+      .eq('id', medicine.id)
+      .select('id')
+
     if (error) {
       toast.error('Failed to remove medicine.')
+    } else if (!data || data.length === 0) {
+      toast.error('Nothing was removed — you may not have permission to change the medicine list.')
     } else {
       toast.success('Medicine removed.')
+      logActivity({
+        action: 'deleted',
+        entityType: 'medicine',
+        entityId: medicine.id,
+        subject: medicine.name,
+      })
       fetchMedicines()
     }
   }
@@ -460,22 +550,43 @@ const NurseDashboard = () => {
           toast.error('Failed to update program!')
         } else {
           toast.success('Program updated!')
+          logActivity({
+            action: 'edited',
+            entityType: 'medical_program',
+            entityId: editingProgram.id,
+            subject: newProgram.title,
+          })
           setShowProgramModal(false)
           fetchMedicalPrograms()
         }
       } else {
-        const { error } = await supabase.from('medical_programs').insert([{
-          title: newProgram.title,
-          schedule_label: newProgram.schedule_label,
-          time_label: newProgram.time_label,
-          display_order: Number(newProgram.display_order) || 0,
-          updated_by: user?.id ?? null,
-        }])
+        // Readback returns the new id so the audit entry can point at the
+        // row. Safe here: this table's SELECT policy covers whoever may
+        // insert, so a successful insert is always readable by its author.
+        const { data: inserted, error } = await supabase
+          .from('medical_programs')
+          .insert([{
+            title: newProgram.title,
+            schedule_label: newProgram.schedule_label,
+            time_label: newProgram.time_label,
+            display_order: Number(newProgram.display_order) || 0,
+            updated_by: user?.id ?? null,
+          }])
+          .select('id')
+          .single()
 
         if (error) {
           toast.error('Failed to add program!')
+        } else if (!inserted?.id) {
+          toast.error('Saved, but the programme could not be read back. Refresh to confirm it is there.')
         } else {
           toast.success('Program added!')
+          logActivity({
+            action: 'added',
+            entityType: 'medical_program',
+            entityId: inserted.id,
+            subject: newProgram.title,
+          })
           setShowProgramModal(false)
           fetchMedicalPrograms()
         }
@@ -486,12 +597,36 @@ const NurseDashboard = () => {
     }
   }
 
-  const handleDeleteProgram = async (id) => {
-    const { error } = await supabase.from('medical_programs').delete().eq('id', id)
+  const handleDeleteProgram = async (program) => {
+    const ok = await confirm({
+      title: 'Remove this medical programme?',
+      message: `"${program.title}" will no longer be listed on the public Health `
+        + 'Center page, and cannot be recovered.',
+      confirmLabel: 'Remove programme',
+    })
+    if (!ok) return
+
+    // .select() matters here: RLS filters rows rather than raising, so a
+    // blocked delete comes back as success with zero rows affected. Without
+    // this check the toast reports a removal that never happened.
+    const { data, error } = await supabase
+      .from('medical_programs')
+      .delete()
+      .eq('id', program.id)
+      .select('id')
+
     if (error) {
       toast.error('Failed to delete program!')
+    } else if (!data || data.length === 0) {
+      toast.error('Nothing was removed — you may not have permission to change programmes.')
     } else {
       toast.success('Program removed!')
+      logActivity({
+        action: 'deleted',
+        entityType: 'medical_program',
+        entityId: program.id,
+        subject: program.title,
+      })
       fetchMedicalPrograms()
     }
   }
@@ -613,7 +748,7 @@ const NurseDashboard = () => {
                           <button
                             className="program-edit-btn"
                             style={{ color: '#dc2626' }}
-                            onClick={() => handleDeleteProgram(program.id)}
+                            onClick={() => handleDeleteProgram(program)}
                           >
                             Remove
                           </button>
@@ -794,7 +929,7 @@ const NurseDashboard = () => {
                             </button>
                             <button
                               className="btn-deny"
-                              onClick={() => handleDeleteAvailability(avail.id)}
+                              onClick={() => handleDeleteAvailability(avail)}
                             >
                               Delete
                             </button>
@@ -869,7 +1004,7 @@ const NurseDashboard = () => {
                           <td data-label="Location">{event.location}</td>
                           <td data-label="Target">{event.target_audience}</td>
                           <td data-label="Action">
-                            <button className="btn-deny" onClick={() => handleDeleteEvent(event.id)}>
+                            <button className="btn-deny" onClick={() => handleDeleteEvent(event)}>
                               Delete
                             </button>
                           </td>
@@ -1210,6 +1345,7 @@ const NurseDashboard = () => {
         </div>
       )}
 
+      {confirmDialog}
     </div>
   )
 }

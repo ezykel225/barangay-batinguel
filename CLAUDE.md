@@ -157,7 +157,7 @@ src/
 
   assets/images/      11 official portraits, page backgrounds, logo.
 
-supabase-migrations/  15 numbered SQL files. A record, not a runner.
+supabase-migrations/  17 numbered SQL files. A record, not a runner.
 supabase/functions/   Edge Function source (notify-reservation-sms).
 docs/                 SETUP.md, TESTING-WALKTHROUGH.pdf + its generator.
 ```
@@ -293,7 +293,7 @@ touches a lot of working code.
 
 ## Database notes
 
-**15 migrations**, `001` through `015`, all applied.
+**17 migrations**, `001` through `017`, all applied.
 
 **15 tables, RLS enabled on every one.**
 
@@ -366,6 +366,28 @@ the relevant role in SQL):
   entries reading "Barangay Secretary / verified / Someone Else".
   `subject` and `details` remain free text, but they hang off a
   truthful actor performing a real action.
+
+  **Two gates, not one.** The CHECK constraints decide what words are
+  permitted; the trigger decides who may say them. Migration 016 widened
+  the vocabulary (14 actions, 11 entity types) and that alone changed
+  nothing for the nurse, because the trigger refuses every non-official.
+  Migration 017 added a narrow nurse branch: `added`/`edited`/`deleted`
+  on `health_event`/`medicine`/`medical_program`, and nothing else. If a
+  new log event is ever rejected, check both gates -- widening one
+  without the other is the mistake 016 made on its own.
+
+  **`is_official()` must not be made nurse-inclusive** to solve that
+  kind of problem. It is used in eleven places including RLS policies on
+  `residents_registry`, `waste_schedule` and `activity_log`'s own SELECT
+  policy, so widening it would hand the nurse the residents registry,
+  the waste schedule and read access to the whole audit trail. The nurse
+  still cannot read `activity_log` at all -- she writes three entity
+  types to a table she never sees.
+
+  **Routine medicine stock changes are deliberately not logged.** Stock
+  status changes daily by design; logging it would bury everything else.
+  Only add/edit/delete of the medicine record itself is recorded. Kapitan
+  status and nurse availability are excluded for the same reason.
 
 **Allowlist, not denylist.** The protect triggers originally named the
 *forbidden* columns, which fails open: anything unlisted was permitted,

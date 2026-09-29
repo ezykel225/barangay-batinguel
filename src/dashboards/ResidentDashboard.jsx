@@ -10,6 +10,7 @@ import {
 import { supabase } from '../supabase/supabaseClient'
 import { pathFromPublicUrl } from '../utils/storagePath'
 import { BARANGAY_NAME, PUROKS } from '../constants/barangay'
+import { logActivity } from '../utils/activityLog'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 import Sidebar from '../components/Sidebar'
@@ -294,13 +295,16 @@ const ResidentDashboard = () => {
       // resident may only record `cancelled` on `reservation`, and only
       // on their own booking — entity_id below is what that is checked
       // against.
-      await supabase.from('activity_log').insert([{
+      // Routed through the shared helper so this write is checked like
+      // every other. Previously the result was not destructured at all,
+      // so a rejected insert was discarded without even a console line.
+      await logActivity({
         action: 'cancelled',
-        entity_type: 'reservation',
-        entity_id: reservation.id,
+        entityType: 'reservation',
+        entityId: reservation.id,
         subject: `${reservation.preferred_date} ${reservation.preferred_time}`,
         details: reservation.purpose || null,
-      }])
+      })
 
       toast.success('Reservation cancelled. The time slot is now open again.')
       fetchMyReservations()
