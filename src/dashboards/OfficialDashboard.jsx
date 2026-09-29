@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   FaClipboardList,
   FaBullhorn,
@@ -131,7 +131,11 @@ const OfficialDashboard = () => {
     fetchWasteSchedule()
     fetchResidentsList()
     fetchRegistryEntries()
-    fetchActivityLog()
+    // fetchActivityLog() is deliberately NOT called here. The effect
+    // below fetches it whenever the Activity Log tab opens, which is the
+    // only place the state is read -- and activeTab starts on
+    // 'dashboard', so fetching 200 rows on every mount only ever
+    // produced data nothing displayed yet.
     if (user?.id) fetchUserInfo(user.id)
   }, [user])
 
@@ -298,7 +302,9 @@ const OfficialDashboard = () => {
     if (!error) setRegistryEntries(data || [])
   }
 
-  const fetchActivityLog = async () => {
+  // useCallback so this keeps a stable identity and the effect below can
+  // list it as a dependency without re-running on every render.
+  const fetchActivityLog = useCallback(async () => {
     const { data, error } = await supabase
       .from('activity_log')
       .select('*')
@@ -306,7 +312,24 @@ const OfficialDashboard = () => {
       .limit(200)
 
     if (!error) setActivityLog(data || [])
-  }
+  }, [])
+
+  // The Activity Log is written as a side effect of actions taken on
+  // OTHER tabs -- an approval, a deletion, a verification. So the copy
+  // fetched on mount went stale the moment anything was logged, and a
+  // new entry only appeared once the dashboard had been remounted by
+  // navigating away and back.
+  //
+  // Refetching when the tab opens also picks up entries written by
+  // another official, which a once-per-mount fetch never would.
+  //
+  // This effect must stay BELOW the definition above. It names
+  // fetchActivityLog in its dependency array, and dependency arrays are
+  // evaluated during render -- moving it earlier would read the const
+  // before it is initialised and throw on first paint.
+  useEffect(() => {
+    if (activeTab === 'activity') fetchActivityLog()
+  }, [activeTab, fetchActivityLog])
 
   // Case-insensitive name lookup against the barangay's own record of
   // inhabitants. Names only -- purok is shown for comparison but is

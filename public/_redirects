@@ -1,0 +1,25 @@
+# Netlify SPA fallback for React Router's BrowserRouter.
+#
+# Without this, requesting a real path directly -- pressing Ctrl+R on
+# /official, or opening a shared link to /announcements/<id> -- makes the
+# browser ask Netlify for a file that does not exist in build/, and
+# Netlify answers with its own 404 page. React never boots, so the router
+# never gets the chance to handle the route.
+#
+# Status 200 is a rewrite, not a redirect: the address bar keeps the
+# original path, which is what the router needs. A 301/302 would send the
+# visitor to / and lose the route.
+#
+# This cannot shadow real assets. Netlify looks for an existing file
+# before applying these rules, so /static/js/*, /favicon.ico and
+# /manifest.json keep serving themselves; only paths with no matching
+# file fall through to index.html.
+#
+# Netlify only. Vercel ignores this file and already applies SPA fallback
+# through its Create React App preset, which is why the bug never
+# appeared there.
+#
+# CRA copies everything in public/ into build/ verbatim, so this ships to
+# the publish directory with no build configuration.
+
+/*    /index.html   200
