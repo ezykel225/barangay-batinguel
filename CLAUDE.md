@@ -8,10 +8,35 @@ for Barangay Services, Official Information, and Health Center Management.*
 
 ---
 
+## Git workflow
+
+**You do not merge. The repo owner does.** The whole point of the PR is
+that he reads the diff before it lands — this is a capstone he has to
+defend and understand, and a change that arrives already merged has
+skipped the part that matters.
+
+1. **`git pull` before starting.** Stale local code has looked like a bug
+   more than once.
+2. **Work on a feature branch** — `claude/<short-description>`.
+3. **Never commit to `main` directly**, and never push to it.
+4. Commit with a message saying what changed and why.
+5. **Push the branch and open a PR.**
+6. **Stop there.** He reviews and merges.
+
+Do not merge your own PR. Not when the change is small, not when CI is
+green, not when it is obviously correct — the review is not a quality
+gate to be satisfied, it is how he learns what changed in his own
+project.
+
+---
+
 ## Tech stack
 
-- **React 19** (Create React App — `npm start`, not Vite)
-- **React Router v6**
+- **React 19.2.5** on **Create React App** (`react-scripts` **5.0.1**) —
+  **not Vite.** Anything assuming Vite is wrong here: no
+  `import.meta.env`, no `vite.config.js`, no `VITE_` prefixes. Env vars
+  are `REACT_APP_*` and are read at **build** time.
+- **React Router v6.28** (`react-router-dom`)
 - **Supabase** — Postgres, Auth, Storage, Edge Functions
 - `react-hot-toast` for notifications, `react-icons/fa` for icons
 - Styling is hand-written CSS, one file per component
@@ -22,6 +47,34 @@ Tailwind utility class in the JSX — the apparent matches are all custom
 class names containing the word "grid". It can be removed.
 
 **Supabase project ref:** `mpcyqwasurhtdztzobwg`
+
+### Commands
+
+| Command | What it does |
+|---|---|
+| `npm start` | Dev server on :3000. Reads `.env` **only at startup** — restart after editing it. |
+| `npm run build` | Production build into `build/`. Exits 0 even when the app is dead — see *Environment*. |
+| `npm test` | Jest via react-scripts, watch mode. |
+
+**There is no lint script and no typecheck script.** Don't reach for
+`npm run lint` or `npm run typecheck` — they do not exist, and this is
+plain JavaScript with no TypeScript anywhere, so there is nothing to
+typecheck. The only lint signal is CRA's build-time ESLint warnings in
+the terminal. That is exactly why `DISABLE_ESLINT_PLUGIN=true` is
+banned below: it silences the one check this project has.
+
+### Tests
+
+One test exists — `src/App.test.js` renders `<App />` and asserts the
+brand name appears. That is the entire suite. Schema and policy changes
+were verified instead by impersonating each role in SQL, with the
+results recorded in the migration headers.
+
+**Tests need the Supabase env vars.** `supabaseClient.js` throws at
+import time when they're missing; `App.test.js` imports `App`, which
+imports the client. So a missing `.env` fails the test with a module
+error that never mentions `.env`. If `npm test` fails on a fresh
+checkout, check `.env` before debugging the test.
 
 ### Environment
 
@@ -60,20 +113,112 @@ in `react-scripts` → `webpack-dev-server`, which never ships. `--force`
 
 ```
 src/
-  constants/            Barangay facts, medicine categories, page content
-  utils/                Photo lookup, storage paths, clinic-hour parsing
-supabase-migrations/    Numbered SQL recording every schema/RLS change
-supabase/functions/     Edge Function source (notify-reservation-sms)
+  App.js              All routing: 11 public routes, 3 role-protected
+                      (/official, /nurse, /resident) wrapped in
+                      ProtectedRoute, plus path="*" — see the note below.
+  index.js            CRA entry point.
+  index.css           Global CSS, plus the unused @tailwind directives.
+
+  context/
+    AuthContext.jsx   Supabase session + role for the whole app. Read the
+                      getSession warning under Authentication first.
+
+  components/
+    Navbar.jsx        Public header.
+    Footer.jsx        Public footer; contact details come from constants.
+    Sidebar.jsx       Dashboard nav. Defines the tab lists for all three
+                      roles: official (13), nurse (5), resident (4).
+    ProtectedRoute    Role gate. Frontend only — RLS is the real control.
+
+  pages/              Public routes: Home, Officials, HealthCenter,
+                      Reservation, Login, ResidentSignup, ResetPassword,
+                      Announcements(+Details), Events(+Details).
+                      Reservation.jsx is the largest at ~950 lines.
+
+  dashboards/         One component per role; each holds every tab's state
+                      and its own data fetching.
+    OfficialDashboard ~2,875 lines. The position gates live here.
+    NurseDashboard    ~1,216 lines.
+    ResidentDashboard ~1,136 lines.
+
+  constants/
+    barangay.js       Purok list, contact numbers, hall hours, nurse label.
+    medicines.js      Medicine categories, forms, status vocabulary.
+    about.js          Barangay history, profile, Batinguel Elementary.
+
+  utils/
+    officialPhotos    Maps barangay_officials.full_name -> portrait file.
+    clinicHours.js    Parses the "8:00 AM" display strings.
+    storagePath.js    Public URL -> storage object path.
+
+  supabase/
+    supabaseClient.js The single Supabase client. Throws at import time
+                      when the env vars are missing.
+
+  assets/images/      11 official portraits, page backgrounds, logo.
+
+supabase-migrations/  15 numbered SQL files. A record, not a runner.
+supabase/functions/   Edge Function source (notify-reservation-sms).
+docs/                 SETUP.md, TESTING-WALKTHROUGH.pdf + its generator.
 ```
+
+**`path="*"` renders `Home`, not a 404 page.** A mistyped URL therefore
+looks like the homepage. Worth knowing before spending time on "why
+does this bad route still work".
 
 `supabase-migrations/` is a **record**, not a runner. Editing a file
 there changes nothing — migrations are applied by pasting them into the
 Supabase SQL Editor. "I edited the migration" and "the database changed"
 are two separate steps, and forgetting the second is an easy mistake.
 
+There is **no migration runner and no Supabase CLI workflow here** — no
+`supabase db push`, no `supabase migration up`. A new file is applied by
+hand in the SQL Editor (or via the Supabase connector), and its header
+is then updated to record that it was applied, when, and how it was
+verified. A file whose header does not say APPLIED has not run.
+
 Each file's header records whether it has been applied, when, and how it
 was verified. Those headers are the only place several non-obvious
 decisions are written down; read them before changing anything nearby.
+
+---
+
+## Authentication and session handling
+
+Supabase Auth, email + password, **email confirmation required**. See
+*Signup flow* below for what that does to the first write after signup.
+
+`AuthContext.jsx` is the single source of both the session and the role:
+it subscribes to `onAuthStateChange`, and on each event fetches
+`profiles.role` for the signed-in user. `ProtectedRoute` reads that
+context to gate the three dashboard routes — **frontend only.** It
+controls what renders, never what the database will allow; see *Security
+model*. Roles are in *User roles* below, and the position-based
+permissions that sit on top of them in *Role-specific permissions*.
+
+### ⚠️ Never reintroduce `getSession()` alongside the subscription
+
+`AuthContext` used to call `supabase.auth.getSession()` in a separate
+`checkUser()` function **as well as** subscribing to
+`onAuthStateChange`. That was the cause of the app-wide hangs and the
+"Auth check timed out" errors.
+
+`onAuthStateChange` already fires once immediately with the current
+session the moment you subscribe — that is documented Supabase
+behaviour. So the extra `getSession()` was a second, redundant request
+racing the first for the same **browser-wide auth lock** on every page
+load. And because `AuthProvider` wraps the whole app, every request
+through the shared client queued behind that stuck lock — including
+plain public table reads with no auth involved, like the Waste
+Management schedule on the public homepage.
+
+There must only ever be **one** of the two. The subscription is the one
+that stays. Adding a `getSession()` call "just to be sure the session
+loaded" reintroduces the bug, and it presents as unrelated public pages
+hanging, which is nearly impossible to trace back.
+
+The full reasoning is also in a comment in `AuthContext.jsx` — keep both
+copies if you edit the file.
 
 ---
 
@@ -87,10 +232,19 @@ Three roles, stored in `profiles.role`:
 | `nurse` | Manually by devs (service_role) | `/nurse` dashboard |
 | `resident` | Self-signup at `/signup` | `/` (Home) — **not** the dashboard |
 
-There is no admin role — that was considered and dropped. Two old
-policies on `kapitan_status` and `kapitan_availability` still reference
-`role = 'admin'`; it is a dead condition, harmless but worth knowing
-before someone assumes the role exists.
+There is no admin role — that was considered and dropped. But **ten old
+policies across six tables still reference it**, as
+`profiles.role = ANY (ARRAY['admin', ...])`: `announcements` (INSERT,
+UPDATE), `events` (INSERT, UPDATE), `health_events` (INSERT, UPDATE),
+`nurse_availability` (INSERT, UPDATE), `kapitan_status` (UPDATE) and
+`kapitan_availability` (UPDATE).
+
+The condition is dead — no row has `role = 'admin'`, so it never matches
+and the `'official'`/`'nurse'` half does all the work. Harmless, but
+worth knowing before someone assumes the role exists, and worth having
+the full list if anyone ever cleans them up: an earlier version of this
+file said "two policies on two tables", which would have left eight
+behind while looking finished.
 
 Residents deliberately land on Home after login, not their dashboard —
 they're citizens browsing a public site who happen to have an account,
@@ -139,11 +293,31 @@ touches a lot of working code.
 
 ## Database notes
 
-14 migrations, all applied. Tables: `profiles`, `reservations`,
-`document_requests`, `announcements`, `events`, `barangay_officials`,
-`residents_registry`, `waste_schedule`, `activity_log`,
-`kapitan_status`, `kapitan_availability`, `nurse_availability`,
-`medical_programs`, `health_events`, `medicine_stock`.
+**15 migrations**, `001` through `015`, all applied.
+
+**15 tables, RLS enabled on every one.**
+
+| Table | Holds |
+|---|---|
+| `profiles` | One row per account — role, verification status, name parts, purok, contact |
+| `reservations` | Covered court bookings. No money columns at all |
+| `document_requests` | Document requests and their status |
+| `announcements` | Public announcements |
+| `events` | Public barangay events |
+| `barangay_officials` | The officials directory, including `position`, which drives permissions |
+| `residents_registry` | The barangay's own resident list — currently dummy data |
+| `waste_schedule` | Collection days per purok |
+| `activity_log` | Append-only audit trail. INSERT and SELECT policies only |
+| `kapitan_status` | Whether the Punong Barangay is in |
+| `kapitan_availability` | The Kapitan's weekly schedule |
+| `nurse_availability` | Clinic hours per weekday, including the lunch break |
+| `medical_programs` | Health centre programmes |
+| `health_events` | Bakuna / health event calendar |
+| `medicine_stock` | Medicine availability as a status, not a count |
+
+What each migration *changed* stays in that migration's own header, not
+here — this section says what exists now, the headers say how it got
+that way and how it was verified.
 
 ### Security model
 
@@ -311,8 +485,14 @@ own domain with SPF, DKIM and DMARC.
 - Unseen-status-change badges; pickup reminders; profile photo
 
 ### Officials
-- Dashboard, announcements, events, reservations, document requests
-- Waste management, Kapitan status, officials directory
+
+Thirteen sidebar tabs, defined in `Sidebar.jsx` as `officialNavItems`:
+Dashboard, Announcements, Events, Reservations, Document Requests, Waste
+Management, Kapitan Status, Officials Directory, Residents, Residents
+Registry, Reports, Activity Log, Settings.
+
+Two of them carry more than their name suggests:
+
 - Residents — verification queue with registry cross-reference, plus a
   permanent **Not a Resident** outcome that also deletes the uploaded ID
 - Residents Registry — the barangay's own record. Currently **dummy
@@ -469,6 +649,10 @@ the real name and photo together when the barangay confirms them.
 - **No automated tests** beyond one smoke test, which fails without
   `.env` because `supabaseClient.js` throws at import time.
 - **An InfinityFree deployment** may still be serving an old broken build.
+- **No 404 page.** `path="*"` in `App.js` renders `Home`, so a mistyped
+  URL looks like the homepage instead of reporting an error.
+- **No lint script and no typecheck script**, and a single test — see
+  *Commands* and *Tests* above.
 
 ---
 
@@ -487,5 +671,3 @@ the real name and photo together when the barangay confirms them.
 - **Run `get_advisors` after any migration that adds a function.** It
   caught a missing `search_path` within minutes.
 - Flag bugs and security gaps found in passing, even when off-task.
-- `git pull` before starting. Stale local code has looked like a bug more
-  than once.
