@@ -38,6 +38,8 @@ const Announcements = () => {
     <div className="announcements-page">
       <Navbar />
 
+      <main id="main-content">
+
       <section className="announcements-page-section">
         <div className="announcements-page-container">
           <Link to="/" className="back-link">← Back to Home</Link>
@@ -83,6 +85,7 @@ const Announcements = () => {
         </div>
       </section>
 
+      </main>
       <Footer />
     </div>
   )

@@ -95,6 +95,8 @@ const Home = () => {
     <div className="home">
       <Navbar />
 
+      <main id="main-content">
+
       <section className="hero">
         <div className="hero-container">
           <span className="hero-badge">
@@ -387,6 +389,7 @@ const Home = () => {
         </div>
       </section>
 
+      </main>
       <Footer />
     </div>
   )

@@ -36,7 +36,7 @@
 }
 
 .health-hero-left h1 {
-  font-size: 48px;
+  font-size: var(--fs-48);
   font-weight: 700;
   line-height: 1.15;
   margin-bottom: 16px;
@@ -49,7 +49,7 @@
 }
 
 .health-hero-left p {
-  font-size: 16px;
+  font-size: var(--fs-16);
   color: #bfdbfe;
   max-width: 520px;
   line-height: 1.7;
@@ -58,14 +58,14 @@
 .health-emergency-card {
   background-color: rgba(255, 255, 255, 0.12);
   border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 20px 28px;
   text-align: center;
   min-width: 200px;
 }
 
 .health-emergency-card p {
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -73,14 +73,14 @@
   color: #bfdbfe;
 }
 
-.health-emergency-card h3 {
-  font-size: 24px;
+.health-emergency-card h2 {
+  font-size: var(--fs-24);
   font-weight: 700;
   color: white;
 }
 
 .health-emergency-card span {
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: #bfdbfe;
 }
 
@@ -113,13 +113,13 @@
 .health-status-card {
   background-color: #ffffff;
   border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-sm);
 }
 
-.health-status-card h4 {
-  font-size: 13px;
+.health-status-card h3 {
+  font-size: var(--fs-13);
   font-weight: 600;
   color: #6b7280;
   text-transform: uppercase;
@@ -133,7 +133,7 @@
 .health-status-dot {
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   background-color: #16a34a;
   animation: pulse 2s infinite;
 }
@@ -167,13 +167,13 @@
 .health-nurse-avatar {
   width: 44px;
   height: 44px;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   background: linear-gradient(135deg, #0f766e, #14b8a6);
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  font-size: 18px;
+  font-size: var(--fs-18);
   flex-shrink: 0;
 }
 
@@ -182,8 +182,8 @@
   min-width: 0;
 }
 
-.health-nurse-info h5 {
-  font-size: 13px;
+.health-nurse-info h4 {
+  font-size: var(--fs-13);
   font-weight: 600;
   color: #1f2937;
   margin-bottom: 2px;
@@ -193,7 +193,7 @@
 }
 
 .health-nurse-info p {
-  font-size: 11px;
+  font-size: var(--fs-12);
   color: #6b7280;
 }
 
@@ -210,8 +210,8 @@
   align-items: center;
   gap: 5px;
   padding: 4px 10px;
-  border-radius: 20px;
-  font-size: 11px;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-12);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -220,7 +220,7 @@
   content: '';
   width: 6px;
   height: 6px;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   flex-shrink: 0;
 }
 
@@ -258,13 +258,13 @@
 .health-clinic-card {
   background-color: #ffffff;
   border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-sm);
 }
 
-.health-clinic-card h4 {
-  font-size: 14px;
+.health-clinic-card h3 {
+  font-size: var(--fs-14);
   font-weight: 700;
   color: #1f2937;
   margin-bottom: 16px;
@@ -276,7 +276,7 @@
   align-items: center;
   padding: 8px 0;
   border-bottom: 1px solid #f3f4f6;
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 
 .clinic-hours-item:last-child {
@@ -304,13 +304,13 @@
 .health-visit-card {
   background-color: #ffffff;
   border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-sm);
 }
 
-.health-visit-card h4 {
-  font-size: 14px;
+.health-visit-card h3 {
+  font-size: var(--fs-14);
   font-weight: 700;
   color: #1f2937;
   margin-bottom: 16px;
@@ -329,11 +329,11 @@
 .visit-option-icon {
   width: 40px;
   height: 40px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  font-size: var(--fs-18);
   flex-shrink: 0;
 }
 
@@ -347,23 +347,23 @@
   color: #16a34a;
 }
 
-.visit-option-info h5 {
-  font-size: 13px;
+.visit-option-info h4 {
+  font-size: var(--fs-13);
   font-weight: 700;
   color: #1f2937;
   margin-bottom: 4px;
 }
 
 .visit-option-info p {
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: #6b7280;
   line-height: 1.5;
 }
 
 .visit-divider {
   text-align: center;
-  font-size: 12px;
-  color: #9ca3af;
+  font-size: var(--fs-12);
+  color: #6b7280;
   font-weight: 600;
   margin: 4px 0;
 }
@@ -378,7 +378,7 @@
 }
 
 .visit-contact span {
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: #6b7280;
   display: flex;
   align-items: center;
@@ -403,9 +403,9 @@
 .health-bakuna-card {
   background-color: #ffffff;
   border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-sm);
 }
 
 .health-card-header {
@@ -415,14 +415,14 @@
   margin-bottom: 20px;
 }
 
-.health-card-header h4 {
-  font-size: 16px;
+.health-card-header h3 {
+  font-size: var(--fs-16);
   font-weight: 700;
   color: #1f2937;
 }
 
 .health-card-header a {
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: #0f766e;
   text-decoration: none;
   font-weight: 500;
@@ -440,13 +440,13 @@
 
 .bakuna-card {
   border: 1px solid #e5e7eb;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
   transition: box-shadow 0.2s;
 }
 
 .bakuna-card:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-md);
 }
 
 .bakuna-card-date {
@@ -457,13 +457,13 @@
 }
 
 .bakuna-card-date .month {
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 600;
   text-transform: uppercase;
 }
 
 .bakuna-card-date .day {
-  font-size: 28px;
+  font-size: var(--fs-28);
   font-weight: 700;
   line-height: 1;
 }
@@ -472,15 +472,15 @@
   padding: 14px;
 }
 
-.bakuna-card-body h5 {
-  font-size: 14px;
+.bakuna-card-body h4 {
+  font-size: var(--fs-14);
   font-weight: 600;
   color: #1f2937;
   margin-bottom: 6px;
 }
 
 .bakuna-card-body p {
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: #6b7280;
   line-height: 1.5;
   margin-bottom: 10px;
@@ -491,8 +491,8 @@
   background-color: #f0fdf4;
   color: #16a34a;
   padding: 3px 10px;
-  border-radius: 20px;
-  font-size: 11px;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-12);
   font-weight: 600;
 }
 
@@ -502,9 +502,9 @@
 .health-tips-card {
   background-color: #ffffff;
   border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-sm);
 }
 
 .health-tips-grid {
@@ -520,31 +520,31 @@
   padding: 14px;
   background-color: #f8fafc;
   border: 1px solid #e5e7eb;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
 }
 
 .health-tip-icon {
   width: 36px;
   height: 36px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background-color: #ecfdf5;
   color: #0f766e;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: var(--fs-16);
   flex-shrink: 0;
 }
 
-.health-tip-info h5 {
-  font-size: 13px;
+.health-tip-info h4 {
+  font-size: var(--fs-13);
   font-weight: 700;
   color: #1f2937;
   margin-bottom: 4px;
 }
 
 .health-tip-info p {
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: #6b7280;
   line-height: 1.5;
 }
@@ -555,13 +555,13 @@
 .health-quicklinks-card {
   background-color: #ffffff;
   border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-sm);
 }
 
-.health-quicklinks-card h4 {
-  font-size: 16px;
+.health-quicklinks-card h3 {
+  font-size: var(--fs-16);
   font-weight: 700;
   color: #1f2937;
   margin-bottom: 16px;
@@ -579,7 +579,7 @@
   gap: 14px;
   padding: 14px;
   border: 1px solid #e5e7eb;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   text-decoration: none;
   transition: background-color 0.2s, box-shadow 0.2s;
   cursor: pointer;
@@ -587,17 +587,17 @@
 
 .quicklink-item:hover {
   background-color: #f9fafb;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--shadow-sm);
 }
 
 .quicklink-icon {
   width: 40px;
   height: 40px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: var(--fs-16);
   flex-shrink: 0;
 }
 
@@ -616,22 +616,22 @@
   color: #4338ca;
 }
 
-.quicklink-info h5 {
-  font-size: 14px;
+.quicklink-info h4 {
+  font-size: var(--fs-14);
   font-weight: 600;
   color: #1f2937;
   margin-bottom: 2px;
 }
 
 .quicklink-info p {
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: #6b7280;
 }
 
 .quicklink-arrow {
   margin-left: auto;
-  color: #9ca3af;
-  font-size: 13px;
+  color: #6b7280;
+  font-size: var(--fs-13);
   flex-shrink: 0;
 }
 
@@ -645,7 +645,7 @@
   }
 
   .health-hero-left h1 {
-    font-size: 34px;
+    font-size: var(--fs-34);
   }
 
   .health-hero-container {
@@ -684,19 +684,19 @@
   }
 
   .health-hero-left h1 {
-    font-size: 26px;
+    font-size: var(--fs-26);
   }
 
   .health-hero-left p {
-    font-size: 14px;
+    font-size: var(--fs-14);
   }
 
   .health-emergency-card {
     padding: 16px;
   }
 
-  .health-emergency-card h3 {
-    font-size: 20px;
+  .health-emergency-card h2 {
+    font-size: var(--fs-20);
   }
 
   .health-main {
@@ -721,8 +721,8 @@
     gap: 8px;
   }
 
-  .health-card-header h4 {
-    font-size: 15px;
+  .health-card-header h3 {
+    font-size: var(--fs-15);
   }
 
   .clinic-hours-item {
@@ -738,42 +738,42 @@
     padding: 12px;
   }
 
-  .quicklink-info h5 {
-    font-size: 12px;
+  .quicklink-info h4 {
+    font-size: var(--fs-12);
   }
 
   .quicklink-info p {
-    font-size: 11px;
+    font-size: var(--fs-12);
   }
 
   .status-badge {
-    font-size: 10px;
+    font-size: var(--fs-12);
     padding: 3px 8px;
   }
 
   .health-nurse-avatar {
     width: 38px;
     height: 38px;
-    font-size: 15px;
+    font-size: var(--fs-15);
   }
 }
 /* ── Medicine availability ──────────────────────────────────── */
 .health-medicine-card {
   background: #fff;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 24px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-sm);
   margin-bottom: 24px;
 }
 
 .medicine-updated {
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: #6b7280;
   font-weight: 500;
 }
 
 .medicine-disclaimer {
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: #6b7280;
   line-height: 1.6;
   margin: 0 0 18px;
@@ -783,7 +783,7 @@
 .medicine-group:last-child { margin-bottom: 0; }
 
 .medicine-group-title {
-  font-size: 12px;
+  font-size: var(--fs-12);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: #15803d;
@@ -809,7 +809,7 @@
   gap: 4px 12px;
   padding: 10px 12px;
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: #f9fafb;
 }
 
@@ -821,13 +821,13 @@
   gap: 8px;
 }
 
-.medicine-name { font-size: 14px; font-weight: 600; color: #111827; }
-.medicine-form { font-size: 12px; color: #6b7280; }
+.medicine-name { font-size: var(--fs-14); font-weight: 600; color: #111827; }
+.medicine-form { font-size: var(--fs-12); color: #6b7280; }
 
 .medicine-generic,
 .medicine-note {
   grid-column: 1;
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: #6b7280;
   line-height: 1.5;
 }
@@ -838,10 +838,10 @@
   grid-column: 2;
   grid-row: 1 / span 3;
   align-self: center;
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 600;
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   white-space: nowrap;
 }
 
@@ -861,9 +861,9 @@
   background: #fef3c7;
   border: 1px solid #fcd34d;
   color: #92400e;
-  font-size: 13px;
+  font-size: var(--fs-13);
   line-height: 1.5;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 10px 12px;
   margin-bottom: 14px;
 }
@@ -878,13 +878,13 @@
 .clinic-today-tag {
   display: inline-block;
   margin-left: 8px;
-  font-size: 10px;
+  font-size: var(--fs-12);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: #15803d;
   background: #dcfce7;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 2px 7px;
   vertical-align: middle;
 }
@@ -900,7 +900,7 @@
 .clinic-hours-block { white-space: nowrap; }
 
 .clinic-hours-break {
-  font-size: 11px;
+  font-size: var(--fs-12);
   font-weight: 500;
   color: #92400e;
   white-space: nowrap;

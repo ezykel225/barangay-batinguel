@@ -11,14 +11,14 @@
 }
 
 .official-dashboard-header h1 {
-  font-size: 28px;
+  font-size: var(--fs-28);
   font-weight: 700;
   color: #1f2937;
   margin-bottom: 4px;
 }
 
 .official-dashboard-header p {
-  font-size: 14px;
+  font-size: var(--fs-14);
   color: #6b7280;
 }
 
@@ -29,14 +29,14 @@
   background: linear-gradient(135deg,
       #1e3a8a,
       #1e40af);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 24px;
   color: white;
   margin-bottom: 24px;
 }
 
 .kapitan-status-section h3 {
-  font-size: 14px;
+  font-size: var(--fs-14);
   font-weight: 600;
   color: #bfdbfe;
   margin-bottom: 16px;
@@ -54,10 +54,10 @@
 .kapitan-status-option {
   padding: 10px;
   border: 2px solid rgba(255, 255, 255, 0.2);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.1);
   color: white;
-  font-size: 13px;
+  font-size: var(--fs-13);
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
@@ -75,7 +75,7 @@
 }
 
 .kapitan-current-status {
-  font-size: 14px;
+  font-size: var(--fs-14);
   color: #bfdbfe;
 }
 
@@ -92,14 +92,14 @@
 }
 
 .announcements-header h1 {
-  font-size: 28px;
+  font-size: var(--fs-28);
   font-weight: 700;
   color: #1f2937;
   margin-bottom: 4px;
 }
 
 .announcements-header p {
-  font-size: 14px;
+  font-size: var(--fs-14);
   color: #6b7280;
 }
 
@@ -111,14 +111,14 @@
 }
 
 .events-header h1 {
-  font-size: 28px;
+  font-size: var(--fs-28);
   font-weight: 700;
   color: #1f2937;
   margin-bottom: 4px;
 }
 
 .events-header p {
-  font-size: 14px;
+  font-size: var(--fs-14);
   color: #6b7280;
 }
 
@@ -130,14 +130,14 @@
 }
 
 .reservations-header h1 {
-  font-size: 28px;
+  font-size: var(--fs-28);
   font-weight: 700;
   color: #1f2937;
   margin-bottom: 4px;
 }
 
 .reservations-header p {
-  font-size: 14px;
+  font-size: var(--fs-14);
   color: #6b7280;
 }
 
@@ -149,19 +149,19 @@
 }
 
 .kapitan-page-header h1 {
-  font-size: 28px;
+  font-size: var(--fs-28);
   font-weight: 700;
   color: #1f2937;
   margin-bottom: 4px;
 }
 
 .kapitan-page-header p {
-  font-size: 14px;
+  font-size: var(--fs-14);
   color: #6b7280;
 }
 
 .kapitan-current-display {
-  font-size: 24px;
+  font-size: var(--fs-24);
   font-weight: 700;
   margin-bottom: 16px;
   color: white;
@@ -175,14 +175,14 @@
 }
 
 .officials-dir-header h1 {
-  font-size: 28px;
+  font-size: var(--fs-28);
   font-weight: 700;
   color: #1f2937;
   margin-bottom: 4px;
 }
 
 .officials-dir-header p {
-  font-size: 14px;
+  font-size: var(--fs-14);
   color: #6b7280;
 }
 
@@ -194,7 +194,7 @@
 }
 
 .modal-form-label {
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 600;
   color: #374151;
   text-transform: uppercase;
@@ -207,10 +207,9 @@
   width: 100%;
   padding: 10px 14px;
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-14);
   font-family: 'Poppins', sans-serif;
-  outline: none;
   transition: border-color 0.2s;
 }
 
@@ -223,10 +222,9 @@
   width: 100%;
   padding: 10px 14px;
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-14);
   font-family: 'Poppins', sans-serif;
-  outline: none;
   min-height: 100px;
   resize: vertical;
   transition: border-color 0.2s;
@@ -244,21 +242,21 @@
   text-align: center;
   padding: 40px;
   color: #6b7280;
-  font-size: 14px;
+  font-size: var(--fs-14);
 }
 
 .dashboard-loading {
   text-align: center;
   padding: 20px;
   color: #6b7280;
-  font-size: 14px;
+  font-size: var(--fs-14);
 }
 
 /* ================================
     VIEW ALL LINK
   ================================ */
 .view-all-link {
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: #1e3a8a;
   text-decoration: none;
   font-weight: 500;
@@ -283,13 +281,13 @@
 
 @media (max-width: 768px) {
   .official-dashboard-header h1 {
-    font-size: 22px;
+    font-size: var(--fs-22);
   }
 }
 .official-row-photo {
   width: 40px;
   height: 40px;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   object-fit: cover;
 }
 
@@ -307,13 +305,13 @@
 }
 
 .report-stat-number {
-  font-size: 28px;
+  font-size: var(--fs-28);
   font-weight: 700;
   color: #1e3a8a;
 }
 
 .report-stat-label {
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: #6b7280;
   margin-top: 4px;
 }
@@ -328,7 +326,7 @@
 .chart-legend {
   display: flex;
   gap: 16px;
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: #6b7280;
   margin-bottom: 12px;
 }
@@ -385,7 +383,7 @@
 .bar-res { background-color: #16a34a; }
 
 .bar-chart-label {
-  font-size: 11px;
+  font-size: var(--fs-12);
   color: #6b7280;
   margin-top: 8px;
 }
@@ -400,7 +398,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 
 .rank-label {
@@ -412,14 +410,14 @@
   flex: 1;
   height: 10px;
   background-color: #f3f4f6;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   overflow: hidden;
 }
 
 .rank-bar-fill {
   height: 100%;
   background-color: #1e3a8a;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   min-width: 2px;
 }
 
@@ -445,6 +443,6 @@
 
   .rank-label {
     flex: 0 0 100px;
-    font-size: 12px;
+    font-size: var(--fs-12);
   }
 }

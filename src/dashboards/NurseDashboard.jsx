@@ -676,7 +676,7 @@ const NurseDashboard = () => {
     <div className="dashboard-layout">
       <Sidebar role="nurse" activeTab={activeTab} setActiveTab={setActiveTab} />
 
-      <div className="dashboard-main">
+      <main className="dashboard-main" id="main-content">
 
         {/* DASHBOARD TAB */}
         {activeTab === 'dashboard' && (
@@ -895,12 +895,12 @@ const NurseDashboard = () => {
                   <table className="dashboard-table">
                     <thead>
                       <tr>
-                        <th>Day</th>
-                        <th>Time Start</th>
-                        <th>Time End</th>
-                        <th>Lunch Break</th>
-                        <th>Status</th>
-                        <th>Action</th>
+                        <th scope="col">Day</th>
+                        <th scope="col">Time Start</th>
+                        <th scope="col">Time End</th>
+                        <th scope="col">Lunch Break</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -989,11 +989,11 @@ const NurseDashboard = () => {
                   <table className="dashboard-table">
                     <thead>
                       <tr>
-                        <th>Title</th>
-                        <th>Date</th>
-                        <th>Location</th>
-                        <th>Target</th>
-                        <th>Action</th>
+                        <th scope="col">Title</th>
+                        <th scope="col">Date</th>
+                        <th scope="col">Location</th>
+                        <th scope="col">Target</th>
+                        <th scope="col">Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1115,7 +1115,7 @@ const NurseDashboard = () => {
             </div>
           </div>
         )}
-      </div>
+      </main>
 
       {/* HEALTH EVENT MODAL */}
       {showEventModal && (

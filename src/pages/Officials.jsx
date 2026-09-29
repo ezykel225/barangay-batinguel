@@ -186,6 +186,8 @@ const Officials = () => {
     <div className="officials-page">
       <Navbar />
 
+      <main id="main-content">
+
       {/* Hero */}
       <section className="officials-hero">
         <div className="officials-hero-container">
@@ -386,6 +388,7 @@ const Officials = () => {
         </div>
       </section>
 
+      </main>
       <Footer />
     </div>
   )

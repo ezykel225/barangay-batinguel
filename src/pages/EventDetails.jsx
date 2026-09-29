@@ -39,6 +39,8 @@ const EventDetails = () => {
     <div className="event-details-page">
       <Navbar />
 
+      <main id="main-content">
+
       <section className="event-details-section">
         <div className="event-details-container">
           <Link to="/events" className="back-link">
@@ -63,6 +65,7 @@ const EventDetails = () => {
         </div>
       </section>
 
+      </main>
       <Footer />
     </div>
   )

@@ -184,7 +184,7 @@ const ResidentSignup = () => {
     <div className="login-page">
       <Navbar />
 
-      <div className="login-container">
+      <main className="login-container" id="main-content">
         <div className="login-box">
           <div className="login-left">
             <div className="login-left-logo">
@@ -201,7 +201,7 @@ const ResidentSignup = () => {
             </div>
 
             <div className="login-left-content">
-              <h2>Create a Resident Account</h2>
+              <h1>Create a Resident Account</h1>
               <p>
                 Sign up to request barangay documents, check waste
                 collection schedules, and stay updated on
@@ -213,7 +213,7 @@ const ResidentSignup = () => {
           </div>
 
           <div className="login-right">
-            <h3>Resident Registration</h3>
+            <h2>Resident Registration</h2>
             <p>
               For residents of <strong>{BARANGAY_NAME}</strong> only. Fill in
               your details as they appear on your valid ID.
@@ -380,7 +380,7 @@ const ResidentSignup = () => {
                     style={{ padding: '10px 0' }}
                   />
                 </div>
-                <p style={{ fontSize: 12, color: '#9ca3af', marginTop: 6 }}>
+                <p style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>
                   A photo of any valid government or barangay-issued ID, if you
                   have one. Don't have an ID? You can skip this and visit the
                   Barangay Hall so an official can verify you in person instead.
@@ -421,7 +421,7 @@ const ResidentSignup = () => {
             </div>
           </div>
         </div>
-      </div>
+      </main>
 
       <Footer />
     </div>

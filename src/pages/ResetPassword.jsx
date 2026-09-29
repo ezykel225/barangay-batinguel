@@ -98,7 +98,7 @@ const ResetPassword = () => {
     <div className="login-page">
       <Navbar />
 
-      <div className="login-container">
+      <main className="login-container" id="main-content">
         <div className="login-box">
           <div className="login-left">
             <div className="login-left-logo">
@@ -119,13 +119,13 @@ const ResetPassword = () => {
                 <FaLock />
                 Secure Gateway Access
               </div>
-              <h2>Reset Your Password</h2>
+              <h1>Reset Your Password</h1>
               <p>Choose a new password for your account.</p>
             </div>
           </div>
 
           <div className="login-right">
-            <h3>Set New Password</h3>
+            <h2>Set New Password</h2>
 
             {linkInvalid ? (
               <>
@@ -202,7 +202,7 @@ const ResetPassword = () => {
             )}
           </div>
         </div>
-      </div>
+      </main>
 
       <Footer />
     </div>

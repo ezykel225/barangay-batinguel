@@ -37,6 +37,8 @@ const Events = () => {
     <div className="events-page">
       <Navbar />
 
+      <main id="main-content">
+
       <section className="events-page-section">
         <div className="events-page-container">
           <Link to="/" className="back-link">← Back to Home</Link>
@@ -75,6 +77,7 @@ const Events = () => {
         </div>
       </section>
 
+      </main>
       <Footer />
     </div>
   )

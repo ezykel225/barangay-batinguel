@@ -1,3 +1,17 @@
+/* Design system first. Kept above the Tailwind directives because
+   `@import` must precede other rules; css-loader inlines both files at
+   build time, so nothing depends on browser @import behaviour.
+
+   `fonts.css` finally loads the Poppins the app has been asking for
+   since it was written. `tokens.css` holds colour, type, radius, shadow
+   and focus values that used to live in a :root block inside
+   `pages/Home.css`. */
+@import './styles/fonts.css';
+@import './styles/tokens.css';
+
+/* Tailwind is configured but entirely unused — there is not one utility
+   class in the JSX. These directives stay for now; removing Tailwind is
+   a separate change with its own review. */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -12,6 +26,79 @@ body {
   font-family: "Poppins", sans-serif;
 }
 
+/* ================================
+   FOCUS VISIBILITY
+   ================================
+   One visible focus ring for the whole application.
+
+   Before this, eleven rules set `outline: none` and nine of them
+   replaced it with nothing more than a border-colour change — which a
+   keyboard user cannot reliably see, and which fails WCAG 1.4.11. Two
+   replaced it with nothing at all: the dashboard filter dropdown and
+   the nurse's password field. Someone navigating by keyboard had no way
+   to tell where they were.
+
+   `:focus-visible` rather than `:focus` on purpose: it fires for
+   keyboard and assistive-technology focus but not for a mouse click, so
+   buttons do not keep a ring after being clicked. That was the real
+   reason those `outline: none` rules were written, and this is the
+   correct fix for it.
+
+   Deliberately `outline` only, with no `box-shadow` and no
+   `position`/`z-index`. Several inputs already define their own soft
+   `box-shadow` glow on `:focus`; adding another here would draw two
+   rings on the same field. And setting `position: relative` on whatever
+   happens to be focused creates a containing block and a stacking
+   context on arbitrary elements, which can move a layout — too high a
+   price for a ring that is already visible. One outline, one treatment. */
+:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* On dark surfaces a navy ring on navy is invisible, so it goes white.
+   The sidebar and the two hero panels are the dark backgrounds in this
+   project. */
+.sidebar :focus-visible,
+.mobile-nav :focus-visible,
+.officials-hero :focus-visible,
+.kapitan-card :focus-visible {
+  outline-color: #ffffff;
+}
+
+/* ================================
+   SKIP LINK
+   ================================
+   First thing in the tab order on every page, so a keyboard or screen
+   reader user can jump past the navigation instead of tabbing through
+   it on every single page. Hidden until focused.
+
+   It targets the `<main>` landmark that each page now has. Before this
+   phase the app had no `<main>` element anywhere — only two `<nav>` and
+   one `<footer>` — so there was nothing to skip to. */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 10001;
+  padding: 12px 20px;
+  background-color: var(--primary);
+  color: var(--white);
+  font-family: 'Poppins', sans-serif;
+  font-size: var(--fs-14);
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: 0 0 var(--radius-sm) 0;
+}
+
+.skip-link:focus {
+  left: 0;
+}
+
+/* `<main>` takes no styling of its own — it replaced a plain wrapper
+   div in each page, so any layout rule that applied to that div still
+   applies through the same class name. */
+
 .protected-loading {
   display: flex;
   flex-direction: column;
@@ -20,19 +107,51 @@ body {
   min-height: 100vh;
   gap: 16px;
   font-family: 'Poppins', sans-serif;
-  color: #1e3a8a;
+  color: var(--primary);
 }
 
 .protected-spinner {
   width: 40px;
   height: 40px;
-  border: 4px solid #dbeafe;
-  border-top: 4px solid #1e3a8a;
-  border-radius: 50%;
+  border: 4px solid var(--primary-light);
+  border-top: 4px solid var(--primary);
+  border-radius: var(--radius-circle);
   animation: spin 0.8s linear infinite;
 }
 
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+/* ================================
+   REDUCED MOTION
+   ================================
+   Honours the operating system's "reduce motion" setting, for people
+   who get motion sickness or find movement distracting.
+
+   Decorative motion is neutralised: the footer modal's fade-in and the
+   four pulsing status dots. Those dots already carry their meaning in
+   colour and text, so a still dot loses nothing.
+
+   ⚠️ The auth spinner is deliberately EXEMPT. It is not decoration — it
+   is the only signal that the session is still resolving. Freezing it
+   would make a slow login look like a hung page, which is worse for
+   everyone including the person who asked for less motion. Keep this
+   exemption if you edit this block. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
+
+  .protected-spinner {
+    animation-duration: 0.8s !important;
+    animation-iteration-count: infinite !important;
+  }
 }

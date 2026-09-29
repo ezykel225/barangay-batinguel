@@ -171,7 +171,7 @@ const Login = () => {
       <Navbar />
 
       {/* Login Container */}
-      <div className="login-container">
+      <main className="login-container" id="main-content">
         <div className="login-box">
 
           {/* Left Panel */}
@@ -194,7 +194,7 @@ const Login = () => {
                 <FaLock />
                 Secure Gateway Access
               </div>
-              <h2>Portal Authentication</h2>
+              <h1>Portal Authentication</h1>
               <p>
                 Please verify your identity to
                 proceed to your workstation.
@@ -211,7 +211,7 @@ const Login = () => {
 
           {/* Right Panel */}
           <div className="login-right">
-            <h3>Portal Authentication</h3>
+            <h2>Portal Authentication</h2>
             <p>
               Please verify your identity to proceed
               to your workstation.
@@ -385,13 +385,13 @@ const Login = () => {
 
           </div>
         </div>
-      </div>
+      </main>
 
       {/* Forgot Access Modal */}
       {showForgotModal && (
         <div className="login-modal-overlay" onClick={() => setShowForgotModal(false)}>
           <div className="login-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Reset Your Access</h3>
+            <h2>Reset Your Access</h2>
             <p>
               Enter the System ID (email) tied to your official or nurse
               account. We'll send a password reset link to it.
@@ -429,7 +429,7 @@ const Login = () => {
       {showSupportModal && (
         <div className="login-modal-overlay" onClick={() => setShowSupportModal(false)}>
           <div className="login-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Support Portal</h3>
+            <h2>Support Portal</h2>
             <p>
               For account access issues that a reset link can't fix,
               contact the Barangay Batinguel administrator directly:

@@ -196,6 +196,8 @@ const HealthCenter = () => {
 
       <Navbar />
 
+      <main id="main-content">
+
       {/* Hero */}
       <section className="health-hero">
         <div className="health-hero-container">
@@ -229,12 +231,12 @@ const HealthCenter = () => {
 
           <div className="health-emergency-card">
             <p>Emergency Hotline</p>
-            <h3>
+            <h2>
                 <a href={telHref(BARANGAY_CONTACT.landline)}>{BARANGAY_CONTACT.landline}</a>
-              </h3>
-              <h3 style={{ fontSize: '0.95em' }}>
+              </h2>
+              <h2 style={{ fontSize: '0.95em' }}>
                 <a href={telHref(BARANGAY_CONTACT.mobile)}>{BARANGAY_CONTACT.mobile}</a>
-              </h3>
+              </h2>
             <span>Available 24/7</span>
           </div>
         </div>
@@ -249,10 +251,10 @@ const HealthCenter = () => {
 
             {/* On Duty Status */}
             <div className="health-status-card">
-              <h4>
+              <h3>
                 <div className="health-status-dot"></div>
                 On-Duty Status
-              </h4>
+              </h3>
 
               {loadingNurse ? (
                 <p style={{ fontSize: '13px', color: '#6b7280' }}>Loading...</p>
@@ -264,7 +266,7 @@ const HealthCenter = () => {
                       <FaUserNurse />
                     </div>
                     <div className="health-nurse-info">
-                      <h5>{HEALTH_NURSE_NAME}</h5>
+                      <h4>{HEALTH_NURSE_NAME}</h4>
                       <p>Public Health Nurse</p>
                     </div>
                     <div className="health-nurse-status">
@@ -279,7 +281,7 @@ const HealthCenter = () => {
 
             {/* Clinic Hours — pulled live from the nurse's own weekly schedule */}
             <div className="health-clinic-card">
-              <h4>Clinic Hours</h4>
+              <h3>Clinic Hours</h3>
 
               {/* The one line a resident standing outside actually
                   needs. Shown above the week, because "are they open
@@ -351,13 +353,13 @@ const HealthCenter = () => {
 
             {/* Walk-in vs Appointment */}
             <div className="health-visit-card">
-              <h4><MdPersonSearch /> How to Visit</h4>
+              <h3><MdPersonSearch /> How to Visit</h3>
               <div className="visit-option">
                 <div className="visit-option-icon visit-walkin">
                   <FaWalking />
                 </div>
                 <div className="visit-option-info">
-                  <h5>Walk-in</h5>
+                  <h4>Walk-in</h4>
                   <p>For consultations, first aid, and minor injuries. Served on a first-come, first-served basis.</p>
                 </div>
               </div>
@@ -367,7 +369,7 @@ const HealthCenter = () => {
                   <MdOutlineEventAvailable />
                 </div>
                 <div className="visit-option-info">
-                  <h5>Prior Notice</h5>
+                  <h4>Prior Notice</h4>
                   <p>For maternal care, immunization, and scheduled check-ups. Contact the clinic beforehand.</p>
                 </div>
               </div>
@@ -391,7 +393,7 @@ const HealthCenter = () => {
                 page before walking to the health center. */}
             <div className="health-medicine-card">
               <div className="health-card-header">
-                <h4>💊 Medicine Availability</h4>
+                <h3>💊 Medicine Availability</h3>
                 {lastUpdated && (
                   <span className="medicine-updated">Updated {lastUpdated}</span>
                 )}
@@ -413,7 +415,7 @@ const HealthCenter = () => {
 
                   {medicinesByCategory.map(([category, items]) => (
                     <div key={category} className="medicine-group">
-                      <h5 className="medicine-group-title">{category}</h5>
+                      <h4 className="medicine-group-title">{category}</h4>
                       <ul className="medicine-list">
                         {items.map((medicine) => {
                           const meta = statusOf(medicine.status)
@@ -451,7 +453,7 @@ const HealthCenter = () => {
             {/* Bakuna Events */}
             <div className="health-bakuna-card">
               <div className="health-card-header">
-                <h4>💉 Bakuna & Health Events</h4>
+                <h3>💉 Bakuna & Health Events</h3>
               </div>
 
               {eventsLoading ? (
@@ -467,7 +469,7 @@ const HealthCenter = () => {
                         <div className="day">{event.event_day}</div>
                       </div>
                       <div className="bakuna-card-body">
-                        <h5>{event.title}</h5>
+                        <h4>{event.title}</h4>
                         <p>{event.description}</p>
                         <span className="bakuna-target">{event.target_audience}</span>
                       </div>
@@ -480,14 +482,14 @@ const HealthCenter = () => {
             {/* Health Tips */}
             <div className="health-tips-card">
               <div className="health-card-header">
-                <h4><FaLightbulb style={{ color: '#d97706' }} /> Health Tips & Advisory</h4>
+                <h3><FaLightbulb style={{ color: '#d97706' }} /> Health Tips & Advisory</h3>
               </div>
               <div className="health-tips-grid">
                 {healthTips.map((tip) => (
                   <div key={tip.id} className="health-tip-item">
                     <div className="health-tip-icon">{tip.icon}</div>
                     <div className="health-tip-info">
-                      <h5>{tip.title}</h5>
+                      <h4>{tip.title}</h4>
                       <p>{tip.desc}</p>
                     </div>
                   </div>
@@ -497,14 +499,14 @@ const HealthCenter = () => {
 
             {/* Quick Links */}
             <div className="health-quicklinks-card">
-              <h4>Quick Links</h4>
+              <h3>Quick Links</h3>
               <div className="quicklinks-grid">
                 <a href="/announcements" className="quicklink-item">
                   <div className="quicklink-icon quicklink-blue">
                     <FaBullhorn />
                   </div>
                   <div className="quicklink-info">
-                    <h5>Announcements</h5>
+                    <h4>Announcements</h4>
                     <p>Latest barangay news and advisories</p>
                   </div>
                   <FaChevronRight className="quicklink-arrow" />
@@ -514,7 +516,7 @@ const HealthCenter = () => {
                     <FaCalendarAlt />
                   </div>
                   <div className="quicklink-info">
-                    <h5>Court Reservation</h5>
+                    <h4>Court Reservation</h4>
                     <p>Book the barangay sports court</p>
                   </div>
                   <FaChevronRight className="quicklink-arrow" />
@@ -524,7 +526,7 @@ const HealthCenter = () => {
                     <FaGavel />
                   </div>
                   <div className="quicklink-info">
-                    <h5>Officials</h5>
+                    <h4>Officials</h4>
                     <p>Meet your barangay officials</p>
                   </div>
                   <FaChevronRight className="quicklink-arrow" />
@@ -536,6 +538,7 @@ const HealthCenter = () => {
         </div>
       </section>
 
+      </main>
       <Footer />
     </div>
   )
