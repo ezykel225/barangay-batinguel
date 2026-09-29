@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   FaClipboardList,
   FaBullhorn,
@@ -19,6 +19,8 @@ import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 import Sidebar from '../components/Sidebar'
 import { PersonAvatar } from '../utils/officialPhotos'
+import { logActivity } from '../utils/activityLog'
+import { useConfirm } from '../components/ConfirmDialog'
 import '../components/Sidebar.css'
 import './OfficialDashboard.css'
 
@@ -26,6 +28,11 @@ const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Se
 
 const OfficialDashboard = () => {
   const { user } = useAuth()
+  // Destructive actions go through this rather than acting on the first
+  // click. confirm() resolves true/false, so each handler needs one
+  // early return and nothing else changes -- which matters, because
+  // several of these sit on top of the per-row processing locks.
+  const [confirm, confirmDialog] = useConfirm()
   const [activeTab, setActiveTab] = useState('dashboard')
   const [reservations, setReservations] = useState([])
   const [announcements, setAnnouncements] = useState([])
@@ -124,7 +131,11 @@ const OfficialDashboard = () => {
     fetchWasteSchedule()
     fetchResidentsList()
     fetchRegistryEntries()
-    fetchActivityLog()
+    // fetchActivityLog() is deliberately NOT called here. The effect
+    // below fetches it whenever the Activity Log tab opens, which is the
+    // only place the state is read -- and activeTab starts on
+    // 'dashboard', so fetching 200 rows on every mount only ever
+    // produced data nothing displayed yet.
     if (user?.id) fetchUserInfo(user.id)
   }, [user])
 
@@ -291,7 +302,9 @@ const OfficialDashboard = () => {
     if (!error) setRegistryEntries(data || [])
   }
 
-  const fetchActivityLog = async () => {
+  // useCallback so this keeps a stable identity and the effect below can
+  // list it as a dependency without re-running on every render.
+  const fetchActivityLog = useCallback(async () => {
     const { data, error } = await supabase
       .from('activity_log')
       .select('*')
@@ -299,7 +312,24 @@ const OfficialDashboard = () => {
       .limit(200)
 
     if (!error) setActivityLog(data || [])
-  }
+  }, [])
+
+  // The Activity Log is written as a side effect of actions taken on
+  // OTHER tabs -- an approval, a deletion, a verification. So the copy
+  // fetched on mount went stale the moment anything was logged, and a
+  // new entry only appeared once the dashboard had been remounted by
+  // navigating away and back.
+  //
+  // Refetching when the tab opens also picks up entries written by
+  // another official, which a once-per-mount fetch never would.
+  //
+  // This effect must stay BELOW the definition above. It names
+  // fetchActivityLog in its dependency array, and dependency arrays are
+  // evaluated during render -- moving it earlier would read the const
+  // before it is initialised and throw on first paint.
+  useEffect(() => {
+    if (activeTab === 'activity') fetchActivityLog()
+  }, [activeTab, fetchActivityLog])
 
   // Case-insensitive name lookup against the barangay's own record of
   // inhabitants. Names only -- purok is shown for comparison but is
@@ -376,22 +406,43 @@ const OfficialDashboard = () => {
           toast.error('Failed to update entry!')
         } else {
           toast.success('Registry entry updated!')
+          logActivity({
+            action: 'edited',
+            entityType: 'registry_entry',
+            entityId: editingRegistryEntry.id,
+            subject: newRegistryEntry.full_name,
+          })
           setShowRegistryModal(false)
           fetchRegistryEntries()
         }
       } else {
-        const { error } = await supabase.from('residents_registry').insert([{
-          full_name: newRegistryEntry.full_name,
-          purok: newRegistryEntry.purok || null,
-          household_number: newRegistryEntry.household_number || null,
-          contact_number: newRegistryEntry.contact_number || null,
-          added_by: user?.id ?? null,
-        }])
+        // Readback returns the new id so the audit entry can point at the
+        // row. Safe here: this table's SELECT policy covers whoever may
+        // insert, so a successful insert is always readable by its author.
+        const { data: inserted, error } = await supabase
+          .from('residents_registry')
+          .insert([{
+            full_name: newRegistryEntry.full_name,
+            purok: newRegistryEntry.purok || null,
+            household_number: newRegistryEntry.household_number || null,
+            contact_number: newRegistryEntry.contact_number || null,
+            added_by: user?.id ?? null,
+          }])
+          .select('id')
+          .single()
 
         if (error) {
           toast.error('Failed to add entry!')
+        } else if (!inserted?.id) {
+          toast.error('Saved, but the new entry could not be read back. Refresh to confirm it is there.')
         } else {
           toast.success('Registry entry added!')
+          logActivity({
+            action: 'added',
+            entityType: 'registry_entry',
+            entityId: inserted.id,
+            subject: newRegistryEntry.full_name,
+          })
           setShowRegistryModal(false)
           fetchRegistryEntries()
         }
@@ -402,12 +453,37 @@ const OfficialDashboard = () => {
     }
   }
 
-  const handleDeleteRegistryEntry = async (id) => {
-    const { error } = await supabase.from('residents_registry').delete().eq('id', id)
+  const handleDeleteRegistryEntry = async (entry) => {
+    const ok = await confirm({
+      title: 'Remove this registry entry?',
+      message: `${entry.full_name} will be removed from the barangay's own resident `
+        + 'record. This does not change their account if they have one, but the '
+        + 'name will no longer appear as a registry match during verification.',
+      confirmLabel: 'Remove entry',
+    })
+    if (!ok) return
+
+    // .select() matters here: RLS filters rows rather than raising, so a
+    // blocked delete comes back as success with zero rows affected. Without
+    // this check the toast reports a removal that never happened.
+    const { data, error } = await supabase
+      .from('residents_registry')
+      .delete()
+      .eq('id', entry.id)
+      .select('id')
+
     if (error) {
       toast.error('Failed to delete entry!')
+    } else if (!data || data.length === 0) {
+      toast.error('Nothing was removed — you may not have permission to change the registry.')
     } else {
       toast.success('Registry entry removed!')
+      logActivity({
+        action: 'deleted',
+        entityType: 'registry_entry',
+        entityId: entry.id,
+        subject: entry.full_name,
+      })
       fetchRegistryEntries()
     }
   }
@@ -716,24 +792,45 @@ const OfficialDashboard = () => {
           toast.error('Failed to update schedule entry!')
         } else {
           toast.success('Schedule entry updated!')
+          logActivity({
+            action: 'edited',
+            entityType: 'waste_schedule',
+            entityId: editingWaste.id,
+            subject: `${newWasteEntry.purok} — ${newWasteEntry.waste_type} (${newWasteEntry.day_of_week})`,
+          })
           setShowWasteModal(false)
           fetchWasteSchedule()
         }
       } else {
-        const { error } = await supabase.from('waste_schedule').insert([{
-          purok: newWasteEntry.purok,
-          waste_type: newWasteEntry.waste_type,
-          day_of_week: newWasteEntry.day_of_week,
-          time_label: newWasteEntry.time_label || null,
-          notes: newWasteEntry.notes || null,
-          display_order: Number(newWasteEntry.display_order) || 0,
-          created_by: user?.id ?? null,
-        }])
+        // Readback returns the new id so the audit entry can point at the
+        // row. Safe here: this table's SELECT policy covers whoever may
+        // insert, so a successful insert is always readable by its author.
+        const { data: inserted, error } = await supabase
+          .from('waste_schedule')
+          .insert([{
+            purok: newWasteEntry.purok,
+            waste_type: newWasteEntry.waste_type,
+            day_of_week: newWasteEntry.day_of_week,
+            time_label: newWasteEntry.time_label || null,
+            notes: newWasteEntry.notes || null,
+            display_order: Number(newWasteEntry.display_order) || 0,
+            created_by: user?.id ?? null,
+          }])
+          .select('id')
+          .single()
 
         if (error) {
           toast.error('Failed to add schedule entry!')
+        } else if (!inserted?.id) {
+          toast.error('Saved, but the schedule entry could not be read back. Refresh to confirm it is there.')
         } else {
           toast.success('Schedule entry added!')
+          logActivity({
+            action: 'added',
+            entityType: 'waste_schedule',
+            entityId: inserted.id,
+            subject: `${newWasteEntry.purok} — ${newWasteEntry.waste_type} (${newWasteEntry.day_of_week})`,
+          })
           setShowWasteModal(false)
           fetchWasteSchedule()
         }
@@ -744,12 +841,37 @@ const OfficialDashboard = () => {
     }
   }
 
-  const handleDeleteWaste = async (id) => {
-    const { error } = await supabase.from('waste_schedule').delete().eq('id', id)
+  const handleDeleteWaste = async (entry) => {
+    const ok = await confirm({
+      title: 'Remove this collection schedule?',
+      message: `${entry.purok} — ${entry.waste_type} on ${entry.day_of_week} will be `
+        + 'removed. This schedule is shown publicly on the home page, so residents '
+        + 'will no longer see a collection day for it.',
+      confirmLabel: 'Remove schedule',
+    })
+    if (!ok) return
+
+    // .select() matters here: RLS filters rows rather than raising, so a
+    // blocked delete comes back as success with zero rows affected. Without
+    // this check the toast reports a removal that never happened.
+    const { data, error } = await supabase
+      .from('waste_schedule')
+      .delete()
+      .eq('id', entry.id)
+      .select('id')
+
     if (error) {
       toast.error('Failed to delete schedule entry!')
+    } else if (!data || data.length === 0) {
+      toast.error('Nothing was removed — you may not have permission to change the schedule.')
     } else {
       toast.success('Schedule entry removed!')
+      logActivity({
+        action: 'deleted',
+        entityType: 'waste_schedule',
+        entityId: entry.id,
+        subject: `${entry.purok} — ${entry.waste_type} (${entry.day_of_week})`,
+      })
       fetchWasteSchedule()
     }
   }
@@ -828,20 +950,6 @@ const OfficialDashboard = () => {
   // able to file entries reading "Barangay Secretary / verified".
   // Sending them anyway would just be a value that looks authoritative
   // and is silently thrown away.
-  const logActivity = async ({ action, entityType, entityId, subject, details }) => {
-    try {
-      await supabase.from('activity_log').insert([{
-        action,
-        entity_type: entityType,
-        entity_id: entityId ?? null,
-        subject: subject ?? null,
-        details: details ?? null,
-      }])
-    } catch (err) {
-      console.error('Activity log error:', err)
-    }
-  }
-
   const withReservationGuard = async (reservation, action) => {
     if (processingReservationIds.has(reservation.id)) return
     setProcessingReservationIds((prev) => new Set(prev).add(reservation.id))
@@ -990,23 +1098,44 @@ const OfficialDashboard = () => {
           toast.error('Failed to update official!')
         } else {
           toast.success('Official updated!')
+          logActivity({
+            action: 'edited',
+            entityType: 'official',
+            entityId: editingOfficial.id,
+            subject: `${newOfficial.full_name} — ${newOfficial.position}`,
+          })
           setShowOfficialModal(false)
           fetchOfficialsList()
         }
       } else {
-        const { error } = await supabase.from('barangay_officials').insert([{
-          full_name: newOfficial.full_name,
-          position: newOfficial.position,
-          committee: newOfficial.committee || null,
-          contact_number: newOfficial.contact_number || null,
-          display_order: Number(newOfficial.display_order) || 0,
-          created_by: user?.id ?? null,
-        }])
+        // Readback returns the new id so the audit entry can point at the
+        // row. Safe here: this table's SELECT policy covers whoever may
+        // insert, so a successful insert is always readable by its author.
+        const { data: inserted, error } = await supabase
+          .from('barangay_officials')
+          .insert([{
+            full_name: newOfficial.full_name,
+            position: newOfficial.position,
+            committee: newOfficial.committee || null,
+            contact_number: newOfficial.contact_number || null,
+            display_order: Number(newOfficial.display_order) || 0,
+            created_by: user?.id ?? null,
+          }])
+          .select('id')
+          .single()
 
         if (error) {
           toast.error('Failed to add official!')
+        } else if (!inserted?.id) {
+          toast.error('Saved, but the new record could not be read back. Refresh to confirm it is there.')
         } else {
           toast.success('Official added!')
+          logActivity({
+            action: 'added',
+            entityType: 'official',
+            entityId: inserted.id,
+            subject: `${newOfficial.full_name} — ${newOfficial.position}`,
+          })
           setShowOfficialModal(false)
           fetchOfficialsList()
         }
@@ -1037,12 +1166,38 @@ const OfficialDashboard = () => {
     setShowOfficialModal(true)
   }
 
-  const handleDeleteOfficial = async (id) => {
-    const { error } = await supabase.from('barangay_officials').delete().eq('id', id)
+  const handleDeleteOfficial = async (official) => {
+    const ok = await confirm({
+      title: 'Remove this official permanently?',
+      message: `${official.full_name} (${official.position}) will be deleted from the `
+        + 'directory and cannot be recovered — their record and history are lost. '
+        + 'If their login is linked to this record, they will also lose their '
+        + 'position permissions.',
+      confirmLabel: 'Delete permanently',
+    })
+    if (!ok) return
+
+    // .select() matters here: RLS filters rows rather than raising, so a
+    // blocked delete comes back as success with zero rows affected. Without
+    // this check the toast reports a removal that never happened.
+    const { data, error } = await supabase
+      .from('barangay_officials')
+      .delete()
+      .eq('id', official.id)
+      .select('id')
+
     if (error) {
       toast.error('Failed to delete official!')
+    } else if (!data || data.length === 0) {
+      toast.error('Nothing was removed — you may not have permission to change the directory.')
     } else {
       toast.success('Official removed from directory.')
+      logActivity({
+        action: 'deleted',
+        entityType: 'official',
+        entityId: official.id,
+        subject: `${official.full_name} — ${official.position}`,
+      })
       fetchOfficialsList()
     }
   }
@@ -1056,18 +1211,31 @@ const OfficialDashboard = () => {
 
     setSubmitting(true)
     try {
-      const { error } = await supabase
+      // Readback returns the new id so the audit entry can point at the
+      // row. Safe here: this table's SELECT policy covers whoever may
+      // insert, so a successful insert is always readable by its author.
+      const { data: inserted, error } = await supabase
         .from('announcements')
         .insert([{
           title: newAnnouncement.title,
           description: newAnnouncement.description,
           badge: newAnnouncement.badge,
         }])
+        .select('id')
+        .single()
 
       if (error) {
         toast.error('Failed to add announcement!')
+      } else if (!inserted?.id) {
+        toast.error('Saved, but the announcement could not be read back. Refresh to confirm it is there.')
       } else {
         toast.success('Announcement added!')
+        logActivity({
+          action: 'added',
+          entityType: 'announcement',
+          entityId: inserted.id,
+          subject: newAnnouncement.title,
+        })
         setShowAnnouncementModal(false)
         setNewAnnouncement({ title: '', description: '', badge: '' })
         fetchAnnouncements()
@@ -1077,16 +1245,36 @@ const OfficialDashboard = () => {
     }
   }
 
-  const handleDeleteAnnouncement = async (id) => {
-    const { error } = await supabase
+  const handleDeleteAnnouncement = async (ann) => {
+    const ok = await confirm({
+      title: 'Delete this announcement?',
+      message: `"${ann.title}" will be removed from the public website immediately `
+        + 'and cannot be recovered.',
+      confirmLabel: 'Delete announcement',
+    })
+    if (!ok) return
+
+    // .select() matters here: RLS filters rows rather than raising, so a
+    // blocked delete comes back as success with zero rows affected. Without
+    // this check the toast reports a removal that never happened.
+    const { data, error } = await supabase
       .from('announcements')
       .delete()
-      .eq('id', id)
+      .eq('id', ann.id)
+      .select('id')
 
     if (error) {
       toast.error('Failed to delete announcement!')
+    } else if (!data || data.length === 0) {
+      toast.error('Nothing was deleted — you may not have permission to remove announcements.')
     } else {
       toast.success('Announcement deleted!')
+      logActivity({
+        action: 'deleted',
+        entityType: 'announcement',
+        entityId: ann.id,
+        subject: ann.title,
+      })
       fetchAnnouncements()
     }
   }
@@ -1104,7 +1292,10 @@ const OfficialDashboard = () => {
       const month = date.toLocaleString('en-US', { month: 'short' }).toUpperCase()
       const day = String(date.getDate()).padStart(2, '0')
 
-      const { error } = await supabase
+      // Readback returns the new id so the audit entry can point at the
+      // row. Safe here: this table's SELECT policy covers whoever may
+      // insert, so a successful insert is always readable by its author.
+      const { data: inserted, error } = await supabase
         .from('events')
         .insert([{
           title: newEvent.title,
@@ -1113,11 +1304,21 @@ const OfficialDashboard = () => {
           event_month: month,
           event_day: day,
         }])
+        .select('id')
+        .single()
 
       if (error) {
         toast.error('Failed to add event!')
+      } else if (!inserted?.id) {
+        toast.error('Saved, but the event could not be read back. Refresh to confirm it is there.')
       } else {
         toast.success('Event added!')
+        logActivity({
+          action: 'added',
+          entityType: 'event',
+          entityId: inserted.id,
+          subject: newEvent.title,
+        })
         setShowEventModal(false)
         setNewEvent({ title: '', location: '', event_date: '' })
         fetchEvents()
@@ -1127,16 +1328,36 @@ const OfficialDashboard = () => {
     }
   }
 
-  const handleDeleteEvent = async (id) => {
-    const { error } = await supabase
+  const handleDeleteEvent = async (event) => {
+    const ok = await confirm({
+      title: 'Delete this event?',
+      message: `"${event.title}" will be removed from the public events page `
+        + 'immediately and cannot be recovered.',
+      confirmLabel: 'Delete event',
+    })
+    if (!ok) return
+
+    // .select() matters here: RLS filters rows rather than raising, so a
+    // blocked delete comes back as success with zero rows affected. Without
+    // this check the toast reports a removal that never happened.
+    const { data, error } = await supabase
       .from('events')
       .delete()
-      .eq('id', id)
+      .eq('id', event.id)
+      .select('id')
 
     if (error) {
       toast.error('Failed to delete event!')
+    } else if (!data || data.length === 0) {
+      toast.error('Nothing was deleted — you may not have permission to remove events.')
     } else {
       toast.success('Event deleted!')
+      logActivity({
+        action: 'deleted',
+        entityType: 'event',
+        entityId: event.id,
+        subject: event.title,
+      })
       fetchEvents()
     }
   }
@@ -1444,7 +1665,7 @@ const OfficialDashboard = () => {
                           <td data-label="Action">
                             <button
                               className="btn-deny"
-                              onClick={() => handleDeleteAnnouncement(ann.id)}>
+                              onClick={() => handleDeleteAnnouncement(ann)}>
                               Delete
                             </button>
                           </td>
@@ -1521,7 +1742,7 @@ const OfficialDashboard = () => {
                           <td data-label="Action">
                             <button
                               className="btn-deny"
-                              onClick={() => handleDeleteEvent(event.id)}>
+                              onClick={() => handleDeleteEvent(event)}>
                               Delete
                             </button>
                           </td>
@@ -1825,7 +2046,7 @@ const OfficialDashboard = () => {
                             </button>
                             <button
                               className="btn-deny"
-                              onClick={() => handleDeleteWaste(entry.id)}>
+                              onClick={() => handleDeleteWaste(entry)}>
                               <FaTrash /> Delete
                             </button>
                           </td>
@@ -2018,7 +2239,7 @@ const OfficialDashboard = () => {
                             </button>
                             <button
                               className="btn-deny"
-                              onClick={() => handleDeleteRegistryEntry(entry.id)}>
+                              onClick={() => handleDeleteRegistryEntry(entry)}>
                               <FaTrash /> Delete
                             </button>
                           </td>
@@ -2088,7 +2309,7 @@ const OfficialDashboard = () => {
                             </button>
                             <button
                               className="btn-deny"
-                              onClick={() => handleDeleteOfficial(official.id)}>
+                              onClick={() => handleDeleteOfficial(official)}>
                               <FaTrash /> Delete
                             </button>
                           </td>
@@ -2869,6 +3090,7 @@ const OfficialDashboard = () => {
         </div>
       )}
 
+      {confirmDialog}
     </div>
   )
 }

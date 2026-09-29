@@ -157,7 +157,7 @@ src/
 
   assets/images/      11 official portraits, page backgrounds, logo.
 
-supabase-migrations/  15 numbered SQL files. A record, not a runner.
+supabase-migrations/  17 numbered SQL files. A record, not a runner.
 supabase/functions/   Edge Function source (notify-reservation-sms).
 docs/                 SETUP.md, TESTING-WALKTHROUGH.pdf + its generator.
 ```
@@ -293,7 +293,7 @@ touches a lot of working code.
 
 ## Database notes
 
-**15 migrations**, `001` through `015`, all applied.
+**17 migrations**, `001` through `017`, all applied.
 
 **15 tables, RLS enabled on every one.**
 
@@ -366,6 +366,28 @@ the relevant role in SQL):
   entries reading "Barangay Secretary / verified / Someone Else".
   `subject` and `details` remain free text, but they hang off a
   truthful actor performing a real action.
+
+  **Two gates, not one.** The CHECK constraints decide what words are
+  permitted; the trigger decides who may say them. Migration 016 widened
+  the vocabulary (14 actions, 11 entity types) and that alone changed
+  nothing for the nurse, because the trigger refuses every non-official.
+  Migration 017 added a narrow nurse branch: `added`/`edited`/`deleted`
+  on `health_event`/`medicine`/`medical_program`, and nothing else. If a
+  new log event is ever rejected, check both gates -- widening one
+  without the other is the mistake 016 made on its own.
+
+  **`is_official()` must not be made nurse-inclusive** to solve that
+  kind of problem. It is used in eleven places including RLS policies on
+  `residents_registry`, `waste_schedule` and `activity_log`'s own SELECT
+  policy, so widening it would hand the nurse the residents registry,
+  the waste schedule and read access to the whole audit trail. The nurse
+  still cannot read `activity_log` at all -- she writes three entity
+  types to a table she never sees.
+
+  **Routine medicine stock changes are deliberately not logged.** Stock
+  status changes daily by design; logging it would bury everything else.
+  Only add/edit/delete of the medicine record itself is recorded. Kapitan
+  status and nurse availability are excluded for the same reason.
 
 **Allowlist, not denylist.** The protect triggers originally named the
 *forbidden* columns, which fails open: anything unlisted was permitted,
@@ -622,15 +644,58 @@ the real name and photo together when the barangay confirms them.
 
 ## Not built yet
 
-- **SMS notifications.** `supabase/functions/notify-reservation-sms` is
-  written, deployed and secured — officials only, and the message is
-  built from the reservation row rather than the request body, so a
-  caller can neither choose the recipient nor write the text. It needs an
+- **SMS notifications — a deferred external-service dependency.** SMS
+  notifications are implemented but require activation and configuration
+  of the paid SMS service for production use. Core reservation
+  operations are designed to continue successfully when SMS delivery is
+  unavailable.
+
+  `supabase/functions/notify-reservation-sms` is written, deployed and
+  secured — officials only, and the message is built from the
+  reservation row rather than the request body, so a caller can neither
+  choose the recipient nor write the text. It needs an
   `IPROG_SMS_API_TOKEN` secret; until then it returns
-  `{ sent: false, reason }` and the dashboard tells the official to phone
-  the resident instead. **Never tested against the live provider** — the
-  phone format (`639XXXXXXXXX`) and content type follow IPROG's docs, not
-  an observed response.
+  `{ sent: false, reason }` and the dashboard tells the official to
+  phone the resident instead. **Never tested against the live
+  provider** — the phone format (`639XXXXXXXXX`) and content type
+  follow IPROG's docs, not an observed response.
+
+  ⚠️ **SMS delivery is not part of the approval transaction, and must
+  never be made part of it.** The toast reading *"Saved, but the text
+  message could not be sent — please contact the resident directly"* is
+  **expected** with no token configured, and is **not a defect.** The
+  reservation status change and the Activity Log entry have already
+  completed and been verified by the time any SMS code runs.
+
+  Four separate things keep it that way. Do not undo any of them:
+
+  1. `notifyResident()` is called only inside the success branch of
+     `handleApproveReservation` / `handleDeclineReservation`, after the
+     `.select()` readback has confirmed a row was written.
+  2. It is **not awaited.** Never add `await` to it — that would let a
+     slow or hanging provider stall the per-row processing lock.
+  3. Every failure path inside it ends in `cannotReach()`, which warns
+     to the console and raises a neutral `toast()`. It must never
+     `throw`, become a `toast.error()`, or roll anything back.
+  4. The Edge Function answers **200** with `{ sent: false, reason }`
+     for every delivery problem. A delivery failure must never become a
+     non-2xx.
+
+  The correct fix for the warning is a provider token, not a code
+  change. Do not silence the toast: an official who believes the
+  resident was texted will not phone them, and the resident then hears
+  nothing at all.
+
+  **No re-send button exists, and that is deferred, not a defect.** The
+  Edge Function was deliberately built to allow a re-send — any
+  official may call it, and it requires the reservation to be `approved`
+  or `declined` already, so a re-send can only ever repeat something
+  true. But the dashboard never exposes it: `notifyResident()` has
+  exactly two callers, both decision handlers. So decisions taken while
+  SMS is inactive cannot be texted retroactively from the UI. That is a
+  known gap to revisit **if and when** the service is activated, not a
+  Phase 1 defect — and it is not a reason to remove or redesign any of
+  the existing SMS implementation.
 - **Broadcast SMS by age group** — discussed, not built. Blocked on
   `profiles` having no birthdate, and on cost: ~₱1/SMS against 13,000+
   residents.

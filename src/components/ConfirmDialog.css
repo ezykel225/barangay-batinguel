@@ -1,0 +1,133 @@
+/* ================================
+   CONFIRMATION DIALOG
+   Barangay Batinguel E-System
+   ================================
+   Sits above everything else. The highest z-index already in the
+   codebase is 9999, so this uses 10000 -- a confirmation must never be
+   rendered behind the thing it is confirming.
+
+   Colours and radii follow the existing house style rather than
+   introducing new ones; Phase 2 replaces these literals with tokens. */
+
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background-color: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.confirm-dialog {
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.25);
+  width: 100%;
+  max-width: 440px;
+  padding: 24px;
+  font-family: 'Poppins', sans-serif;
+}
+
+.confirm-dialog-title {
+  margin: 0 0 10px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+  line-height: 1.35;
+}
+
+/* Deliberately not 11px or 12px. This text explains a consequence that
+   cannot be undone, so it is the one place in the system that should
+   not be set in the smallest available size. */
+.confirm-dialog-message {
+  margin: 0 0 22px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #374151;
+}
+
+.confirm-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.confirm-dialog-cancel,
+.confirm-dialog-confirm {
+  font-family: 'Poppins', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s;
+  /* Minimum comfortable touch target. */
+  min-height: 42px;
+}
+
+.confirm-dialog-cancel {
+  background-color: #ffffff;
+  border: 1px solid #d1d5db;
+  color: #374151;
+}
+
+.confirm-dialog-cancel:hover:not(:disabled) {
+  background-color: #f3f4f6;
+}
+
+.confirm-dialog-confirm {
+  background-color: #1e3a8a;
+  border: 1px solid #1e3a8a;
+  color: #ffffff;
+}
+
+.confirm-dialog-confirm:hover:not(:disabled) {
+  background-color: #1e40af;
+}
+
+/* Destructive is the default for this dialog: every current caller is
+   removing something. */
+.confirm-dialog-confirm.destructive {
+  background-color: #b91c1c;
+  border-color: #b91c1c;
+}
+
+.confirm-dialog-confirm.destructive:hover:not(:disabled) {
+  background-color: #991b1b;
+}
+
+.confirm-dialog-cancel:disabled,
+.confirm-dialog-confirm:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* A visible focus ring, because this dialog is reachable by keyboard
+   and Cancel is focused on open. Phase 2 makes this global; until then
+   it is stated locally rather than inherited from nothing. */
+.confirm-dialog-cancel:focus-visible,
+.confirm-dialog-confirm:focus-visible {
+  outline: 3px solid #93c5fd;
+  outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+  .confirm-dialog {
+    padding: 20px;
+  }
+
+  /* Stacked and full width: side-by-side buttons at this size put
+     Confirm under the thumb. Cancel is first in the DOM, so
+     column-reverse keeps the primary action lowest while leaving tab
+     order unchanged. */
+  .confirm-dialog-actions {
+    flex-direction: column-reverse;
+  }
+
+  .confirm-dialog-cancel,
+  .confirm-dialog-confirm {
+    width: 100%;
+  }
+}
