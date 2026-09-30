@@ -15,12 +15,15 @@ import {
   EVENING_SLOTS,
   EXCEPTION_BADGE_LABEL,
   MAX_DURATION_HOURS,
+  MAX_EXCEPTION_DURATION_HOURS,
   OFFICE_HOUR_SLOTS,
   SLOT_HOURS,
   canFitDuration,
+  coveredHours,
   durationOptionsForSlot,
   endsWithinWindow,
   getCoveredSlots,
+  hourLabel,
   isEveningSlot,
   isExceptionRequest,
   isLegacyDaytimeBooking,
@@ -43,10 +46,16 @@ describe('the hour map', () => {
     })
   })
 
-  it('has no 12 NN slot, because the court closes for lunch', () => {
+  it('offers no 12 NN START, because the database offers none either', () => {
+    // Not a closure -- a booking may RUN THROUGH noon (see the
+    // noon-spanning block below). This is only about what can be stored
+    // in `preferred_time`: reservation_slot_hour() has no '12:00 PM'
+    // case, so a row starting at noon would carry a NULL slot_hour and
+    // escape the overlap constraint's partial WHERE. The INSERT guard
+    // rejects it instead, and this list never offers it.
     expect(ALL_SLOTS).not.toContain('12:00 PM')
     expect(ALL_SLOTS).not.toContain('12:00 NN')
-    // 11 AM and 1 PM are adjacent in the list and two hours apart.
+    // 11 AM and 1 PM are adjacent in the start list, two hours apart.
     expect(SLOT_HOURS['1:00 PM'] - SLOT_HOURS['11:00 AM']).toBe(2)
   })
 
@@ -128,6 +137,31 @@ describe('durations offered per slot', () => {
     expect(MAX_DURATION_HOURS).toBe(4)
   })
 
+  it('offers an exception more hours, up to the database CHECK', () => {
+    // ⚠️ 8 is the ceiling of reservations_duration_hours_check, not a
+    // number picked here. An ayuda activity can take most of the day;
+    // an ordinary resident booking is still 4.
+    expect(MAX_EXCEPTION_DURATION_HOURS).toBe(8)
+    expect(maxDurationForSlot('8:00 AM', { exception: true })).toBe(8)
+    expect(maxDurationForSlot('8:00 AM')).toBe(4)
+  })
+
+  it('still refuses to let an exception run past closing', () => {
+    // 4 PM has six hours before 10 PM, so the window decides, not the
+    // 8-hour cap.
+    expect(maxDurationForSlot('4:00 PM', { exception: true })).toBe(6)
+    expect(maxDurationForSlot('3:00 PM', { exception: true })).toBe(7)
+    expect(maxDurationForSlot('1:00 PM', { exception: true })).toBe(8)
+  })
+
+  it('does not widen the evening by asking for the exception cap', () => {
+    // An evening start is never an exception, so nothing offers it 8
+    // hours -- but even if a caller passed the flag, closing still
+    // decides.
+    expect(maxDurationForSlot('9:00 PM', { exception: true })).toBe(1)
+    expect(maxDurationForSlot('6:00 PM', { exception: true })).toBe(4)
+  })
+
   it('offers 0 for a time the court does not offer', () => {
     expect(maxDurationForSlot('9:30 PM')).toBe(0)
     expect(durationOptionsForSlot('9:30 PM')).toEqual([])
@@ -138,48 +172,97 @@ describe('durations offered per slot', () => {
     expect(durationOptionsForSlot('7:00 PM')).toEqual([1, 2, 3])
     expect(durationOptionsForSlot('5:00 PM')).toEqual([1, 2, 3, 4])
   })
+
+  it('lists the longer options for an exception', () => {
+    expect(durationOptionsForSlot('8:00 AM', { exception: true }))
+      .toEqual([1, 2, 3, 4, 5, 6, 7, 8])
+    expect(durationOptionsForSlot('4:00 PM', { exception: true }))
+      .toEqual([1, 2, 3, 4, 5, 6])
+  })
 })
 
-describe('covered slots and the lunch gap', () => {
-  it('walks consecutive hours', () => {
+describe('what a booking occupies', () => {
+  it('is a continuous run of hours, like the database range', () => {
+    expect(coveredHours('5:00 PM', 3)).toEqual([17, 18, 19])
     expect(getCoveredSlots('5:00 PM', 3)).toEqual(['5:00 PM', '6:00 PM', '7:00 PM'])
   })
 
-  it('stops at the lunch gap instead of spanning it', () => {
-    // 11 AM for 3 hours would be 11-12, then a closed hour. The walk
-    // returns short, which every caller treats as "does not fit".
-    expect(getCoveredSlots('11:00 AM', 3)).toEqual(['11:00 AM'])
-    expect(canFitDuration('11:00 AM', 3)).toBe(false)
-    expect(canFitDuration('11:00 AM', 1)).toBe(true)
+  it('runs straight through noon', () => {
+    // ⚠️ The barangay's decision of 2026-09-30: an exception may occupy
+    // 12 NN - 1 PM continuously, because an ayuda activity can take most
+    // of the day. The old walk stopped dead at the label gap and
+    // returned ['11:00 AM'] for this.
+    expect(coveredHours('11:00 AM', 3)).toEqual([11, 12, 13])
+    expect(getCoveredSlots('11:00 AM', 3))
+      .toEqual(['11:00 AM', '12:00 NN', '1:00 PM'])
+    expect(canFitDuration('11:00 AM', 3, { exception: true })).toBe(true)
+  })
+
+  it('reports the hours of the noon-spanning row already in the data', () => {
+    // An approved 10:00 AM / 3-hour booking predates all of this. The
+    // database's exclusion constraint holds hours 10, 11 and 12 for it;
+    // the old walk reported two labels, so the form printed the wrong
+    // end time and the grid under-reported what was held.
+    expect(coveredHours('10:00 AM', 3)).toEqual([10, 11, 12])
+    expect(getCoveredSlots('10:00 AM', 3))
+      .toEqual(['10:00 AM', '11:00 AM', '12:00 NN'])
+  })
+
+  it('covers a whole daytime ayuda activity', () => {
+    expect(coveredHours('8:00 AM', 8)).toEqual([8, 9, 10, 11, 12, 13, 14, 15])
+    expect(canFitDuration('8:00 AM', 8, { exception: true })).toBe(true)
+    // ...but not as an ordinary resident booking.
+    expect(canFitDuration('8:00 AM', 8)).toBe(false)
   })
 
   it('lets an exception run from office hours into the evening', () => {
     // 4 PM for 3 hours ends at 7 PM. The database accepted this case.
     expect(getCoveredSlots('4:00 PM', 3)).toEqual(['4:00 PM', '5:00 PM', '6:00 PM'])
-    expect(canFitDuration('4:00 PM', 3)).toBe(true)
+    expect(canFitDuration('4:00 PM', 3, { exception: true })).toBe(true)
   })
 
-  it('refuses a duration that runs past closing even when slots remain', () => {
-    // There is no slot after 9 PM, so the walk returns short too -- but
-    // canFitDuration must refuse on the window as well, not only on the
-    // list running out.
+  it('refuses a duration that runs past closing', () => {
     expect(canFitDuration('9:00 PM', 2)).toBe(false)
     expect(canFitDuration('8:00 PM', 2)).toBe(true)
+    expect(canFitDuration('4:00 PM', 7, { exception: true })).toBe(false)
+    expect(canFitDuration('4:00 PM', 6, { exception: true })).toBe(true)
   })
 
   it('returns nothing for an unknown start', () => {
+    expect(coveredHours('9:30 PM', 1)).toEqual([])
     expect(getCoveredSlots('9:30 PM', 1)).toEqual([])
     expect(canFitDuration('9:30 PM', 1)).toBe(false)
+    expect(canFitDuration('9:30 PM', 1, { exception: true })).toBe(false)
   })
 
   it('treats a missing or zero duration as one hour', () => {
     expect(getCoveredSlots('5:00 PM', 0)).toEqual(['5:00 PM'])
     expect(getCoveredSlots('5:00 PM', undefined)).toEqual(['5:00 PM'])
+    expect(coveredHours('5:00 PM', -3)).toEqual([17])
+  })
+})
+
+describe('naming an hour for display', () => {
+  it('calls the middle of the day 12:00 NN', () => {
+    // Deliberately not "12:00 PM": that string is not in SLOT_HOURS and
+    // must never look like a value this app would store.
+    expect(hourLabel(12)).toBe('12:00 NN')
+    expect(SLOT_HOURS['12:00 NN']).toBeUndefined()
   })
 
-  it('can be restricted to one list', () => {
-    // Given only the evening list, a 4 PM start is not in it at all.
-    expect(getCoveredSlots('4:00 PM', 2, EVENING_SLOTS)).toEqual([])
+  it('agrees with the slot labels for every startable hour', () => {
+    ALL_SLOTS.forEach((slot) => {
+      expect(hourLabel(SLOT_HOURS[slot])).toBe(slot)
+    })
+  })
+
+  it('names closing time, which no slot starts at', () => {
+    expect(hourLabel(COURT_CLOSES_HOUR)).toBe('10:00 PM')
+  })
+
+  it('returns nothing for a non-hour', () => {
+    expect(hourLabel(undefined)).toBe('')
+    expect(hourLabel('8')).toBe('')
   })
 })
 

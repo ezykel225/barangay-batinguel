@@ -81,19 +81,39 @@
 -- The accepting cases matter as much as the refusals. A guard that
 -- rejected everything would pass every refusal test and break the site.
 --
--- ⚠️ KNOWN LIMIT — the lunch closure is client-side only.
--- The "11 AM 3h, spanning the lunch gap ACCEPTED" case above is not a
--- pass, it is the one thing this guard does not check. It tests the
--- start hour, the end hour and the reason; it does not test whether the
--- span crosses the closed 12-1 PM hour, so an API caller bypassing the
--- form can file an 11:00 AM exception for 3 hours. The booking form
--- refuses it (getCoveredSlots stops at the gap), the exclusion
--- constraint then holds [11,14) as occupied, and the public calendar
--- shows only 11 AM held -- so the three disagree.
--- The condition would be `v_hour < 13 AND v_end > 12`. NOT added:
--- nobody has approved that rule, this migration is already applied, and
--- the same hole predates it -- before 020 there was no insert guard at
--- all. Recorded in CLAUDE.md under *The office-hours exception*.
+-- ⚠️ NOON IS NOT A CLOSURE FOR AN EXCEPTION — corrected 2026-09-30.
+-- The "11 AM 3h, spanning the lunch gap ACCEPTED" case above was first
+-- recorded here as a gap, with a proposed `v_hour < 13 AND v_end > 12`
+-- condition to close it. The barangay then decided the opposite, and
+-- that decision stands: an office-hours exception MAY run continuously
+-- across 12 NN - 1 PM, because an ayuda or distribution activity can
+-- take most or all of the day. So the case is a PASS, and no rule
+-- prohibiting a noon-spanning exception is to be added here.
+--
+-- What was actually wrong was the CLIENT. Its slot walk stopped at the
+-- 11 AM / 1 PM label gap, so it under-reported a booking's extent --
+-- including an approved 10:00 AM / 3-hour row already in this table,
+-- whose exclusion range is [10,13) while the form printed "Ends At:
+-- 12:00 PM". Fixed in src/utils/reservationWindow.js by computing the
+-- extent in hours (coveredHours) to match that range exactly. The
+-- database needed no change: verified that the constraint refuses both
+-- an 11:00 AM and a 1:00 PM booking against a 10 AM / 4-hour
+-- exception, so overlap protection already covers every hour of a long
+-- span, noon included.
+--
+-- ⚠️ TWO THINGS THIS GUARD STILL DOES NOT DO, both pre-existing:
+--   * It does not cap duration. reservations_duration_hours_check
+--     allows 1..8 and predates this migration, so the 4-hour cap on an
+--     ORDINARY booking lives only in the client. Verified: a 5:00 PM
+--     5-hour booking with no reason is ACCEPTED over the API. The
+--     exception cap of 8 is deliberately that CHECK's own ceiling, so
+--     client and database agree there without a schema change.
+--   * A 12:00 NN start is refused (P0001, unknown time) rather than
+--     stored -- reservation_slot_hour() has no such case, and a NULL
+--     slot_hour would escape the constraint's partial WHERE. Noon is a
+--     coverable hour, not a startable one. Making it startable means
+--     adding the mapping here, which is a migration.
+-- Both recorded in CLAUDE.md under *The office-hours exception*.
 --
 -- get_advisors(security): the SECURITY DEFINER RPC lints went 11 -> 12,
 -- adding `enforce_reservation_window`, exactly like every other trigger

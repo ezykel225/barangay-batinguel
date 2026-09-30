@@ -2,11 +2,11 @@
 //
 // ─── THE RULE ─────────────────────────────────────────────────────────
 //
-// Ordinary bookings run 5:00 PM - 10:00 PM. The court is made available
-// for booking after office hours, so the window describes when the
-// FACILITY is open: a booking must FINISH by 10:00 PM, not merely start
-// before it. Maximum duration stays 4 hours, so the latest ordinary
-// start for a full 4 hours is 6:00 PM.
+// Ordinary bookings run 5:00 PM - 10:00 PM, up to 4 hours. The court is
+// made available for booking after office hours, so the window
+// describes when the FACILITY is open: a booking must FINISH by
+// 10:00 PM, not merely start before it. The latest ordinary start for a
+// full 4 hours is 6:00 PM.
 //
 // An office-hours booking is an EXCEPTION the barangay decides one at a
 // time. A resident asks for one deliberately and has to explain the
@@ -23,6 +23,28 @@
 // has always offered -- not a documented statement that the barangay's
 // office hours are 8 to 5. User-facing wording says "office hours"
 // without claiming a span.
+//
+// ─── NOON IS NOT A CLOSURE FOR AN EXCEPTION ───────────────────────────
+//
+// The barangay's decision, 2026-09-30: an exception MAY run continuously
+// across 12:00 NN - 1:00 PM, because an ayuda or distribution activity
+// can take most or all of the day. The old lunch discontinuity applied
+// to ordinary daytime bookings under the previous rule and is gone from
+// the booking path entirely.
+//
+// ⚠️ So a booking's extent is computed in HOURS, never by walking the
+// slot-label list. `SLOT_HOURS` has no 12:00 NN entry -- there is no
+// such value in `reservation_slot_hour()` either, so noon is not a
+// startable time -- and the old walk stopped dead at that gap. That was
+// not only the wrong rule, it silently under-reported a booking that
+// was already in the data: an approved 10:00 AM / 3-hour row occupies
+// hours 10, 11 and 12 in the database's exclusion constraint, while the
+// walk returned two labels and the form printed "Ends At: 12:00 PM"
+// instead of 1:00 PM.
+//
+// `coveredHours()` is now the single source of a booking's extent, and
+// it matches the database's `int4range(slot_hour, slot_hour + hours)`
+// exactly -- continuous, noon included.
 //
 // ─── WHY THIS IS A MODULE ─────────────────────────────────────────────
 //
@@ -44,15 +66,26 @@
 // ── The window ───────────────────────────────────────────────────
 export const COURT_OPENS_HOUR = 17   // 5:00 PM
 export const COURT_CLOSES_HOUR = 22  // 10:00 PM
+
+// What an ordinary resident booking may run for. Unchanged.
 export const MAX_DURATION_HOURS = 4
 
-// ── Every slot the court offers, in clock order ──────────────────
+// What an exception request may run for. ⚠️ 8 is not a number chosen
+// here -- it is the ceiling of `reservations_duration_hours_check`,
+// which has read `duration_hours BETWEEN 1 AND 8` since the table was
+// created. So client and database agree exactly, and supporting a
+// long ayuda activity needed no schema change. Going past 8 would need
+// that CHECK altered, which is a migration and a decision, not a
+// constant bumped here.
+export const MAX_EXCEPTION_DURATION_HOURS = 8
+
+// ── Every time the court offers as a START, in clock order ───────
 //
-// 12:00 NN is absent because the court closes for lunch. 11:00 AM and
-// 1:00 PM therefore sit next to each other in this list while being two
-// hours apart on the clock, and everything that walks the list has to
-// know it -- otherwise a 2-hour booking at 11 AM quietly holds 11-12 and
-// 1-2 while telling the resident they have the court from 11 to 1.
+// ⚠️ This mirrors `reservation_slot_hour()` in migration 020 label for
+// label. 12:00 NN is absent from BOTH: noon is not a startable time,
+// and the INSERT guard rejects it (`P0001`) rather than storing a row
+// the overlap constraint cannot see. A booking may still RUN THROUGH
+// noon -- see `coveredHours`.
 export const SLOT_HOURS = {
   '8:00 AM': 8,
   '9:00 AM': 9,
@@ -76,9 +109,9 @@ export const EVENING_SLOTS = ALL_SLOTS.filter(
   (slot) => SLOT_HOURS[slot] >= COURT_OPENS_HOUR
 )
 
-// What an exception request may choose. An exception may run on into the
-// evening -- 4 PM for 3 hours ends at 7 PM and is allowed -- so this is
-// the start times only, not the hours a request may occupy.
+// What an exception request may choose as a start. An exception may run
+// on into the evening -- 4 PM for 3 hours ends at 7 PM and is allowed --
+// so this is the start times only, not the hours a request may occupy.
 export const OFFICE_HOUR_SLOTS = ALL_SLOTS.filter(
   (slot) => SLOT_HOURS[slot] < COURT_OPENS_HOUR
 )
@@ -86,6 +119,20 @@ export const OFFICE_HOUR_SLOTS = ALL_SLOTS.filter(
 export const slotHour = (label) => (
   Object.prototype.hasOwnProperty.call(SLOT_HOURS, label) ? SLOT_HOURS[label] : null
 )
+
+// ── Naming an hour ───────────────────────────────────────────────
+//
+// For DISPLAY only -- the covered-slots line, the end time. Hour 12 has
+// a name here and no entry in SLOT_HOURS, which is the whole point:
+// a booking can be shown occupying noon without noon becoming a value
+// this app would ever write to `preferred_time`.
+export const hourLabel = (hour) => {
+  if (!Number.isInteger(hour)) return ''
+  if (hour === 12) return '12:00 NN'
+  const suffix = hour >= 12 ? 'PM' : 'AM'
+  const display = hour % 12 === 0 ? 12 : hour % 12
+  return `${display}:00 ${suffix}`
+}
 
 // ── Classification ───────────────────────────────────────────────
 //
@@ -104,18 +151,26 @@ export const isOfficeHourSlot = (label) => {
 
 // ── Duration ─────────────────────────────────────────────────────
 //
-// How long a booking starting here may run: never more than the cap, and
-// never past closing. At 9:00 PM that is one hour; at 6:00 PM the full
-// four. Returns 0 for a label the court does not offer, so a caller
-// cannot accidentally offer a duration for a time that does not exist.
-export const maxDurationForSlot = (label) => {
+// How long a booking starting here may run: never more than its cap,
+// and never past closing. Ordinary at 9:00 PM is one hour; an exception
+// at 8:00 AM is the full eight. Returns 0 for a label the court does
+// not offer, so a caller cannot offer a duration for a time that does
+// not exist.
+//
+// `exception` is passed explicitly rather than inferred from the hour.
+// The two agree today -- an office-hours start is exactly what needs a
+// reason -- but a caller deciding "is this an exception?" should read
+// `isExceptionRequest`/`isOfficeHourSlot` at its own level, not have a
+// cap silently change under it.
+export const maxDurationForSlot = (label, { exception = false } = {}) => {
   const hour = slotHour(label)
   if (hour === null) return 0
-  return Math.max(0, Math.min(MAX_DURATION_HOURS, COURT_CLOSES_HOUR - hour))
+  const cap = exception ? MAX_EXCEPTION_DURATION_HOURS : MAX_DURATION_HOURS
+  return Math.max(0, Math.min(cap, COURT_CLOSES_HOUR - hour))
 }
 
-export const durationOptionsForSlot = (label) => {
-  const max = maxDurationForSlot(label)
+export const durationOptionsForSlot = (label, options = {}) => {
+  const max = maxDurationForSlot(label, options)
   return Array.from({ length: max }, (_, index) => index + 1)
 }
 
@@ -126,32 +181,33 @@ export const endsWithinWindow = (label, duration) => {
   return hour + hours <= COURT_CLOSES_HOUR
 }
 
-// ── Covered slots ────────────────────────────────────────────────
+// ── What a booking occupies ──────────────────────────────────────
 //
-// The consecutive labels a booking occupies, stopping at the lunch gap.
-// A short return means the duration does not fit, which every caller
-// treats as a refusal rather than silently shortening the booking.
-export const getCoveredSlots = (startSlot, duration, slots = ALL_SLOTS) => {
-  const startIndex = slots.indexOf(startSlot)
-  const covered = []
-  if (startIndex === -1) return covered
-
-  const wanted = Math.max(1, Number(duration) || 1)
-  for (let i = 0; i < wanted; i++) {
-    const slot = slots[startIndex + i]
-    if (!slot) break
-    if (i > 0) {
-      const previous = slots[startIndex + i - 1]
-      if (SLOT_HOURS[slot] - SLOT_HOURS[previous] !== 1) break
-    }
-    covered.push(slot)
-  }
-  return covered
+// The hours themselves, continuous, exactly as the database's
+// `int4range(slot_hour, slot_hour + GREATEST(COALESCE(duration_hours,
+// 1), 1))`. Noon is included when the span reaches it. Nothing here
+// stops at a gap, because there is no gap any more.
+//
+// Empty for a start the court does not offer -- every caller reads that
+// as "does not fit" rather than silently shortening the booking.
+export const coveredHours = (startSlot, duration) => {
+  const hour = slotHour(startSlot)
+  if (hour === null) return []
+  const hours = Math.max(1, Number(duration) || 1)
+  return Array.from({ length: hours }, (_, index) => hour + index)
 }
 
-export const canFitDuration = (startSlot, duration, slots = ALL_SLOTS) =>
-  getCoveredSlots(startSlot, duration, slots).length === Math.max(1, Number(duration) || 1)
-  && endsWithinWindow(startSlot, duration)
+// The same extent, named for display and for matching against the slot
+// grid. An hour with no startable label of its own -- noon -- still
+// appears, so "Covered Slots" reads 10:00 AM, 11:00 AM, 12:00 NN rather
+// than stopping short of what the court is actually being held for.
+export const getCoveredSlots = (startSlot, duration) =>
+  coveredHours(startSlot, duration).map(hourLabel)
+
+export const canFitDuration = (startSlot, duration, { exception = false } = {}) => {
+  const hours = Math.max(1, Number(duration) || 1)
+  return hours <= maxDurationForSlot(startSlot, { exception })
+}
 
 // ── Is this row an exception request? ────────────────────────────
 //

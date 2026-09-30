@@ -11,12 +11,16 @@ import {
   COURT_OPENS_HOUR,
   EVENING_SLOTS,
   MAX_DURATION_HOURS,
+  MAX_EXCEPTION_DURATION_HOURS,
   OFFICE_HOUR_SLOTS,
-  SLOT_HOURS,
   canFitDuration,
+  coveredHours,
   durationOptionsForSlot,
   getCoveredSlots,
+  hourLabel,
   isOfficeHourSlot,
+  maxDurationForSlot,
+  slotHour,
 } from '../utils/reservationWindow'
 import './Reservation.css'
 
@@ -49,14 +53,6 @@ const ACTIVITY_TYPES = [
   'City / Government Activity',
   'Other',
 ]
-
-// Renders the true end of a booking (start hour + duration), which is
-// not the same as the start of its last slot.
-const formatHour = (hour24) => {
-  const suffix = hour24 >= 12 ? 'PM' : 'AM'
-  const display = hour24 % 12 === 0 ? 12 : hour24 % 12
-  return `${display}:00 ${suffix}`
-}
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -329,50 +325,63 @@ const Reservation = () => {
   // picks 7:00 PM is making an ordinary booking.
   const needsExceptionReason = isOfficeHourSlot(formData.preferred_time)
 
+  // Which cap applies. Read from the mode the resident is in, not from
+  // the chosen hour, because the duration is usually picked BEFORE the
+  // start time -- so the control has to know which list it is offering
+  // for while `preferred_time` is still empty.
+  const isExceptionMode = bookingMode === 'office-hours'
+
   // Only the durations that actually fit the chosen start time. Before a
-  // slot is picked the full cap is offered, because changing the
+  // slot is picked the mode's full cap is offered, because changing the
   // duration clears the slot (see handleChange) -- so this narrows the
   // moment a start time exists and widens again when it is cleared.
   const durationOptions = useMemo(() => {
-    const options = durationOptionsForSlot(formData.preferred_time)
+    const options = durationOptionsForSlot(
+      formData.preferred_time, { exception: isExceptionMode }
+    )
     if (options.length) return options
-    return Array.from({ length: MAX_DURATION_HOURS }, (_, index) => index + 1)
-  }, [formData.preferred_time])
+    const cap = isExceptionMode ? MAX_EXCEPTION_DURATION_HOURS : MAX_DURATION_HOURS
+    return Array.from({ length: cap }, (_, index) => index + 1)
+  }, [formData.preferred_time, isExceptionMode])
 
   const calculatedEndTime = useMemo(() => {
-    if (!selectedSlots.length) return ''
-    // The booking runs until the END of its last slot, an hour after
-    // that slot starts — not until the moment the last slot begins.
-    const lastSlot = selectedSlots[selectedSlots.length - 1]
-    return formatHour(SLOT_HOURS[lastSlot] + 1)
-  }, [selectedSlots])
+    // Start hour + duration, which is what `end_time` means and what
+    // the database's int4range upper bound is. Derived from the hours
+    // rather than from the last slot's label, because a booking running
+    // through noon occupies an hour that has no startable label.
+    const hours = coveredHours(formData.preferred_time, formData.duration_hours)
+    if (!hours.length) return ''
+    return hourLabel(hours[hours.length - 1] + 1)
+  }, [formData.preferred_time, formData.duration_hours])
 
+  const fits = (startSlot, duration) =>
+    canFitDuration(startSlot, duration, { exception: isExceptionMode })
+
+  // ⚠️ Checked over the covered HOURS, not the covered start labels, so
+  // an exception running through noon is tested against the noon hour
+  // too -- the same extent the database's exclusion constraint uses.
   const hasConflict = (startSlot, duration) => {
-    if (!canFitDuration(startSlot, duration)) return true
+    if (!fits(startSlot, duration)) return true
     return getCoveredSlots(startSlot, duration).some((slot) => reservedSlots.has(slot))
   }
 
-  // Why a duration does not fit, in the resident's own terms. Two
-  // different reasons produce the same refusal, so the message has to
-  // name the one that applies: the court closes at 10:00 PM, and it is
-  // also shut over lunch, which only an office-hours request can run
-  // into. The old single message named 12 NN and a 6:00 PM last slot,
-  // neither of which is the rule any more.
+  // Why a duration does not fit, in the resident's own terms. Only two
+  // things can now cause it -- the cap for this kind of booking, and
+  // closing time -- so the message names whichever one bit. The lunch
+  // closure is no longer among them: an exception may run through noon.
   const durationFitMessage = (startSlot, duration) => {
-    let longest = 0
-    for (let hours = 1; hours <= MAX_DURATION_HOURS; hours++) {
-      if (canFitDuration(startSlot, hours)) longest = hours
-    }
+    const longest = maxDurationForSlot(startSlot, { exception: isExceptionMode })
     if (longest === 0) {
       return 'That is not a time the covered court offers. Please pick a slot from the list.'
     }
     const plural = longest === 1 ? '' : 's'
-    const lunch = isOfficeHourSlot(startSlot)
-      ? ' The court is also closed over lunch, between 12 NN and 1:00 PM.'
-      : ''
+    const because = slotHour(startSlot) + longest >= COURT_CLOSES_HOUR
+      ? `the court closes at ${hourLabel(COURT_CLOSES_HOUR)}`
+      : isExceptionMode
+        ? `${MAX_EXCEPTION_DURATION_HOURS} hours is the longest single booking the court takes`
+        : `${MAX_DURATION_HOURS} hours is the most an ordinary booking may run`
     return `A booking starting at ${startSlot} can run for at most ${longest} hour${plural}`
-      + ` — the court closes at ${formatHour(COURT_CLOSES_HOUR)}.${lunch}`
-      + ` You asked for ${duration} hours.`
+      + ` — ${because}. You asked for ${duration}.`
   }
 
   const handleChange = (e) => {
@@ -413,13 +422,22 @@ const Reservation = () => {
     setFormData((prev) => ({
       ...prev,
       preferred_time: '',
+      // ⚠️ Clamped, not carried over. Leaving the exception panel with 8
+      // hours selected would otherwise submit an ordinary evening
+      // booking of 8 hours -- which the form's own rule forbids, and
+      // which the database would currently accept, since the 4-hour
+      // ordinary cap lives only here.
+      duration_hours: Math.min(
+        Number(prev.duration_hours) || 1,
+        mode === 'office-hours' ? MAX_EXCEPTION_DURATION_HOURS : MAX_DURATION_HOURS
+      ),
       exception_reason: mode === 'office-hours' ? prev.exception_reason : '',
     }))
   }
 
   const handleTimeSelect = (slot) => {
     if (showPaymentStep) return
-    if (!canFitDuration(slot, formData.duration_hours)) {
+    if (!fits(slot, formData.duration_hours)) {
       toast.error(durationFitMessage(slot, formData.duration_hours))
       return
     }
@@ -463,7 +481,7 @@ const Reservation = () => {
       toast.error('Please choose what the court will be used for.')
       return
     }
-    if (!canFitDuration(formData.preferred_time, formData.duration_hours)) {
+    if (!fits(formData.preferred_time, formData.duration_hours)) {
       toast.error(durationFitMessage(formData.preferred_time, formData.duration_hours))
       return
     }
@@ -491,7 +509,7 @@ const Reservation = () => {
       return
     }
 
-    if (!canFitDuration(formData.preferred_time, formData.duration_hours)) {
+    if (!fits(formData.preferred_time, formData.duration_hours)) {
       toast.error(durationFitMessage(formData.preferred_time, formData.duration_hours))
       return
     }
@@ -855,9 +873,12 @@ const Reservation = () => {
                       onChange={handleChange}
                       required
                     >
-                      {/* Only the durations that actually fit. At 9:00 PM
-                          that is one hour, because a booking has to finish
-                          by 10:00 PM rather than merely start before it. */}
+                      {/* Only the durations that actually fit: the cap for
+                          this kind of booking, then closing time. An
+                          ordinary evening booking is up to 4 hours and one
+                          hour at 9:00 PM; an office-hours request is up to
+                          8 -- the ceiling the reservations table's own
+                          CHECK has always had. */}
                       {durationOptions.map((hour) => (
                         <option key={hour} value={hour}>
                           {hour} Hour{hour > 1 ? 's' : ''}
@@ -1013,10 +1034,10 @@ const Reservation = () => {
                 <p>
                   The covered court is reservable{' '}
                   <strong>
-                    {formatHour(COURT_OPENS_HOUR)} – {formatHour(COURT_CLOSES_HOUR)}
+                    {hourLabel(COURT_OPENS_HOUR)} – {hourLabel(COURT_CLOSES_HOUR)}
                   </strong>
                   . It is made available for booking after office hours, so a
-                  booking has to <em>finish</em> by {formatHour(COURT_CLOSES_HOUR)}.
+                  booking has to <em>finish</em> by {hourLabel(COURT_CLOSES_HOUR)}.
                 </p>
 
                 {bookingMode === 'evening' ? (
@@ -1039,13 +1060,20 @@ const Reservation = () => {
                       as examples. Picking one of those categories approves
                       nothing: an official reads your reason and decides.
                     </p>
+                    <p className="exception-explainer">
+                      A daytime request may run for up to{' '}
+                      <strong>{MAX_EXCEPTION_DURATION_HOURS} hours</strong> and may
+                      run straight through {hourLabel(12)} — an activity that takes
+                      most of the day does not have to stop for lunch. It still has
+                      to finish by {hourLabel(COURT_CLOSES_HOUR)}.
+                    </p>
                     <button
                       type="button"
                       className="exception-toggle"
                       onClick={() => switchBookingMode('evening')}
                       disabled={showPaymentStep}
                     >
-                      ← Back to the {formatHour(COURT_OPENS_HOUR)} – {formatHour(COURT_CLOSES_HOUR)} slots
+                      ← Back to the {hourLabel(COURT_OPENS_HOUR)} – {hourLabel(COURT_CLOSES_HOUR)} slots
                     </button>
                   </>
                 )}
