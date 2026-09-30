@@ -189,6 +189,31 @@ supabase/functions/   Edge Function source (notify-reservation-sms).
 docs/                 SETUP.md, TESTING-WALKTHROUGH.pdf + its generator.
 ```
 
+### ⚠️ The mobile table-to-card block converts rows, not the table
+
+`Sidebar.css`'s protected responsive block sets `tr { display: block }` and
+`td { display: flex }` at 768px and below, but leaves the `<table>` and
+`<tbody>` as table boxes. A table box is sized by its contents' **minimum**
+width, and one unbreakable value -- a long email address -- sets that
+floor. So the cards kept a ~485px floor at every viewport width and
+`.table-wrapper`'s `overflow-x: auto` scrolled them sideways: at 375px,
+184px of every card sat off-screen, and because the layout is label-left /
+value-right, the hidden part was the **value**.
+
+It read as "the cards clip their values". The cause was the table box, not
+the cells. `display: block` on the table and tbody, appended after the
+protected block, removes the floor; `min-width: 0` and
+`overflow-wrap: anywhere` on the cell let a long word wrap instead of
+pushing the card wide; and below 480px each value stacks under its label.
+Measured at 320/360/375/390/414/480/600/768: card width now equals the
+available width at every one.
+
+**Anything appended after that block must stay at equal or lower
+specificity.** `.dashboard-table td:last-child` (0,2,1) in the protected
+block outranks `.dashboard-table td` (0,1,1), which is why the action cell
+keeps its own column layout and 8px gap while every other cell takes the
+2px stack.
+
 **`path="*"` renders `Home`, not a 404 page.** A mistyped URL therefore
 looks like the homepage. Worth knowing before spending time on "why
 does this bad route still work".
@@ -1214,6 +1239,13 @@ the real name and photo together when the barangay confirms them.
   the resident workflow rules, the display labels and the ⋮ menu's
   keyboard behaviour. No integration or end-to-end tests, and no test
   touches the database.
+- **Desktop at 1024px with the sidebar expanded still scrolls the widest
+  table.** 1024 minus a 260px sidebar minus padding leaves ~650px, and
+  eleven columns of real reservation data need ~784px even with the Email
+  and Purpose caps. `.table-wrapper` scrolls, and its scrollbar is now
+  styled to be visible rather than an invisible overlay, so a column that
+  is off the end reads as scrollable rather than missing. Collapsing the
+  sidebar fits it (838px). 1280px and above fit either way.
 - **`kapitan_availability` has no administrative UI.** The weekly
   consultation schedule shown on the public Officials page is read from
   that table by `src/pages/Officials.jsx` and by nothing else, so it can

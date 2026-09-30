@@ -1243,3 +1243,144 @@
 .nav-drawer-user .sidebar-user-info span {
   overflow-wrap: anywhere;
 }
+
+/* ================================
+   TABLE FIT — CARDS THAT FIT, COLUMNS THAT STAY VISIBLE
+   ================================
+   Appended after the protected mobile table-to-card block, which is
+   unchanged. Everything here is a later rule at equal or lower
+   specificity, so the protected declarations still decide anything they
+   set and these only fill the gaps they leave.
+
+   ── The mobile root cause ──
+   The protected block turns each ROW into a card (`tr { display: block }`)
+   and each CELL into a label/value line (`td { display: flex }`), but the
+   `<table>` and `<tbody>` are left as table boxes. A table box is sized by
+   its contents' MINIMUM width, and an unbreakable value -- a long email --
+   sets that floor. So the cards kept a ~485px floor at every viewport
+   width, and `.table-wrapper`'s `overflow-x: auto` scrolled them sideways
+   inside it.
+
+   Measured on the Reservations table with a 57-character email:
+
+     | viewport | card floor | visible | hidden off-screen |
+     |----------|-----------|---------|-------------------|
+     | 320px    | 485px     | 246px   | 239px             |
+     | 375px    | 485px     | 301px   | 184px             |
+     | 414px    | 485px     | 340px   | 145px             |
+     | 600px    | 526px     | 526px   | none              |
+
+   The hidden part is the right-hand side of every line -- which, in a
+   label-left/value-right layout, is the VALUE. The reading was "cards
+   clip their values", and the cause was the table box, not the cells.
+
+   Making the table and tbody blocks removes the floor entirely. */
+@media (max-width: 768px) {
+  .dashboard-table,
+  .dashboard-table tbody {
+    display: block;
+    width: 100%;
+  }
+
+  /* A flex item will not shrink below its content unless told it may.
+     Without these, one long word still pushes a card wider than the
+     screen even once the table box is gone. */
+  .dashboard-table td {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  /* The label is `flex-shrink: 0` in the protected block, so a long one
+     ("Household #", "Voter List Match") would otherwise take whatever it
+     wanted and leave the value a sliver. */
+  .dashboard-table td::before {
+    max-width: 42%;
+  }
+}
+
+/* ── Narrow phones: stack the value under its label ──
+   Below this width a side-by-side line leaves too little room for the
+   value even after the fixes above -- a 320px card minus padding, minus
+   the label, minus the gap is around 120px for a name or an email. The
+   label goes on its own line and the value gets the full width.
+
+   480px rather than a guess: 414px (the widest common phone) sits well
+   inside it, and 481-768px measures comfortably at two columns.
+
+   `.dashboard-table td:last-child` in the protected block is more
+   specific than this, so the action cell keeps the column layout and the
+   8px gap it already had. */
+@media (max-width: 480px) {
+  .dashboard-table td {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+
+  .dashboard-table td::before {
+    max-width: none;
+  }
+}
+
+/* ── Desktop: two free-text columns get a ceiling ──
+   With the sidebar expanded the Reservations table wanted 1252px against
+   906px of room at 1280px, so its last four columns -- including the
+   Approve/Deny buttons -- were off the end of the scroller. Collapsing
+   the sidebar fixed it, but needing to collapse a sidebar to see whether
+   a booking is approvable is not a fix.
+
+   Email and Purpose were 425px and 276px of that: one is an address that
+   cannot break without help, the other is free text with no natural
+   length. Capping those two and letting them wrap buys back the room
+   without touching the other nine columns or the collapsed-sidebar
+   layout, which is already good. */
+@media (min-width: 769px) {
+  .dashboard-table td {
+    overflow-wrap: anywhere;
+  }
+
+  .dashboard-table td[data-label="Email"] {
+    max-width: 190px;
+  }
+
+  .dashboard-table td[data-label="Purpose"] {
+    max-width: 240px;
+  }
+}
+
+/* ── A scrollbar you can see ──
+   A narrow desktop window can still need the scroller, and the default
+   overlay scrollbar on macOS and on touch devices is invisible until
+   something is already being dragged -- so a clipped column reads as a
+   missing column. `.table-wrapper` keeps the `overflow-x: auto` the
+   protected block gives it; this only makes the affordance visible. */
+.table-wrapper {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.table-wrapper::-webkit-scrollbar {
+  height: 10px;
+}
+
+.table-wrapper::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: var(--radius-pill);
+}
+
+.table-wrapper::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: var(--radius-pill);
+}
+
+.table-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Cards do not scroll sideways any more, so a track under them would be
+   decoration pointing at nothing. */
+@media (max-width: 768px) {
+  .table-wrapper::-webkit-scrollbar {
+    height: 0;
+  }
+}
