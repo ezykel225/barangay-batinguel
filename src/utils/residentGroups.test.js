@@ -24,6 +24,9 @@ import {
   matchesSearch,
   filterRows,
   findReconciliationIssues,
+  isActionableSeverity,
+  RECONCILE_SEVERITIES,
+  VOTER_LIST_CAVEAT,
 } from './residentGroups'
 
 const account = (id, overrides = {}) => ({
@@ -305,5 +308,90 @@ describe('findReconciliationIssues', () => {
   it('survives empty input', () => {
     expect(findReconciliationIssues()).toEqual([])
     expect(findReconciliationIssues({ residents: [], registryEntries: [] })).toEqual([])
+  })
+})
+
+describe('the voter reference list is not a resident list', () => {
+  // The barangay has no complete resident list; residents_registry holds
+  // the voter records it has available. So a verified resident missing
+  // from it is the ordinary case, and these tests exist to stop that
+  // finding being promoted back into a warning by a later edit.
+  const verifiedNotOnList = () =>
+    findReconciliationIssues({
+      residents: [account('a', { full_name: 'Ana Reyes', verification_status: 'verified' })],
+      registryEntries: [entry('r', { full_name: 'Ben Cruz' })],
+    }).find((i) => i.id === 'verified-not-in-registry')
+
+  it('reports a verified resident missing from the voter list as expected, not a problem', () => {
+    const issue = verifiedNotOnList()
+    expect(issue.severity).toBe('expected')
+    expect(isActionableSeverity(issue.severity)).toBe(false)
+    expect(RECONCILE_SEVERITIES[issue.severity].label).toMatch(/not a problem/i)
+  })
+
+  it('says in its own words that these residents stay verified', () => {
+    const issue = verifiedNotOnList()
+    expect(issue.explanation).toMatch(/stay verified/i)
+    expect(issue.explanation).toMatch(/do not reject/i)
+    // And that nobody should top up the voter data to empty the list.
+    expect(issue.explanation).toMatch(/do not add them/i)
+  })
+
+  it('never classifies an off-list resident as anything but a resident', () => {
+    // Absence from the voter list must not move an account between groups.
+    const groups = groupResidents([
+      account('a', { full_name: 'Ana Reyes', verification_status: 'verified' }),
+    ])
+    expect(groups.residents.map((r) => r.id)).toEqual(['a'])
+    expect(groups.notResidents).toEqual([])
+    expect(groups.requests).toEqual([])
+  })
+
+  it('treats only contradictions as actionable', () => {
+    const issues = findReconciliationIssues({
+      residents: [
+        account('verifiedOff', { full_name: 'Ana Reyes', verification_status: 'verified' }),
+        account('contradiction', { full_name: 'Ben Cruz', verification_status: 'ineligible' }),
+      ],
+      registryEntries: [entry('r', { full_name: 'Ben Cruz' })],
+    })
+    const actionable = issues.filter((i) => isActionableSeverity(i.severity)).map((i) => i.id)
+    expect(actionable).toEqual(['not-resident-in-registry'])
+  })
+
+  it('orders the expected finding last, after anything needing attention', () => {
+    const issues = findReconciliationIssues({
+      residents: [
+        account('verifiedOff', { full_name: 'Ana Reyes', verification_status: 'verified' }),
+        account('dupe1', { full_name: 'Ben Cruz', verification_status: 'pending' }),
+        account('dupe2', { full_name: 'Ben Cruz', verification_status: 'pending' }),
+      ],
+      registryEntries: [],
+    })
+    expect(issues[issues.length - 1].id).toBe('verified-not-in-registry')
+    expect(issues[0].severity).toBe('warning')
+  })
+
+  it('gives every severity a label and a badge', () => {
+    const used = new Set(
+      findReconciliationIssues({
+        residents: [
+          account('a', { verification_status: 'verified', full_name: 'Ana Reyes' }),
+          account('b', { verification_status: 'mystery', purok: 'asd' }),
+        ],
+        registryEntries: [entry('r', { purok: null })],
+      }).map((i) => i.severity)
+    )
+    expect(used.size).toBeGreaterThan(1)
+    used.forEach((severity) => {
+      expect(RECONCILE_SEVERITIES[severity].label).toBeTruthy()
+      expect(RECONCILE_SEVERITIES[severity].badge).toBeTruthy()
+    })
+  })
+
+  it('states the caveat once, for every surface to reuse', () => {
+    expect(VOTER_LIST_CAVEAT).toMatch(/does not yet have a complete list/i)
+    expect(VOTER_LIST_CAVEAT).toMatch(/voter records/i)
+    expect(VOTER_LIST_CAVEAT).toMatch(/city/i)
   })
 })

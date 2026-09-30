@@ -39,8 +39,11 @@ import {
   filterRows,
   findReconciliationIssues,
   groupResidents,
+  isActionableSeverity,
   isKnownPurok,
   normalizeName,
+  RECONCILE_SEVERITIES,
+  VOTER_LIST_CAVEAT,
 } from '../utils/residentGroups'
 import '../components/Sidebar.css'
 import './OfficialDashboard.css'
@@ -48,7 +51,7 @@ import './OfficialDashboard.css'
 const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 // Search box + purok filter + result count + reset, shared by the
-// Residents and Residents Registry tabs.
+// Residents and Voter Reference List tabs.
 //
 // ⚠️ Declared at module scope, NOT inside OfficialDashboard. A component
 // defined in a render body is a brand-new component type on every
@@ -187,7 +190,7 @@ const OfficialDashboard = () => {
   const [residentGroup, setResidentGroup] = useState('requests')
   const [residentQuery, setResidentQuery] = useState('')
   const [residentPurok, setResidentPurok] = useState('all')
-  // Residents Registry tab has its own pair, so switching tabs does not
+  // The Voter Reference List tab has its own pair, so switching tabs does not
   // silently carry a filter across into a different dataset.
   const [registryQuery, setRegistryQuery] = useState('')
   const [registryPurok, setRegistryPurok] = useState('all')
@@ -507,9 +510,9 @@ const OfficialDashboard = () => {
   // against "Ana Garcia") is worth a second look, not a tick.
   // The exact half of this test now shares normalizeName() with the
   // reconciliation panel, so the two can never disagree about whether a
-  // name is in the registry -- a badge reading "in registry" beside a
-  // panel counting the same account as missing would leave an official
-  // with no way to tell which was right. Collapsing runs of whitespace
+  // name is on the voter reference list -- a badge reading "On voter
+  // list" beside a panel counting the same account as missing would
+  // leave an official with no way to tell which was right. Collapsing runs of whitespace
   // is the only behavioural change: "Juan  Dela Cruz" now matches "Juan
   // Dela Cruz", which it should always have done.
   //
@@ -573,7 +576,7 @@ const OfficialDashboard = () => {
         if (error) {
           toast.error('Failed to update entry!')
         } else {
-          toast.success('Registry entry updated!')
+          toast.success('Voter reference entry updated!')
           logActivity({
             action: 'edited',
             entityType: 'registry_entry',
@@ -604,7 +607,7 @@ const OfficialDashboard = () => {
         } else if (!inserted?.id) {
           toast.error('Saved, but the new entry could not be read back. Refresh to confirm it is there.')
         } else {
-          toast.success('Registry entry added!')
+          toast.success('Voter reference entry added!')
           logActivity({
             action: 'added',
             entityType: 'registry_entry',
@@ -623,10 +626,10 @@ const OfficialDashboard = () => {
 
   const handleDeleteRegistryEntry = async (entry) => {
     const ok = await confirm({
-      title: 'Remove this registry entry?',
+      title: 'Remove this voter reference entry?',
       message: `${entry.full_name} will be removed from the barangay's own resident `
         + 'record. This does not change their account if they have one, but the '
-        + 'name will no longer appear as a registry match during verification.',
+        + 'name will no longer appear as a voter list match during verification.',
       confirmLabel: 'Remove entry',
     })
     if (!ok) return
@@ -643,9 +646,9 @@ const OfficialDashboard = () => {
     if (error) {
       toast.error('Failed to delete entry!')
     } else if (!data || data.length === 0) {
-      toast.error('Nothing was removed — you may not have permission to change the registry.')
+      toast.error('Nothing was removed — you may not have permission to change the voter reference list.')
     } else {
-      toast.success('Registry entry removed!')
+      toast.success('Voter reference entry removed!')
       logActivity({
         action: 'deleted',
         entityType: 'registry_entry',
@@ -1769,9 +1772,15 @@ const OfficialDashboard = () => {
     () => findReconciliationIssues({ residents: residentsList, registryEntries }),
     [residentsList, registryEntries]
   )
-  const reconciliationTotal = reconciliationIssues.reduce(
-    (total, issue) => total + issue.items.length, 0
-  )
+  // Counted by severity, from the same arrays the panel renders. Rolling
+  // them into one number made the expected case -- verified residents who
+  // are simply not registered voters -- read as part of a backlog.
+  const reconciliationAttention = reconciliationIssues
+    .filter((issue) => isActionableSeverity(issue.severity))
+    .reduce((total, issue) => total + issue.items.length, 0)
+  const reconciliationInformational = reconciliationIssues
+    .filter((issue) => !isActionableSeverity(issue.severity))
+    .reduce((total, issue) => total + issue.items.length, 0)
 
   // ── Reports: derived entirely from data already fetched, so no
   // extra queries are needed for the charts. ──────────────────────
@@ -2516,7 +2525,7 @@ const OfficialDashboard = () => {
                         <th scope="col">Name</th>
                         <th scope="col">Contact</th>
                         <th scope="col">Purok</th>
-                        <th scope="col">Registry Match</th>
+                        <th scope="col">Voter List Match</th>
                         <th scope="col">Verification</th>
                         <th scope="col">ID</th>
                         <th scope="col">Action</th>
@@ -2544,15 +2553,16 @@ const OfficialDashboard = () => {
                               </span>
                             )}
                           </td>
-                          <td data-label="Registry Match">
+                          <td data-label="Voter List Match">
                             {registryMatch?.exact ? (
                               <span
                                 className="badge badge-approved"
-                                title={`Registry: ${registryMatch.entry.full_name}`
+                                title={`Voter reference entry: ${registryMatch.entry.full_name}`
                                   + ` — ${registryMatch.entry.purok || 'no purok'}`
-                                  + `${registryMatch.entry.household_number ? `, ${registryMatch.entry.household_number}` : ''}`}
+                                  + `${registryMatch.entry.household_number ? `, ${registryMatch.entry.household_number}` : ''}`
+                                  + '. A supporting cross-reference, not proof of identity — the ID and the official settle who this is.'}
                               >
-                                ✓ In registry
+                                ✓ On voter list
                               </span>
                             ) : registryMatch ? (
                               <span
@@ -2560,16 +2570,16 @@ const OfficialDashboard = () => {
                                 title={`Closest entry: ${registryMatch.entry.full_name}`
                                   + ` — ${registryMatch.entry.purok || 'no purok'}`
                                   + `${registryMatch.entry.household_number ? `, ${registryMatch.entry.household_number}` : ''}`
-                                  + '. Not an exact name match — check the ID.'}
+                                  + '. Not an exact name match on the voter reference list — check the ID.'}
                               >
                                 ~ Similar name
                               </span>
                             ) : (
                               <span
                                 className="role-restricted-note"
-                                title="This name is not in the barangay's registry. The registry is not complete, so this is not a reason to reject — verify from the ID or in person."
+                                title="This name is not on the barangay's voter reference list. That list covers registered voters, not every resident, so being absent from it is normal and is NEVER a reason to reject anyone — verify from the ID or in person."
                               >
-                                Not in registry
+                                Not on voter list
                               </span>
                             )}
                           </td>
@@ -2659,7 +2669,7 @@ const OfficialDashboard = () => {
               )}
             </div>
 
-            {/* ── D6: account ↔ registry reconciliation ──────────────
+            {/* ── D6: account ↔ voter reference list cross-check ─────
                 Always rendered, including when there is nothing to report.
                 The Archived Officials panel was hidden while empty in
                 migration 018's first cut and the result was a reviewer
@@ -2670,38 +2680,55 @@ const OfficialDashboard = () => {
 
                 Read-only by construction: this block renders findings and
                 offers no action. Nothing here merges records, rewrites a
-                name, creates or deletes an account, or edits the registry. */}
+                name, creates or deletes an account, or edits the voter
+                reference data. */}
             <div className="dashboard-card" style={{ marginTop: 20 }}>
               <div className="dashboard-card-header">
-                <h3>Account &amp; registry reconciliation</h3>
+                <h3>Account &amp; voter list cross-check</h3>
                 <span className="official-archive-count">
                   {reconciliationIssues.length === 0
-                    ? 'nothing to reconcile'
-                    : `${reconciliationTotal} ${reconciliationTotal === 1 ? 'record' : 'records'}`
-                      + ` across ${reconciliationIssues.length}`
-                      + ` ${reconciliationIssues.length === 1 ? 'check' : 'checks'}`}
+                    ? 'nothing to cross-check'
+                    : [
+                      reconciliationAttention > 0
+                        ? `${reconciliationAttention} to look at` : null,
+                      reconciliationInformational > 0
+                        ? `${reconciliationInformational} for information` : null,
+                    ].filter(Boolean).join(' · ')}
                 </span>
               </div>
               <p className="dashboard-card-note">
-                Differences between resident accounts and the barangay&rsquo;s own
-                registry. Informational only — nothing on this panel changes any
-                record, and a listing here is never by itself a reason to reverse a
-                verification. Accounts and registry entries are compared by exact
-                name, because the two tables share no identifier; that is a string
-                comparison, never a statement that two records are the same person.
+                <strong>{VOTER_LIST_CAVEAT}</strong>
+              </p>
+              <p className="dashboard-card-note">
+                So a verified resident who is <em>not</em> on the voter reference
+                list is <strong>normal, not an error</strong>, and stays verified.
+                Being absent from that list must never lead to a rejection, a loss
+                of verification or a &ldquo;Not a resident&rdquo; outcome — and a
+                verified account must never be added to the voter reference data
+                just to clear a line from this panel.
+              </p>
+              <p className="dashboard-card-note">
+                Nothing here changes any record; the panel has no actions at all.
+                Names are compared as exact text because the two tables share no
+                identifier — a string comparison, never a statement that two
+                records describe the same person.
               </p>
 
               {reconciliationIssues.length === 0 ? (
                 <p className="dashboard-empty">
-                  No inconsistencies found between resident accounts and the registry.
+                  Nothing to cross-check between resident accounts and the voter
+                  reference list.
                 </p>
               ) : (
                 <ul className="reconcile-list">
                   {reconciliationIssues.map((issue) => (
                     <li key={issue.id} className={`reconcile-item reconcile-${issue.severity}`}>
                       <div className="reconcile-item-head">
-                        <span className={`badge badge-${issue.severity === 'warning' ? 'pending' : 'claimed'}`}>
-                          {issue.severity === 'warning' ? 'Needs a look' : 'For information'}
+                        {/* Three levels, not two: 'expected' says in words that
+                            the rows beneath it are the normal case, so ordinary
+                            verified residents are not filed under "problems". */}
+                        <span className={`badge badge-${RECONCILE_SEVERITIES[issue.severity].badge}`}>
+                          {RECONCILE_SEVERITIES[issue.severity].label}
                         </span>
                         <h4>{issue.title}</h4>
                         <span className="reconcile-count">
@@ -2723,8 +2750,8 @@ const OfficialDashboard = () => {
               )}
 
               <p className="reconcile-footnote">
-                An account and a registry entry cannot be linked reliably until
-                there is a stored relationship between them — the{' '}
+                An account and a voter reference entry cannot be linked reliably
+                until there is a stored relationship between them — the{' '}
                 <code>profile_id</code> foreign key still outstanding in the
                 project notes. Until that exists this panel is detection only, and
                 a name match here proves that two records carry the same text, not
@@ -2737,29 +2764,33 @@ const OfficialDashboard = () => {
         {activeTab === 'registry' && (
           <div>
             <div className="official-dashboard-header">
-              <h1>Residents Registry</h1>
-              <p>The barangay's own record of known residents — used as a cross-reference signal when verifying new accounts, not an automatic approval.</p>
+              <h1>Voter Reference List</h1>
+              <p>
+                {VOTER_LIST_CAVEAT} It is used as a cross-reference signal when
+                verifying a new account — never as an automatic approval, and
+                never as a reason to refuse somebody who is not on it.
+              </p>
             </div>
 
             <div className="dashboard-card">
               <div className="dashboard-card-header">
-                <h3>Registry Entries</h3>
+                <h3>Voter Reference Entries</h3>
                 <button className="btn-add" onClick={handleOpenAddRegistryEntry}>
                   <FaPlus /> Add Entry
                 </button>
               </div>
 
               {registryEntries.length === 0 ? (
-                <p className="dashboard-empty">No registry entries yet.</p>
+                <p className="dashboard-empty">No voter reference entries yet.</p>
               ) : (
                 <>
                   <ResidentFilterBar
                     idPrefix="registry"
-                    searchLabel="Search the registry by name, purok, household number or contact number"
+                    searchLabel="Search the voter reference list by name, purok, household number or contact number"
                     placeholder="Search name, purok, household or contact…"
                     query={registryQuery}
                     onQueryChange={setRegistryQuery}
-                    purokLabel="Filter registry entries by purok"
+                    purokLabel="Filter voter reference entries by purok"
                     purok={registryPurok}
                     onPurokChange={setRegistryPurok}
                     resultText={
@@ -2773,7 +2804,7 @@ const OfficialDashboard = () => {
 
                   {visibleRegistryEntries.length === 0 ? (
                     <p className="dashboard-empty">
-                      No registry entries match the search.
+                      No voter reference entries match the search.
                     </p>
                   ) : (
                 <div className="table-wrapper">
@@ -3577,7 +3608,7 @@ const OfficialDashboard = () => {
       {showRegistryModal && (
         <div className="modal-overlay">
           <div className="modal">
-            <h3>{editingRegistryEntry ? 'Edit Registry Entry' : 'Add Registry Entry'}</h3>
+            <h3>{editingRegistryEntry ? 'Edit Voter Reference Entry' : 'Add Voter Reference Entry'}</h3>
 
             <div className="modal-form-group">
               <label className="modal-form-label">Full Name</label>
@@ -3733,6 +3764,18 @@ const OfficialDashboard = () => {
               Unlike Reject, they cannot put themselves back in the queue — only an
               official can reinstate the account.
             </p>
+            {/* Spelled out because the old placeholder below offered
+                "not listed in the residents registry" as a worked example of
+                a reason, and that list is voter data rather than a roll of
+                residents. A resident too young to vote, or registered
+                elsewhere, or simply not yet supplied by the city, is absent
+                from it while being a resident. */}
+            <p style={{ fontSize: 12, color: '#b45309', marginBottom: 8 }}>
+              Not being on the Voter Reference List is <strong>not</strong> a reason
+              to use this. That list covers registered voters the barangay holds
+              records for, not every resident. Use it only when residency itself has
+              been established as false.
+            </p>
             {ineligibleResident.id_document_url && (
               <p style={{ fontSize: 12, color: '#b45309', marginBottom: 16 }}>
                 Their uploaded ID will be permanently deleted. The account record and
@@ -3744,7 +3787,7 @@ const OfficialDashboard = () => {
               <label className="modal-form-label">Reason</label>
               <textarea
                 className="modal-form-textarea"
-                placeholder="e.g. address is in another barangay; not listed in the residents registry"
+                placeholder="e.g. confirmed to be living in another barangay"
                 value={ineligibleNotes}
                 onChange={(e) => setIneligibleNotes(e.target.value)}
               />

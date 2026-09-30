@@ -209,7 +209,12 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {} }) => {
     { id: 'kapitan', label: 'Kapitan Status', icon: <FaUserTie /> },
     { id: 'officials', label: 'Officials Directory', icon: <FaUsers /> },
     { id: 'residents', label: 'Residents', icon: <FaUserFriends /> },
-    { id: 'registry', label: 'Residents Registry', icon: <FaAddressBook /> },
+    // Voter Reference List, not "Residents Registry": the table holds the
+    // voter records the barangay has available, not a complete list of who
+    // lives here, and the city may supply a broader dataset later. The tab
+    // id stays 'registry' -- it is the switch value the dashboard matches
+    // on, not something anybody reads.
+    { id: 'registry', label: 'Voter Reference List', icon: <FaAddressBook /> },
     { id: 'reports', label: 'Reports', icon: <FaChartBar /> },
     { id: 'activity', label: 'Activity Log', icon: <FaHistory /> },
     { id: 'settings', label: 'Settings', icon: <FaCog /> },

@@ -1,5 +1,5 @@
-// Resident account vocabulary, grouping, searching and account/registry
-// reconciliation -- in one module, deliberately.
+// Resident account vocabulary, grouping, searching and the account /
+// voter-reference cross-check -- in one module, deliberately.
 //
 // Three surfaces need the same answers and used to derive them
 // separately: the Residents tab (which accounts are which), the Reports
@@ -21,11 +21,40 @@
 
 import { PUROKS } from '../constants/barangay'
 
+// ── What `residents_registry` actually holds ──────────────────
+//
+// ⚠️ It is NOT a list of everyone who lives in Barangay Batinguel. The
+// barangay does not have one. What the table holds is the voter records
+// the barangay had available, and the city may supply a broader resident
+// dataset later.
+//
+// That distinction decides how every string below is worded. A table
+// presented as "the residents registry" invites exactly one wrong
+// inference -- that a resident missing from it is a resident whose
+// residency is in doubt -- and the consequence of that inference is an
+// official refusing somebody a government document. So the user-facing
+// name is the Voter Reference List, and absence from it is stated as
+// normal wherever it appears.
+//
+// The table, its columns and the `registry_entry` audit vocabulary keep
+// their names: renaming them means a migration and an `activity_log`
+// CHECK constraint change, for no gain a reader would ever see.
+export const VOTER_LIST_LABEL = 'Voter Reference List'
+
+// The one-sentence caveat. Kept here so the Residents tab, the Voter
+// Reference List tab and the cross-check panel cannot drift into saying
+// three different things about the same dataset.
+export const VOTER_LIST_CAVEAT =
+  'The barangay does not yet have a complete list of its residents. These '
+  + 'entries come from the voter records it has available, and the city may '
+  + 'supply a broader resident dataset later — so this is a supporting '
+  + 'cross-reference, never a definition of who lives here.'
+
 // ── Name normalisation ───────────────────────────────────────
 //
-// One function, used by BOTH the registry badge on a resident row and
-// the reconciliation panel. Two separate normalisations would let the
-// badge say "in registry" while the panel counted the same account as
+// One function, used by BOTH the voter-list badge on a resident row and
+// the cross-check panel. Two separate normalisations would let the badge
+// say "On voter list" while the panel counted the same account as
 // missing from it -- a disagreement the official has no way to resolve.
 //
 // Trim, collapse runs of whitespace, lowercase. Nothing cleverer: no
@@ -179,12 +208,21 @@ export const filterRows = (list = [], { query = '', purok = 'all', fields }) =>
     (row) => matchesSearch(row, query, fields) && purokMatchesFilter(row?.purok, purok)
   )
 
-// ── D6: account ↔ registry reconciliation ────────────────────
+// ── D6: account ↔ voter reference list cross-check ────────────
 //
 // ⚠️ READ THIS BEFORE ADDING A RULE.
 //
-// There is no deterministic link between a resident account and a
-// registry entry. `profiles` has no registry reference,
+// The list being compared against is voter data, not a resident roll --
+// see VOTER_LIST_CAVEAT above. So a resident who is not on it is
+// ORDINARY, and the one check that reports them carries severity
+// 'expected' rather than 'notice' or 'warning'. Absence from the voter
+// list must never cause a rejection, a loss of verification or a "Not a
+// resident" outcome, and a verified account must never be added to the
+// voter data in order to clear a finding here -- that would be the
+// circular check with the reassuring appearance, one step removed.
+//
+// There is no deterministic link between a resident account and a voter
+// reference entry. `profiles` has no reference to the voter data,
 // `residents_registry` has no profile reference (`added_by` is the
 // official who typed it), and `profiles.system_id` is null on every
 // resident account, so it cannot serve as one either. The only thing
@@ -193,17 +231,17 @@ export const filterRows = (list = [], { query = '', purok = 'all', fields }) =>
 //
 // So this panel INFORMS; it never concludes, and it never writes.
 // Nothing here merges records, rewrites a name, creates or deletes an
-// account, or edits a registry entry. Every issue is something an
-// official then decides about by hand.
+// account, or edits a voter reference entry. Every issue is something an
+// official then decides about by hand -- and for the 'expected' one, the
+// right decision is usually nothing at all.
 //
 // Two deliberate limits:
 //
-// 1. Exact normalised equality only. The resident row's registry badge
-//    also shows a "similar name" case, and that substring test is
+// 1. Exact normalised equality only. The resident row's voter-list
+//    badge also shows a "similar name" case, and that substring test is
 //    useful as a prompt to look closer -- but it is fuzzy, so it must
-//    not drive a list captioned "problems". A near-match here would
-//    report two different people as one, which is worse than reporting
-//    nothing.
+//    not drive a list of findings. A near-match here would report two
+//    different people as one, which is worse than reporting nothing.
 // 2. A missing optional field is never a finding. An uploaded ID is
 //    optional by design -- requiring one would exclude the residents
 //    who most need barangay documents -- so "verified without an ID on
@@ -214,6 +252,27 @@ export const filterRows = (list = [], { query = '', purok = 'all', fields }) =>
 // already recorded as outstanding in CLAUDE.md. That is a schema
 // change, so it is not in this file's gift; until it exists, this is
 // detection only.
+// Three severities, and the third one matters as much as the other two.
+//
+//   warning  -- two records contradict each other, or a value is
+//               ambiguous. Somebody should look.
+//   notice   -- untidy data worth correcting when convenient.
+//   expected -- NOT a problem. Reported because the cross-check is only
+//               useful if it says what it found, but presented as the
+//               normal case it is. Without this level, ordinary verified
+//               residents appear in a list of findings and start to look
+//               like errors -- which is how a cross-check turns into a
+//               reason to doubt somebody's residency.
+export const RECONCILE_SEVERITIES = {
+  warning: { label: 'Needs a look', badge: 'pending' },
+  notice: { label: 'For information', badge: 'claimed' },
+  expected: { label: 'Expected — not a problem', badge: 'ready' },
+}
+
+// Only 'warning' rows are things to act on. The panel counts them
+// separately so a screenful of expected rows cannot read as a backlog.
+export const isActionableSeverity = (severity) => severity === 'warning'
+
 const countByKey = (rows, keyOf) => {
   const counts = new Map()
   rows.forEach((row) => {
@@ -236,31 +295,21 @@ export const findReconciliationIssues = ({
   const accountNameCounts = countByKey(residents, (r) => normalizeName(r.full_name))
   const registryNameCounts = countByKey(registryEntries, (e) => normalizeName(e.full_name))
 
+  // Ordered by what an official should read first: contradictions, then
+  // untidiness, then the expected case last. The old order opened with
+  // verified-residents-not-on-the-list, which put the most ordinary
+  // finding in the position a reader takes for the most serious.
   const issues = [
-    {
-      id: 'verified-not-in-registry',
-      severity: 'notice',
-      title: 'Verified accounts with no registry entry of the same name',
-      explanation:
-        'The registry is incomplete, so this is not evidence of anything wrong — '
-        + 'and it is not a reason to reverse a verification. It is a prompt to add '
-        + 'the resident to the registry once their residency is independently '
-        + 'established. Never add someone to the registry in order to verify them: '
-        + 'that makes the cross-reference circular while still looking reassuring.',
-      items: residents
-        .filter((r) => r.verification_status === 'verified' && !inRegistry(r))
-        .map((r) => ({ key: r.id, label: r.full_name, detail: r.purok || 'no purok recorded' })),
-    },
     {
       id: 'not-resident-in-registry',
       severity: 'warning',
-      title: 'Accounts marked “Not a resident” whose name is in the registry',
+      title: 'Accounts marked “Not a resident” whose name is on the voter reference list',
       explanation:
         'Two barangay records disagree: the account says this person is not a '
-        + 'resident, the registry lists the name. One of them is wrong, or they are '
-        + 'two different people who share a name. Worth a look before the resident '
-        + 'is turned away again — the account state is terminal and only an official '
-        + 'can reopen it.',
+        + 'resident of Batinguel, the voter reference list carries the name. One '
+        + 'of them is wrong, or they are two different people who share a name. '
+        + 'Worth a look before the resident is turned away again — the account '
+        + 'state is terminal and only an official can reopen it.',
       items: residents
         .filter((r) => r.verification_status === 'ineligible' && inRegistry(r))
         .map((r) => ({ key: r.id, label: r.full_name, detail: r.purok || 'no purok recorded' })),
@@ -285,18 +334,34 @@ export const findReconciliationIssues = ({
     {
       id: 'duplicate-registry-names',
       severity: 'warning',
-      title: 'Registry entries sharing an identical name',
+      title: 'Voter reference entries sharing an identical name',
       explanation:
-        'The registry lists this name more than once, so a match against it does '
-        + 'not identify one household. Merge or distinguish them by hand — the '
-        + 'entries may be two real people or one entered twice, and only the '
-        + 'barangay knows which.',
+        'The voter reference list carries this name more than once, so a match '
+        + 'against it does not point to one person. Distinguish or merge them by '
+        + 'hand — they may be two real people or one entry made twice, and only '
+        + 'the barangay knows which.',
       items: registryEntries
         .filter((e) => registryNameCounts.get(normalizeName(e.full_name)) > 1)
         .map((e) => ({
           key: e.id,
           label: e.full_name,
           detail: e.household_number ? `household ${e.household_number}` : 'no household number',
+        })),
+    },
+    {
+      id: 'unrecognised-status',
+      severity: 'warning',
+      title: 'Accounts holding an unrecognised verification status',
+      explanation:
+        'The stored value is not one of the four this app knows. Such an account '
+        + 'is shown under Requests so that it cannot disappear from every group '
+        + 'and leave the counts short.',
+      items: residents
+        .filter((r) => !VERIFICATION_STATES[r.verification_status])
+        .map((r) => ({
+          key: r.id,
+          label: r.full_name,
+          detail: `stored as “${r.verification_status ?? 'null'}”`,
         })),
     },
     {
@@ -320,9 +385,9 @@ export const findReconciliationIssues = ({
     {
       id: 'registry-purok-unlisted',
       severity: 'notice',
-      title: 'Registry entries whose purok is blank or not on the barangay’s list',
+      title: 'Voter reference entries whose purok is blank or not on the barangay’s list',
       explanation:
-        'Same cause as above, on the barangay’s own record. Editing the entry now '
+        'Same cause as above, on the voter reference data. Editing the entry now '
         + 'offers the purok list.',
       items: registryEntries
         .filter((e) => !isKnownPurok(e.purok))
@@ -333,20 +398,28 @@ export const findReconciliationIssues = ({
         })),
     },
     {
-      id: 'unrecognised-status',
-      severity: 'warning',
-      title: 'Accounts holding an unrecognised verification status',
+      // ⚠️ severity 'expected', and it must stay that way. The voter
+      // reference list is not a list of residents, so a resident missing
+      // from it is the normal case, not a defect. Raising this to
+      // 'notice' or 'warning' would put ordinary verified residents in a
+      // list of problems, and the next step from there is somebody
+      // treating the absence as grounds to doubt their residency.
+      id: 'verified-not-in-registry',
+      severity: 'expected',
+      title: 'Verified residents not on the voter reference list',
       explanation:
-        'The stored value is not one of the four this app knows. Such an account '
-        + 'is shown under Requests so that it cannot disappear from every group '
-        + 'and leave the counts short.',
+        'Normal, and not a finding against these accounts. The voter reference '
+        + 'list is not a list of residents: it covers registered voters the '
+        + 'barangay happens to hold records for, so it leaves out anyone too '
+        + 'young to vote, anyone registered elsewhere, and anyone the city has '
+        + 'not supplied yet. These residents were verified against an ID by an '
+        + 'official and stay verified. Do not reject them, do not reverse a '
+        + 'verification, and do not add them to the voter reference data to make '
+        + 'this list shorter — the cross-check exists to be read, not to be '
+        + 'emptied.',
       items: residents
-        .filter((r) => !VERIFICATION_STATES[r.verification_status])
-        .map((r) => ({
-          key: r.id,
-          label: r.full_name,
-          detail: `stored as “${r.verification_status ?? 'null'}”`,
-        })),
+        .filter((r) => r.verification_status === 'verified' && !inRegistry(r))
+        .map((r) => ({ key: r.id, label: r.full_name, detail: r.purok || 'no purok recorded' })),
     },
   ]
 

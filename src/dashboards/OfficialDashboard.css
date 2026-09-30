@@ -450,7 +450,7 @@
 /* ================================
     RESIDENTS — GROUPS, SEARCH, RECONCILIATION
     ================================
-    Added for the Residents / Residents Registry workflow. All of it sits
+    Added for the Residents / Voter Reference List workflow. All of it sits
     outside tables, so the mobile table-to-card conversion in Sidebar.css
     is untouched and the tables below keep converting to cards as before.
 
@@ -777,4 +777,13 @@
   background-color: #f3f4f6;
   padding: 1px 5px;
   border-radius: 4px;
+}
+
+/* The expected case — a verified resident who is simply not a registered
+    voter. Blue, the colour this app already uses for "informational"
+    (.badge-ready), rather than the amber of a warning or the grey of
+    untidiness: these rows are the normal state of affairs, and a list of
+    ordinary residents must not read as a list of defects. */
+.reconcile-expected {
+  border-left-color: #1d4ed8;
 }
