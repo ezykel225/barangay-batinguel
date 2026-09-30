@@ -14,6 +14,8 @@ import {
   FaFilter,
   FaArchive,
   FaUndo,
+  FaSearch,
+  FaTimes,
 } from 'react-icons/fa'
 import { supabase } from '../supabase/supabaseClient'
 import { pathFromPublicUrl } from '../utils/storagePath'
@@ -27,10 +29,115 @@ import {
   ArchiveOfficialDialog,
   RestoreOfficialDialog,
 } from '../components/OfficialArchiveDialog'
+import { PUROKS } from '../constants/barangay'
+import {
+  RESIDENT_GROUPS,
+  RESIDENT_SEARCH_FIELDS,
+  REGISTRY_SEARCH_FIELDS,
+  PUROK_FILTER_UNLISTED,
+  describeVerification,
+  filterRows,
+  findReconciliationIssues,
+  groupResidents,
+  isActionableSeverity,
+  isKnownPurok,
+  normalizeName,
+  RECONCILE_SEVERITIES,
+  VOTER_LIST_CAVEAT,
+} from '../utils/residentGroups'
 import '../components/Sidebar.css'
 import './OfficialDashboard.css'
 
 const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+// Search box + purok filter + result count + reset, shared by the
+// Residents and Voter Reference List tabs.
+//
+// ⚠️ Declared at module scope, NOT inside OfficialDashboard. A component
+// defined in a render body is a brand-new component type on every
+// render, so React unmounts the old tree and mounts a fresh one --
+// which throws the text cursor out of the search box after the first
+// keystroke and makes the field feel broken. Same reason the filter
+// state lives in the dashboard rather than in here.
+const ResidentFilterBar = ({
+  idPrefix,
+  searchLabel,
+  placeholder,
+  query,
+  onQueryChange,
+  purokLabel,
+  purok,
+  onPurokChange,
+  resultText,
+  onReset,
+  filtersActive,
+}) => (
+  <div className="resident-filter-bar">
+    <div className="resident-search-field">
+      <FaSearch className="resident-search-icon" aria-hidden="true" />
+      {/* A real label rather than a bare placeholder: a placeholder
+          disappears as soon as anything is typed and is not a name for
+          assistive technology. Hidden visually because the magnifier and
+          the placeholder already say what the field is. */}
+      <label className="visually-hidden" htmlFor={`${idPrefix}-search`}>
+        {searchLabel}
+      </label>
+      <input
+        id={`${idPrefix}-search`}
+        type="search"
+        className="resident-search-input"
+        placeholder={placeholder}
+        value={query}
+        onChange={(event) => onQueryChange(event.target.value)}
+      />
+      {query !== '' && (
+        <button
+          type="button"
+          className="resident-search-clear"
+          onClick={() => onQueryChange('')}
+          aria-label="Clear the search box"
+        >
+          <FaTimes aria-hidden="true" />
+        </button>
+      )}
+    </div>
+
+    <div className="filter-select-wrap">
+      <FaFilter style={{ fontSize: 12, color: '#6b7280' }} aria-hidden="true" />
+      <label className="visually-hidden" htmlFor={`${idPrefix}-purok`}>
+        {purokLabel}
+      </label>
+      <select
+        id={`${idPrefix}-purok`}
+        className="filter-select"
+        value={purok}
+        onChange={(event) => onPurokChange(event.target.value)}
+      >
+        <option value="all">All puroks</option>
+        {PUROKS.map((option) => (
+          <option key={option} value={option}>{option}</option>
+        ))}
+        {/* Blank and off-list share one option because they are the same
+            job from here: a value that cannot be grouped or matched. */}
+        <option value={PUROK_FILTER_UNLISTED}>Blank or not on the list</option>
+      </select>
+    </div>
+
+    {/* role="status" so the count is announced as the list narrows --
+        otherwise a screen reader user types into a box and hears
+        nothing change. */}
+    <p className="resident-filter-count" role="status">{resultText}</p>
+
+    <button
+      type="button"
+      className="resident-filter-reset"
+      onClick={onReset}
+      disabled={!filtersActive}
+    >
+      Reset
+    </button>
+  </div>
+)
 
 const OfficialDashboard = () => {
   const { user } = useAuth()
@@ -76,6 +183,17 @@ const OfficialDashboard = () => {
   const [reservationFilter, setReservationFilter] = useState('all')
   const [announcementFilter, setAnnouncementFilter] = useState('all')
   const [eventFilter, setEventFilter] = useState('all')
+
+  // Residents tab: which of the three groups is open, plus the search
+  // box and purok filter that apply within it. 'requests' is the default
+  // because it is the group that needs an official to do something.
+  const [residentGroup, setResidentGroup] = useState('requests')
+  const [residentQuery, setResidentQuery] = useState('')
+  const [residentPurok, setResidentPurok] = useState('all')
+  // The Voter Reference List tab has its own pair, so switching tabs does not
+  // silently carry a filter across into a different dataset.
+  const [registryQuery, setRegistryQuery] = useState('')
+  const [registryPurok, setRegistryPurok] = useState('all')
 
   // Logged-in user info from profiles + barangay_officials
   const [userProfile, setUserProfile] = useState(null)
@@ -390,20 +508,30 @@ const OfficialDashboard = () => {
   // differently: an exact hit is worth a green badge, a partial one
   // ("Juan Dela Cruz Jr." against "Juan Dela Cruz", or a bare "Ana"
   // against "Ana Garcia") is worth a second look, not a tick.
+  // The exact half of this test now shares normalizeName() with the
+  // reconciliation panel, so the two can never disagree about whether a
+  // name is on the voter reference list -- a badge reading "On voter
+  // list" beside a panel counting the same account as missing would
+  // leave an official with no way to tell which was right. Collapsing runs of whitespace
+  // is the only behavioural change: "Juan  Dela Cruz" now matches "Juan
+  // Dela Cruz", which it should always have done.
+  //
+  // The partial branch stays exactly as it was, and stays out of the
+  // reconciliation panel: a substring test is a prompt to look closer,
+  // not a finding.
   const findRegistryMatch = (resident) => {
-    if (!resident?.full_name) return null
-    const nameLower = resident.full_name.trim().toLowerCase()
-    if (!nameLower) return null
+    const nameKey = normalizeName(resident?.full_name)
+    if (!nameKey) return null
 
     const exact = registryEntries.find(
-      (entry) => (entry.full_name || '').trim().toLowerCase() === nameLower
+      (entry) => normalizeName(entry.full_name) === nameKey
     )
     if (exact) return { entry: exact, exact: true }
 
     const partial = registryEntries.find((entry) => {
-      const entryName = (entry.full_name || '').trim().toLowerCase()
+      const entryName = normalizeName(entry.full_name)
       if (!entryName) return false
-      return entryName.includes(nameLower) || nameLower.includes(entryName)
+      return entryName.includes(nameKey) || nameKey.includes(entryName)
     })
     return partial ? { entry: partial, exact: false } : null
   }
@@ -448,7 +576,7 @@ const OfficialDashboard = () => {
         if (error) {
           toast.error('Failed to update entry!')
         } else {
-          toast.success('Registry entry updated!')
+          toast.success('Voter reference entry updated!')
           logActivity({
             action: 'edited',
             entityType: 'registry_entry',
@@ -479,7 +607,7 @@ const OfficialDashboard = () => {
         } else if (!inserted?.id) {
           toast.error('Saved, but the new entry could not be read back. Refresh to confirm it is there.')
         } else {
-          toast.success('Registry entry added!')
+          toast.success('Voter reference entry added!')
           logActivity({
             action: 'added',
             entityType: 'registry_entry',
@@ -498,10 +626,10 @@ const OfficialDashboard = () => {
 
   const handleDeleteRegistryEntry = async (entry) => {
     const ok = await confirm({
-      title: 'Remove this registry entry?',
+      title: 'Remove this voter reference entry?',
       message: `${entry.full_name} will be removed from the barangay's own resident `
         + 'record. This does not change their account if they have one, but the '
-        + 'name will no longer appear as a registry match during verification.',
+        + 'name will no longer appear as a voter list match during verification.',
       confirmLabel: 'Remove entry',
     })
     if (!ok) return
@@ -518,9 +646,9 @@ const OfficialDashboard = () => {
     if (error) {
       toast.error('Failed to delete entry!')
     } else if (!data || data.length === 0) {
-      toast.error('Nothing was removed — you may not have permission to change the registry.')
+      toast.error('Nothing was removed — you may not have permission to change the voter reference list.')
     } else {
-      toast.success('Registry entry removed!')
+      toast.success('Voter reference entry removed!')
       logActivity({
         action: 'deleted',
         entityType: 'registry_entry',
@@ -1590,6 +1718,70 @@ const OfficialDashboard = () => {
 
   const pendingReservations = reservations.filter(r => r.status === 'pending')
 
+  // ── Residents: groups, filters and reconciliation ────────────────
+  //
+  // Every number the Residents tab shows comes from this block, and the
+  // lists it shows come from the same values. A group's tab count is
+  // literally the length of the array rendered when that tab is open,
+  // filters included -- so the count above a list cannot disagree with
+  // the list, which is what a separately-computed total would eventually
+  // do.
+  const residentGroups = useMemo(() => groupResidents(residentsList), [residentsList])
+
+  const residentFilter = useMemo(
+    () => ({ query: residentQuery, purok: residentPurok, fields: RESIDENT_SEARCH_FIELDS }),
+    [residentQuery, residentPurok]
+  )
+
+  const residentGroupCounts = useMemo(() => {
+    const counts = {}
+    RESIDENT_GROUPS.forEach((group) => {
+      counts[group.id] = filterRows(residentGroups[group.id], residentFilter).length
+    })
+    return counts
+  }, [residentGroups, residentFilter])
+
+  const visibleResidents = useMemo(
+    () => filterRows(residentGroups[residentGroup], residentFilter),
+    [residentGroups, residentGroup, residentFilter]
+  )
+
+  const activeResidentGroup = RESIDENT_GROUPS.find((group) => group.id === residentGroup)
+    || RESIDENT_GROUPS[0]
+  const residentFiltersActive = residentQuery.trim() !== '' || residentPurok !== 'all'
+  const resetResidentFilters = () => {
+    setResidentQuery('')
+    setResidentPurok('all')
+  }
+
+  const visibleRegistryEntries = useMemo(
+    () => filterRows(registryEntries, {
+      query: registryQuery, purok: registryPurok, fields: REGISTRY_SEARCH_FIELDS,
+    }),
+    [registryEntries, registryQuery, registryPurok]
+  )
+  const registryFiltersActive = registryQuery.trim() !== '' || registryPurok !== 'all'
+  const resetRegistryFilters = () => {
+    setRegistryQuery('')
+    setRegistryPurok('all')
+  }
+
+  // D6. Detection only -- see findReconciliationIssues for why this
+  // cannot conclude anything about identity, and why it never writes.
+  const reconciliationIssues = useMemo(
+    () => findReconciliationIssues({ residents: residentsList, registryEntries }),
+    [residentsList, registryEntries]
+  )
+  // Counted by severity, from the same arrays the panel renders. Rolling
+  // them into one number made the expected case -- verified residents who
+  // are simply not registered voters -- read as part of a backlog.
+  const reconciliationAttention = reconciliationIssues
+    .filter((issue) => isActionableSeverity(issue.severity))
+    .reduce((total, issue) => total + issue.items.length, 0)
+  const reconciliationInformational = reconciliationIssues
+    .filter((issue) => !isActionableSeverity(issue.severity))
+    .reduce((total, issue) => total + issue.items.length, 0)
+
   // ── Reports: derived entirely from data already fetched, so no
   // extra queries are needed for the charts. ──────────────────────
 
@@ -2263,13 +2455,69 @@ const OfficialDashboard = () => {
           <div>
             <div className="official-dashboard-header">
               <h1>Residents</h1>
-              <p>Registered resident accounts and ID verification.</p>
+              <p>
+                Resident accounts, grouped by where they stand in verification.
+                The group is read from each account&rsquo;s stored verification
+                status — nothing here is a second record that could drift from it.
+              </p>
             </div>
 
             <div className="dashboard-card">
               {residentsList.length === 0 ? (
                 <p className="dashboard-empty">No residents have registered yet.</p>
               ) : (
+                <>
+                  {/* Group buttons rather than an ARIA tablist: these swap the
+                      panel below without changing the page, and a plain button
+                      is keyboard-operable with no arrow-key handling to get
+                      wrong. `aria-pressed` carries the selected state to a
+                      screen reader, which the green underline does not. */}
+                  <div className="resident-group-tabs" role="group" aria-label="Resident account groups">
+                    {RESIDENT_GROUPS.map((group) => (
+                      <button
+                        key={group.id}
+                        type="button"
+                        className={`resident-group-tab${residentGroup === group.id ? ' is-active' : ''}`}
+                        aria-pressed={residentGroup === group.id}
+                        onClick={() => setResidentGroup(group.id)}
+                      >
+                        {group.label}
+                        <span className="resident-group-tab-count">
+                          {residentGroupCounts[group.id]}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  <p className="dashboard-card-note">{activeResidentGroup.description}</p>
+
+                  <ResidentFilterBar
+                    idPrefix="residents"
+                    searchLabel="Search resident accounts by name, contact number or purok"
+                    placeholder="Search name, contact or purok…"
+                    query={residentQuery}
+                    onQueryChange={setResidentQuery}
+                    purokLabel="Filter resident accounts by purok"
+                    purok={residentPurok}
+                    onPurokChange={setResidentPurok}
+                    resultText={
+                      residentFiltersActive
+                        ? `Showing ${visibleResidents.length} of `
+                          + `${residentGroups[residentGroup].length} in ${activeResidentGroup.label}`
+                        : `${visibleResidents.length} ${visibleResidents.length === 1 ? 'account' : 'accounts'}`
+                          + ` in ${activeResidentGroup.label}`
+                    }
+                    onReset={resetResidentFilters}
+                    filtersActive={residentFiltersActive}
+                  />
+
+                  {visibleResidents.length === 0 ? (
+                    <p className="dashboard-empty">
+                      {residentFiltersActive
+                        ? 'No accounts in this group match the search.'
+                        : activeResidentGroup.emptyMessage}
+                    </p>
+                  ) : (
                 <div className="table-wrapper">
                   <table className="dashboard-table">
                     <thead>
@@ -2277,29 +2525,44 @@ const OfficialDashboard = () => {
                         <th scope="col">Name</th>
                         <th scope="col">Contact</th>
                         <th scope="col">Purok</th>
-                        <th scope="col">Registry Match</th>
+                        <th scope="col">Voter List Match</th>
                         <th scope="col">Verification</th>
                         <th scope="col">ID</th>
                         <th scope="col">Action</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {residentsList.map((resident) => {
+                      {visibleResidents.map((resident) => {
                         const registryMatch = findRegistryMatch(resident)
+                        const state = describeVerification(resident.verification_status)
                         return (
                         <tr key={resident.id}>
                           <td data-label="Name">{resident.full_name}</td>
                           <td data-label="Contact">{resident.contact_number || '—'}</td>
-                          <td data-label="Purok">{resident.purok || '—'}</td>
-                          <td data-label="Registry Match">
+                          <td data-label="Purok">
+                            {resident.purok || '—'}
+                            {/* A value the purok list does not contain cannot be
+                                grouped or matched. Flagged in words, not left to
+                                be noticed -- and never rewritten here. */}
+                            {resident.purok && !isKnownPurok(resident.purok) && (
+                              <span
+                                className="resident-purok-flag"
+                                title="This spelling is not on the barangay's purok list, so it cannot be grouped or matched. Correct it with the resident; the signup and settings forms now offer the list."
+                              >
+                                not on the list
+                              </span>
+                            )}
+                          </td>
+                          <td data-label="Voter List Match">
                             {registryMatch?.exact ? (
                               <span
                                 className="badge badge-approved"
-                                title={`Registry: ${registryMatch.entry.full_name}`
+                                title={`Voter reference entry: ${registryMatch.entry.full_name}`
                                   + ` — ${registryMatch.entry.purok || 'no purok'}`
-                                  + `${registryMatch.entry.household_number ? `, ${registryMatch.entry.household_number}` : ''}`}
+                                  + `${registryMatch.entry.household_number ? `, ${registryMatch.entry.household_number}` : ''}`
+                                  + '. A supporting cross-reference, not proof of identity — the ID and the official settle who this is.'}
                               >
-                                ✓ In registry
+                                ✓ On voter list
                               </span>
                             ) : registryMatch ? (
                               <span
@@ -2307,32 +2570,37 @@ const OfficialDashboard = () => {
                                 title={`Closest entry: ${registryMatch.entry.full_name}`
                                   + ` — ${registryMatch.entry.purok || 'no purok'}`
                                   + `${registryMatch.entry.household_number ? `, ${registryMatch.entry.household_number}` : ''}`
-                                  + '. Not an exact name match — check the ID.'}
+                                  + '. Not an exact name match on the voter reference list — check the ID.'}
                               >
                                 ~ Similar name
                               </span>
                             ) : (
                               <span
                                 className="role-restricted-note"
-                                title="This name is not in the barangay's registry. The registry is not complete, so this is not a reason to reject — verify from the ID or in person."
+                                title="This name is not on the barangay's voter reference list. That list covers registered voters, not every resident, so being absent from it is normal and is NEVER a reason to reject anyone — verify from the ID or in person."
                               >
-                                Not in registry
+                                Not on voter list
                               </span>
                             )}
                           </td>
                           <td data-label="Verification">
-                            <span className={`badge badge-${
-                              resident.verification_status === 'verified' ? 'approved'
-                                : resident.verification_status === 'rejected'
-                                  || resident.verification_status === 'ineligible' ? 'declined'
-                                  : 'pending'
-                            }`}>
-                              {resident.verification_status}
+                            {/* The label is a sentence-length description of the
+                                stored state, and the stored value itself is in
+                                the tooltip. "rejected" and "ineligible" used to
+                                share one red badge and differ only in the word
+                                -- one is resubmittable and the other is
+                                permanent, so they now read differently and are
+                                coloured differently. */}
+                            <span
+                              className={`badge badge-${state.tone}`}
+                              title={`${state.meaning} (stored as “${resident.verification_status}”)`}
+                            >
+                              {state.label}
                             </span>
                             {(resident.verification_status === 'rejected'
                               || resident.verification_status === 'ineligible')
                               && resident.verification_notes && (
-                              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+                              <div className="resident-status-note">
                                 {resident.verification_notes}
                               </div>
                             )}
@@ -2347,7 +2615,15 @@ const OfficialDashboard = () => {
                                 View ID
                               </button>
                             ) : (
-                              <span className="role-restricted-note">Not uploaded</span>
+                              // Optional by design: requiring an ID would
+                              // exclude the residents who most need barangay
+                              // documents. Absence is not a finding.
+                              <span
+                                className="role-restricted-note"
+                                title="Uploading an ID is optional. This resident can be verified in person at the Barangay Hall."
+                              >
+                                None uploaded
+                              </span>
                             )}
                           </td>
                           <td data-label="Action" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -2388,7 +2664,99 @@ const OfficialDashboard = () => {
                     </tbody>
                   </table>
                 </div>
+                  )}
+                </>
               )}
+            </div>
+
+            {/* ── D6: account ↔ voter reference list cross-check ─────
+                Always rendered, including when there is nothing to report.
+                The Archived Officials panel was hidden while empty in
+                migration 018's first cut and the result was a reviewer
+                looking for a feature that was working correctly. A panel
+                that says "nothing to reconcile" is the useful answer; a
+                panel that is absent is indistinguishable from one that is
+                broken.
+
+                Read-only by construction: this block renders findings and
+                offers no action. Nothing here merges records, rewrites a
+                name, creates or deletes an account, or edits the voter
+                reference data. */}
+            <div className="dashboard-card" style={{ marginTop: 20 }}>
+              <div className="dashboard-card-header">
+                <h3>Account &amp; voter list cross-check</h3>
+                <span className="official-archive-count">
+                  {reconciliationIssues.length === 0
+                    ? 'nothing to cross-check'
+                    : [
+                      reconciliationAttention > 0
+                        ? `${reconciliationAttention} to look at` : null,
+                      reconciliationInformational > 0
+                        ? `${reconciliationInformational} for information` : null,
+                    ].filter(Boolean).join(' · ')}
+                </span>
+              </div>
+              <p className="dashboard-card-note">
+                <strong>{VOTER_LIST_CAVEAT}</strong>
+              </p>
+              <p className="dashboard-card-note">
+                So a verified resident who is <em>not</em> on the voter reference
+                list is <strong>normal, not an error</strong>, and stays verified.
+                Being absent from that list must never lead to a rejection, a loss
+                of verification or a &ldquo;Not a resident&rdquo; outcome — and a
+                verified account must never be added to the voter reference data
+                just to clear a line from this panel.
+              </p>
+              <p className="dashboard-card-note">
+                Nothing here changes any record; the panel has no actions at all.
+                Names are compared as exact text because the two tables share no
+                identifier — a string comparison, never a statement that two
+                records describe the same person.
+              </p>
+
+              {reconciliationIssues.length === 0 ? (
+                <p className="dashboard-empty">
+                  Nothing to cross-check between resident accounts and the voter
+                  reference list.
+                </p>
+              ) : (
+                <ul className="reconcile-list">
+                  {reconciliationIssues.map((issue) => (
+                    <li key={issue.id} className={`reconcile-item reconcile-${issue.severity}`}>
+                      <div className="reconcile-item-head">
+                        {/* Three levels, not two: 'expected' says in words that
+                            the rows beneath it are the normal case, so ordinary
+                            verified residents are not filed under "problems". */}
+                        <span className={`badge badge-${RECONCILE_SEVERITIES[issue.severity].badge}`}>
+                          {RECONCILE_SEVERITIES[issue.severity].label}
+                        </span>
+                        <h4>{issue.title}</h4>
+                        <span className="reconcile-count">
+                          {issue.items.length}
+                        </span>
+                      </div>
+                      <p className="reconcile-explanation">{issue.explanation}</p>
+                      <ul className="reconcile-rows">
+                        {issue.items.map((item) => (
+                          <li key={item.key}>
+                            <span className="reconcile-row-name">{item.label}</span>
+                            <span className="reconcile-row-detail">{item.detail}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <p className="reconcile-footnote">
+                An account and a voter reference entry cannot be linked reliably
+                until there is a stored relationship between them — the{' '}
+                <code>profile_id</code> foreign key still outstanding in the
+                project notes. Until that exists this panel is detection only, and
+                a name match here proves that two records carry the same text, not
+                that they describe the same person.
+              </p>
             </div>
           </div>
         )}
@@ -2396,21 +2764,49 @@ const OfficialDashboard = () => {
         {activeTab === 'registry' && (
           <div>
             <div className="official-dashboard-header">
-              <h1>Residents Registry</h1>
-              <p>The barangay's own record of known residents — used as a cross-reference signal when verifying new accounts, not an automatic approval.</p>
+              <h1>Voter Reference List</h1>
+              <p>
+                {VOTER_LIST_CAVEAT} It is used as a cross-reference signal when
+                verifying a new account — never as an automatic approval, and
+                never as a reason to refuse somebody who is not on it.
+              </p>
             </div>
 
             <div className="dashboard-card">
               <div className="dashboard-card-header">
-                <h3>Registry Entries</h3>
+                <h3>Voter Reference Entries</h3>
                 <button className="btn-add" onClick={handleOpenAddRegistryEntry}>
                   <FaPlus /> Add Entry
                 </button>
               </div>
 
               {registryEntries.length === 0 ? (
-                <p className="dashboard-empty">No registry entries yet.</p>
+                <p className="dashboard-empty">No voter reference entries yet.</p>
               ) : (
+                <>
+                  <ResidentFilterBar
+                    idPrefix="registry"
+                    searchLabel="Search the voter reference list by name, purok, household number or contact number"
+                    placeholder="Search name, purok, household or contact…"
+                    query={registryQuery}
+                    onQueryChange={setRegistryQuery}
+                    purokLabel="Filter voter reference entries by purok"
+                    purok={registryPurok}
+                    onPurokChange={setRegistryPurok}
+                    resultText={
+                      registryFiltersActive
+                        ? `Showing ${visibleRegistryEntries.length} of ${registryEntries.length} entries`
+                        : `${registryEntries.length} ${registryEntries.length === 1 ? 'entry' : 'entries'}`
+                    }
+                    onReset={resetRegistryFilters}
+                    filtersActive={registryFiltersActive}
+                  />
+
+                  {visibleRegistryEntries.length === 0 ? (
+                    <p className="dashboard-empty">
+                      No voter reference entries match the search.
+                    </p>
+                  ) : (
                 <div className="table-wrapper">
                   <table className="dashboard-table">
                     <thead>
@@ -2423,10 +2819,20 @@ const OfficialDashboard = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {registryEntries.map((entry) => (
+                      {visibleRegistryEntries.map((entry) => (
                         <tr key={entry.id}>
                           <td data-label="Name">{entry.full_name}</td>
-                          <td data-label="Purok">{entry.purok || '—'}</td>
+                          <td data-label="Purok">
+                            {entry.purok || '—'}
+                            {entry.purok && !isKnownPurok(entry.purok) && (
+                              <span
+                                className="resident-purok-flag"
+                                title="This spelling is not on the barangay's purok list, so it cannot be grouped or matched. Editing this entry now offers the list."
+                              >
+                                not on the list
+                              </span>
+                            )}
+                          </td>
                           <td data-label="Household #">{entry.household_number || '—'}</td>
                           <td data-label="Contact">{entry.contact_number || '—'}</td>
                           <td data-label="Action" style={{ display: 'flex', gap: 8 }}>
@@ -2447,6 +2853,8 @@ const OfficialDashboard = () => {
                     </tbody>
                   </table>
                 </div>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -2649,15 +3057,19 @@ const OfficialDashboard = () => {
                 <div className="report-stat-number">{reservations.length}</div>
                 <div className="report-stat-label">Total Reservations</div>
               </div>
+              {/* Both figures come from the same grouping the Residents tab
+                  lists, so the two tabs cannot report different numbers for
+                  the same thing. "Registered Residents" used to count every
+                  account including the ones established not to be residents
+                  at all, which read as a barangay population figure and was
+                  not one. */}
               <div className="dashboard-card report-stat">
-                <div className="report-stat-number">{residentsList.length}</div>
-                <div className="report-stat-label">Registered Residents</div>
+                <div className="report-stat-number">{residentGroups.residents.length}</div>
+                <div className="report-stat-label">Verified Residents</div>
               </div>
               <div className="dashboard-card report-stat">
-                <div className="report-stat-number">
-                  {residentsList.filter((r) => r.verification_status === 'pending').length}
-                </div>
-                <div className="report-stat-label">Pending Verifications</div>
+                <div className="report-stat-number">{residentGroups.requests.length}</div>
+                <div className="report-stat-label">Open Verification Requests</div>
               </div>
             </div>
 
@@ -3196,7 +3608,7 @@ const OfficialDashboard = () => {
       {showRegistryModal && (
         <div className="modal-overlay">
           <div className="modal">
-            <h3>{editingRegistryEntry ? 'Edit Registry Entry' : 'Add Registry Entry'}</h3>
+            <h3>{editingRegistryEntry ? 'Edit Voter Reference Entry' : 'Add Voter Reference Entry'}</h3>
 
             <div className="modal-form-group">
               <label className="modal-form-label">Full Name</label>
@@ -3210,14 +3622,33 @@ const OfficialDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Purok</label>
-              <input
-                type="text"
+              <label className="modal-form-label" htmlFor="registry-entry-purok">Purok</label>
+              {/* The barangay's own list, not a text box. Free text here is
+                  what produced the five different spellings of one purok
+                  already in the data, none of which can be grouped or
+                  matched against anything.
+
+                  An entry that already holds an off-list value keeps it as
+                  an extra option, selected: the dropdown must not silently
+                  drop what the barangay recorded the moment somebody opens
+                  the form to change a phone number. Correcting it is a
+                  deliberate choice from the list. */}
+              <select
+                id="registry-entry-purok"
                 className="modal-form-input"
-                placeholder="e.g. Purok 3"
                 value={newRegistryEntry.purok}
                 onChange={(e) => setNewRegistryEntry({ ...newRegistryEntry, purok: e.target.value })}
-              />
+              >
+                <option value="">Select a purok</option>
+                {PUROKS.map((purok) => (
+                  <option key={purok} value={purok}>{purok}</option>
+                ))}
+                {newRegistryEntry.purok && !isKnownPurok(newRegistryEntry.purok) && (
+                  <option value={newRegistryEntry.purok}>
+                    {newRegistryEntry.purok} (as recorded — not on the list)
+                  </option>
+                )}
+              </select>
             </div>
 
             <div className="modal-form-group">
@@ -3333,6 +3764,18 @@ const OfficialDashboard = () => {
               Unlike Reject, they cannot put themselves back in the queue — only an
               official can reinstate the account.
             </p>
+            {/* Spelled out because the old placeholder below offered
+                "not listed in the residents registry" as a worked example of
+                a reason, and that list is voter data rather than a roll of
+                residents. A resident too young to vote, or registered
+                elsewhere, or simply not yet supplied by the city, is absent
+                from it while being a resident. */}
+            <p style={{ fontSize: 12, color: '#b45309', marginBottom: 8 }}>
+              Not being on the Voter Reference List is <strong>not</strong> a reason
+              to use this. That list covers registered voters the barangay holds
+              records for, not every resident. Use it only when residency itself has
+              been established as false.
+            </p>
             {ineligibleResident.id_document_url && (
               <p style={{ fontSize: 12, color: '#b45309', marginBottom: 16 }}>
                 Their uploaded ID will be permanently deleted. The account record and
@@ -3344,7 +3787,7 @@ const OfficialDashboard = () => {
               <label className="modal-form-label">Reason</label>
               <textarea
                 className="modal-form-textarea"
-                placeholder="e.g. address is in another barangay; not listed in the residents registry"
+                placeholder="e.g. confirmed to be living in another barangay"
                 value={ineligibleNotes}
                 onChange={(e) => setIneligibleNotes(e.target.value)}
               />

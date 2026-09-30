@@ -446,3 +446,344 @@
     font-size: var(--fs-12);
   }
 }
+
+/* ================================
+    RESIDENTS — GROUPS, SEARCH, RECONCILIATION
+    ================================
+    Added for the Residents / Voter Reference List workflow. All of it sits
+    outside tables, so the mobile table-to-card conversion in Sidebar.css
+    is untouched and the tables below keep converting to cards as before.
+
+    Every rule here is written for the narrow case first and widened by
+    flex-wrap, so nothing needs a breakpoint of its own and nothing can
+    push the document sideways at 375px. */
+
+/* Accessible name for a control whose purpose is already clear visually.
+    Clipped rather than `display: none`, which would hide it from screen
+    readers as well and defeat the point. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── The three group buttons ── */
+.resident-group-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.resident-group-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  /* 40px tall at the default font size, so the touch target clears the
+      44px guidance once the 4px gap either side is counted. */
+  padding: 9px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-pill);
+  background-color: #ffffff;
+  font-family: 'Poppins', sans-serif;
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: #4b5563;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.resident-group-tab:hover {
+  border-color: #16a34a;
+  color: #15803d;
+}
+
+/* The selected group is marked by fill AND weight, not colour alone;
+    `aria-pressed` carries it to assistive technology. */
+.resident-group-tab.is-active {
+  background-color: #15803d;
+  border-color: #15803d;
+  color: #ffffff;
+}
+
+.resident-group-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background-color: #f3f4f6;
+  color: #374151;
+  font-size: var(--fs-12);
+  font-weight: 700;
+}
+
+.resident-group-tab.is-active .resident-group-tab-count {
+  background-color: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+}
+
+/* ── Search + filter bar ── */
+.resident-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.resident-search-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 220px;
+  /* Without a min-width a flex item refuses to shrink past its content
+      and the bar becomes the widest thing on the page at 375px. */
+  min-width: 0;
+  padding: 8px 10px;
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-sm);
+}
+
+.resident-search-icon {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.resident-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  font-family: 'Poppins', sans-serif;
+  font-size: var(--fs-13);
+  color: #374151;
+}
+
+.resident-search-input::placeholder {
+  color: #9ca3af;
+}
+
+/* Safari draws its own clear button on type="search"; ours is the one
+    that is labelled, so hide the native one rather than show two. */
+.resident-search-input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.resident-search-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  /* 34px inside a 44px-tall field, so the hit area clears the row it
+      sits in. The Reset button beside it does the same job at full size
+      for anyone who finds this one small. */
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background-color: #e5e7eb;
+  color: #4b5563;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.resident-search-clear:hover {
+  background-color: #d1d5db;
+  color: #1f2937;
+}
+
+.resident-filter-count {
+  margin: 0;
+  font-size: var(--fs-12);
+  color: #6b7280;
+}
+
+.resident-filter-reset {
+  /* Matches the 40px of the group buttons rather than sitting a couple of
+      pixels under it. */
+  padding: 10px 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-sm);
+  background-color: #ffffff;
+  font-family: 'Poppins', sans-serif;
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: #374151;
+  cursor: pointer;
+}
+
+.resident-filter-reset:hover:not(:disabled) {
+  border-color: #16a34a;
+  color: #15803d;
+}
+
+/* Present but inert when there is nothing to reset, rather than
+    appearing and disappearing under the pointer. */
+.resident-filter-reset:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* The purok select reuses .filter-select-wrap from Sidebar.css, which the
+    Reservations, Announcements and Events filters also use. That shared
+    rule is left exactly as it is -- changing it would resize four filters
+    on three other tabs -- and the extra height is added only inside this
+    bar, where it brings the control to 41px alongside its neighbours. */
+.resident-filter-bar .filter-select-wrap {
+  padding: 9px 10px;
+}
+
+/* ── Row annotations ── */
+
+/* A purok spelling the barangay's list does not contain. Words, not a
+    colour: the table converts to cards on mobile where a coloured dot
+    beside a value loses its column heading. */
+.resident-purok-flag {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--fs-12);
+  font-style: italic;
+  color: #b45309;
+}
+
+.resident-status-note {
+  margin-top: 4px;
+  font-size: var(--fs-12);
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+/* `ineligible` had been sharing `badge-declined` with `rejected`. One is
+    resubmittable and the other is permanent, so they now differ in
+    weight as well as in wording. */
+.badge-ineligible {
+  background-color: #fee2e2;
+  color: #7f1d1d;
+  border: 1px solid #fca5a5;
+}
+
+/* ── Reconciliation panel ── */
+.reconcile-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.reconcile-item {
+  padding: 14px;
+  border: 1px solid #e5e7eb;
+  border-left-width: 4px;
+  border-radius: var(--radius-sm);
+  background-color: #f9fafb;
+}
+
+.reconcile-warning {
+  border-left-color: #b45309;
+}
+
+.reconcile-notice {
+  border-left-color: #6b7280;
+}
+
+.reconcile-item-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.reconcile-item-head h4 {
+  margin: 0;
+  flex: 1 1 200px;
+  font-size: var(--fs-14);
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.reconcile-count {
+  flex-shrink: 0;
+  min-width: 22px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background-color: #e5e7eb;
+  color: #374151;
+  font-size: var(--fs-12);
+  font-weight: 700;
+  text-align: center;
+}
+
+.reconcile-explanation {
+  margin: 0 0 10px;
+  font-size: var(--fs-13);
+  color: #4b5563;
+  line-height: 1.5;
+}
+
+.reconcile-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.reconcile-rows li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background-color: #ffffff;
+  border: 1px solid #f3f4f6;
+}
+
+.reconcile-row-name {
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.reconcile-row-detail {
+  font-size: var(--fs-12);
+  color: #6b7280;
+}
+
+.reconcile-footnote {
+  margin: 16px 0 0;
+  font-size: var(--fs-12);
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+.reconcile-footnote code {
+  font-size: var(--fs-12);
+  background-color: #f3f4f6;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+/* The expected case — a verified resident who is simply not a registered
+    voter. Blue, the colour this app already uses for "informational"
+    (.badge-ready), rather than the amber of a warning or the grey of
+    untidiness: these rows are the normal state of affairs, and a list of
+    ordinary residents must not read as a list of defects. */
+.reconcile-expected {
+  border-left-color: #1d4ed8;
+}

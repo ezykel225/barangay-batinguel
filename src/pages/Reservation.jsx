@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import toast from 'react-hot-toast'
+import { PUROKS } from '../constants/barangay'
+import { isKnownPurok } from '../utils/residentGroups'
 import './Reservation.css'
 
 const timeSlots = [
@@ -642,15 +644,34 @@ const Reservation = () => {
                   </div>
 
                   <div className="form-group">
-                    <label>Purok</label>
-                    <input
-                      type="text"
+                    <label htmlFor="reservation-purok">Purok</label>
+                    {/* The barangay's own list rather than a text box. This
+                        field is open to anonymous walk-ins as well as signed-in
+                        residents, so it was the last resident-facing place a
+                        new free-text purok could still enter the database --
+                        the signup and settings forms already offer the list.
+
+                        A prefilled value the list does not contain is kept as
+                        an extra option and stays selected: a resident opening
+                        the booking form must not have what the barangay already
+                        holds about them quietly blanked. */}
+                    <select
+                      id="reservation-purok"
                       name="purok"
                       value={formData.purok}
                       onChange={handleChange}
-                      placeholder="Enter your purok"
                       required
-                    />
+                    >
+                      <option value="">Select your purok</option>
+                      {PUROKS.map((purok) => (
+                        <option key={purok} value={purok}>{purok}</option>
+                      ))}
+                      {formData.purok && !isKnownPurok(formData.purok) && (
+                        <option value={formData.purok}>
+                          {formData.purok} (as recorded)
+                        </option>
+                      )}
+                    </select>
                   </div>
 
                   <div className="form-group">
