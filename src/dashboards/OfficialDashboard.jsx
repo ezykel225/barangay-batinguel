@@ -2549,23 +2549,39 @@ const OfficialDashboard = () => {
                 the other historical fields immutable in the database. That
                 is a deliberate Phase 3A boundary.
 
-                Hidden entirely while empty, which is how it starts: an
-                empty panel with a heading is noise. */}
-            {archivedOfficials.length > 0 && (
-              <div className="dashboard-card">
-                <div className="dashboard-card-header">
-                  <h3>Archived Officials</h3>
-                  <span className="official-archive-count">
-                    {archivedOfficials.length} historical {archivedOfficials.length === 1 ? 'record' : 'records'}
-                  </span>
-                </div>
+                ALWAYS RENDERED, including at zero. An earlier version hid
+                the whole panel while empty, on the theory that a heading
+                over nothing is noise. That was wrong here for three
+                reasons, found by testing the deploy preview:
 
-                <p className="dashboard-card-note">
-                  Officials who have left office. They do not appear in the
-                  directory above or on the public Officials page, and their
-                  photos are kept. Restoring one returns it exactly as stored.
-                </p>
+                  - The archive could not be demonstrated or verified until
+                    somebody had already archived a real official, which is
+                    the one thing you want to avoid doing just to look at
+                    the UI.
+                  - An official told "archiving keeps the record" had no way
+                    to confirm that before using it. The empty state is
+                    where the promise is stated.
+                  - Every other list in these dashboards shows an empty
+                    state instead of vanishing -- "No officials in the
+                    directory yet." sits in the card directly above. Hiding
+                    made this the one inconsistent surface. */}
+            <div className="dashboard-card">
+              <div className="dashboard-card-header">
+                <h3>Archived Officials</h3>
+                <span className="official-archive-count">
+                  {archivedOfficials.length} historical {archivedOfficials.length === 1 ? 'record' : 'records'}
+                </span>
+              </div>
 
+              <p className="dashboard-card-note">
+                Officials who have left office. They do not appear in the
+                directory above or on the public Officials page, and their
+                photos are kept. Restoring one returns it exactly as stored.
+              </p>
+
+              {archivedOfficials.length === 0 ? (
+                <p className="dashboard-empty">No archived officials.</p>
+              ) : (
                 <div className="table-wrapper">
                   <table className="dashboard-table">
                     <thead>
@@ -2609,8 +2625,8 @@ const OfficialDashboard = () => {
                     </tbody>
                   </table>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         )}
 
