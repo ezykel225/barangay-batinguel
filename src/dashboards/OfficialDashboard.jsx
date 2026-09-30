@@ -12,6 +12,8 @@ import {
   FaEdit,
   FaTrash,
   FaFilter,
+  FaArchive,
+  FaUndo,
 } from 'react-icons/fa'
 import { supabase } from '../supabase/supabaseClient'
 import { pathFromPublicUrl } from '../utils/storagePath'
@@ -21,6 +23,10 @@ import Sidebar from '../components/Sidebar'
 import { PersonAvatar } from '../utils/officialPhotos'
 import { logActivity } from '../utils/activityLog'
 import { useConfirm } from '../components/ConfirmDialog'
+import {
+  ArchiveOfficialDialog,
+  RestoreOfficialDialog,
+} from '../components/OfficialArchiveDialog'
 import '../components/Sidebar.css'
 import './OfficialDashboard.css'
 
@@ -80,6 +86,11 @@ const OfficialDashboard = () => {
   const [showEventModal, setShowEventModal] = useState(false)
   const [showOfficialModal, setShowOfficialModal] = useState(false)
   const [editingOfficial, setEditingOfficial] = useState(null)
+  // Officials archive (migration 018). `archivingOfficial` and
+  // `restoringOfficial` each hold the row a dialog is open for, or null.
+  const [archivedOfficials, setArchivedOfficials] = useState([])
+  const [archivingOfficial, setArchivingOfficial] = useState(null)
+  const [restoringOfficial, setRestoringOfficial] = useState(null)
   const [showWasteModal, setShowWasteModal] = useState(false)
   const [editingWaste, setEditingWaste] = useState(null)
   const [processingDocRequestIds, setProcessingDocRequestIds] = useState(new Set())
@@ -127,6 +138,7 @@ const OfficialDashboard = () => {
     fetchEvents()
     fetchKapitanStatus()
     fetchOfficialsList()
+    fetchArchivedOfficials()
     fetchDocumentRequests()
     fetchWasteSchedule()
     fetchResidentsList()
@@ -150,12 +162,20 @@ const OfficialDashboard = () => {
     if (profile) {
       setUserProfile(profile)
 
-      // Get position/committee/avatar from barangay_officials
+      // Get position/committee/avatar from barangay_officials.
+      //
+      // Archived rows are excluded on purpose: an official whose directory
+      // record has been archived is no longer serving, so their position
+      // permissions must stop resolving here as well as in the database.
+      // maybeSingle() rather than single(): an official with no ACTIVE row
+      // is now an expected state (theirs may be archived), and single()
+      // treats zero rows as an error.
       const { data: official } = await supabase
         .from('barangay_officials')
         .select('id, position, committee, photo_url')
         .eq('full_name', profile.full_name)
-        .single()
+        .is('archived_at', null)
+        .maybeSingle()
 
       if (official) setOfficialInfo(official)
     }
@@ -256,13 +276,36 @@ const OfficialDashboard = () => {
     if (!error && data) setKapitanStatus(data.status)
   }
 
+  // Active officials, for the current directory and the public page.
+  //
+  // The filter is defence in depth, not the control: migration 018's
+  // SELECT policy is what stops anonymous callers retrieving archived
+  // rows. Filtering here as well documents the intent and keeps the
+  // dashboard correct if a policy is ever changed carelessly.
   const fetchOfficialsList = async () => {
     const { data, error } = await supabase
       .from('barangay_officials')
       .select('*')
+      .is('archived_at', null)
       .order('display_order', { ascending: true })
 
     if (!error) setOfficialsList(data || [])
+  }
+
+  // Archived officials -- barangay history. Ordered most recently archived
+  // first: display_order is meaningless once a row is off the public page,
+  // and sorting by it would leave the archive in an arbitrary order.
+  //
+  // Only officials can read these rows at all; the policy grants archived
+  // rows to is_official(auth.uid()) and to nobody else.
+  const fetchArchivedOfficials = async () => {
+    const { data, error } = await supabase
+      .from('barangay_officials')
+      .select('*')
+      .not('archived_at', 'is', null)
+      .order('archived_at', { ascending: false })
+
+    if (!error) setArchivedOfficials(data || [])
   }
 
   const fetchDocumentRequests = async () => {
@@ -876,6 +919,20 @@ const OfficialDashboard = () => {
     }
   }
 
+  // Display orders currently held by ACTIVE officials, and the lowest
+  // free positive integer. Used to validate Add/Edit and to block a
+  // restore into an occupied position -- never to renumber anybody.
+  const activeDisplayOrders = officialsList
+    .map((o) => o.display_order)
+    .filter((n) => Number.isInteger(n))
+
+  const nextFreeDisplayOrder = (() => {
+    const taken = new Set(activeDisplayOrders)
+    let candidate = 1
+    while (taken.has(candidate)) candidate += 1
+    return candidate
+  })()
+
   // Only Punong Barangay can update kapitan status
   const isKapitan = officialInfo?.position === 'Punong Barangay'
   // Only the Treasurer approves/denies court reservations — they're the
@@ -1079,6 +1136,37 @@ const OfficialDashboard = () => {
       return
     }
 
+    // display_order used to be coerced with `Number(x) || 0`, which turned
+    // a blank field AND any non-numeric value silently into 0. Two
+    // officials added without an order therefore both landed at 0, and the
+    // public page ordered them arbitrarily. It is now validated instead of
+    // guessed.
+    const requestedOrder = Number(newOfficial.display_order)
+    if (!Number.isInteger(requestedOrder) || requestedOrder < 1) {
+      toast.error('Display order must be a whole number greater than 0.')
+      return
+    }
+
+    // A collision WARNS and asks for confirmation; it does not block, and
+    // it never moves the other official. Ordering between two officials
+    // sharing a number is arbitrary, which is worth knowing about before
+    // saving rather than discovering on the public page.
+    const collidesWith = officialsList.find(
+      (o) => o.display_order === requestedOrder
+        && o.id !== (editingOfficial ? editingOfficial.id : null),
+    )
+    if (collidesWith) {
+      const proceed = await confirm({
+        title: `Position ${requestedOrder} is already used`,
+        message: `${collidesWith.full_name} is already at position ${requestedOrder}. `
+          + 'Saving will leave two officials sharing it, and the order between '
+          + 'them will be arbitrary. No other official will be moved.',
+        confirmLabel: 'Save anyway',
+        destructive: false,
+      })
+      if (!proceed) return
+    }
+
     setSubmitting(true)
     try {
       if (editingOfficial) {
@@ -1089,7 +1177,7 @@ const OfficialDashboard = () => {
             position: newOfficial.position,
             committee: newOfficial.committee || null,
             contact_number: newOfficial.contact_number || null,
-            display_order: Number(newOfficial.display_order) || 0,
+            display_order: requestedOrder,
             updated_by: user?.id ?? null,
           })
           .eq('id', editingOfficial.id)
@@ -1118,7 +1206,7 @@ const OfficialDashboard = () => {
             position: newOfficial.position,
             committee: newOfficial.committee || null,
             contact_number: newOfficial.contact_number || null,
-            display_order: Number(newOfficial.display_order) || 0,
+            display_order: requestedOrder,
             created_by: user?.id ?? null,
           }])
           .select('id')
@@ -1155,50 +1243,161 @@ const OfficialDashboard = () => {
       position: official.position || '',
       committee: official.committee || '',
       contact_number: official.contact_number || '',
-      display_order: official.display_order || 0,
+      display_order: official.display_order ?? '',
     })
     setShowOfficialModal(true)
   }
 
   const handleOpenAddOfficial = () => {
     setEditingOfficial(null)
-    setNewOfficial({ full_name: '', position: '', committee: '', contact_number: '', display_order: 0 })
+    // Pre-filled with the lowest free position rather than 0, which the
+    // form used to default to and which is no longer a valid order.
+    setNewOfficial({
+      full_name: '',
+      position: '',
+      committee: '',
+      contact_number: '',
+      display_order: String(nextFreeDisplayOrder),
+    })
     setShowOfficialModal(true)
   }
 
-  const handleDeleteOfficial = async (official) => {
-    const ok = await confirm({
-      title: 'Remove this official permanently?',
-      message: `${official.full_name} (${official.position}) will be deleted from the `
-        + 'directory and cannot be recovered — their record and history are lost. '
-        + 'If their login is linked to this record, they will also lose their '
-        + 'position permissions.',
-      confirmLabel: 'Delete permanently',
-    })
-    if (!ok) return
+  // ── Officials archive (migration 018) ─────────────────────────────
+  //
+  // This replaces a permanent DELETE. An official who leaves office is now
+  // kept as barangay history: there are no term columns and no history
+  // table, so the row IS the record of who held the position. Deleting it
+  // also orphaned their photo in a public bucket and left
+  // activity_log.entity_id pointing at nothing.
+  //
+  // There is deliberately NO permanent-delete control anywhere in this UI.
+  // The DELETE policy still exists but only matches rows that are already
+  // archived, so an active official cannot be deleted in one step.
 
-    // .select() matters here: RLS filters rows rather than raising, so a
-    // blocked delete comes back as success with zero rows affected. Without
-    // this check the toast reports a removal that never happened.
-    const { data, error } = await supabase
-      .from('barangay_officials')
-      .delete()
-      .eq('id', official.id)
-      .select('id')
+  // True when this row is the signed-in official's own directory record.
+  // The link is full_name string equality, which is the only link that
+  // exists (there is no foreign key -- see CLAUDE.md "Known fragility").
+  const isOwnOfficialRecord = (official) =>
+    Boolean(userProfile?.full_name) && official?.full_name === userProfile.full_name
 
-    if (error) {
-      toast.error('Failed to delete official!')
-    } else if (!data || data.length === 0) {
-      toast.error('Nothing was removed — you may not have permission to change the directory.')
-    } else {
-      toast.success('Official removed from directory.')
+  const handleArchiveOfficial = async (reason) => {
+    const official = archivingOfficial
+    if (!official || submitting) return
+
+    // Blocked in the UI, and again by the trg_stamp_official_archive
+    // trigger. Both are needed: this branch gives the clear message, the
+    // trigger covers a direct API call. Neither is an authorization
+    // boundary -- archiving yourself only reduces your own privileges.
+    if (isOwnOfficialRecord(official)) {
+      toast.error('You cannot archive your own record — another authorized official must archive it.')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      // archived_at is sent so the row transitions, but its value and
+      // archived_by are both re-stamped server-side by the trigger from
+      // the caller's own token. Whatever is sent here is discarded.
+      //
+      // .select() matters: RLS filters rows rather than raising, so a
+      // blocked update comes back as success with zero rows affected.
+      // Without this check the toast reports an archive that never
+      // happened.
+      const { data, error } = await supabase
+        .from('barangay_officials')
+        .update({ archived_at: new Date().toISOString() })
+        .eq('id', official.id)
+        .select('id')
+
+      if (error) {
+        // The trigger raises for a self-archive; surface its meaning
+        // rather than a generic failure.
+        if (/archive their own/i.test(error.message)) {
+          toast.error('You cannot archive your own record — another authorized official must archive it.')
+        } else {
+          toast.error('Failed to archive official!')
+        }
+        return
+      }
+      if (!data || data.length === 0) {
+        toast.error('Nothing was archived — you may not have permission to change the directory.')
+        return
+      }
+
+      toast.success('Official archived. Their record is kept as barangay history.')
       logActivity({
-        action: 'deleted',
+        action: 'archived',
         entityType: 'official',
         entityId: official.id,
         subject: `${official.full_name} — ${official.position}`,
+        details: reason || null,
       })
+      setArchivingOfficial(null)
       fetchOfficialsList()
+      fetchArchivedOfficials()
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleRestoreOfficial = async (chosenOrder) => {
+    const official = restoringOfficial
+    if (!official || submitting) return
+
+    // Re-checked here, not only in the dialog: the active list could have
+    // changed in another tab while the dialog sat open. An occupied order
+    // stops the restore rather than moving anybody.
+    if (!Number.isInteger(chosenOrder) || chosenOrder < 1) {
+      toast.error('Choose a display order greater than 0.')
+      return
+    }
+    if (activeDisplayOrders.includes(chosenOrder)) {
+      toast.error(`Position ${chosenOrder} is already taken by an active official.`)
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      // One UPDATE. The chosen display order is a PARAMETER OF THE
+      // RESTORE, applied in the same statement that clears archived_at --
+      // an archived record is never edited on its own. archived_by is
+      // forced to NULL by the trigger.
+      const { data, error } = await supabase
+        .from('barangay_officials')
+        .update({ archived_at: null, display_order: chosenOrder })
+        .eq('id', official.id)
+        .select('id')
+
+      if (error) {
+        // 23505 is the partial unique index on active full_name: an active
+        // official already holds this name. Never resolved by renaming.
+        if (error.code === '23505') {
+          toast.error('An active official with this name already exists.')
+        } else {
+          toast.error('Failed to restore official!')
+        }
+        return
+      }
+      if (!data || data.length === 0) {
+        toast.error('Nothing was restored — you may not have permission to change the directory.')
+        return
+      }
+
+      toast.success('Official restored to the directory.')
+      logActivity({
+        action: 'restored',
+        entityType: 'official',
+        entityId: official.id,
+        subject: `${official.full_name} — ${official.position}`,
+        details: chosenOrder === official.display_order
+          ? null
+          : `Restored at display order ${chosenOrder}`,
+      })
+      setRestoringOfficial(null)
+      fetchOfficialsList()
+      fetchArchivedOfficials()
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -2307,11 +2506,25 @@ const OfficialDashboard = () => {
                               onClick={() => handleEditOfficial(official)}>
                               <FaEdit /> Edit
                             </button>
-                            <button
-                              className="btn-deny"
-                              onClick={() => handleDeleteOfficial(official)}>
-                              <FaTrash /> Delete
-                            </button>
+                            {/* Archive, not Delete. An official who leaves
+                                office is kept as barangay history. There is
+                                no permanent-delete control in this UI.
+
+                                An official may not archive their own record.
+                                The reason is stated in text rather than left
+                                to a disabled button, which explains nothing
+                                on its own. */}
+                            {isOwnOfficialRecord(official) ? (
+                              <span className="official-archive-blocked">
+                                Your own record — another official must archive it
+                              </span>
+                            ) : (
+                              <button
+                                className="btn-deny"
+                                onClick={() => setArchivingOfficial(official)}>
+                                <FaArchive /> Archive
+                              </button>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -2320,6 +2533,84 @@ const OfficialDashboard = () => {
                 </div>
               )}
             </div>
+
+            {/* ========================
+                ARCHIVED OFFICIALS
+            ========================
+                Deliberately a panel INSIDE this tab rather than a
+                fourteenth sidebar destination: the archive, the warning
+                and the corrective action belong on one screen.
+
+                Restore is the only action. Archived records are historical
+                records, so there is no Edit and no Delete -- to change
+                normal information, restore first and use the existing Edit
+                flow. Note that this is enforced by this UI only; migration
+                018 protects archived_at and archived_by but does not make
+                the other historical fields immutable in the database. That
+                is a deliberate Phase 3A boundary.
+
+                Hidden entirely while empty, which is how it starts: an
+                empty panel with a heading is noise. */}
+            {archivedOfficials.length > 0 && (
+              <div className="dashboard-card">
+                <div className="dashboard-card-header">
+                  <h3>Archived Officials</h3>
+                  <span className="official-archive-count">
+                    {archivedOfficials.length} historical {archivedOfficials.length === 1 ? 'record' : 'records'}
+                  </span>
+                </div>
+
+                <p className="dashboard-card-note">
+                  Officials who have left office. They do not appear in the
+                  directory above or on the public Officials page, and their
+                  photos are kept. Restoring one returns it exactly as stored.
+                </p>
+
+                <div className="table-wrapper">
+                  <table className="dashboard-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Photo</th>
+                        <th scope="col">Name</th>
+                        <th scope="col">Position</th>
+                        <th scope="col">Committee</th>
+                        <th scope="col">Archived</th>
+                        <th scope="col">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {archivedOfficials.map((official) => (
+                        <tr key={official.id}>
+                          <td data-label="Photo">
+                            <PersonAvatar
+                              name={official.full_name}
+                              photoUrl={official.photo_url}
+                              fallbackIcon={<FaUser style={{ fontSize: 18, color: '#6b7280' }} />}
+                              className="official-row-photo"
+                            />
+                          </td>
+                          <td data-label="Name">{official.full_name}</td>
+                          <td data-label="Position">{official.position}</td>
+                          <td data-label="Committee">{official.committee || '—'}</td>
+                          <td data-label="Archived">
+                            {official.archived_at
+                              ? new Date(official.archived_at).toLocaleDateString()
+                              : '—'}
+                          </td>
+                          <td data-label="Action">
+                            <button
+                              className="btn-approve"
+                              onClick={() => setRestoringOfficial(official)}>
+                              <FaUndo /> Restore
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -3091,6 +3382,26 @@ const OfficialDashboard = () => {
       )}
 
       {confirmDialog}
+
+      {/* Officials archive. Each dialog renders only while its row is set,
+          so there is no `open` prop to keep in sync with the row. */}
+      <ArchiveOfficialDialog
+        official={archivingOfficial}
+        busy={submitting}
+        onConfirm={handleArchiveOfficial}
+        onCancel={() => { if (!submitting) setArchivingOfficial(null) }}
+      />
+
+      <RestoreOfficialDialog
+        official={restoringOfficial}
+        takenOrders={activeDisplayOrders}
+        occupiedBy={officialsList.find(
+          (o) => o.display_order === restoringOfficial?.display_order,
+        )?.full_name}
+        busy={submitting}
+        onConfirm={handleRestoreOfficial}
+        onCancel={() => { if (!submitting) setRestoringOfficial(null) }}
+      />
     </div>
   )
 }

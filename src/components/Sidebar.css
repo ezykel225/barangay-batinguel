@@ -1104,3 +1104,33 @@
     gap: 8px;
   }
 }
+/* ================================
+   OFFICIALS ARCHIVE
+   ================================
+   The Archived Officials panel lives inside the Officials Directory tab.
+   Appended after the mobile table-to-card block, which is unchanged: these
+   rules are desktop-and-mobile alike and the archive table inherits the
+   card conversion from `.dashboard-table` for free. */
+
+/* Count beside the panel heading. Sits in `.dashboard-card-header`, which
+   already wraps on narrow screens. */
+.official-archive-count {
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: var(--grey-600);
+}
+
+/* Explains why an official cannot archive their own record. A sentence,
+   not a disabled button: a disabled control explains nothing on its own. */
+.official-archive-blocked {
+  font-size: var(--fs-12);
+  color: var(--grey-600);
+  line-height: 1.4;
+}
+
+.dashboard-card-note {
+  margin: 0 0 16px;
+  font-size: var(--fs-13);
+  color: var(--grey-600);
+  line-height: 1.5;
+}

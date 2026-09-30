@@ -1,0 +1,56 @@
+/* ================================
+   OFFICIAL ARCHIVE / RESTORE DIALOG FIELDS
+   Barangay Batinguel E-System
+   ================================
+
+   Only the form fields live here. The overlay, panel, title, message and
+   both buttons come from `ConfirmDialog.css`, so these dialogs are the
+   same object visually rather than a near-match that drifts.
+
+   Colours, radii and type sizes come from the design tokens. */
+
+.archive-field-label {
+  display: block;
+  margin-top: 4px;
+  margin-bottom: 6px;
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.archive-field-optional {
+  font-weight: 500;
+  color: var(--grey-600);
+}
+
+.archive-field-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface);
+  color: var(--text-body);
+  font-family: 'Poppins', sans-serif;
+  font-size: var(--fs-14);
+  resize: vertical;
+}
+
+.archive-field-input:disabled {
+  background-color: var(--grey-50);
+  color: var(--grey-600);
+}
+
+/* The restore dialog blocks its own action while this is showing, so the
+   border is a reinforcement of a state the button already reflects --
+   never the only signal. */
+.archive-field-input.has-error {
+  border-color: var(--danger);
+}
+
+.archive-field-help {
+  margin: 6px 0 0;
+  font-size: var(--fs-12);
+  color: var(--grey-600);
+  line-height: 1.45;
+}
