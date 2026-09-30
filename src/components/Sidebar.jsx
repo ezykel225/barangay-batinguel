@@ -56,9 +56,10 @@ const writeCollapsed = (value) => {
   }
 }
 
-// The breakpoint below which the desktop sidebar is hidden and the bottom
-// bar takes over. Kept in one place because the drawer has to close when
-// the viewport crosses it; the matching CSS value lives in Sidebar.css.
+// The breakpoint below which the desktop sidebar is hidden and mobile
+// navigation is reached through the hamburger button and its drawer.
+// Kept in one place because the drawer has to close when the viewport
+// crosses it; the matching CSS value lives in Sidebar.css.
 const DESKTOP_QUERY = '(min-width: 769px)'
 
 const Sidebar = ({ role, activeTab, setActiveTab, badges = {} }) => {
@@ -236,7 +237,7 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {} }) => {
 
   return (
     <>
-      {/* The mobile entry point into navigation. Fixed at the top left on
+      {/* The mobile entry point into navigation. Fixed at the top right on
           every tab of every portal, so it is in the same place whatever
           the page. Hidden above the breakpoint, where the sidebar itself
           is the navigation.
