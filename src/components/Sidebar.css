@@ -219,6 +219,9 @@
 
 .dashboard-main {
   flex: 1;
+  /* Allow this flex item to shrink so wide table content is contained
+     by .table-wrapper instead of widening the document. */
+  min-width: 0;
   margin-left: 260px;
   padding: 32px;
   min-height: 100vh;
