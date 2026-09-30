@@ -436,11 +436,19 @@
   box-shadow: var(--shadow-sm);
 }
 
+/* Allow long header controls to wrap instead of widening the page. */
 .dashboard-card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
   margin-bottom: 20px;
+}
+
+/* Allow grouped header actions to wrap on narrow screens. */
+.dashboard-card-header > div {
+  flex-wrap: wrap;
 }
 
 .dashboard-card-header h3 {
@@ -908,22 +916,14 @@
 /* ================================
    MOBILE MENU BUTTON
    ================================
-   The only way into navigation on a phone, so it is deliberately solid
-   rather than a bare icon: brand blue, 44px square, shadowed, and fixed
-   at the top left of every page in every portal.
-
-   `display: none` here and `flex` inside the mobile media query -- the
-   desktop sidebar is its own navigation and does not need it.
-
-   Fixed rather than in flow because .dashboard-layout is a flex row: an
-   in-flow button rendered from this component would sit beside the
-   content column, not above it. .dashboard-main reserves 76px of top
-   padding so the button never covers a heading at rest. */
+   Keep mobile navigation reachable while leaving page content
+   unobstructed. Same position for every portal; hidden on desktop, where
+   the sidebar is the navigation. */
 .mobile-menu-button {
   display: none;
   position: fixed;
   top: 20px;
-  left: 20px;
+  right: 20px;
   z-index: 1050;
   align-items: center;
   justify-content: center;
