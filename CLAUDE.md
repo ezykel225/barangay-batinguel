@@ -157,7 +157,7 @@ src/
 
   assets/images/      11 official portraits, page backgrounds, logo.
 
-supabase-migrations/  17 numbered SQL files. A record, not a runner.
+supabase-migrations/  19 numbered SQL files. A record, not a runner.
 supabase/functions/   Edge Function source (notify-reservation-sms).
 docs/                 SETUP.md, TESTING-WALKTHROUGH.pdf + its generator.
 ```
@@ -371,11 +371,145 @@ archived rows — **restore is itself an UPDATE**.
 
 ---
 
+## Previous term officials — schema only, nothing seeded
+
+**Migration 019A created the structure and NOTHING ELSE.** Both tables hold
+**zero rows**, there is **no Previous Term Officials frontend**, and 019B
+has not started.
+
+| Table | Holds |
+|---|---|
+| `barangay_terms` | one row per term: `label`, `start_year`/`end_year`, `status`, `is_current`, provenance |
+| `barangay_term_members` | who served: `full_name`, `position`, `record_status`, `display_order` |
+
+### ⚠️ This is NOT the officials archive, and must never be merged with it
+
+Migration 018's archive means one specific thing: *this system archived
+this record, and here is who did it and when.* A historical roster is not
+that. Storing past terms in `barangay_officials` as archived rows would:
+
+- offer **Restore buttons that can never work** — two members of the
+  2018–2023 roster are also *current* officials, so restoring either would
+  hit `23505` on `barangay_officials_one_active_per_name` every time;
+- make the **audit trail contradict the UI** — ten "archived" officials
+  with zero `archived` entries in `activity_log`;
+- require **fabricating** `archived_at` and `archived_by` for people nobody
+  archived.
+
+So: separate tables, **no foreign key** to `barangay_officials`, no shared
+column, and no policy on either side referencing the other.
+
+### No name matching, anywhere
+
+`barangay_term_members` stores names as plain text per term, with **no link
+to `barangay_officials`, none to `profiles`, and none between terms.** The
+only identity key this system has is the name string — the fragility above
+— and matching on it gets all three interesting cases wrong:
+
+| | |
+|---|---|
+| `Frankie Sia Credo` vs `Hon. Frankie Credo` | almost certainly one person; a matcher would **miss** it |
+| `Catherine Lacson Tan` vs `Alexis Theress P. Tan` | different people sharing a surname **and** the office of Secretary; a matcher would **wrongly link** them |
+| `Arnulfo Abol Catalan`, `Caroline Catan Amparado` | exact matches, the only ones a matcher would get right |
+
+A roster that quietly asserts a false identity is worse than one that
+asserts none. Consequence, all upside: archiving, restoring, renaming or
+reordering a current official has **zero effect** on any historical roster.
+
+### Read-only to application clients — two barriers, not one
+
+| Barrier | Mechanism |
+|---|---|
+| **RLS** | enabled on both tables, **zero** write policies |
+| **Privileges** | `INSERT`/`UPDATE`/`DELETE`/`TRUNCATE` **revoked** from `anon` and `authenticated` |
+
+Supabase grants full DML on public tables by default, so the absent
+policies alone would be the *only* thing stopping a write. Revoking as well
+means a write is refused at the privilege layer first — verified: every
+attempt, including as an official, returns **`42501`**, not RLS's silent
+zero rows. If somebody later adds a permissive write policy by mistake, the
+missing grant still blocks it.
+
+**Seeding therefore happens from SQL only** (SQL Editor or the connector,
+which connect as the table owner). There is deliberately **no in-app path**
+to create, edit or delete historical terms — decided, not overlooked.
+
+### Draft terms are invisible to the public at the RLS layer
+
+`status` defaults to `'draft'`. A draft term is unreachable for `anon`,
+residents and the nurse **at the database**, while officials see it — so a
+roster can be entered and checked before the barangay confirms it.
+
+The publishable key ships inside the bundle by design, so a React filter
+would hide an unconfirmed roster from the page and **from nobody else**.
+Verified both directions: draft → anon sees 0; confirm → anon sees it; back
+to draft → 0 again.
+
+**`term_is_confirmed(uuid)` is `SECURITY DEFINER` on purpose.** An inline
+`EXISTS` subquery in the members policy would inherit the caller's view of
+`barangay_terms`, so changing the term policies later would silently change
+what members are visible — the exact coupling that would have let an
+archived Treasurer keep approval rights in 018. It returns `false` for a
+draft *and* for a non-existent id, so it reveals nothing about drafts.
+
+### Recording what is not known, instead of guessing
+
+Two constraints make uncertainty impossible to record silently:
+
+- `term_members_name_matches_status` — a row cannot carry a name while
+  claiming the holder is `unknown`, and cannot omit a name without saying
+  so. **`full_name` is nullable only for `record_status = 'unknown'`.**
+- `term_members_uncertainty_is_explained` — `partial` or `unknown`
+  **requires** a `source_note`.
+
+This is why the 2018–2023 Treasurer will be a row reading *"not
+established"* rather than no row at all: an absent row cannot tell a reader
+apart from "there was none", which is precisely what made the missing
+Kagawad take an investigation to explain.
+
+### Still unresolved, deliberately not seeded
+
+- **SK Chairperson's middle name** — one source says `Danielle`, another
+  `Daiella`. Neither chosen. Note that omitting it is *also* a version of
+  the name, which is what `record_status = 'partial'` and a visible marker
+  are for.
+- **2018–2023 Barangay Treasurer** — not listed by either source. The post
+  is *appointed*, not elected, so its absence from directory listings is
+  expected and is **not** evidence the post was vacant.
+- **The roster itself** — both sources are third-party directory sites that
+  already disagree on one name. Nothing is seeded until the barangay
+  confirms it.
+
+### `display_order` is unique here, and not on `barangay_officials`
+
+Opposite conclusions, for a real reason rather than inconsistency.
+`barangay_officials` is edited one row at a time through a form, where
+swapping two officials' order would collide midway and a partial unique
+index cannot be `DEFERRABLE`. These tables are seeded and corrected by SQL,
+where a reorder is one statement.
+
+### `ON DELETE RESTRICT`, not `CASCADE`
+
+Deleting a term with members **fails** (`23503`). Deleting the roster takes
+two deliberate statements instead of one accidental one — the right default
+for append-mostly historical data in a project that has already lost an
+official's record without explanation.
+
+### The current term
+
+If it is ever represented here, add a `barangay_terms` row with
+`is_current = true` and **no member rows**. `barangay_officials` stays the
+single source of truth for who is serving; duplicating the serving roster
+would give "who is serving now" two answers that can drift. 019A creates no
+such row.
+
+---
+
 ## Database notes
 
-**18 migrations**, `001` through `018`, all applied.
+**19 migrations**, `001` through `019`, all applied.
 
-**15 tables, RLS enabled on every one.**
+**17 tables, RLS enabled on every one.**
 
 | Table | Holds |
 |---|---|
@@ -394,6 +528,8 @@ archived rows — **restore is itself an UPDATE**.
 | `medical_programs` | Health centre programmes |
 | `health_events` | Bakuna / health event calendar |
 | `medicine_stock` | Medicine availability as a status, not a count |
+| `barangay_terms` | One row per barangay term. **Empty** — schema only, migration 019A |
+| `barangay_term_members` | Who served in a term. **Empty** — schema only, migration 019A |
 
 What each migration *changed* stays in that migration's own header, not
 here — this section says what exists now, the headers say how it got
@@ -787,6 +923,11 @@ the real name and photo together when the barangay confirms them.
 - **Auto-expiry for stale pending reservations.** An abandoned request
   blocks its slot until an official declines it.
 - **`profile_id` foreign key** replacing the `full_name` matching above.
+- **019B — the Previous Term Officials roster and its UI.** Migration 019A
+  created the tables; both are **empty**, and there is **no frontend**. 019B
+  seeds the confirmed roster from SQL and adds the read-only Official Portal
+  panel and the collapsed public section. Blocked on the barangay confirming
+  the roster, the SK Chairperson's middle name and the 2018–2023 Treasurer.
 
 ## Known gaps
 
