@@ -26,6 +26,16 @@ function App() {
     <AuthProvider>
       <Router>
         <Toaster position="top-right" />
+
+        {/* First thing in the tab order on every page, so a keyboard or
+            screen-reader user can jump straight past the navigation
+            instead of tabbing through it again on each page. Invisible
+            until focused. Every page and dashboard now renders a
+            <main id="main-content"> for it to target. Placed here rather
+            than in Navbar because the three auth pages and the three
+            dashboards do not all share one header. */}
+        <a className="skip-link" href="#main-content">Skip to main content</a>
+
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Home />} />

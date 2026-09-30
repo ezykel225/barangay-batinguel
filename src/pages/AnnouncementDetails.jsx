@@ -39,6 +39,8 @@ const AnnouncementDetails = () => {
     <div className="announcement-details-page">
       <Navbar />
 
+      <main id="main-content">
+
       <section className="announcement-details-section">
         <div className="announcement-details-container">
           <Link to="/announcements" className="back-link">
@@ -68,6 +70,7 @@ const AnnouncementDetails = () => {
         </div>
       </section>
 
+      </main>
       <Footer />
     </div>
   )

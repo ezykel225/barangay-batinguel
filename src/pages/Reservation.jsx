@@ -593,6 +593,8 @@ const Reservation = () => {
     <div className="reservation-page">
       <Navbar />
 
+      <main id="main-content">
+
       <section className="reservation-hero">
         <div className="reservation-hero-content">
           <span className="reservation-badge">
@@ -945,6 +947,7 @@ const Reservation = () => {
         </div>
       </section>
 
+      </main>
       <Footer />
     </div>
   )

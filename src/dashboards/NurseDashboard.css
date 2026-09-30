@@ -14,14 +14,14 @@
 }
 
 .nurse-dashboard-header h1 {
-  font-size: 28px;
+  font-size: var(--fs-28);
   font-weight: 700;
   color: #1f2937;
   margin-bottom: 4px;
 }
 
 .nurse-dashboard-header p {
-  font-size: 14px;
+  font-size: var(--fs-14);
   color: #6b7280;
 }
 
@@ -33,15 +33,15 @@
   background: #dcfce7;
   color: #16a34a;
   padding: 8px 16px;
-  border-radius: 20px;
-  font-size: 13px;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-13);
   font-weight: 600;
 }
 
 .nurse-status-dot {
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   background-color: #16a34a;
   animation: pulse 2s infinite;
 }
@@ -67,9 +67,9 @@
 .bakuna-calendar-card {
   background-color: #ffffff;
   border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-sm);
 }
 
 .bakuna-calendar-header {
@@ -80,7 +80,7 @@
 }
 
 .bakuna-calendar-header h3 {
-  font-size: 16px;
+  font-size: var(--fs-16);
   font-weight: 700;
   color: #1f2937;
 }
@@ -99,33 +99,33 @@
 .bakuna-event-date {
   background: #0f766e;
   color: white;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 8px 12px;
   text-align: center;
   min-width: 56px;
 }
 
 .bakuna-event-date .month {
-  font-size: 10px;
+  font-size: var(--fs-12);
   font-weight: 600;
   text-transform: uppercase;
 }
 
 .bakuna-event-date .day {
-  font-size: 20px;
+  font-size: var(--fs-20);
   font-weight: 700;
   line-height: 1;
 }
 
 .bakuna-event-info h5 {
-  font-size: 14px;
+  font-size: var(--fs-14);
   font-weight: 600;
   color: #1f2937;
   margin-bottom: 2px;
 }
 
 .bakuna-event-info p {
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: #6b7280;
 }
 
@@ -139,8 +139,8 @@
   background-color: #1e3a8a;
   color: white;
   border: none;
-  border-radius: 8px;
-  font-size: 13px;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-13);
   font-weight: 600;
   cursor: pointer;
   font-family: 'Poppins', sans-serif;
@@ -158,9 +158,9 @@
 .programs-card {
   background-color: #ffffff;
   border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-sm);
 }
 
 .programs-card-header {
@@ -171,13 +171,13 @@
 }
 
 .programs-card-header h3 {
-  font-size: 16px;
+  font-size: var(--fs-16);
   font-weight: 700;
   color: #1f2937;
 }
 
 .programs-subtitle {
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: #6b7280;
   margin-bottom: 16px;
 }
@@ -190,37 +190,37 @@
 
 .program-item {
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 14px;
   transition: box-shadow 0.2s;
 }
 
 .program-item:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-sm);
 }
 
 .program-item-title {
-  font-size: 14px;
+  font-size: var(--fs-14);
   font-weight: 600;
   color: #1f2937;
   margin-bottom: 4px;
 }
 
 .program-item-schedule {
-  font-size: 11px;
+  font-size: var(--fs-12);
   color: #16a34a;
   font-weight: 600;
   margin-bottom: 2px;
 }
 
 .program-item-time {
-  font-size: 11px;
+  font-size: var(--fs-12);
   color: #6b7280;
   margin-bottom: 8px;
 }
 
 .program-edit-btn {
-  font-size: 11px;
+  font-size: var(--fs-12);
   color: #1e3a8a;
   background: none;
   border: none;
@@ -243,25 +243,25 @@
     #1e3a8a,
     #1e40af
   );
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 24px;
   color: white;
 }
 
 .outreach-label {
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: #bfdbfe;
   margin-bottom: 8px;
 }
 
 .outreach-number {
-  font-size: 48px;
+  font-size: var(--fs-48);
   font-weight: 700;
   margin-bottom: 4px;
 }
 
 .outreach-sublabel {
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: #bfdbfe;
 }
 
@@ -271,13 +271,13 @@
 .nurse-my-status-card {
   background-color: #ffffff;
   border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-sm);
 }
 
 .nurse-my-status-card h3 {
-  font-size: 16px;
+  font-size: var(--fs-16);
   font-weight: 700;
   color: #1f2937;
   margin-bottom: 16px;
@@ -291,8 +291,8 @@
 
 .nurse-status-option-btn {
   padding: 10px 16px;
-  border-radius: 8px;
-  font-size: 13px;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-13);
   font-weight: 600;
   cursor: pointer;
   font-family: 'Poppins', sans-serif;
@@ -320,14 +320,14 @@
 }
 
 .availability-header h1 {
-  font-size: 28px;
+  font-size: var(--fs-28);
   font-weight: 700;
   color: #1f2937;
   margin-bottom: 4px;
 }
 
 .availability-header p {
-  font-size: 14px;
+  font-size: var(--fs-14);
   color: #6b7280;
 }
 
@@ -339,14 +339,14 @@
 }
 
 .health-events-header h1 {
-  font-size: 28px;
+  font-size: var(--fs-28);
   font-weight: 700;
   color: #1f2937;
   margin-bottom: 4px;
 }
 
 .health-events-header p {
-  font-size: 14px;
+  font-size: var(--fs-14);
   color: #6b7280;
 }
 
@@ -358,14 +358,14 @@
 }
 
 .settings-header h1 {
-  font-size: 28px;
+  font-size: var(--fs-28);
   font-weight: 700;
   color: #1f2937;
   margin-bottom: 4px;
 }
 
 .settings-header p {
-  font-size: 14px;
+  font-size: var(--fs-14);
   color: #6b7280;
 }
 
@@ -379,9 +379,9 @@
 .profile-card {
   background-color: #ffffff;
   border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-sm);
 }
 
 .profile-card-header {
@@ -392,7 +392,7 @@
 }
 
 .profile-card-header h3 {
-  font-size: 16px;
+  font-size: var(--fs-16);
   font-weight: 700;
   color: #1f2937;
 }
@@ -407,7 +407,7 @@
 .profile-avatar {
   width: 80px;
   height: 80px;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   overflow: hidden;
   background: linear-gradient(
     135deg,
@@ -418,19 +418,19 @@
   align-items: center;
   justify-content: center;
   color: white;
-  font-size: 32px;
+  font-size: var(--fs-32);
   margin-bottom: 12px;
 }
 
 .profile-name {
-  font-size: 16px;
+  font-size: var(--fs-16);
   font-weight: 700;
   color: #1f2937;
   margin-bottom: 4px;
 }
 
 .profile-role {
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: #6b7280;
 }
 
@@ -447,7 +447,7 @@
 }
 
 .profile-form-label {
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 600;
   color: #374151;
   text-transform: uppercase;
@@ -458,10 +458,9 @@
   width: 100%;
   padding: 10px 14px;
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-14);
   font-family: 'Poppins', sans-serif;
-  outline: none;
   transition: border-color 0.2s;
 }
 
@@ -480,8 +479,8 @@
   background-color: #1e3a8a;
   color: white;
   border: none;
-  border-radius: 8px;
-  font-size: 13px;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-13);
   font-weight: 600;
   cursor: pointer;
   font-family: 'Poppins', sans-serif;
@@ -496,9 +495,9 @@
 .security-card {
   background-color: #ffffff;
   border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-sm);
 }
 
 .security-card-header {
@@ -509,7 +508,7 @@
 }
 
 .security-card-header h3 {
-  font-size: 16px;
+  font-size: var(--fs-16);
   font-weight: 700;
   color: #1f2937;
 }
@@ -521,7 +520,7 @@
 }
 
 .security-label {
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 600;
   color: #374151; /* ← FIXED: removed quotes around color value */
   text-transform: uppercase;
@@ -531,7 +530,7 @@
 }
 
 .security-desc {
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: #6b7280;
   margin-bottom: 12px;
 }
@@ -540,10 +539,9 @@
   width: 100%;
   padding: 10px 14px;
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-14);
   font-family: 'Poppins', sans-serif;
-  outline: none;
   margin-bottom: 8px;
 }
 
@@ -551,7 +549,7 @@
   background: none;
   border: none;
   color: #1e3a8a;
-  font-size: 13px;
+  font-size: var(--fs-13);
   cursor: pointer;
   font-family: 'Poppins', sans-serif;
   display: flex;
@@ -565,7 +563,7 @@
 }
 
 .notification-label {
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 600;
   color: #374151;
   text-transform: uppercase;
@@ -583,14 +581,14 @@
 }
 
 .notification-item-label {
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: #374151;
 }
 
 .notification-toggle {
   width: 44px;
   height: 24px;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: #16a34a;
   cursor: pointer;
   border: none;
@@ -606,8 +604,8 @@
   background-color: #1e3a8a;
   color: white;
   border: none;
-  border-radius: 8px;
-  font-size: 13px;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-13);
   font-weight: 600;
   cursor: pointer;
   font-family: 'Poppins', sans-serif;
@@ -650,14 +648,14 @@
 
 /* ── Medicines tab ──────────────────────────────────────────── */
 .medicine-intro {
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: #6b7280;
   line-height: 1.6;
   margin: 0 0 16px;
 }
 
 .medicine-field-hint {
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: #6b7280;
   margin: 6px 0 0;
 }
@@ -675,7 +673,7 @@
   gap: 12px;
   padding: 12px 14px;
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: #f9fafb;
 }
 
@@ -689,13 +687,13 @@
   min-width: 0;
 }
 
-.medicine-admin-meta { font-size: 12px; color: #6b7280; }
-.medicine-admin-note { font-size: 12px; color: #6b7280; font-style: italic; }
+.medicine-admin-meta { font-size: var(--fs-12); color: #6b7280; }
+.medicine-admin-note { font-size: var(--fs-12); color: #6b7280; font-style: italic; }
 
 .medicine-status-group {
   display: inline-flex;
   border: 1px solid #d1d5db;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   overflow: hidden;
   background: #fff;
 }
@@ -703,7 +701,7 @@
 .medicine-status-btn {
   border: none;
   background: transparent;
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 600;
   padding: 6px 12px;
   cursor: pointer;

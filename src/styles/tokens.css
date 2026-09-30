@@ -1,0 +1,173 @@
+/* ================================
+   DESIGN TOKENS
+   Barangay Batinguel E-System
+   ================================
+
+   One source of truth for colour, type, radius, shadow and focus.
+
+   ─── WHY THIS FILE EXISTS ────────────────────────────────────────────
+   These tokens used to live in a `:root` block inside
+   `src/pages/Home.css`. They were global — any `:root` block is — but
+   they were *owned* by a page, so editing the home page meant editing
+   the palette for the whole application, and nothing said so. Moving
+   them here changes no value and no rendering; it just puts them
+   somewhere honest.
+
+   ─── WHAT IS DELIBERATELY UNCHANGED ──────────────────────────────────
+   `--primary: #1e3a8a` is the barangay's government blue, used 87
+   times. It is not a design choice to revisit.
+
+   ─── ON MIGRATING LITERALS ───────────────────────────────────────────
+   This phase does NOT rewrite all 72 hex literals in the 17 stylesheets
+   to `var()`. Those that were touched for another approved reason (the
+   three contrast fixes, radii, shadows, focus) now use tokens; the rest
+   stay literal. A 72-colour find-and-replace across every file would be
+   a large diff with no visual result, and it is not what this phase was
+   approved to do. New CSS should use the tokens. */
+
+:root {
+  /* ── Brand ─────────────────────────────────────────────────────────
+     Promoted unchanged from Home.css. */
+  --primary: #1e3a8a;
+  --primary-dark: #1e2d6b;
+  --primary-light: #dbeafe;
+
+  --secondary: #1e40af;
+  --secondary-dark: #1e3a8a;
+  --secondary-light: #eff6ff;
+
+  --accent: #3b82f6;
+  --accent-dark: #2563eb;
+  --accent-light: #eff6ff;
+
+  /* ── Surfaces ──────────────────────────────────────────────────────
+     Promoted unchanged. */
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --surface-alt: #f1f5f9;
+  --white: #ffffff;
+  --border: #e5e7eb;
+
+  /* ── Text ──────────────────────────────────────────────────────────
+     `--text-muted` was #94a3b8, which is 2.56:1 on white and fails
+     WCAG AA. It is now #64748b (4.76:1). That makes it identical to
+     `--text-light`; both names are kept so the two existing consumers
+     keep working, but there is now only one legible muted grey. */
+  --text: #1e293b;
+  --text-light: #64748b;
+  --text-muted: #64748b;
+  --text-body: #374151;
+  --text-strong: #1f2937;
+
+  /* ── Extended palette ──────────────────────────────────────────────
+     The rest of the colours this project actually uses, by frequency.
+     `--grey-600` is the single most used colour in the codebase (96
+     occurrences) and is also the approved replacement for the failing
+     #9ca3af. */
+  --grey-600: #6b7280;
+  --grey-100: #f3f4f6;
+  --grey-50: #f9fafb;
+  --slate-600: #475569;
+  --blue-pale: #bfdbfe;
+  --blue-50: #eff6ff;
+
+  --success: #15803d;
+  --success-strong: #16a34a;
+  --success-light: #dcfce7;
+  --success-pale: #f0fdf4;
+  --teal: #0f766e;
+
+  --danger: #dc2626;
+  --danger-light: #fee2e2;
+
+  /* Amber pair. The text colour was #ca8a04 on this background —
+     2.74:1, a fail. #b45309 gives 4.68:1 and was already used on the
+     same background in NurseDashboard, so this unifies rather than
+     inventing a third amber. */
+  --warning-bg: #fef9c3;
+  --warning-text: #b45309;
+
+  /* ── Type scale ────────────────────────────────────────────────────
+     In `rem`, so a resident who has enlarged their browser's default
+     text actually gets larger text. `px` ignores that preference
+     entirely, which is the whole reason for this change.
+
+     Named for the pixel size each replaces at the default 16px root,
+     so the mapping is obvious when reading a diff.
+
+     FLOOR: 12px equivalent. The 10px and 11px values the project used
+     are too small to read comfortably, and a barangay's users include
+     elderly residents. There is no 10px or 11px token — by design, so
+     one cannot be reintroduced by habit. 19px folded into 18px (a 1px
+     difference nobody can see). */
+  --fs-12: 0.75rem;
+  --fs-13: 0.8125rem;
+  --fs-14: 0.875rem;
+  --fs-15: 0.9375rem;
+  --fs-16: 1rem;
+  --fs-18: 1.125rem;
+  --fs-20: 1.25rem;
+  --fs-22: 1.375rem;
+  --fs-24: 1.5rem;
+  --fs-26: 1.625rem;
+  --fs-28: 1.75rem;
+  --fs-30: 1.875rem;
+  --fs-32: 2rem;
+  --fs-34: 2.125rem;
+  --fs-36: 2.25rem;
+  --fs-48: 3rem;
+  --fs-64: 4rem;
+
+  /* ── Radius ────────────────────────────────────────────────────────
+     Three elevation-independent steps, chosen as the three values the
+     project already used most so the majority of surfaces do not move:
+     8px (40 uses), 12px (30), 16px (8). Neighbouring values fold into
+     the nearest step, none by more than 4px.
+
+     `--radius-pill` replaces the 20px used on every badge: at badge
+     height both render as fully rounded ends, so this is a rename, not
+     a restyle.
+
+     Two literals are deliberately NOT tokenised: the 3px and 4px radii
+     on `.chart-dot`, `.legend-dot` and `.legend-box`. Those are ~8px
+     decorative squares where an 8px radius would turn them into
+     circles. A token system that distorts three dots to reach a round
+     number is a worse system. */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+  --radius-circle: 50%;
+
+  /* ── Elevation ─────────────────────────────────────────────────────
+     Three steps. `--shadow-sm` is the project's dominant shadow
+     verbatim (17 uses), so most cards are pixel-identical.
+
+     The brand and success glows are a separate category, not elevation:
+     they are deliberate colour on primary calls to action, and folding
+     them into a neutral grey shadow would visibly flatten the hero
+     buttons. Two directional shadows stay literal where they are used —
+     the sidebar's right edge and the mobile bottom bar's upward
+     shadow — because a generic downward shadow points the wrong way. */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 8px 24px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 20px 45px rgba(0, 0, 0, 0.22);
+
+  --shadow-brand: 0 8px 20px rgba(30, 58, 138, 0.25);
+  --shadow-brand-strong: 0 10px 24px rgba(30, 58, 138, 0.35);
+  --shadow-success: 0 8px 20px rgba(22, 163, 74, 0.30);
+
+  /* ── Focus ─────────────────────────────────────────────────────────
+     One visible focus treatment for the whole application. See the
+     `:focus-visible` rule in `index.css` for why this is not optional
+     and what it replaced. */
+  --focus-ring-color: #1d4ed8;
+  --focus-ring-width: 3px;
+  --focus-ring-offset: 2px;
+
+  /* ── Motion ────────────────────────────────────────────────────────
+     Every decorative transition in the project is ~0.2s. Collected
+     here so the reduced-motion rule in `index.css` has one thing to
+     neutralise. */
+  --transition-fast: 0.2s;
+}

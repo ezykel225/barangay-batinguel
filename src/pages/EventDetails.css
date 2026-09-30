@@ -19,13 +19,13 @@
 
 .event-details-card {
   background: white;
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   padding: 28px;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  box-shadow: var(--shadow-md);
 }
 
 .event-details-card h1 {
-  font-size: 30px;
+  font-size: var(--fs-30);
   color: #1e293b;
   margin-bottom: 16px;
 }
@@ -37,11 +37,11 @@
 .event-details-meta p {
   margin-bottom: 8px;
   color: #475569;
-  font-size: 15px;
+  font-size: var(--fs-15);
 }
 
 .event-details-card p {
   color: #475569;
   line-height: 1.8;
-  font-size: 15px;
+  font-size: var(--fs-15);
 }

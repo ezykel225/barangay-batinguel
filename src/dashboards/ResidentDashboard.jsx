@@ -591,7 +591,7 @@ const ResidentDashboard = () => {
         badges={{ documents: unseenRequestCount, reservations: unseenReservationCount }}
       />
 
-      <div className="dashboard-main">
+      <main className="dashboard-main" id="main-content">
         {activeTab === 'dashboard' && (
           <div>
             <div className="resident-dashboard-header">
@@ -648,10 +648,10 @@ const ResidentDashboard = () => {
                   <table className="dashboard-table">
                     <thead>
                       <tr>
-                        <th>Document</th>
-                        <th>Purpose</th>
-                        <th>Status</th>
-                        <th>Submitted</th>
+                        <th scope="col">Document</th>
+                        <th scope="col">Purpose</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Submitted</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -714,11 +714,11 @@ const ResidentDashboard = () => {
                   <table className="dashboard-table">
                     <thead>
                       <tr>
-                        <th>Document</th>
-                        <th>Purpose</th>
-                        <th>Status</th>
-                        <th>Notes from Official</th>
-                        <th>Submitted</th>
+                        <th scope="col">Document</th>
+                        <th scope="col">Purpose</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Notes from Official</th>
+                        <th scope="col">Submitted</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -767,11 +767,11 @@ const ResidentDashboard = () => {
                   <table className="dashboard-table">
                     <thead>
                       <tr>
-                        <th>Date</th>
-                        <th>Time</th>
-                        <th>Purpose</th>
-                        <th>Status</th>
-                        <th>Action</th>
+                        <th scope="col">Date</th>
+                        <th scope="col">Time</th>
+                        <th scope="col">Purpose</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -799,7 +799,7 @@ const ResidentDashboard = () => {
                                 {cancellingId === r.id ? 'Cancelling...' : 'Cancel'}
                               </button>
                             ) : (
-                              <span style={{ fontSize: 11, color: '#9ca3af' }}>—</span>
+                              <span style={{ fontSize: 12, color: '#6b7280' }}>—</span>
                             )}
                           </td>
                         </tr>
@@ -948,7 +948,7 @@ const ResidentDashboard = () => {
                     width: 64, height: 64, borderRadius: '50%', background: '#e5e7eb',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
-                    <FaUser style={{ fontSize: 24, color: '#9ca3af' }} />
+                    <FaUser style={{ fontSize: 24, color: '#6b7280' }} />
                   </div>
                 )}
                 <div>
@@ -967,7 +967,7 @@ const ResidentDashboard = () => {
                     disabled={submitting}
                     style={{ display: 'none' }}
                   />
-                  <p style={{ fontSize: 12, color: '#9ca3af', marginTop: 6 }}>
+                  <p style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>
                     JPG or PNG.
                   </p>
                 </div>
@@ -1040,7 +1040,7 @@ const ResidentDashboard = () => {
                     onClick={() => setShowNew(!showNew)}
                     style={{
                       position: 'absolute', right: 12, background: 'none',
-                      border: 'none', cursor: 'pointer', color: '#94a3b8',
+                      border: 'none', cursor: 'pointer', color: '#64748b',
                       fontSize: 15, display: 'flex', alignItems: 'center', padding: 0,
                     }}>
                     {showNew ? <FaEyeSlash /> : <FaEye />}
@@ -1063,7 +1063,7 @@ const ResidentDashboard = () => {
                     onClick={() => setShowConfirm(!showConfirm)}
                     style={{
                       position: 'absolute', right: 12, background: 'none',
-                      border: 'none', cursor: 'pointer', color: '#94a3b8',
+                      border: 'none', cursor: 'pointer', color: '#64748b',
                       fontSize: 15, display: 'flex', alignItems: 'center', padding: 0,
                     }}>
                     {showConfirm ? <FaEyeSlash /> : <FaEye />}
@@ -1081,7 +1081,7 @@ const ResidentDashboard = () => {
             </div>
           </div>
         )}
-      </div>
+      </main>
 
       {/* New Document Request Modal */}
       {showRequestModal && (

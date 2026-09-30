@@ -19,13 +19,13 @@
 
 .announcement-details-card {
   background: white;
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   padding: 28px;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  box-shadow: var(--shadow-md);
 }
 
 .announcement-details-card h1 {
-  font-size: 30px;
+  font-size: var(--fs-30);
   color: #1e293b;
   margin: 12px 0;
 }
@@ -33,11 +33,11 @@
 .announcement-date {
   color: #64748b;
   margin-bottom: 16px;
-  font-size: 14px;
+  font-size: var(--fs-14);
 }
 
 .announcement-details-card p {
   color: #475569;
   line-height: 1.8;
-  font-size: 15px;
+  font-size: var(--fs-15);
 }

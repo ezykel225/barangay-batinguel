@@ -1459,7 +1459,7 @@ const OfficialDashboard = () => {
       />
 
       {/* Main Content */}
-      <div className="dashboard-main">
+      <main className="dashboard-main" id="main-content">
 
         {/* ========================
             DASHBOARD TAB
@@ -1559,11 +1559,11 @@ const OfficialDashboard = () => {
                   <table className="dashboard-table">
                     <thead>
                       <tr>
-                        <th>Name</th>
-                        <th>Date</th>
-                        <th>Time</th>
-                        <th>Purpose</th>
-                        <th>Action</th>
+                        <th scope="col">Name</th>
+                        <th scope="col">Date</th>
+                        <th scope="col">Time</th>
+                        <th scope="col">Purpose</th>
+                        <th scope="col">Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1648,10 +1648,10 @@ const OfficialDashboard = () => {
                   <table className="dashboard-table">
                     <thead>
                       <tr>
-                        <th>Title</th>
-                        <th>Badge</th>
-                        <th>Date Posted</th>
-                        <th>Action</th>
+                        <th scope="col">Title</th>
+                        <th scope="col">Badge</th>
+                        <th scope="col">Date Posted</th>
+                        <th scope="col">Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1727,10 +1727,10 @@ const OfficialDashboard = () => {
                   <table className="dashboard-table">
                     <thead>
                       <tr>
-                        <th>Title</th>
-                        <th>Date</th>
-                        <th>Location</th>
-                        <th>Action</th>
+                        <th scope="col">Title</th>
+                        <th scope="col">Date</th>
+                        <th scope="col">Location</th>
+                        <th scope="col">Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1799,17 +1799,17 @@ const OfficialDashboard = () => {
                   <table className="dashboard-table">
                     <thead>
                       <tr>
-                        <th>Name</th>
-                        <th>Phone</th>
-                        <th>Email</th>
-                        <th>Purok</th>
-                        <th>Date</th>
-                        <th>Time</th>
-                        <th>Duration</th>
-                        <th>Purpose</th>
-                        <th>Submitted</th>
-                        <th>Status</th>
-                        <th>Action</th>
+                        <th scope="col">Name</th>
+                        <th scope="col">Phone</th>
+                        <th scope="col">Email</th>
+                        <th scope="col">Purok</th>
+                        <th scope="col">Date</th>
+                        <th scope="col">Time</th>
+                        <th scope="col">Duration</th>
+                        <th scope="col">Purpose</th>
+                        <th scope="col">Submitted</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1921,13 +1921,13 @@ const OfficialDashboard = () => {
                   <table className="dashboard-table">
                     <thead>
                       <tr>
-                        <th>Resident</th>
-                        <th>Document</th>
-                        <th>Purpose</th>
-                        <th>Contact</th>
-                        <th>Status</th>
-                        <th>Submitted</th>
-                        <th>Action</th>
+                        <th scope="col">Resident</th>
+                        <th scope="col">Document</th>
+                        <th scope="col">Purpose</th>
+                        <th scope="col">Contact</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Submitted</th>
+                        <th scope="col">Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -2021,12 +2021,12 @@ const OfficialDashboard = () => {
                   <table className="dashboard-table">
                     <thead>
                       <tr>
-                        <th>Purok</th>
-                        <th>Waste Type</th>
-                        <th>Day</th>
-                        <th>Time</th>
-                        <th>Notes</th>
-                        <th>Action</th>
+                        <th scope="col">Purok</th>
+                        <th scope="col">Waste Type</th>
+                        <th scope="col">Day</th>
+                        <th scope="col">Time</th>
+                        <th scope="col">Notes</th>
+                        <th scope="col">Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -2075,13 +2075,13 @@ const OfficialDashboard = () => {
                   <table className="dashboard-table">
                     <thead>
                       <tr>
-                        <th>Name</th>
-                        <th>Contact</th>
-                        <th>Purok</th>
-                        <th>Registry Match</th>
-                        <th>Verification</th>
-                        <th>ID</th>
-                        <th>Action</th>
+                        <th scope="col">Name</th>
+                        <th scope="col">Contact</th>
+                        <th scope="col">Purok</th>
+                        <th scope="col">Registry Match</th>
+                        <th scope="col">Verification</th>
+                        <th scope="col">ID</th>
+                        <th scope="col">Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -2133,7 +2133,7 @@ const OfficialDashboard = () => {
                             {(resident.verification_status === 'rejected'
                               || resident.verification_status === 'ineligible')
                               && resident.verification_notes && (
-                              <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
+                              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
                                 {resident.verification_notes}
                               </div>
                             )}
@@ -2216,11 +2216,11 @@ const OfficialDashboard = () => {
                   <table className="dashboard-table">
                     <thead>
                       <tr>
-                        <th>Name</th>
-                        <th>Purok</th>
-                        <th>Household #</th>
-                        <th>Contact</th>
-                        <th>Action</th>
+                        <th scope="col">Name</th>
+                        <th scope="col">Purok</th>
+                        <th scope="col">Household #</th>
+                        <th scope="col">Contact</th>
+                        <th scope="col">Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -2275,13 +2275,13 @@ const OfficialDashboard = () => {
                   <table className="dashboard-table">
                     <thead>
                       <tr>
-                        <th>Photo</th>
-                        <th>Order</th>
-                        <th>Name</th>
-                        <th>Position</th>
-                        <th>Committee</th>
-                        <th>Contact</th>
-                        <th>Action</th>
+                        <th scope="col">Photo</th>
+                        <th scope="col">Order</th>
+                        <th scope="col">Name</th>
+                        <th scope="col">Position</th>
+                        <th scope="col">Committee</th>
+                        <th scope="col">Contact</th>
+                        <th scope="col">Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -2291,7 +2291,7 @@ const OfficialDashboard = () => {
                             <PersonAvatar
                               name={official.full_name}
                               photoUrl={official.photo_url}
-                              fallbackIcon={<FaUser style={{ fontSize: 18, color: '#9ca3af' }} />}
+                              fallbackIcon={<FaUser style={{ fontSize: 18, color: '#6b7280' }} />}
                               className="official-row-photo"
                             />
                           </td>
@@ -2459,12 +2459,12 @@ const OfficialDashboard = () => {
                   <table className="dashboard-table">
                     <thead>
                       <tr>
-                        <th>When</th>
-                        <th>Who</th>
-                        <th>Action</th>
-                        <th>Type</th>
-                        <th>Subject</th>
-                        <th>Notes</th>
+                        <th scope="col">When</th>
+                        <th scope="col">Who</th>
+                        <th scope="col">Action</th>
+                        <th scope="col">Type</th>
+                        <th scope="col">Subject</th>
+                        <th scope="col">Notes</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -2518,7 +2518,7 @@ const OfficialDashboard = () => {
                       width: 64, height: 64, borderRadius: '50%', background: '#e5e7eb',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}>
-                      <FaUser style={{ fontSize: 24, color: '#9ca3af' }} />
+                      <FaUser style={{ fontSize: 24, color: '#6b7280' }} />
                     </div>
                   }
                   className="official-row-photo"
@@ -2539,7 +2539,7 @@ const OfficialDashboard = () => {
                     disabled={submitting}
                     style={{ display: 'none' }}
                   />
-                  <p style={{ fontSize: 12, color: '#9ca3af', marginTop: 6 }}>
+                  <p style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>
                     JPG or PNG, shown across the public Officials Directory.
                   </p>
                 </div>
@@ -2571,7 +2571,7 @@ const OfficialDashboard = () => {
                     onClick={() => setShowNew(!showNew)}
                     style={{
                       position: 'absolute', right: 12, background: 'none',
-                      border: 'none', cursor: 'pointer', color: '#94a3b8',
+                      border: 'none', cursor: 'pointer', color: '#64748b',
                       fontSize: 15, display: 'flex', alignItems: 'center', padding: 0,
                     }}>
                     {showNew ? <FaEyeSlash /> : <FaEye />}
@@ -2594,7 +2594,7 @@ const OfficialDashboard = () => {
                     onClick={() => setShowConfirm(!showConfirm)}
                     style={{
                       position: 'absolute', right: 12, background: 'none',
-                      border: 'none', cursor: 'pointer', color: '#94a3b8',
+                      border: 'none', cursor: 'pointer', color: '#64748b',
                       fontSize: 15, display: 'flex', alignItems: 'center', padding: 0,
                     }}>
                     {showConfirm ? <FaEyeSlash /> : <FaEye />}
@@ -2623,7 +2623,7 @@ const OfficialDashboard = () => {
           </div>
         )}
 
-      </div>
+      </main>
 
       {/* ========================
           ANNOUNCEMENT MODAL
