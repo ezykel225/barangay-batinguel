@@ -65,16 +65,26 @@ banned below: it silences the one check this project has.
 
 ### Tests
 
-One test exists — `src/App.test.js` renders `<App />` and asserts the
-brand name appears. That is the entire suite. Schema and policy changes
-were verified instead by impersonating each role in SQL, with the
-results recorded in the migration headers.
+Two suites, 32 tests:
 
-**Tests need the Supabase env vars.** `supabaseClient.js` throws at
-import time when they're missing; `App.test.js` imports `App`, which
-imports the client. So a missing `.env` fails the test with a module
+| File | What it covers |
+|---|---|
+| `src/App.test.js` | One smoke test — renders `<App />` and asserts the brand name appears |
+| `src/utils/residentGroups.test.js` | 31 tests over the resident grouping, status vocabulary, search/filter and account↔registry reconciliation rules |
+
+Schema and policy changes are still verified by impersonating each role
+in SQL, with the results recorded in the migration headers — not by
+these tests.
+
+**`App.test.js` needs the Supabase env vars.** `supabaseClient.js` throws
+at import time when they're missing; `App.test.js` imports `App`, which
+imports the client. So a missing `.env` fails that test with a module
 error that never mentions `.env`. If `npm test` fails on a fresh
 checkout, check `.env` before debugging the test.
+
+`residentGroups.test.js` does **not** — `residentGroups.js` is pure, with
+no Supabase import, which is the reason the resident workflow's rules
+live there rather than inside the dashboard component.
 
 ### Environment
 
@@ -150,6 +160,13 @@ src/
     officialPhotos    Maps barangay_officials.full_name -> portrait file.
     clinicHours.js    Parses the "8:00 AM" display strings.
     storagePath.js    Public URL -> storage object path.
+    residentGroups    The resident workflow's rules: the status
+                      vocabulary, the Requests/Residents/Not Residents
+                      grouping, search/filter, purok validity and the
+                      account-registry reconciliation checks. Pure, and
+                      unit-tested. Shared by both dashboards so an
+                      official and a resident cannot be shown different
+                      words for the same stored state.
 
   supabase/
     supabaseClient.js The single Supabase client. Throws at import time
@@ -721,6 +738,10 @@ own domain with SPF, DKIM and DMARC.
 - Correct their own name, contact number and purok (changing a verified
   name re-opens verification)
 - Unseen-status-change badges; pickup reminders; profile photo
+- Their own account status shown on the dashboard in the same words the
+  official sees, verified included — the warning banner appears only when
+  something is wrong, so its absence was being left to mean "you are
+  fine", which is not something a resident can be expected to infer
 
 ### Officials
 
@@ -729,10 +750,13 @@ Dashboard, Announcements, Events, Reservations, Document Requests, Waste
 Management, Kapitan Status, Officials Directory, Residents, Residents
 Registry, Reports, Activity Log, Settings.
 
-Two of them carry more than their name suggests:
+Several of them carry more than their name suggests:
 
-- Residents — verification queue with registry cross-reference, plus a
-  permanent **Not a Resident** outcome that also deletes the uploaded ID
+- Residents — the verification queue, split into **Requests /
+  Residents / Not Residents** (see *The three resident groups* below),
+  with registry cross-reference, search and purok filter, the permanent
+  **Not a Resident** outcome that also deletes the uploaded ID, and the
+  **Account & registry reconciliation** panel
 - Residents Registry — the barangay's own record. Currently **dummy
   data**; the real list wasn't available for a student project, which is
   also the right call under the Data Privacy Act.
@@ -783,6 +807,78 @@ exists, and in a barangay everyone knows their neighbours' names —
 auto-verifying would let anyone claim a neighbour's identity. Equally,
 never add someone to the registry *in order to* verify them: that makes
 the check circular while keeping its reassuring appearance.
+
+### The three resident groups
+
+The Residents tab groups accounts as **Requests**, **Residents** and
+**Not Residents**. All three are derived from `verification_status` — the
+column that already records the decision. **There is no second store and
+no new column**, deliberately: a separate record of "is this person a
+resident" would be a copy that can drift from the one the RLS policies
+actually enforce.
+
+| Group | Stored status | Means |
+|---|---|---|
+| Requests | `pending`, `rejected` | Still in verification — waiting for an official, or sent back to the resident to correct |
+| Residents | `verified` | Checked against an ID. The only group that may request documents |
+| Not Residents | `ineligible` | Established not to be a resident. Terminal; only an official can reopen it |
+
+A status the app does not recognise lands in **Requests** and is listed
+by the reconciliation panel. It must never be dropped from all three:
+the group counts are how the totals are read, and an account missing from
+every group makes them silently short.
+
+`rejected` sits under Requests rather than with Not Residents on purpose.
+It means *details wrong, fix and resubmit* — the resident may return
+themselves to `pending` — so filing it beside the terminal outcome would
+misrepresent it as a refusal.
+
+**The UI labels describe the stored states; they do not rename them.**
+`src/utils/residentGroups.js` holds one vocabulary used by both the
+Official Dashboard and the Resident Portal, and each badge carries its
+raw stored value in its tooltip. `rejected` and `ineligible` used to
+share one red badge and differ only by the word inside it — one is
+resubmittable, the other permanent, so they now read and look different.
+
+### Account ↔ registry reconciliation (D6)
+
+The Residents tab carries an **Account & registry reconciliation** panel:
+deterministic checks over data already fetched, rendered as findings.
+
+**It is detection only.** Nothing on it merges records, rewrites a name,
+creates or deletes an account, or edits a registry entry — there are no
+actions on the panel at all. It is rendered even when it finds nothing,
+because a panel that is absent cannot be told apart from one that is
+broken; that was the mistake in migration 018's first Archived Officials
+cut.
+
+The checks: a verified account with no registry entry of the same name; a
+`ineligible` account whose name *is* in the registry; duplicate names
+within accounts; duplicate names within the registry; a purok that is
+blank or off the barangay's list, on either side; and an unrecognised
+`verification_status`.
+
+Two limits that are load-bearing:
+
+- **Exact normalised name equality only** — trim, collapse inner
+  whitespace, lowercase, shared with `findRegistryMatch` so a badge
+  reading "in registry" can never sit beside a panel counting the same
+  account as missing. The *partial* (substring) branch of the badge is
+  deliberately **not** used here: it is a prompt to look closer, and a
+  near-match presented as a finding would assert that two different
+  people are one.
+- **A missing optional field is never a finding.** An uploaded ID is
+  optional by design, so "verified with no ID on file" is not listed —
+  it describes the intended flow for someone verified in person.
+
+⚠️ **There is no deterministic link between an account and a registry
+entry.** `profiles` holds no registry reference, `residents_registry`
+holds none to `profiles` (`added_by` is the official who typed it), and
+`profiles.system_id` is null on every resident account. The name string
+is all there is. So this panel informs an official; it never concludes.
+Resolving the class properly needs the `profile_id` foreign key still
+listed under *Not built yet* — a schema change, which is why the panel
+was built without one.
 
 ---
 
@@ -855,6 +951,22 @@ from data already present; 7 was added on the strength of "I think there
 is one". A resident whose purok is missing **cannot sign up at all** —
 the dropdown replaced a free-text box precisely so there is no "other"
 to fall back on.
+
+**Every resident-facing purok field now offers this list**, not a text
+box: signup, the resident's own details, the court reservation form
+(which anonymous walk-ins use, and which was the last way a new spelling
+could still reach the database) and the officials' Add/Edit Registry
+Entry form. The waste schedule form is still free text — it is a
+schedule, not a resident record, and was left out of that change
+deliberately rather than overlooked.
+
+**Existing stored values are never rewritten.** A record already holding
+an off-list spelling keeps it, shown as an extra selected option so
+opening a form to change a phone number cannot silently blank it, and
+flagged "not on the list" wherever it is displayed. Correcting one is a
+deliberate choice made with the resident — a bulk normalisation would
+need its own approval, since the system cannot know whether 'purol 5'
+meant Purok 5.
 
 The nurse is labelled **"Barangay Health Nurse"**, a role rather than a
 person. The system previously carried an invented name and a stock photo
@@ -937,13 +1049,16 @@ the real name and photo together when the barangay confirms them.
 - **Source maps ship to production** (~7 MB), so the original JSX is
   publicly reconstructable. `GENERATE_SOURCEMAP=false` in Vercel fixes it.
 - **`public/logo.png` is 984 KB and referenced by nothing.**
-- **No automated tests** beyond one smoke test, which fails without
-  `.env` because `supabaseClient.js` throws at import time.
+- **Thin automated test coverage.** 32 tests in two suites: one smoke
+  test over `<App />`, which fails without `.env` because
+  `supabaseClient.js` throws at import time, and 31 pure unit tests over
+  the resident workflow rules. No component, integration or end-to-end
+  tests, and no test touches the database.
 - **An InfinityFree deployment** may still be serving an old broken build.
 - **No 404 page.** `path="*"` in `App.js` renders `Home`, so a mistyped
   URL looks like the homepage instead of reporting an error.
-- **No lint script and no typecheck script**, and a single test — see
-  *Commands* and *Tests* above.
+- **No lint script and no typecheck script** — see *Commands* and
+  *Tests* above.
 
 ---
 

@@ -10,6 +10,7 @@ import {
 import { supabase } from '../supabase/supabaseClient'
 import { pathFromPublicUrl } from '../utils/storagePath'
 import { BARANGAY_NAME, PUROKS } from '../constants/barangay'
+import { describeVerification } from '../utils/residentGroups'
 import { logActivity } from '../utils/activityLog'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
@@ -597,6 +598,23 @@ const ResidentDashboard = () => {
             <div className="resident-dashboard-header">
               <h1>Welcome, {userProfile?.full_name || 'Resident'}</h1>
               <p>Request barangay documents and check waste collection schedules.</p>
+              {/* The account's own status, in the same words the official
+                  sees on their Residents tab -- both come from
+                  VERIFICATION_STATES. A verified resident previously got no
+                  confirmation anywhere on this page: the banner below appears
+                  only when something is wrong, so "no banner" was left to mean
+                  "you are fine", which is not something a resident can be
+                  expected to infer. */}
+              {userProfile && (
+                <p className="resident-status-line">
+                  Account status:{' '}
+                  <span
+                    className={`badge badge-${describeVerification(userProfile.verification_status).tone}`}
+                  >
+                    {describeVerification(userProfile.verification_status).residentLabel}
+                  </span>
+                </p>
+              )}
             </div>
 
             <VerificationBanner />
