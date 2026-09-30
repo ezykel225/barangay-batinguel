@@ -74,6 +74,26 @@ export const normalizePurok = (value) =>
 export const isKnownPurok = (value) =>
   PUROKS.some((purok) => normalizePurok(purok) === normalizePurok(value))
 
+// ── Purok, shown short ────────────────────────────────────────
+//
+// "Purok 4" -> "4", for a column already headed Purok where repeating the
+// word in every cell says nothing. Display only: the stored value is
+// never touched, and it stays available in the cell's `title`.
+//
+// A value the pattern does not recognise is returned exactly as stored.
+// The alternative -- blanking it, or guessing a number out of it -- would
+// hide the legacy free-text spellings the purok flag exists to surface.
+export const purokShortLabel = (value) => {
+  const raw = (value ?? '').trim().replace(/\s+/g, ' ')
+  if (!raw) return ''
+  const named = /^purok\s*0*(\d{1,2})$/i.exec(raw)
+  if (named) return named[1]
+  // A bare number, with any leading zeros dropped: '04' and '4' are the
+  // same purok written two ways.
+  if (/^0*\d{1,2}$/.test(raw)) return String(Number(raw))
+  return raw
+}
+
 // Sentinel for the purok filter's last option. Covers both a blank
 // purok and an off-list one, because from an official's side they are
 // the same job: a value that cannot be grouped or matched and needs
@@ -201,6 +221,17 @@ export const matchesSearch = (row, query, fields) => {
 export const RESIDENT_SEARCH_FIELDS = ['full_name', 'contact_number', 'purok']
 export const REGISTRY_SEARCH_FIELDS = [
   'full_name', 'purok', 'household_number', 'contact_number',
+]
+
+// Court reservations. `purpose` is the resident's own words and
+// `activity_type` the fixed category, so both are searched -- an official
+// looking for "basketball" should find it whichever field it landed in.
+//
+// A purok search works in both directions without special handling: the
+// column displays "4" while the row stores "Purok 4", and a substring
+// test matches "4" and "purok 4" alike.
+export const RESERVATION_SEARCH_FIELDS = [
+  'full_name', 'contact_number', 'email', 'purpose', 'activity_type', 'purok',
 ]
 
 export const filterRows = (list = [], { query = '', purok = 'all', fields }) =>

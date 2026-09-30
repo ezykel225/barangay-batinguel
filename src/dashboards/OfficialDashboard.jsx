@@ -41,6 +41,7 @@ import {
   RESIDENT_GROUPS,
   RESIDENT_SEARCH_FIELDS,
   REGISTRY_SEARCH_FIELDS,
+  RESERVATION_SEARCH_FIELDS,
   PUROK_FILTER_UNLISTED,
   describeVerification,
   filterRows,
@@ -49,6 +50,7 @@ import {
   isActionableSeverity,
   isKnownPurok,
   normalizeName,
+  purokShortLabel,
   RECONCILE_SEVERITIES,
   VOTER_LIST_CAVEAT,
 } from '../utils/residentGroups'
@@ -57,8 +59,13 @@ import './OfficialDashboard.css'
 
 const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-// Search box + purok filter + result count + reset, shared by the
-// Residents and Voter Reference List tabs.
+// Search box + one optional dropdown + result count + reset. Shared by
+// the Residents tab, the Voter Reference List tab and the Reservations
+// queue, which is why the dropdown is a prop rather than the purok select
+// it started as: Reservations needs the status filter in that slot.
+//
+// `selectFilter` is { label, value, onChange, options: [{ value, label }] }
+// or absent, in which case only the search box is rendered.
 //
 // ⚠️ Declared at module scope, NOT inside OfficialDashboard. A component
 // defined in a render body is a brand-new component type on every
@@ -66,15 +73,13 @@ const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Se
 // which throws the text cursor out of the search box after the first
 // keystroke and makes the field feel broken. Same reason the filter
 // state lives in the dashboard rather than in here.
-const ResidentFilterBar = ({
+const DashboardFilterBar = ({
   idPrefix,
   searchLabel,
   placeholder,
   query,
   onQueryChange,
-  purokLabel,
-  purok,
-  onPurokChange,
+  selectFilter,
   resultText,
   onReset,
   filtersActive,
@@ -109,26 +114,24 @@ const ResidentFilterBar = ({
       )}
     </div>
 
-    <div className="filter-select-wrap">
-      <FaFilter style={{ fontSize: 12, color: '#6b7280' }} aria-hidden="true" />
-      <label className="visually-hidden" htmlFor={`${idPrefix}-purok`}>
-        {purokLabel}
-      </label>
-      <select
-        id={`${idPrefix}-purok`}
-        className="filter-select"
-        value={purok}
-        onChange={(event) => onPurokChange(event.target.value)}
-      >
-        <option value="all">All puroks</option>
-        {PUROKS.map((option) => (
-          <option key={option} value={option}>{option}</option>
-        ))}
-        {/* Blank and off-list share one option because they are the same
-            job from here: a value that cannot be grouped or matched. */}
-        <option value={PUROK_FILTER_UNLISTED}>Blank or not on the list</option>
-      </select>
-    </div>
+    {selectFilter && (
+      <div className="filter-select-wrap">
+        <FaFilter style={{ fontSize: 12, color: '#6b7280' }} aria-hidden="true" />
+        <label className="visually-hidden" htmlFor={`${idPrefix}-filter`}>
+          {selectFilter.label}
+        </label>
+        <select
+          id={`${idPrefix}-filter`}
+          className="filter-select"
+          value={selectFilter.value}
+          onChange={(event) => selectFilter.onChange(event.target.value)}
+        >
+          {selectFilter.options.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+      </div>
+    )}
 
     {/* role="status" so the count is announced as the list narrows --
         otherwise a screen reader user types into a box and hears
@@ -145,6 +148,27 @@ const ResidentFilterBar = ({
     </button>
   </div>
 )
+
+// The purok dropdown's options. Blank and off-list share one entry
+// because they are the same job from an official's side: a value that
+// cannot be grouped or matched.
+const PUROK_FILTER_OPTIONS = [
+  { value: 'all', label: 'All puroks' },
+  ...PUROKS.map((purok) => ({ value: purok, label: purok })),
+  { value: PUROK_FILTER_UNLISTED, label: 'Blank or not on the list' },
+]
+
+// The reservation status dropdown. `cancelled` is new here: a resident
+// may cancel their own pending or approved booking, so those rows exist
+// and were visible under "All Statuses" -- but there was no way to filter
+// to them, and no way to filter them out.
+const RESERVATION_FILTER_OPTIONS = [
+  { value: 'all', label: 'All Statuses' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'approved', label: 'Approved' },
+  { value: 'declined', label: 'Declined' },
+  { value: 'cancelled', label: 'Cancelled' },
+]
 
 const OfficialDashboard = () => {
   const { user } = useAuth()
@@ -188,6 +212,7 @@ const OfficialDashboard = () => {
 
   // Filters
   const [reservationFilter, setReservationFilter] = useState('all')
+  const [reservationQuery, setReservationQuery] = useState('')
   const [announcementFilter, setAnnouncementFilter] = useState('all')
   const [eventFilter, setEventFilter] = useState('all')
 
@@ -365,10 +390,21 @@ const OfficialDashboard = () => {
   }
 
   const fetchReservations = async () => {
+    // Newest submission first, which is the existing and intended order:
+    // the queue is worked from the top and a booking made this morning
+    // should not be below one from last month.
+    //
+    // `id` is a tie-break, not a change of order. `created_at` alone is
+    // not a total order -- two rows sharing a timestamp have no defined
+    // relative position, and Postgres may return them either way round
+    // between fetches, so a row could swap places after an unrelated
+    // refetch. Sorting on the primary key after it makes the list
+    // deterministic without moving anything a reader would notice.
     const { data, error } = await supabase
       .from('reservations')
       .select('*')
       .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
 
     if (!error) setReservations(data)
     setLoading(false)
@@ -1845,6 +1881,30 @@ const OfficialDashboard = () => {
     setResidentPurok('all')
   }
 
+  // Status and search compose: the status narrows the set, the query
+  // narrows what is left. Choosing Pending and typing a name shows that
+  // resident's pending bookings and nothing else.
+  //
+  // Same `filterRows` the other two tabs use, so case-insensitivity and
+  // whitespace trimming behave identically everywhere and are covered by
+  // the same tests.
+  const visibleReservations = useMemo(() => {
+    const byStatus = reservationFilter === 'all'
+      ? reservations
+      : reservations.filter((r) => r.status === reservationFilter)
+    return filterRows(byStatus, {
+      query: reservationQuery,
+      fields: RESERVATION_SEARCH_FIELDS,
+    })
+  }, [reservations, reservationFilter, reservationQuery])
+
+  const reservationFiltersActive =
+    reservationQuery.trim() !== '' || reservationFilter !== 'all'
+  const resetReservationFilters = () => {
+    setReservationQuery('')
+    setReservationFilter('all')
+  }
+
   const visibleRegistryEntries = useMemo(
     () => filterRows(registryEntries, {
       query: registryQuery, purok: registryPurok, fields: REGISTRY_SEARCH_FIELDS,
@@ -2284,30 +2344,47 @@ const OfficialDashboard = () => {
             <div className="dashboard-card">
               <div className="dashboard-card-header">
                 <h3>All Reservations</h3>
-                <div className="filter-select-wrap">
-                  <FaFilter style={{ fontSize: 12, color: '#6b7280' }} />
-                  <select
-                    className="filter-select"
-                    value={reservationFilter}
-                    onChange={(e) => setReservationFilter(e.target.value)}
-                  >
-                    <option value="all">All Statuses</option>
-                    <option value="pending">Pending</option>
-                    <option value="approved">Approved</option>
-                    <option value="declined">Declined</option>
-                  </select>
-                </div>
               </div>
 
+              {/* The status dropdown now sits in the shared filter bar
+                  beside the search box, so it reads as one set of controls
+                  narrowing one list. Same options as before plus
+                  Cancelled, and the two compose -- see
+                  visibleReservations. */}
+              <DashboardFilterBar
+                idPrefix="reservations"
+                searchLabel="Search reservations by name, contact number, email, purpose or purok"
+                placeholder="Search reservations..."
+                query={reservationQuery}
+                onQueryChange={setReservationQuery}
+                selectFilter={{
+                  label: 'Filter reservations by status',
+                  value: reservationFilter,
+                  onChange: setReservationFilter,
+                  options: RESERVATION_FILTER_OPTIONS,
+                }}
+                resultText={
+                  reservationFiltersActive
+                    ? `Showing ${visibleReservations.length} of ${reservations.length}`
+                      + ` ${reservations.length === 1 ? 'reservation' : 'reservations'}`
+                    : `${reservations.length}`
+                      + ` ${reservations.length === 1 ? 'reservation' : 'reservations'}`
+                }
+                onReset={resetReservationFilters}
+                filtersActive={reservationFiltersActive}
+              />
+
               {(() => {
-                // fetchReservations already orders by created_at desc, so
-                // "All Statuses" shows most recent first by default.
-                const filteredReservations = reservationFilter === 'all'
-                  ? reservations
-                  : reservations.filter((r) => r.status === reservationFilter)
+                // Ordering is newest submission first, set by
+                // fetchReservations and unchanged; filtering preserves it.
+                const filteredReservations = visibleReservations
 
                 return filteredReservations.length === 0 ? (
-                  <p className="dashboard-empty">No reservations found.</p>
+                  <p className="dashboard-empty">
+                    {reservationFiltersActive
+                      ? 'No reservations match this search.'
+                      : 'No reservations found.'}
+                  </p>
                 ) : (
                 <div className="table-wrapper">
                   <table className="dashboard-table">
@@ -2319,9 +2396,14 @@ const OfficialDashboard = () => {
                         <th scope="col">Purok</th>
                         <th scope="col">Date</th>
                         <th scope="col">Time</th>
-                        <th scope="col">Duration</th>
+                        {/* "Hours" and "Filed" rather than "Duration" and
+                            "Submitted": an uppercase letter-spaced header
+                            was setting the minimum width of a column whose
+                            values are "3h" and a short date, so the header
+                            was costing more room than the data it labels. */}
+                        <th scope="col">Hours</th>
                         <th scope="col">Purpose</th>
-                        <th scope="col">Submitted</th>
+                        <th scope="col">Filed</th>
                         <th scope="col">Status</th>
                         <th scope="col">Action</th>
                       </tr>
@@ -2331,13 +2413,33 @@ const OfficialDashboard = () => {
                         <tr key={res.id}>
                           <td data-label="Name">{res.full_name}</td>
                           <td data-label="Phone">{res.contact_number || '—'}</td>
-                          <td data-label="Email">{res.email || '—'}</td>
-                          <td data-label="Purok">{res.purok}</td>
+                          {/* Truncated with an ellipsis rather than
+                              wrapped: a 57-character address broken
+                              character-by-character was taking four lines
+                              and making every other row that tall. The
+                              whole address is in the tooltip, and the
+                              truncation is released in card mode where
+                              the value must be complete. */}
+                          <td data-label="Email">
+                            {res.email ? (
+                              <span className="cell-truncate" title={res.email}>
+                                {res.email}
+                              </span>
+                            ) : '—'}
+                          </td>
+                          {/* The column is already headed Purok, so the
+                              cell says "4" rather than "Purok 4". Display
+                              only -- the stored value is untouched and is
+                              on the cell as a tooltip, which is also how
+                              a legacy free-text spelling stays visible. */}
+                          <td data-label="Purok" title={res.purok || undefined}>
+                            {purokShortLabel(res.purok)}
+                          </td>
                           <td data-label="Date">{res.preferred_date}</td>
                           <td data-label="Time">{res.preferred_time}</td>
-                          <td data-label="Duration">{res.duration_hours}h</td>
+                          <td data-label="Hours">{res.duration_hours}h</td>
                           <td data-label="Purpose">{res.purpose}</td>
-                          <td data-label="Submitted">
+                          <td data-label="Filed">
                             {res.created_at ? new Date(res.created_at).toLocaleDateString() : '—'}
                           </td>
                           <td data-label="Status">
@@ -2641,15 +2743,18 @@ const OfficialDashboard = () => {
                     </p>
                   )}
 
-                  <ResidentFilterBar
+                  <DashboardFilterBar
                     idPrefix="residents"
                     searchLabel="Search resident accounts by name, contact number or purok"
                     placeholder="Search name, contact or purok…"
                     query={residentQuery}
                     onQueryChange={setResidentQuery}
-                    purokLabel="Filter resident accounts by purok"
-                    purok={residentPurok}
-                    onPurokChange={setResidentPurok}
+                    selectFilter={{
+                      label: 'Filter resident accounts by purok',
+                      value: residentPurok,
+                      onChange: setResidentPurok,
+                      options: PUROK_FILTER_OPTIONS,
+                    }}
                     resultText={
                       residentFiltersActive
                         ? `Showing ${visibleResidents.length} of `
@@ -2933,15 +3038,18 @@ const OfficialDashboard = () => {
                 <p className="dashboard-empty">No voter reference entries yet.</p>
               ) : (
                 <>
-                  <ResidentFilterBar
+                  <DashboardFilterBar
                     idPrefix="registry"
                     searchLabel="Search the voter reference list by name, purok, household number or contact number"
                     placeholder="Search name, purok, household or contact…"
                     query={registryQuery}
                     onQueryChange={setRegistryQuery}
-                    purokLabel="Filter voter reference entries by purok"
-                    purok={registryPurok}
-                    onPurokChange={setRegistryPurok}
+                    selectFilter={{
+                      label: 'Filter voter reference entries by purok',
+                      value: registryPurok,
+                      onChange: setRegistryPurok,
+                      options: PUROK_FILTER_OPTIONS,
+                    }}
                     resultText={
                       registryFiltersActive
                         ? `Showing ${visibleRegistryEntries.length} of ${registryEntries.length} entries`

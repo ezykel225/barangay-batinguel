@@ -1335,16 +1335,95 @@
    without touching the other nine columns or the collapsed-sidebar
    layout, which is already good. */
 @media (min-width: 769px) {
+  /* Compact cells. 12px each side across eleven columns was 264px of
+     padding -- more than the Purpose column was getting to hold a
+     sentence in. Trimming it is the cheapest width there is: it takes
+     nothing away from the data, and the desktop table is meant to be
+     compact. */
+  .dashboard-table th {
+    padding: 8px 8px;
+  }
+
   .dashboard-table td {
-    overflow-wrap: anywhere;
+    padding: 10px 8px;
   }
 
-  .dashboard-table td[data-label="Email"] {
-    max-width: 190px;
+  /* Short, fixed-shape values that must never be split. A phone number
+     across two lines, a date wrapped after the year or a status pill with
+     its word on the next line all read as broken rather than as narrow. */
+  .dashboard-table td[data-label="Phone"],
+  .dashboard-table td[data-label="Contact"],
+  .dashboard-table td[data-label="Date"],
+  .dashboard-table td[data-label="Time"],
+  .dashboard-table td[data-label="Hours"],
+  .dashboard-table td[data-label="Duration"],
+  .dashboard-table td[data-label="Filed"],
+  .dashboard-table td[data-label="Submitted"],
+  .dashboard-table td[data-label="Purok"],
+  .dashboard-table td[data-label="Status"] {
+    white-space: nowrap;
   }
 
+  /* Free text, and the only column that should be spending vertical
+     space. Wraps at spaces like prose -- `overflow-wrap: anywhere` here
+     would break mid-word, which is what made every value look mangled. */
   .dashboard-table td[data-label="Purpose"] {
-    max-width: 240px;
+    max-width: 220px;
+    /* A floor as well as a ceiling. Without it the auto table layout
+       hands this column its minimum -- the width of its longest single
+       word -- whenever the table is squeezed, and a 95-character purpose
+       then stacks into eleven lines and sets the height of every other
+       cell in the row. */
+    min-width: 150px;
+  }
+
+  /* A name may wrap between its parts, but not inside one of them. */
+  .dashboard-table td[data-label="Name"],
+  .dashboard-table td[data-label="Resident"] {
+    max-width: 150px;
+  }
+
+  /* One line with an ellipsis, not four lines of broken address. The
+     element is inside the cell rather than the cell itself, because
+     `text-overflow` needs a block box with a width and an auto-layout
+     table does not reliably give a `td` one. */
+  .cell-truncate {
+    display: inline-block;
+    max-width: 130px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
+  }
+}
+
+/* A status pill is two or three words that belong together at every
+   width, card mode included. */
+.badge {
+  white-space: nowrap;
+}
+
+/* A button's label is one word and should stay one word. "Approve"
+   broken after "App" in a squeezed action column reads as a rendering
+   fault; the column wraps BETWEEN the buttons instead, which is what it
+   already does on a phone. */
+.btn-approve,
+.btn-deny,
+.btn-add {
+  white-space: nowrap;
+}
+
+/* In card mode the value must be complete -- that is the whole point of
+   the card conversion -- so the truncation is released and the address
+   wraps instead. `anywhere` is right here and wrong on desktop: a 320px
+   card has no space to break an address politely. */
+@media (max-width: 768px) {
+  .cell-truncate {
+    display: inline;
+    max-width: none;
+    overflow: visible;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 }
 
