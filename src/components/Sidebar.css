@@ -231,13 +231,6 @@
   padding: 0 5px;
 }
 
-.mobile-nav-badge {
-  position: absolute;
-  top: 2px;
-  right: 8px;
-  margin-left: 0;
-}
-
 .sidebar-nav-home {
   margin-top: 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.12);
@@ -773,81 +766,15 @@
 }
 
 /* ================================
-   MOBILE BOTTOM NAVIGATION
-================================ */
-.mobile-nav {
-  display: none;
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: linear-gradient(135deg,
-      #1e3a8a,
-      #1e40af);
-  padding: 8px 0;
-  z-index: 1000;
-  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.15);
-}
-
-.mobile-nav-items {
-  display: flex;
-  justify-content: space-around;
-  align-items: center;
-}
-
-.mobile-nav-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  color: #bfdbfe;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
-  transition: all 0.2s;
-  font-family: 'Poppins', sans-serif;
-  min-width: 60px;
-  position: relative;
-}
-
-.mobile-nav-item.active {
-  color: white;
-  background: rgba(255, 255, 255, 0.15);
-}
-
-.mobile-nav-item:hover {
-  color: white;
-}
-
-.mobile-nav-item svg {
-  font-size: var(--fs-20);
-}
-
-.mobile-nav-item span {
-  font-size: var(--fs-12);
-  font-weight: 500;
-}
-
-/* The fifth bottom slot. It reuses .mobile-nav-item so all five
-   positions keep the same size and rhythm; `active` is applied while the
-   drawer is open, so the bar shows where you are. The Logout button that
-   used to occupy this slot now lives inside the drawer, which is why its
-   rules are gone rather than left unused. */
-.mobile-nav-more {
-  color: #bfdbfe;
-}
-
-/* ================================
-   MORE DRAWER
+   MOBILE NAVIGATION DRAWER
    ================================
-   Off-canvas panel holding the complete role navigation, so a phone can
-   reach every destination instead of only the four the bottom bar fits.
+   Off-canvas panel holding the complete role navigation. It is the whole
+   of mobile navigation -- there is no bottom bar and no split between
+   primary and secondary destinations, so nothing is out of reach.
 
-   z-index sits above .mobile-nav (1000) and below ConfirmDialog (10000):
-   the drawer must cover the bar it was opened from, but a confirmation
-   must still come out on top of the drawer. */
+   z-index sits above the menu button (1050) and below ConfirmDialog
+   (10000): the drawer covers the button that opened it, but a
+   confirmation still comes out on top of the drawer. */
 .nav-drawer-overlay {
   position: fixed;
   inset: 0;
@@ -911,12 +838,11 @@
 }
 
 /* The list scrolls on its own when a role has more destinations than the
-   screen is tall -- the Official portal has thirteen. The bottom padding
-   keeps the last item clear of the fixed bottom bar underneath. */
+   screen is tall -- the Official portal has thirteen. */
 .nav-drawer-nav {
   flex: 1;
   overflow-y: auto;
-  padding: 12px 0 96px;
+  padding: 12px 0 24px;
 }
 
 .nav-drawer-item {
@@ -969,14 +895,58 @@
   background-color: rgba(220, 38, 38, 0.2);
 }
 
-/* The drawer belongs to the bottom bar, which only exists below 769px. A
-   matchMedia listener already closes it when the viewport crosses that
-   line; this is the backstop, so a drawer can never be left stranded
-   over the desktop layout if that listener is ever removed. */
+/* The drawer is mobile-only. A matchMedia listener already closes it when
+   the viewport crosses the breakpoint; this is the backstop, so a drawer
+   can never be left stranded over the desktop layout if that listener is
+   ever removed. */
 @media (min-width: 769px) {
   .nav-drawer-overlay {
     display: none;
   }
+}
+
+/* ================================
+   MOBILE MENU BUTTON
+   ================================
+   The only way into navigation on a phone, so it is deliberately solid
+   rather than a bare icon: brand blue, 44px square, shadowed, and fixed
+   at the top left of every page in every portal.
+
+   `display: none` here and `flex` inside the mobile media query -- the
+   desktop sidebar is its own navigation and does not need it.
+
+   Fixed rather than in flow because .dashboard-layout is a flex row: an
+   in-flow button rendered from this component would sit beside the
+   content column, not above it. .dashboard-main reserves 76px of top
+   padding so the button never covers a heading at rest. */
+.mobile-menu-button {
+  display: none;
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  z-index: 1050;
+  align-items: center;
+  justify-content: center;
+  /* 44px square: the usual minimum for a comfortable touch target. */
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg,
+      #1e3a8a,
+      #1e40af);
+  color: #ffffff;
+  font-size: var(--fs-20);
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
+}
+
+/* The drawer is dark navy, and the global focus ring is navy -- invisible
+   against it. index.css lists the project's other dark surfaces; this
+   one is new, and scoping the override here keeps the change inside this
+   component. */
+.nav-drawer :focus-visible {
+  outline-color: #ffffff;
 }
 
 /* Dashboard main padding for mobile */
@@ -987,19 +957,17 @@
 
   .dashboard-main {
     margin-left: 0;
-    /* Clears the fixed bottom bar. 80px was not enough: the bar is 74px
-       tall for the Official portal but 92px for Nurse and Resident,
-       whose primary labels ("Health Events", "Document Requests") wrap to
-       two lines at phone widths -- measured identical at 320, 360, 375
-       and 414px. It reserved 80px against a 92px bar, so the last 12px of
-       content sat underneath it. 104px clears the tallest case with a
-       little slack. */
     padding: 20px;
-    padding-bottom: 104px;
+    /* Reserves the strip the menu button occupies, so a page heading
+       never starts underneath it. 20px (top inset) + 44px (button) +
+       12px (breathing room) = 76px. The bottom clearance that used to be
+       here existed only for the fixed bottom bar, which is gone; the
+       20px from the shorthand is the page's own spacing. */
+    padding-top: 76px;
   }
 
-  .mobile-nav {
-    display: block;
+  .mobile-menu-button {
+    display: flex;
   }
 
   .dashboard-stats {

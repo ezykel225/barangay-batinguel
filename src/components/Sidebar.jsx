@@ -68,7 +68,7 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {} }) => {
   const [profilePosition, setProfilePosition] = useState('')
   const [collapsed, setCollapsed] = useState(readCollapsed)
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const moreButtonRef = useRef(null)
+  const menuButtonRef = useRef(null)
   const drawerRef = useRef(null)
   const drawerCloseRef = useRef(null)
 
@@ -163,15 +163,15 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {} }) => {
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [drawerOpen, closeDrawer])
 
-  // Focus into the panel on open and back onto More on close, so a
-  // keyboard user is never dropped at the top of the document.
+  // Focus into the panel on open and back onto the menu button on
+  // close, so a keyboard user is never dropped at the top of the page.
   useEffect(() => {
     if (!drawerOpen) return undefined
     drawerCloseRef.current?.focus()
     // Captured now rather than read in the cleanup: by the time cleanup
     // runs the ref may point somewhere else, and focus would land on the
     // wrong element or nothing at all.
-    const returnFocusTo = moreButtonRef.current
+    const returnFocusTo = menuButtonRef.current
     return () => returnFocusTo?.focus()
   }, [drawerOpen])
 
@@ -236,6 +236,25 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {} }) => {
 
   return (
     <>
+      {/* The mobile entry point into navigation. Fixed at the top left on
+          every tab of every portal, so it is in the same place whatever
+          the page. Hidden above the breakpoint, where the sidebar itself
+          is the navigation.
+
+          .dashboard-main reserves room for it at mobile widths, so it
+          never sits on top of a page heading. */}
+      <button
+        type="button"
+        className="mobile-menu-button"
+        onClick={() => setDrawerOpen(true)}
+        aria-expanded={drawerOpen}
+        aria-controls="nav-drawer"
+        aria-label="Open navigation menu"
+        ref={menuButtonRef}
+      >
+        <FaBars />
+      </button>
+
       {/* Desktop Sidebar. `is-collapsed` narrows it to an icon rail; the
           matching margin on .dashboard-main is applied from CSS with a
           sibling selector, so no dashboard needs to know about it. That
@@ -323,49 +342,9 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {} }) => {
         </div>
       </div>
 
-      {/* Mobile Bottom Navigation: the role's first four destinations,
-          then More. slice(0, 4) already yields the right four for every
-          role because the nav arrays are ordered that way -- Official
-          gets Dashboard/Announcements/Events/Reservations, Nurse gets
-          Dashboard/Medicines/Availability/Health Events, Resident gets
-          Dashboard/Document Requests/My Reservations/Settings.
-
-          Logout used to sit in the fifth slot, which meant a phone could
-          reach 4 of the Official portal's 13 destinations and nothing
-          else. It now lives in the drawer with everything else. */}
-      <div className="mobile-nav">
-        <div className="mobile-nav-items">
-          {navItems.slice(0, 4).map((item) => (
-            <button
-              key={item.id}
-              className={`mobile-nav-item ${activeTab === item.id ? 'active' : ''}`}
-              onClick={() => setActiveTab(item.id)}
-              aria-current={activeTab === item.id ? 'page' : undefined}
-            >
-              {item.icon}
-              <span>{item.label}</span>
-              {badges[item.id] > 0 && (
-                <span className="sidebar-nav-badge mobile-nav-badge">{badges[item.id]}</span>
-              )}
-            </button>
-          ))}
-          <button
-            type="button"
-            className={`mobile-nav-item mobile-nav-more${drawerOpen ? ' active' : ''}`}
-            onClick={() => setDrawerOpen(true)}
-            aria-expanded={drawerOpen}
-            aria-controls="nav-drawer"
-            ref={moreButtonRef}
-          >
-            <FaBars />
-            <span>More</span>
-          </button>
-        </div>
-      </div>
-
-      {/* More drawer: the complete role navigation, so every destination
-          is reachable on a phone. Same list as the desktop sidebar above
-          -- one definition, nothing to drift. */}
+      {/* Mobile navigation drawer: the complete role navigation, so every
+          destination is reachable on a phone. Same list as the desktop
+          sidebar above -- one definition, nothing to drift. */}
       {drawerOpen && (
         <div
           className="nav-drawer-overlay"
