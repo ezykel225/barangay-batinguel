@@ -54,6 +54,10 @@ import {
   RECONCILE_SEVERITIES,
   VOTER_LIST_CAVEAT,
 } from '../utils/residentGroups'
+import {
+  EXCEPTION_BADGE_LABEL,
+  isExceptionRequest,
+} from '../utils/reservationWindow'
 import '../components/Sidebar.css'
 import './OfficialDashboard.css'
 
@@ -66,6 +70,13 @@ const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Se
 //
 // `selectFilter` is { label, value, onChange, options: [{ value, label }] }
 // or absent, in which case only the search box is rendered.
+//
+// `toggleFilter` is { label, checked, onChange } or absent: one checkbox
+// for a yes/no narrowing that is not a status. Reservations uses it for
+// office-hours exceptions, which cut across every status -- a pending
+// exception and an approved one are both exceptions -- so it could not
+// be another entry in the status dropdown without making two different
+// dimensions look like one.
 //
 // ⚠️ Declared at module scope, NOT inside OfficialDashboard. A component
 // defined in a render body is a brand-new component type on every
@@ -80,6 +91,7 @@ const DashboardFilterBar = ({
   query,
   onQueryChange,
   selectFilter,
+  toggleFilter,
   resultText,
   onReset,
   filtersActive,
@@ -130,6 +142,18 @@ const DashboardFilterBar = ({
             <option key={option.value} value={option.value}>{option.label}</option>
           ))}
         </select>
+      </div>
+    )}
+
+    {toggleFilter && (
+      <div className="filter-toggle-wrap">
+        <input
+          id={`${idPrefix}-toggle`}
+          type="checkbox"
+          checked={toggleFilter.checked}
+          onChange={(event) => toggleFilter.onChange(event.target.checked)}
+        />
+        <label htmlFor={`${idPrefix}-toggle`}>{toggleFilter.label}</label>
       </div>
     )}
 
@@ -212,6 +236,10 @@ const OfficialDashboard = () => {
 
   // Filters
   const [reservationFilter, setReservationFilter] = useState('all')
+  // Office-hours exceptions only. Separate from the status filter
+  // because the two compose: "pending exceptions" is the queue an
+  // official actually works through.
+  const [reservationExceptionsOnly, setReservationExceptionsOnly] = useState(false)
   const [reservationQuery, setReservationQuery] = useState('')
   const [announcementFilter, setAnnouncementFilter] = useState('all')
   const [eventFilter, setEventFilter] = useState('all')
@@ -1892,17 +1920,32 @@ const OfficialDashboard = () => {
     const byStatus = reservationFilter === 'all'
       ? reservations
       : reservations.filter((r) => r.status === reservationFilter)
-    return filterRows(byStatus, {
+    // ⚠️ isExceptionRequest reads `exception_reason`, never the hour.
+    // Every booking filed before migration 020 starts before 5 PM and
+    // carries no reason, so filtering by hour here would hand the
+    // official the whole of the old queue labelled as exceptions.
+    const byException = reservationExceptionsOnly
+      ? byStatus.filter(isExceptionRequest)
+      : byStatus
+    return filterRows(byException, {
       query: reservationQuery,
       fields: RESERVATION_SEARCH_FIELDS,
     })
-  }, [reservations, reservationFilter, reservationQuery])
+  }, [reservations, reservationFilter, reservationExceptionsOnly, reservationQuery])
+
+  const exceptionReservationCount = useMemo(
+    () => reservations.filter(isExceptionRequest).length,
+    [reservations]
+  )
 
   const reservationFiltersActive =
-    reservationQuery.trim() !== '' || reservationFilter !== 'all'
+    reservationQuery.trim() !== ''
+    || reservationFilter !== 'all'
+    || reservationExceptionsOnly
   const resetReservationFilters = () => {
     setReservationQuery('')
     setReservationFilter('all')
+    setReservationExceptionsOnly(false)
   }
 
   const visibleRegistryEntries = useMemo(
@@ -2145,8 +2188,32 @@ const OfficialDashboard = () => {
                         <tr key={res.id}>
                           <td data-label="Name">{res.full_name}</td>
                           <td data-label="Date">{res.preferred_date}</td>
-                          <td data-label="Time">{res.preferred_time}</td>
-                          <td data-label="Purpose">{res.purpose}</td>
+                          {/* The badge sits with the time, because the
+                              time is what the exception is about. A
+                              booking from before migration 020 has no
+                              reason and gets no badge -- see
+                              isExceptionRequest, which reads the reason
+                              rather than the hour. */}
+                          <td data-label="Time">
+                            {res.preferred_time}
+                            {isExceptionRequest(res) && (
+                              <span
+                                className="badge badge-exception"
+                                title="Starts before 5:00 PM. The resident asked for an office-hours exception; an official decides it."
+                              >
+                                {EXCEPTION_BADGE_LABEL}
+                              </span>
+                            )}
+                          </td>
+                          <td data-label="Purpose">
+                            {res.purpose}
+                            {isExceptionRequest(res) && (
+                              <span className="exception-reason-note">
+                                <strong>Office-hours reason:</strong>{' '}
+                                {res.exception_reason}
+                              </span>
+                            )}
+                          </td>
                           <td data-label="Action">
                             {isTreasurer ? (
                               <>
@@ -2363,6 +2430,11 @@ const OfficialDashboard = () => {
                   onChange: setReservationFilter,
                   options: RESERVATION_FILTER_OPTIONS,
                 }}
+                toggleFilter={{
+                  label: `Office-hours exceptions only (${exceptionReservationCount})`,
+                  checked: reservationExceptionsOnly,
+                  onChange: setReservationExceptionsOnly,
+                }}
                 resultText={
                   reservationFiltersActive
                     ? `Showing ${visibleReservations.length} of ${reservations.length}`
@@ -2436,9 +2508,33 @@ const OfficialDashboard = () => {
                             {purokShortLabel(res.purok)}
                           </td>
                           <td data-label="Date">{res.preferred_date}</td>
-                          <td data-label="Time">{res.preferred_time}</td>
+                          {/* The badge sits with the time, because the
+                              time is what the exception is about. A
+                              booking from before migration 020 has no
+                              reason and gets no badge -- see
+                              isExceptionRequest, which reads the reason
+                              rather than the hour. */}
+                          <td data-label="Time">
+                            {res.preferred_time}
+                            {isExceptionRequest(res) && (
+                              <span
+                                className="badge badge-exception"
+                                title="Starts before 5:00 PM. The resident asked for an office-hours exception; an official decides it."
+                              >
+                                {EXCEPTION_BADGE_LABEL}
+                              </span>
+                            )}
+                          </td>
                           <td data-label="Hours">{res.duration_hours}h</td>
-                          <td data-label="Purpose">{res.purpose}</td>
+                          <td data-label="Purpose">
+                            {res.purpose}
+                            {isExceptionRequest(res) && (
+                              <span className="exception-reason-note">
+                                <strong>Office-hours reason:</strong>{' '}
+                                {res.exception_reason}
+                              </span>
+                            )}
+                          </td>
                           <td data-label="Filed">
                             {res.created_at ? new Date(res.created_at).toLocaleDateString() : '—'}
                           </td>

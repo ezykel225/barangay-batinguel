@@ -1463,3 +1463,56 @@
     height: 0;
   }
 }
+
+/* ── The office-hours exception ──
+   A booking that starts before 5:00 PM is something an official decides
+   rather than something the system accepted, so the queue has to say so
+   on the row itself. Appended here, after the protected responsive
+   block, and at a specificity (0,1,0) that does not outrank anything in
+   it.
+
+   The badge WRAPS, unlike every other one. `.badge { white-space:
+   nowrap }` above is right for "Ready for Pickup"; "Office-hours
+   exception" held on one line would set a ~140px floor on a column
+   whose values are "5:00 PM", and the reservations table has no width
+   to spare. Same specificity, declared later, so this wins for this one
+   badge and leaves the rest alone. */
+.badge-exception {
+  display: block;
+  margin-top: 4px;
+  max-width: 120px;
+  white-space: normal;
+  background-color: #ffedd5;
+  color: #c2410c;
+}
+
+/* The reason the resident gave, under the purpose. The official
+   deciding the row needs it in front of them, not behind a tooltip:
+   this is the whole substance of the request. */
+.exception-reason-note {
+  display: block;
+  margin-top: 4px;
+  font-size: var(--fs-12);
+  line-height: 1.4;
+  color: #7c2d12;
+  overflow-wrap: anywhere;
+}
+
+.exception-reason-note strong {
+  color: #9a3412;
+}
+
+/* The filter bar's optional checkbox. Matches the height and colour of
+   the select beside it so the two read as one control strip. */
+.filter-toggle-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-13);
+  color: #374151;
+}
+
+.filter-toggle-wrap input,
+.filter-toggle-wrap label {
+  cursor: pointer;
+}

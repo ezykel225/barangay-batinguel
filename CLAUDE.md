@@ -65,7 +65,7 @@ banned below: it silences the one check this project has.
 
 ### Tests
 
-Four suites, 72 tests:
+Five suites, 115 tests:
 
 | File | What it covers |
 |---|---|
@@ -73,6 +73,7 @@ Four suites, 72 tests:
 | `src/utils/residentGroups.test.js` | 38 tests over the resident grouping, status vocabulary, search/filter, and the account ↔ voter-list cross-check — including the ones that hold "not on the voter list" at severity `expected` so a later edit cannot quietly promote ordinary residents into a list of problems |
 | `src/utils/displayLabels.test.js` | 20 tests over the shared status labels, the upcoming-event count, and a guard that this module never re-acquires a second verification vocabulary |
 | `src/components/ActionMenu.test.js` | 13 tests over the ⋮ menu's keyboard, Escape and focus-restore behaviour — the parts nobody catches by clicking |
+| `src/utils/reservationWindow.test.js` | 31 tests over the 5–10 PM window, the per-slot durations, the lunch gap and the office-hours exception — deliberately mirroring the SQL cases in migration 020's header, so client and database are asserted to agree rather than each checked alone. The load-bearing one is that an exception is read from `exception_reason` and never from the hour |
 
 Schema and policy changes are still verified by impersonating each role
 in SQL, with the results recorded in the migration headers — not by
@@ -84,10 +85,11 @@ imports the client. So a missing `.env` fails that test with a module
 error that never mentions `.env`. If `npm test` fails on a fresh
 checkout, check `.env` before debugging the test.
 
-The other three suites do **not** need it. `residentGroups.js`,
-`displayLabels.js` and `ActionMenu.jsx` have no Supabase import, which is
-the reason the resident workflow's rules and the label vocabulary live in
-modules rather than inside the dashboard components.
+The other four suites do **not** need it. `residentGroups.js`,
+`displayLabels.js`, `reservationWindow.js` and `ActionMenu.jsx` have no
+Supabase import, which is the reason the resident workflow's rules, the
+label vocabulary and the booking window live in modules rather than
+inside the dashboard components.
 
 ### Environment
 
@@ -170,6 +172,11 @@ src/
                       requests, reservations, availability. Also the
                       upcoming-event count. It does NOT own account
                       verification -- see below.
+    reservationWindow The covered court's booking window: the slot list,
+                      the 5-10 PM rule, the per-slot durations, the lunch
+                      gap, and what counts as an office-hours exception.
+                      Pure and unit-tested. Shared by the booking form,
+                      the Official queue and the Resident portal.
     residentGroups    The resident workflow's rules: the status
                       vocabulary, the Requests/Residents/Not Residents
                       grouping, search/filter, purok validity and the
@@ -184,7 +191,7 @@ src/
 
   assets/images/      11 official portraits, page backgrounds, logo.
 
-supabase-migrations/  19 numbered SQL files. A record, not a runner.
+supabase-migrations/  20 numbered SQL files. A record, not a runner.
 supabase/functions/   Edge Function source (notify-reservation-sms).
 docs/                 SETUP.md, TESTING-WALKTHROUGH.pdf + its generator.
 ```
@@ -559,7 +566,7 @@ such row.
 
 ## Database notes
 
-**19 migrations**, `001` through `019`, all applied.
+**20 migrations**, `001` through `020`, all applied.
 
 **17 tables, RLS enabled on every one.**
 
@@ -1026,6 +1033,14 @@ was built without one.
 
 ## Court reservations
 
+- **Reservable 5:00 PM – 10:00 PM** (migration 020). The court is made
+  available for booking after office hours, so the window describes when
+  the **facility** is open: a booking must **finish** by 10:00 PM, not
+  merely start before it. With the 4-hour cap unchanged, the latest
+  ordinary start for a full four hours is 6:00 PM, and 9:00 PM offers one
+  hour only. `src/utils/reservationWindow.js` holds this for the client;
+  `reservation_slot_hour()` and `enforce_reservation_window()` hold it in
+  the database. See *The office-hours exception* below.
 - **Free.** The database has **no money columns at all** — ten fee-model
   columns were dropped in migration 006. "The system cannot charge you"
   is a stronger claim than "the system is configured not to charge you."
@@ -1040,9 +1055,12 @@ was built without one.
   it had worked. Error code `23P01`; the form translates it.
 - **The court closes for lunch.** `11:00 AM` and `1:00 PM` are adjacent
   in the slot list but *not* consecutive hours. `SLOT_HOURS` and
-  `getCoveredSlots()` handle this; don't index blindly. The exclusion
-  constraint needs no special case — `[11,12)` and `[13,14)` don't
-  intersect.
+  `getCoveredSlots()` — both in `src/utils/reservationWindow.js` since
+  migration 020 — handle this; don't index blindly. The exclusion
+  constraint needs no special case for two separate bookings —
+  `[11,12)` and `[13,14)` don't intersect — but see the caveat at the
+  end of *The office-hours exception* for a single booking spanning the
+  closed hour.
 - `end_time` is the **end** of the booking (start + duration), not the
   start of its last slot. Rows created before 2026-09-04 have the old,
   wrong value.
@@ -1055,6 +1073,82 @@ was built without one.
   unreviewed, and attached to their own account or to none. Before that,
   both INSERT policies were `WITH CHECK (true)` and an anonymous caller
   could insert a booking already marked `approved`.
+
+### The office-hours exception
+
+A booking that starts **before 5:00 PM** is an exception the barangay
+decides one at a time. It is not reachable by scrolling: the booking form
+offers the evening slots, and the daytime slots appear only after the
+resident deliberately opens *Request an exception*, which also requires a
+free-text `exception_reason`.
+
+⚠️ **The activity categories are descriptions, not approval rules.**
+Migration 020 added *Ayuda / Distribution*, *Health Activity* and *City /
+Government Activity* to `activity_type`'s vocabulary because those are
+the kinds of thing the barangay described. **Nothing anywhere reads
+`activity_type` to decide anything**, and nothing should — whether an
+event can be accommodated depends on the day and on which officials are
+available. An official decides every exception, and the Treasurer-only
+approval gate is untouched.
+
+The daytime slot range (8 AM – 4 PM) is **inherited system behaviour** —
+the hours this app has always offered — not a documented statement of the
+barangay's office hours. User-facing wording says "office hours" without
+claiming a span.
+
+| | |
+|---|---|
+| Client | `reservationWindow.js`; the form refuses a daytime slot with no reason and a duration that does not fit |
+| Database | `enforce_reservation_window()`, BEFORE INSERT. Rejects an unknown time, an end past 10:00 PM, a daytime start with no reason, **and an evening start that carries one** |
+| Official Portal | an `Office-hours exception` badge on the row, the reason under the purpose, and an *exceptions only* checkbox beside the status filter |
+| Resident Portal | a pending exception reads *"Office-hours request — awaiting barangay decision"* rather than plain "Pending" |
+
+⚠️ **An exception is identified by `exception_reason`, never by the
+hour.** All 21 bookings that existed before migration 020 start before
+5 PM and carry no reason, because that was the ordinary path under the
+old rule. Classifying by hour would badge the entire history as
+exception requests and bury the real ones. `isExceptionRequest()` is the
+single predicate, and `reservationWindow.test.js` asserts it.
+
+⚠️ **`exception_reason` is deliberately NOT in `get_reservation_slots` or
+`get_reservation_slots_range`.** Those two are SECURITY DEFINER with
+`anon` execute, so whatever they select becomes public; the reason is
+free text a resident wrote about their own activity, and belongs with
+`purpose` — officials only.
+
+**Why a BEFORE INSERT trigger and not a CHECK constraint.** A CHECK is
+revalidated on **every UPDATE**, so a window CHECK would have made
+approve, decline and cancel fail on all 21 legacy daytime rows — the
+history would have become uneditable. The trigger fires on INSERT only,
+so it governs new bookings and leaves the record alone. Verified: all
+three transitions still succeed on a legacy row.
+
+⚠️ **`NEW.slot_hour` is NULL inside a BEFORE trigger.** `slot_hour` is a
+`GENERATED ALWAYS` column, and generated values are computed *after*
+before-triggers run. Reading it in the guard would have compared NULL
+against everything and passed every check silently. The guard calls
+`reservation_slot_hour(NEW.preferred_time)` — the same IMMUTABLE helper
+the generation expression uses — instead.
+
+**The hour map exists twice, by necessity**: `SLOT_HOURS` in
+`reservationWindow.js` and `reservation_slot_hour()` in migration 020. A
+client constant cannot cross into the database. If they drift, an
+unrecognised label yields a NULL `slot_hour` and the overlap
+constraint's partial `WHERE` silently stops covering those rows — which
+is also the pre-existing hole migration 020 closed: `preferred_time` had
+no constraint at all, so `'9:30 PM'` inserted fine and was invisible to
+the overlap guard.
+
+⚠️ **The lunch closure is still enforced by the client only.** The
+trigger checks the start time, the end time and the reason, but not
+whether the span crosses the closed 12–1 PM hour, so an API caller
+bypassing the form can still file an 11:00 AM exception for 3 hours.
+Verified accepted by the database (`2099-12-03`, rolled back). The form
+refuses it, and the exclusion constraint then holds 11–2 as occupied
+while the public calendar's `getCoveredSlots` shows only 11 AM held.
+Found while verifying 020 and **recorded, not fixed** — the condition
+would be `v_hour < 13 AND v_end > 12`, but it is a rule nobody has
+approved adding, and 020 is already applied.
 
 ---
 
@@ -1199,25 +1293,14 @@ the real name and photo together when the barangay confirms them.
   residents.
 - **Auto-expiry for stale pending reservations.** An abandoned request
   blocks its slot until an official declines it.
-- **Reservation hours and the exception workflow — PR #23, recorded not
-  built.** The covered court is normally reservable **5:00 PM – 10:00
-  PM** only, because it is made available for bookings after office
-  hours. The barangay may allow an office-hours booking depending on the
-  event — the examples given were ayuda/distribution activities,
-  health-related activities, city or government activities, and anything
-  else officials judge should be accommodated.
-
-  ⚠️ **Those examples are not automatic approval categories, and must not
-  be built as ones.** Officials keep discretion, because whether an event
-  can be accommodated depends on the day and on which Kagawads are
-  available. So PR #23 is a **controlled exception workflow** — a request
-  outside 5–10 PM is something an official decides on, with the reason
-  recorded — not a rule that simply opens office hours to everyone who
-  picks the right category from a dropdown.
-
-  **Nothing in the reservation schedule changed in PR #21.** `timeSlots`
-  and `SLOT_HOURS` still offer 8 AM – 5 PM exactly as before; only the
-  purok field on that form was touched.
+- ~~**Reservation hours and the exception workflow — PR #23**~~ —
+  **built.** Migration 020 and `src/utils/reservationWindow.js`; see
+  *The office-hours exception* under *Court reservations*. It is a
+  controlled exception workflow, as recorded: a request outside 5–10 PM
+  is something an official decides on with the reason recorded, and no
+  activity category approves anything. One piece of it is deliberately
+  **not** built — there is no re-send or re-decide path, and the lunch
+  closure is still client-side only, both noted where they belong.
 - **`profile_id` foreign key** replacing the `full_name` matching above.
 - **019B — the Previous Term Officials roster and its UI.** Migration 019A
   created the tables; both are **empty**, and there is **no frontend**. 019B
@@ -1233,12 +1316,14 @@ the real name and photo together when the barangay confirms them.
 - **Source maps ship to production** (~7 MB), so the original JSX is
   publicly reconstructable. `GENERATE_SOURCEMAP=false` in Vercel fixes it.
 - **`public/logo.png` is 984 KB and referenced by nothing.**
-- **Thin automated test coverage.** 72 tests in four suites: one smoke
+- **Thin automated test coverage.** 115 tests in five suites: one smoke
   test over `<App />`, which fails without `.env` because
-  `supabaseClient.js` throws at import time, and 71 pure unit tests over
-  the resident workflow rules, the display labels and the ⋮ menu's
-  keyboard behaviour. No integration or end-to-end tests, and no test
-  touches the database.
+  `supabaseClient.js` throws at import time, and 114 pure unit tests over
+  the resident workflow rules, the display labels, the booking window and
+  the ⋮ menu's keyboard behaviour. No integration or end-to-end tests,
+  and **no test touches the database** — the reservation-window tests
+  mirror migration 020's SQL cases rather than running them, so the two
+  can still drift if only one is edited.
 - **Desktop at 1024px with the sidebar expanded still scrolls the widest
   table.** 1024 minus a 260px sidebar minus padding leaves ~650px, and
   eleven columns of real reservation data need ~784px even with the Email

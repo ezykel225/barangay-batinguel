@@ -15,6 +15,7 @@ import {
   DOCUMENT_STATUS_LABELS as STATUS_LABELS,
   RESERVATION_STATUS_LABELS,
 } from '../utils/displayLabels'
+import { residentStatusLabel } from '../utils/reservationWindow'
 import { logActivity } from '../utils/activityLog'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
@@ -802,6 +803,24 @@ const ResidentDashboard = () => {
                             <span className={`badge ${RESERVATION_STATUS_LABELS[r.status]?.className || ''}`}>
                               {RESERVATION_STATUS_LABELS[r.status]?.label || r.status}
                             </span>
+                            {/* A pending office-hours request is not the
+                                same prospect as a pending evening
+                                booking: the court is normally reservable
+                                from 5:00 PM, so this one needs a decision
+                                that the other does not. Saying only
+                                "Pending" for both would imply otherwise.
+                                Returns null for every other case --
+                                including a booking filed before migration
+                                020, which carries no reason and is not
+                                relabelled. */}
+                            {residentStatusLabel(r) && (
+                              <span
+                                className="reservation-exception-note"
+                                title={r.exception_reason || undefined}
+                              >
+                                {residentStatusLabel(r)}
+                              </span>
+                            )}
                           </td>
                           <td data-label="Action">
                             {canCancel(r) ? (
