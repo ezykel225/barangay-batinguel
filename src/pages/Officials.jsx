@@ -6,7 +6,9 @@ import {
 } from 'react-icons/fa'
 import { MdVerified } from 'react-icons/md'
 import { supabase } from '../supabase/supabaseClient'
-import { HEALTH_NURSE_NAME } from '../constants/barangay'
+import {
+  HEALTH_NURSE_NAME, HEALTH_NURSE_ROLE, PUNONG_BARANGAY_LABEL,
+} from '../constants/barangay'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { PersonAvatar } from '../utils/officialPhotos'
@@ -18,7 +20,7 @@ const healthDept = [
   {
     id: 1,
     name: HEALTH_NURSE_NAME,
-    role: 'Public Health Nurse',
+    role: HEALTH_NURSE_ROLE,
     desc: 'Oversees local community immunization drives, maternal care programs, and clinical health tracking.',
     liveAvailability: true,
   },
@@ -203,7 +205,10 @@ const Officials = () => {
       <section className="officials-hero">
         <div className="officials-hero-container">
           <div>
-            <h1>Kapitan's Office</h1>
+            {/* The paragraph under this heading already said "Punong
+                Barangay"; the heading said "Kapitan". One page, two names
+                for the same person. */}
+            <h1>Office of the {PUNONG_BARANGAY_LABEL}</h1>
             <p>
               Direct access to Punong Barangay's schedule and
               administrative availability. We promise transparency

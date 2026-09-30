@@ -1,0 +1,110 @@
+/* ================================
+   ACTION MENU (⋮)
+   ================================
+   Styles for the overflow menu used by the nurse's medicine list. See
+   ActionMenu.jsx for why it is used there and nowhere else.
+
+   Nothing here touches `.dashboard-table`, `.table-wrapper` or the
+   protected mobile table-to-card rules. */
+
+.action-menu {
+  /* The menu is positioned against this, so it stays with its row. */
+  position: relative;
+  display: inline-flex;
+}
+
+.action-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* 40px square: a comfortable target on a phone, and the same height as
+      the small buttons it sits beside. */
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-sm);
+  background-color: #ffffff;
+  color: #4b5563;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.action-menu-trigger:hover {
+  background-color: #f9fafb;
+  border-color: #d1d5db;
+  color: #1f2937;
+}
+
+.action-menu-trigger[aria-expanded='true'] {
+  background-color: #f3f4f6;
+  border-color: #9ca3af;
+  color: #1f2937;
+}
+
+.action-menu-list {
+  position: absolute;
+  top: calc(100% + 6px);
+  /* Anchored to the right edge: the trigger is the last thing in its row,
+      so a left-anchored menu would hang off the card. */
+  right: 0;
+  z-index: 30;
+  min-width: 168px;
+  padding: 6px;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.action-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  /* 40px tall for the same reason as the trigger. */
+  padding: 10px 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  font-family: 'Poppins', sans-serif;
+  font-size: var(--fs-13);
+  font-weight: 500;
+  color: #1f2937;
+  text-align: left;
+  cursor: pointer;
+}
+
+.action-menu-item:hover {
+  background-color: #f3f4f6;
+}
+
+/* Remove is destructive, so it reads differently from Edit rather than
+    relying on position in the list. The confirmation dialog is still what
+    actually protects the record. */
+.action-menu-item.is-danger {
+  color: #b91c1c;
+}
+
+.action-menu-item.is-danger:hover {
+  background-color: #fef2f2;
+}
+
+.action-menu-item-icon {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+/* On a narrow screen the menu would otherwise be a 168px panel floating
+    beside a card that is barely wider. Let it use the card's width. */
+@media (max-width: 480px) {
+  .action-menu-list {
+    min-width: 148px;
+  }
+}

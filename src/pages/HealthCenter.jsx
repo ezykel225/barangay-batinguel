@@ -16,7 +16,9 @@ import {
 import { MdOutlineEventAvailable, MdPersonSearch } from 'react-icons/md'
 import { supabase } from '../supabase/supabaseClient'
 import { MEDICINE_CATEGORIES, statusOf } from '../constants/medicines'
-import { BARANGAY_CONTACT, HEALTH_NURSE_NAME, telHref } from '../constants/barangay'
+import {
+  BARANGAY_CONTACT, HEALTH_NURSE_NAME, HEALTH_NURSE_ROLE, telHref,
+} from '../constants/barangay'
 import {
   formatTime, isOnScheduledBreak, manilaWeekday,
 } from '../utils/clinicHours'
@@ -267,7 +269,7 @@ const HealthCenter = () => {
                     </div>
                     <div className="health-nurse-info">
                       <h4>{HEALTH_NURSE_NAME}</h4>
-                      <p>Public Health Nurse</p>
+                      <p>{HEALTH_NURSE_ROLE}</p>
                     </div>
                     <div className="health-nurse-status">
                       <span className={`status-badge ${isAvailable ? 'available' : 'unavailable'}`}>

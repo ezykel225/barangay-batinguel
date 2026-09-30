@@ -572,8 +572,36 @@
   color: #4b5563;
 }
 
+/* `badge badge-${res.status}` on the official Reservations table produced
+    `badge-cancelled`, which no stylesheet defined -- so a booking the
+    resident had cancelled rendered as an unstyled pill among styled ones
+    and looked like a rendering fault. Grey rather than red: a resident
+    releasing their own slot is not a refusal, and it is the one status no
+    official caused. */
+.badge-cancelled {
+  background-color: #e5e7eb;
+  color: #4b5563;
+}
+
 /* Action Buttons */
+/* `inline-flex` with a gap, because both of these buttons are used with
+    an icon beside their label (Edit, Archive, Delete). Without it the
+    icon sits on the text baseline rather than centred on it, which is the
+    misalignment visible in every action column.
+
+    `margin-right` is gone: every action cell now spaces its buttons with
+    `gap` via `.action-cell`, and the two together produced 10px between
+    some buttons and 6px between others in the same table.
+
+    ⚠️ The protected mobile block sets `width: 100%` on both of these at
+    768px and below. `inline-flex` honours that -- the button still fills
+    its card row -- and `justify-content: center` is what keeps the label
+    centred once it does. */
 .btn-approve {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   padding: 6px 12px;
   background-color: #16a34a;
   color: white;
@@ -584,7 +612,6 @@
   cursor: pointer;
   font-family: 'Poppins', sans-serif;
   transition: background-color 0.2s;
-  margin-right: 4px;
 }
 
 .btn-approve:hover {
@@ -592,6 +619,10 @@
 }
 
 .btn-deny {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   padding: 6px 12px;
   background-color: #dc2626;
   color: white;
@@ -608,9 +639,13 @@
   background-color: #b91c1c;
 }
 
+/* `inline-flex`, not `flex`: as a block-level flex container this
+    stretched inside table cells and card rows, which is why nearly every
+    in-table instance carried an inline style to shrink it. */
 .btn-add {
-  display: flex;
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   padding: 8px 16px;
   background-color: #1e3a8a;
@@ -1133,4 +1168,78 @@
   font-size: var(--fs-13);
   color: var(--grey-600);
   line-height: 1.5;
+}
+
+/* ================================
+   ACTION CELLS AND SMALL BUTTONS
+   ================================
+   Two classes replacing style attributes that were repeated across the
+   dashboards. Appended after the protected mobile table-to-card block,
+   which is unchanged: both rules are deliberately weaker than the
+   protected ones, so mobile still wins.
+
+   `.action-cell` is what `style={{ display: 'flex', gap: 6, flexWrap:
+   'wrap' }}` was doing on six action cells -- with 6px on some and 8px on
+   others -- while four more had no wrapper at all and their buttons ran
+   together.
+
+   ⚠️ `.dashboard-table td:last-child` in the protected block (0,2,1)
+   outranks `.action-cell` (0,1,0) and comes later in the file, so at
+   768px and below the action cell still stacks into a column with the
+   protected gap. Verified in the browser at 375px, not assumed. */
+.action-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* The small variant of .btn-add / .btn-deny, replacing the
+   `style={{ fontSize: 12, padding: '4px 10px' }}` that was repeated on
+   seven in-table buttons -- in two spellings, `12` and `'12px'`. One
+   definition, so they cannot drift a pixel apart again. */
+.btn-sm {
+  padding: 5px 10px;
+  font-size: var(--fs-12);
+}
+
+/* ================================
+   SIGNED-IN IDENTITY
+   ================================
+   The sidebar footer showed a generic icon for everybody, and the mobile
+   drawer showed nothing at all -- so on a phone the account you were
+   about to log out of was never named. Both now render the same block.
+
+   Appended after the protected mobile table-to-card rules, which are
+   untouched: none of this concerns tables. */
+
+/* The avatar box was already a 36px circle that centres its child; an
+    <img> needs telling to fill it. PersonAvatar returns the old role icon
+    when there is no photo, so an account without one is unchanged. */
+.sidebar-user-photo {
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-circle);
+  object-fit: cover;
+  display: block;
+}
+
+/* Identity in the mobile drawer, above the destinations. Same two lines
+    as the desktop footer, on the drawer's dark background. */
+.nav-drawer-user {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* Long names wrap rather than pushing the drawer sideways. */
+.nav-drawer-user .sidebar-user-info {
+  min-width: 0;
+}
+
+.nav-drawer-user .sidebar-user-info span {
+  overflow-wrap: anywhere;
 }

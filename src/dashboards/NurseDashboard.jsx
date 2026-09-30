@@ -6,12 +6,19 @@ import {
   FaEyeSlash,
   FaLock,
   FaFilter,
+  FaEdit,
+  FaTrash,
 } from 'react-icons/fa'
 import { supabase } from '../supabase/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 import Sidebar from '../components/Sidebar'
-import { HEALTH_NURSE_NAME } from '../constants/barangay'
+import { HEALTH_NURSE_NAME, HEALTH_NURSE_ROLE } from '../constants/barangay'
+import {
+  availabilityStatusClass,
+  availabilityStatusLabel,
+} from '../utils/displayLabels'
+import ActionMenu from '../components/ActionMenu'
 import {
   MEDICINE_CATEGORIES, MEDICINE_FORMS, MEDICINE_STATUS, statusOf,
 } from '../constants/medicines'
@@ -467,11 +474,17 @@ const NurseDashboard = () => {
   }
 
   const handleDeleteMedicine = async (medicine) => {
-    const ok = window.confirm(
-      `Remove ${medicine.name} from the list?\n\n` +
-      'If it is only out of stock, set it to "Out of stock" instead — ' +
-      'residents can then see it exists and ask when it is expected.'
-    )
+    // The last window.confirm in this portal. The other three deletes
+    // here already used the shared dialog, so this one was the odd
+    // browser-styled box in an otherwise consistent set -- and an
+    // unstyled prompt reads as a security warning rather than a question
+    // about a medicine.
+    const ok = await confirm({
+      title: `Remove ${medicine.name} from the list?`,
+      message: 'If it is only out of stock, set it to "Out of stock" instead — '
+        + 'residents can then see it exists and ask when it is expected.',
+      confirmLabel: 'Remove medicine',
+    })
     if (!ok) return
 
     // .select() matters here: RLS filters rows rather than raising, so a
@@ -683,7 +696,9 @@ const NurseDashboard = () => {
           <div>
             <div className="nurse-dashboard-header">
               <div>
-                <h1>Nurse Administrator Dashboard</h1>
+                {/* "Nurse Administrator" was a fourth description of the
+                    same person. This is a page name, not a job title. */}
+                <h1>Health Center Dashboard</h1>
                 <p>Managing community health and medical services for Barangay Batinguel.</p>
               </div>
               <div className="nurse-status-badge" style={getStatusStyle()}>
@@ -855,15 +870,35 @@ const NurseDashboard = () => {
                         ))}
                       </div>
 
+                      {/* Five controls per row became three plus a menu.
+                          The three availability buttons stay exactly where
+                          they were -- setting stock is the whole purpose of
+                          this screen and must not cost an extra click --
+                          while Edit and Remove, which are occasional, move
+                          behind the ⋮.
+
+                          This list is cards, not a `.dashboard-table`, so
+                          the menu is not clipped by `.table-wrapper`'s
+                          `overflow-x: auto`. See ActionMenu.jsx. */}
                       <div className="medicine-admin-actions">
-                        <button className="btn-add" style={{ fontSize: 12, padding: '4px 10px' }}
-                                onClick={() => handleEditMedicine(medicine)}>
-                          Edit
-                        </button>
-                        <button className="btn-deny" style={{ fontSize: 12, padding: '4px 10px' }}
-                                onClick={() => handleDeleteMedicine(medicine)}>
-                          Remove
-                        </button>
+                        <ActionMenu
+                          label={`More actions for ${medicine.name}`}
+                          items={[
+                            {
+                              key: 'edit',
+                              label: 'Edit details',
+                              icon: <FaEdit />,
+                              onSelect: () => handleEditMedicine(medicine),
+                            },
+                            {
+                              key: 'remove',
+                              label: 'Remove',
+                              icon: <FaTrash />,
+                              danger: true,
+                              onSelect: () => handleDeleteMedicine(medicine),
+                            },
+                          ]}
+                        />
                       </div>
                     </div>
                   ))}
@@ -877,7 +912,11 @@ const NurseDashboard = () => {
           <div>
             <div className="availability-header">
               <h1>Nurse Availability</h1>
-              <p>Configure your recurring schedule. Click a row to edit its status.</p>
+              {/* The old copy said "Click a row to edit its status". No row
+                  has ever had a click handler -- editing is the Edit button
+                  in each row -- so the instruction described something that
+                  did not exist. */}
+              <p>Configure your recurring clinic schedule. Use Edit on a row to change it.</p>
             </div>
 
             <div className="dashboard-card">
@@ -894,11 +933,16 @@ const NurseDashboard = () => {
                 <div className="table-wrapper">
                   <table className="dashboard-table">
                     <thead>
+                      {/* Four columns, not six. Time Start, Time End and
+                          Lunch Break were three columns holding one idea --
+                          when the clinic is open -- and on a phone, where
+                          each row becomes a card, that was six labelled
+                          lines for five days. Hours now carries the opening
+                          span with the break beneath it, which reads the
+                          same way on both. */}
                       <tr>
                         <th scope="col">Day</th>
-                        <th scope="col">Time Start</th>
-                        <th scope="col">Time End</th>
-                        <th scope="col">Lunch Break</th>
+                        <th scope="col">Hours</th>
                         <th scope="col">Status</th>
                         <th scope="col">Action</th>
                       </tr>
@@ -907,31 +951,39 @@ const NurseDashboard = () => {
                       {nurseAvailability.map((avail) => (
                         <tr key={avail.id}>
                           <td data-label="Day">{avail.day_of_week}</td>
-                          <td data-label="Time Start">{avail.time_start}</td>
-                          <td data-label="Time End">{avail.time_end}</td>
-                          <td data-label="Lunch Break">
-                            {avail.break_start && avail.break_end
-                              ? `${avail.break_start} – ${avail.break_end}`
-                              : '—'}
+                          <td data-label="Hours">
+                            <span className="availability-hours">
+                              {avail.time_start && avail.time_end
+                                ? `${avail.time_start} – ${avail.time_end}`
+                                : '—'}
+                            </span>
+                            {avail.break_start && avail.break_end && (
+                              <span className="availability-break">
+                                Lunch {avail.break_start} – {avail.break_end}
+                              </span>
+                            )}
                           </td>
                           <td data-label="Status">
-                            <span className={`badge ${avail.status === 'available' ? 'badge-approved' : 'badge-declined'}`}>
-                              {avail.status}
+                            {/* The old rule was `available ? green : red`,
+                                which coloured a scheduled day off as a
+                                fault, and printed the raw stored value.
+                                Both now come from one shared map. */}
+                            <span className={`badge ${availabilityStatusClass(avail.status)}`}>
+                              {availabilityStatusLabel(avail.status)}
                             </span>
                           </td>
-                          <td data-label="Action" style={{ display: 'flex', gap: '8px' }}>
+                          <td data-label="Action" className="action-cell">
                             <button
-                              className="btn-add"
-                              style={{ fontSize: '12px', padding: '4px 10px' }}
+                              className="btn-add btn-sm"
                               onClick={() => handleEditAvailability(avail)}
                             >
-                              Edit
+                              <FaEdit /> Edit
                             </button>
                             <button
-                              className="btn-deny"
+                              className="btn-deny btn-sm"
                               onClick={() => handleDeleteAvailability(avail)}
                             >
-                              Delete
+                              <FaTrash /> Delete
                             </button>
                           </td>
                         </tr>
@@ -1003,9 +1055,9 @@ const NurseDashboard = () => {
                           <td data-label="Date">{event.event_date}</td>
                           <td data-label="Location">{event.location}</td>
                           <td data-label="Target">{event.target_audience}</td>
-                          <td data-label="Action">
-                            <button className="btn-deny" onClick={() => handleDeleteEvent(event)}>
-                              Delete
+                          <td data-label="Action" className="action-cell">
+                            <button className="btn-deny btn-sm" onClick={() => handleDeleteEvent(event)}>
+                              <FaTrash /> Delete
                             </button>
                           </td>
                         </tr>
@@ -1041,7 +1093,11 @@ const NurseDashboard = () => {
                     />
                   </div>
                   <div className="profile-name">{nurseName}</div>
-                  <div className="profile-role">Head Barangay Nurse</div>
+                  {/* One role label, from constants/barangay.js. This card
+                      used to read "Barangay Health Nurse / Head Barangay
+                      Nurse" -- a name and a title that were nearly the same
+                      words and disagreed with the sidebar. */}
+                  <div className="profile-role">{HEALTH_NURSE_ROLE}</div>
                 </div>
                 <div className="profile-form">
                   <div className="profile-form-group">

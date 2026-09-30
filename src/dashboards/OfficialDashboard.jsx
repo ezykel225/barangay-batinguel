@@ -29,7 +29,14 @@ import {
   ArchiveOfficialDialog,
   RestoreOfficialDialog,
 } from '../components/OfficialArchiveDialog'
-import { PUROKS } from '../constants/barangay'
+import { PUROKS, PUNONG_BARANGAY_LABEL } from '../constants/barangay'
+import {
+  countUpcoming,
+  documentStatusClass,
+  documentStatusLabel,
+  reservationStatusClass,
+  reservationStatusLabel,
+} from '../utils/displayLabels'
 import {
   RESIDENT_GROUPS,
   RESIDENT_SEARCH_FIELDS,
@@ -700,8 +707,30 @@ const OfficialDashboard = () => {
     }
   }
 
-  const handleVerifyResident = (resident) =>
-    withVerificationGuard(resident.id, async () => {
+  // Asked BEFORE the guard is taken, not inside it. The guard exists to
+  // stop a double-click firing the same write twice; holding it while a
+  // dialog waits for an answer would leave the row's buttons disabled for
+  // as long as the official is reading. The early `has` check below stops
+  // a second dialog opening for a row that already has one in flight.
+  const handleVerifyResident = async (resident) => {
+    if (processingVerificationIds.has(resident.id)) return
+    const state = describeVerification(resident.verification_status)
+    const ok = await confirm({
+      title: resident.verification_status === 'ineligible'
+        ? `Reinstate ${resident.full_name}?`
+        : `Verify ${resident.full_name}?`,
+      message: resident.verification_status === 'ineligible'
+        ? 'This account was marked as not a resident of this barangay. Verifying it '
+          + 'reopens it and lets them request documents again. Check the ID or their '
+          + 'record first — only an official can set or lift this state.'
+        : `This confirms you have checked their ID. They will be able to request `
+          + `barangay documents immediately. Currently: ${state.label}.`,
+      confirmLabel: resident.verification_status === 'ineligible'
+        ? 'Reinstate account'
+        : 'Verify account',
+    })
+    if (!ok) return
+    return withVerificationGuard(resident.id, async () => {
       const { error } = await supabase
         .from('profiles')
         .update({
@@ -725,6 +754,7 @@ const OfficialDashboard = () => {
         fetchResidentsList()
       }
     })
+  }
 
   const handleOpenReject = (resident) => {
     setRejectingResident(resident)
@@ -900,6 +930,33 @@ const OfficialDashboard = () => {
         fetchDocumentRequests()
       }
     })
+
+  // Only the `claimed` transition is gated, and it is gated in a wrapper
+  // rather than inside handleUpdateDocRequestStatus -- that function is
+  // also how a decline is written, and a decline already has its own
+  // reason dialog. Confirming inside it would ask twice for one decision.
+  //
+  // Approve and Mark Ready are deliberately NOT gated. Both are
+  // intermediate steps the Secretary can move past in the same session,
+  // and a prompt on every step of a four-step queue is the fatigue that
+  // makes people stop reading prompts. `claimed` is where the request
+  // stops: there is no button that walks it back.
+  const handleMarkDocRequestClaimed = async (request) => {
+    if (!isSecretary) {
+      toast.error('Only the Secretary can update document requests.')
+      return
+    }
+    if (processingDocRequestIds.has(request.id)) return
+    const ok = await confirm({
+      title: 'Mark this request as claimed?',
+      message: `This records that ${request.full_name} has collected their `
+        + `${request.document_type}. It is the last step — there is no control here `
+        + 'that moves the request back afterwards.',
+      confirmLabel: 'Mark claimed',
+    })
+    if (!ok) return
+    return handleUpdateDocRequestStatus(request, 'claimed')
+  }
 
   const handleOpenDeclineRequest = (request) => {
     setDecliningRequest(request)
@@ -1149,12 +1206,35 @@ const OfficialDashboard = () => {
     }
   }
 
-  const handleApproveReservation = (reservation) =>
-    withReservationGuard(reservation, async () => {
-      if (!isTreasurer) {
-        toast.error('Only the Treasurer can approve reservations.')
-        return
-      }
+  // ⚠️ Ordering matters here, in this order:
+  //
+  //   1. permission check -- a non-Treasurer must never be asked to
+  //      confirm something they will then be refused;
+  //   2. the in-flight check -- so one row cannot open two dialogs;
+  //   3. the confirmation;
+  //   4. only then withReservationGuard, which takes the per-row lock.
+  //
+  // Putting the dialog inside the guard would hold that lock for as long
+  // as the official took to answer, disabling the row's buttons and the
+  // other decision on it meanwhile. The guard still does its real job:
+  // the write itself cannot run twice.
+  const handleApproveReservation = async (reservation) => {
+    if (!isTreasurer) {
+      toast.error('Only the Treasurer can approve reservations.')
+      return
+    }
+    if (processingReservationIds.has(reservation.id)) return
+    const ok = await confirm({
+      title: 'Approve this reservation?',
+      message: `The court will be held for ${reservation.full_name} on `
+        + `${reservation.preferred_date} at ${reservation.preferred_time}`
+        + `${reservation.duration_hours ? ` for ${reservation.duration_hours} hour(s)` : ''}. `
+        + 'The resident is told the decision, and the slot stays held until somebody '
+        + 'changes it.',
+      confirmLabel: 'Approve booking',
+    })
+    if (!ok) return
+    return withReservationGuard(reservation, async () => {
       const { data: updated, error } = await supabase
         .from('reservations')
         .update({ status: 'approved', reviewed_by: user?.id ?? null, updated_at: new Date().toISOString() })
@@ -1182,13 +1262,23 @@ const OfficialDashboard = () => {
         fetchReservations()
       }
     })
+  }
 
-  const handleDeclineReservation = (reservation) =>
-    withReservationGuard(reservation, async () => {
-      if (!isTreasurer) {
-        toast.error('Only the Treasurer can decline reservations.')
-        return
-      }
+  const handleDeclineReservation = async (reservation) => {
+    if (!isTreasurer) {
+      toast.error('Only the Treasurer can decline reservations.')
+      return
+    }
+    if (processingReservationIds.has(reservation.id)) return
+    const ok = await confirm({
+      title: 'Decline this reservation?',
+      message: `${reservation.full_name}'s booking for ${reservation.preferred_date} at `
+        + `${reservation.preferred_time} will be declined and the slot released for `
+        + 'someone else. The resident is told the decision.',
+      confirmLabel: 'Decline booking',
+    })
+    if (!ok) return
+    return withReservationGuard(reservation, async () => {
       const { data: updated, error } = await supabase
         .from('reservations')
         .update({ status: 'declined', reviewed_by: user?.id ?? null, updated_at: new Date().toISOString() })
@@ -1211,6 +1301,7 @@ const OfficialDashboard = () => {
         fetchReservations()
       }
     })
+  }
 
   const handleUpdateKapitanStatus = async (status) => {
     if (!isKapitan) return
@@ -1225,7 +1316,7 @@ const OfficialDashboard = () => {
 
     if (fetchError || !current) {
       console.error('Kapitan status row missing:', fetchError)
-      toast.error('No Kapitan status record exists yet. Ask the admin to create one.')
+      toast.error(`No ${PUNONG_BARANGAY_LABEL} status record exists yet. Ask the admin to create one.`)
       return
     }
 
@@ -1766,6 +1857,30 @@ const OfficialDashboard = () => {
     setRegistryPurok('all')
   }
 
+  // ── Sidebar badge counts ─────────────────────────────────────────
+  //
+  // Both come from data this dashboard already fetched, so a badge costs
+  // no extra request, no new column and no read-state to keep. They also
+  // update on their own: each successful action refetches its list, the
+  // filter below recomputes, and the badge drops.
+  //
+  // Only work that is waiting on an OFFICIAL is counted. `rejected` is an
+  // account the official has already dealt with and sent back, so it sits
+  // in the Requests group but not in the badge -- the line under that
+  // group's heading says so, because a tab reading 5 above a badge
+  // reading 3 is otherwise just confusing.
+  const pendingDocRequestCount = documentRequests
+    .filter((request) => request.status === 'pending').length
+  const awaitingVerificationCount = residentsList
+    .filter((resident) => resident.verification_status === 'pending').length
+  const returnedToResidentCount = residentsList
+    .filter((resident) => resident.verification_status === 'rejected').length
+  // Anything with an unrecognised status also lands in Requests. Counted
+  // here so the two figures above plus this one always add up to the
+  // group's own total rather than quietly falling short.
+  const unclassifiedRequestCount =
+    residentGroups.requests.length - awaitingVerificationCount - returnedToResidentCount
+
   // D6. Detection only -- see findReconciliationIssues for why this
   // cannot conclude anything about identity, and why it never writes.
   const reconciliationIssues = useMemo(
@@ -1847,6 +1962,10 @@ const OfficialDashboard = () => {
         role="official"
         activeTab={activeTab}
         setActiveTab={setActiveTab}
+        badges={{
+          documents: pendingDocRequestCount,
+          residents: awaitingVerificationCount,
+        }}
       />
 
       {/* Main Content */}
@@ -1896,7 +2015,11 @@ const OfficialDashboard = () => {
                     <FaCalendarAlt />
                   </div>
                 </div>
-                <div className="stat-card-value">{events.length}</div>
+                {/* This said "Upcoming Events" while counting every event
+                    ever created, so a barangay with three events last year
+                    and nothing planned still read "3 upcoming". Compared
+                    against today in Manila, not the browser's timezone. */}
+                <div className="stat-card-value">{countUpcoming(events, 'event_date')}</div>
                 <div className="stat-card-label">Upcoming Events</div>
               </div>
 
@@ -1911,11 +2034,11 @@ const OfficialDashboard = () => {
               </div>
             </div>
 
-            {/* Kapitan Status — compact summary only. Full controls live on
-                the dedicated "Kapitan Status" tab to avoid duplicating the
+            {/* Punong Barangay status — compact summary only. Full controls
+                live on the dedicated status tab to avoid duplicating the
                 same control in two places. */}
             <div className="kapitan-status-section">
-              <h3>{isKapitan ? 'My Status' : "Kapitan's Status"}</h3>
+              <h3>{isKapitan ? 'My Status' : `${PUNONG_BARANGAY_LABEL} Status`}</h3>
               <div className="kapitan-current-display">
                 {kapitanStatusDisplay(kapitanStatus)}
               </div>
@@ -2218,8 +2341,14 @@ const OfficialDashboard = () => {
                             {res.created_at ? new Date(res.created_at).toLocaleDateString() : '—'}
                           </td>
                           <td data-label="Status">
-                            <span className={`badge badge-${res.status}`}>
-                              {res.status}
+                            {/* Was `badge-${res.status}` with the raw value
+                                as its text: a cancelled booking produced
+                                `badge-cancelled`, which no stylesheet
+                                defined, and an official read "pending"
+                                where the resident read "Pending". Both now
+                                come from the shared map. */}
+                            <span className={`badge ${reservationStatusClass(res.status)}`}>
+                              {reservationStatusLabel(res.status)}
                             </span>
                           </td>
                           <td data-label="Action">
@@ -2262,7 +2391,11 @@ const OfficialDashboard = () => {
         {activeTab === 'kapitan' && (
           <div>
             <div className="kapitan-page-header">
-              <h1>Kapitan Status Tracker</h1>
+              {/* Formal title throughout, matching the officials directory
+                  and barangay_officials.position. Implementation names --
+                  the `kapitan` tab id, kapitan_status, isKapitan, the
+                  .kapitan-* classes -- are untouched. */}
+              <h1>{PUNONG_BARANGAY_LABEL} Status Tracker</h1>
               <p>Maintain transparency by providing real-time updates on your availability.</p>
             </div>
 
@@ -2285,7 +2418,7 @@ const OfficialDashboard = () => {
               </div>
             ) : (
               <div className="kapitan-status-section">
-                <h3>Kapitan's Current Status</h3>
+                <h3>Current {PUNONG_BARANGAY_LABEL} Status</h3>
                 <div className="kapitan-current-display">
                   {kapitanStatusDisplay(kapitanStatus)}
                 </div>
@@ -2329,18 +2462,18 @@ const OfficialDashboard = () => {
                           <td data-label="Purpose">{req.purpose}</td>
                           <td data-label="Contact">{req.contact_number || '—'}</td>
                           <td data-label="Status">
-                            <span className={`badge badge-${
-                              req.status === 'ready_for_pickup' ? 'ready'
-                                : req.status === 'claimed' ? 'claimed'
-                                  : req.status
-                            }`}>
-                              {req.status.replace(/_/g, ' ')}
+                            {/* The resident portal read "Ready for Pickup"
+                                from its own label map while this table
+                                printed "ready for pickup" from a regex on
+                                the stored value. One map now serves both. */}
+                            <span className={`badge ${documentStatusClass(req.status)}`}>
+                              {documentStatusLabel(req.status)}
                             </span>
                           </td>
                           <td data-label="Submitted">
                             {req.created_at ? new Date(req.created_at).toLocaleDateString() : '—'}
                           </td>
-                          <td data-label="Action" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          <td data-label="Action" className="action-cell">
                             {isSecretary ? (
                               <>
                                 {req.status === 'pending' && (
@@ -2371,7 +2504,7 @@ const OfficialDashboard = () => {
                                   <button
                                     className="btn-approve"
                                     disabled={processingDocRequestIds.has(req.id)}
-                                    onClick={() => handleUpdateDocRequestStatus(req, 'claimed')}>
+                                    onClick={() => handleMarkDocRequestClaimed(req)}>
                                     Mark Claimed
                                   </button>
                                 )}
@@ -2428,10 +2561,9 @@ const OfficialDashboard = () => {
                           <td data-label="Day">{entry.day_of_week}</td>
                           <td data-label="Time">{entry.time_label || '—'}</td>
                           <td data-label="Notes">{entry.notes || '—'}</td>
-                          <td data-label="Action" style={{ display: 'flex', gap: 8 }}>
+                          <td data-label="Action" className="action-cell">
                             <button
-                              className="btn-add"
-                              style={{ fontSize: 12, padding: '4px 10px' }}
+                              className="btn-add btn-sm"
                               onClick={() => handleEditWaste(entry)}>
                               <FaEdit /> Edit
                             </button>
@@ -2490,6 +2622,24 @@ const OfficialDashboard = () => {
                   </div>
 
                   <p className="dashboard-card-note">{activeResidentGroup.description}</p>
+
+                  {/* Why the sidebar badge can read lower than this tab's
+                      count: the badge counts only what is waiting on an
+                      official. Both numbers are right; without this line
+                      they look like one of them is wrong. */}
+                  {residentGroup === 'requests' && residentGroups.requests.length > 0 && (
+                    <p className="dashboard-card-note">
+                      {[
+                        `${awaitingVerificationCount} awaiting an official's review`
+                          + ' (what the sidebar badge counts)',
+                        `${returnedToResidentCount} returned to the resident to correct`,
+                        unclassifiedRequestCount > 0
+                          ? `${unclassifiedRequestCount} with an unrecognised status — see the`
+                            + ' cross-check below'
+                          : null,
+                      ].filter(Boolean).join(' · ')}
+                    </p>
+                  )}
 
                   <ResidentFilterBar
                     idPrefix="residents"
@@ -2608,8 +2758,7 @@ const OfficialDashboard = () => {
                           <td data-label="ID">
                             {resident.id_document_url ? (
                               <button
-                                className="btn-add"
-                                style={{ fontSize: 12, padding: '4px 10px' }}
+                                className="btn-add btn-sm"
                                 onClick={() => handleViewId(resident)}
                               >
                                 View ID
@@ -2626,7 +2775,7 @@ const OfficialDashboard = () => {
                               </span>
                             )}
                           </td>
-                          <td data-label="Action" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          <td data-label="Action" className="action-cell">
                             {resident.verification_status !== 'verified' && (
                               <button
                                 className="btn-approve"
@@ -2835,10 +2984,9 @@ const OfficialDashboard = () => {
                           </td>
                           <td data-label="Household #">{entry.household_number || '—'}</td>
                           <td data-label="Contact">{entry.contact_number || '—'}</td>
-                          <td data-label="Action" style={{ display: 'flex', gap: 8 }}>
+                          <td data-label="Action" className="action-cell">
                             <button
-                              className="btn-add"
-                              style={{ fontSize: 12, padding: '4px 10px' }}
+                              className="btn-add btn-sm"
                               onClick={() => handleEditRegistryEntry(entry)}>
                               <FaEdit /> Edit
                             </button>
@@ -2907,10 +3055,9 @@ const OfficialDashboard = () => {
                           <td data-label="Position">{official.position}</td>
                           <td data-label="Committee">{official.committee || '—'}</td>
                           <td data-label="Contact">{official.contact_number || '—'}</td>
-                          <td data-label="Action" style={{ display: 'flex', gap: 8 }}>
+                          <td data-label="Action" className="action-cell">
                             <button
-                              className="btn-add"
-                              style={{ fontSize: 12, padding: '4px 10px' }}
+                              className="btn-add btn-sm"
                               onClick={() => handleEditOfficial(official)}>
                               <FaEdit /> Edit
                             </button>

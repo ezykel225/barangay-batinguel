@@ -11,6 +11,10 @@ import { supabase } from '../supabase/supabaseClient'
 import { pathFromPublicUrl } from '../utils/storagePath'
 import { BARANGAY_NAME, PUROKS } from '../constants/barangay'
 import { describeVerification } from '../utils/residentGroups'
+import {
+  DOCUMENT_STATUS_LABELS as STATUS_LABELS,
+  RESERVATION_STATUS_LABELS,
+} from '../utils/displayLabels'
 import { logActivity } from '../utils/activityLog'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
@@ -27,20 +31,12 @@ const DOCUMENT_TYPES = [
   'Other',
 ]
 
-const STATUS_LABELS = {
-  pending: { label: 'Pending Review', className: 'badge-pending' },
-  approved: { label: 'Approved', className: 'badge-approved' },
-  declined: { label: 'Declined', className: 'badge-declined' },
-  ready_for_pickup: { label: 'Ready for Pickup', className: 'badge-ready' },
-  claimed: { label: 'Claimed', className: 'badge-claimed' },
-}
-
-const RESERVATION_STATUS_LABELS = {
-  pending: { label: 'Pending', className: 'badge-pending' },
-  approved: { label: 'Approved', className: 'badge-approved' },
-  declined: { label: 'Declined', className: 'badge-declined' },
-  cancelled: { label: 'Cancelled', className: 'badge-claimed' },
-}
+// These two maps used to be defined here, and the Official Dashboard
+// rendered the same columns from raw database values instead -- so a
+// resident read "Ready for Pickup" while the official looking at the same
+// request read "ready for pickup". They now come from
+// utils/displayLabels.js, which both dashboards read, with the wording
+// this portal already shipped kept exactly as it was.
 
 // Today's date in Manila as YYYY-MM-DD. 'en-CA' formats that way, and
 // ISO date strings compare correctly with <, so no Date maths needed.

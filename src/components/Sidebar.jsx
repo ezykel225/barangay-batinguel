@@ -29,6 +29,8 @@ import { supabase } from '../supabase/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
+import { HEALTH_NURSE_ROLE, PUNONG_BARANGAY_LABEL } from '../constants/barangay'
+import { PersonAvatar } from '../utils/officialPhotos'
 import './Sidebar.css'
 
 // Remembers whether the desktop sidebar was left expanded or collapsed.
@@ -67,6 +69,7 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {} }) => {
   const { user } = useAuth()
   const [profileName, setProfileName] = useState('')
   const [profilePosition, setProfilePosition] = useState('')
+  const [profilePhoto, setProfilePhoto] = useState(null)
   const [collapsed, setCollapsed] = useState(readCollapsed)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const menuButtonRef = useRef(null)
@@ -74,14 +77,22 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {} }) => {
   const drawerCloseRef = useRef(null)
 
   const fetchProfile = useCallback(async () => {
+    // photo_url as well as the name: the sidebar showed a generic icon for
+    // everybody while the same person's photo was already on their
+    // Settings page and, for an official, on the public directory. One
+    // column more on a query that already runs.
     const { data: profile } = await supabase
       .from('profiles')
-      .select('full_name')
+      .select('full_name, photo_url')
       .eq('id', user.id)
       .single()
 
     if (profile?.full_name) {
       setProfileName(profile.full_name)
+      // A resident's photo lives on their profile. An official's lives on
+      // their directory row and is read below instead, because that is the
+      // one shown publicly and the one their Settings page edits.
+      if (role === 'resident') setProfilePhoto(profile.photo_url || null)
 
       if (role === 'official') {
         // Active records only, and maybeSingle() rather than single():
@@ -90,7 +101,7 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {} }) => {
         // They fall back to the generic label below rather than erroring.
         const { data: official } = await supabase
           .from('barangay_officials')
-          .select('position, committee')
+          .select('position, committee, photo_url')
           .eq('full_name', profile.full_name)
           .is('archived_at', null)
           .maybeSingle()
@@ -100,11 +111,12 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {} }) => {
             ? `${official.position} — ${official.committee}`
             : official.position
           setProfilePosition(pos)
+          setProfilePhoto(official.photo_url || null)
         } else {
           setProfilePosition('Barangay Official')
         }
       } else if (role === 'nurse') {
-        setProfilePosition('Public Health Nurse')
+        setProfilePosition(HEALTH_NURSE_ROLE)
       } else if (role === 'resident') {
         setProfilePosition('Resident')
       }
@@ -206,7 +218,12 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {} }) => {
     { id: 'reservations', label: 'Reservations', icon: <FaClipboardList /> },
     { id: 'documents', label: 'Document Requests', icon: <FaFileAlt /> },
     { id: 'waste', label: 'Waste Management', icon: <FaTrashAlt /> },
-    { id: 'kapitan', label: 'Kapitan Status', icon: <FaUserTie /> },
+    // "Punong Barangay", not "Kapitan": the officials directory, the
+    // public cards and barangay_officials.position all use the formal
+    // title, so the informal one here was a second name for one person.
+    // The tab id and everything else in the implementation keep the old
+    // word -- see PUNONG_BARANGAY_LABEL.
+    { id: 'kapitan', label: `${PUNONG_BARANGAY_LABEL} Status`, icon: <FaUserTie /> },
     { id: 'officials', label: 'Officials Directory', icon: <FaUsers /> },
     { id: 'residents', label: 'Residents', icon: <FaUserFriends /> },
     // Voter Reference List, not "Residents Registry": the table holds the
@@ -244,6 +261,34 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {} }) => {
     role === 'nurse' ? 'Health Portal'
       : role === 'resident' ? 'Resident Portal'
         : 'Official Portal'
+
+  // Who is signed in. Rendered in the desktop footer and, since it was
+  // missing there entirely, in the mobile drawer -- on a phone the
+  // logged-in name and role appeared nowhere in navigation at all.
+  //
+  // `PersonAvatar` falls back to the same role icon the sidebar always
+  // showed, so an account with no photo looks exactly as it did.
+  const identity = (
+    <>
+      <div className="sidebar-user-avatar">
+        <PersonAvatar
+          name={profileName}
+          photoUrl={profilePhoto}
+          fallbackIcon={role === 'nurse' ? <FaHeartbeat /> : <FaUser />}
+          className="sidebar-user-photo"
+        />
+      </div>
+      <div className="sidebar-user-info">
+        <span>{profileName || 'Loading...'}</span>
+        <span>{profilePosition || '...'}</span>
+      </div>
+    </>
+  )
+
+  // The collapsed rail hides the two lines above, so without this the
+  // only thing left is a generic icon -- while every nav item beside it
+  // does get a tooltip. Same text, so nothing is invented for it.
+  const identityTitle = [profileName, profilePosition].filter(Boolean).join(' — ')
 
   return (
     <>
@@ -332,14 +377,11 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {} }) => {
         </nav>
 
         <div className="sidebar-footer">
-          <div className="sidebar-user">
-            <div className="sidebar-user-avatar">
-              {role === 'nurse' ? <FaHeartbeat /> : <FaUser />}
-            </div>
-            <div className="sidebar-user-info">
-              <span>{profileName || 'Loading...'}</span>
-              <span>{profilePosition || '...'}</span>
-            </div>
+          <div
+            className="sidebar-user"
+            title={collapsed ? identityTitle || undefined : undefined}
+          >
+            {identity}
           </div>
           <button
             className="sidebar-logout"
@@ -381,6 +423,13 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {} }) => {
               >
                 <FaTimes />
               </button>
+            </div>
+
+            {/* Who is signed in, before the destinations. The drawer is
+                the whole of navigation on a phone, and it used to end at
+                Logout without ever naming the account it would log out. */}
+            <div className="nav-drawer-user">
+              {identity}
             </div>
 
             <nav className="nav-drawer-nav">

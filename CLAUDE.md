@@ -65,12 +65,14 @@ banned below: it silences the one check this project has.
 
 ### Tests
 
-Two suites, 39 tests:
+Four suites, 72 tests:
 
 | File | What it covers |
 |---|---|
 | `src/App.test.js` | One smoke test — renders `<App />` and asserts the brand name appears |
 | `src/utils/residentGroups.test.js` | 38 tests over the resident grouping, status vocabulary, search/filter, and the account ↔ voter-list cross-check — including the ones that hold "not on the voter list" at severity `expected` so a later edit cannot quietly promote ordinary residents into a list of problems |
+| `src/utils/displayLabels.test.js` | 20 tests over the shared status labels, the upcoming-event count, and a guard that this module never re-acquires a second verification vocabulary |
+| `src/components/ActionMenu.test.js` | 13 tests over the ⋮ menu's keyboard, Escape and focus-restore behaviour — the parts nobody catches by clicking |
 
 Schema and policy changes are still verified by impersonating each role
 in SQL, with the results recorded in the migration headers — not by
@@ -82,9 +84,10 @@ imports the client. So a missing `.env` fails that test with a module
 error that never mentions `.env`. If `npm test` fails on a fresh
 checkout, check `.env` before debugging the test.
 
-`residentGroups.test.js` does **not** — `residentGroups.js` is pure, with
-no Supabase import, which is the reason the resident workflow's rules
-live there rather than inside the dashboard component.
+The other three suites do **not** need it. `residentGroups.js`,
+`displayLabels.js` and `ActionMenu.jsx` have no Supabase import, which is
+the reason the resident workflow's rules and the label vocabulary live in
+modules rather than inside the dashboard components.
 
 ### Environment
 
@@ -139,6 +142,9 @@ src/
     Sidebar.jsx       Dashboard nav. Defines the tab lists for all three
                       roles: official (13), nurse (5), resident (4).
     ProtectedRoute    Role gate. Frontend only — RLS is the real control.
+    ActionMenu        The ⋮ overflow menu. Used in exactly one place --
+                      read the constraint in its own header before
+                      putting it anywhere else.
 
   pages/              Public routes: Home, Officials, HealthCenter,
                       Reservation, Login, ResidentSignup, ResetPassword,
@@ -160,6 +166,10 @@ src/
     officialPhotos    Maps barangay_officials.full_name -> portrait file.
     clinicHours.js    Parses the "8:00 AM" display strings.
     storagePath.js    Public URL -> storage object path.
+    displayLabels     Stored status -> the words users read: document
+                      requests, reservations, availability. Also the
+                      upcoming-event count. It does NOT own account
+                      verification -- see below.
     residentGroups    The resident workflow's rules: the status
                       vocabulary, the Requests/Residents/Not Residents
                       grouping, search/filter, purok validity and the
@@ -747,12 +757,22 @@ own domain with SPF, DKIM and DMARC.
 
 Thirteen sidebar tabs, defined in `Sidebar.jsx` as `officialNavItems`:
 Dashboard, Announcements, Events, Reservations, Document Requests, Waste
-Management, Kapitan Status, Officials Directory, Residents, Voter
+Management, Punong Barangay Status, Officials Directory, Residents, Voter
 Reference List, Reports, Activity Log, Settings.
 
 The tab **ids** are unchanged — the Voter Reference List is still
-`registry` internally. That is the value `activeTab` is matched against,
-not something anybody reads.
+`registry` internally and the Punong Barangay Status tab is still
+`kapitan`. Those are the values `activeTab` is matched against, not
+something anybody reads.
+
+**Two tabs carry sidebar badges**, from data the dashboard already
+fetched: Document Requests shows requests at `pending`, and Residents
+shows accounts at `pending`. Both count only what is waiting on an
+official — `rejected` is an account already dealt with and returned to
+the resident, so it is in the Requests group but not in the badge, and a
+line under that group's heading says so. There is no read-state and no
+new column; each successful action refetches its list and the badge
+drops on its own.
 
 Several of them carry more than their name suggests:
 
@@ -856,6 +876,34 @@ auto-verifying would let anyone claim a neighbour's identity. Equally,
 **never add someone to the voter reference data *in order to* verify
 them, or to clear a line from the cross-check panel**: that makes the
 check circular while keeping its reassuring appearance.
+
+### Who owns a status label
+
+Two modules, and the split is deliberate:
+
+| Module | Owns |
+|---|---|
+| `residentGroups.js` | `profiles.verification_status` — the wording **and** the Requests / Residents / Not Residents grouping, so the two cannot drift apart |
+| `displayLabels.js` | `document_requests.status`, `reservations.status`, and the availability vocabulary shared by `nurse_availability` and `kapitan_availability` |
+
+`displayLabels.js` used to be **dead** — written ahead of the phases that
+would need it, imported by nothing, and by the time those phases arrived
+the wording had been settled elsewhere. So it sat in the repo holding a
+*second* vocabulary for statuses the app was already rendering:
+`verified` as "Resident", `rejected` as "Needs correction". Neither
+shipped. Those maps are gone, and `displayLabels.test.js` asserts they
+stay gone — re-adding them would give one status two answers again.
+
+⚠️ **No raw database value is shown to a user.** The Official Dashboard
+used to print `pending` and, through a regex, `ready for pickup` in the
+same table where the resident portal read "Pending Review" and "Ready for
+Pickup". Both now read from one map. Three related defects were fixed
+with it: `badge-cancelled` was generated from the status string and
+defined in no stylesheet, so a cancelled booking rendered as an unstyled
+pill; the nurse's weekly schedule coloured everything that was not
+`available` red, presenting a lunch break and a scheduled field day as
+faults; and a card labelled "Upcoming Events" counted every event ever
+created.
 
 ### The three resident groups
 
@@ -1037,6 +1085,29 @@ deliberate choice made with the resident — a bulk normalisation would
 need its own approval, since the system cannot know whether 'purol 5'
 meant Purok 5.
 
+### One word per thing
+
+Two label constants exist because the app had been using several words
+for one person in one product:
+
+| Constant | Value | Replaces |
+|---|---|---|
+| `PUNONG_BARANGAY_LABEL` | "Punong Barangay" | "Kapitan" in the sidebar tab, the status tab heading and its toast, and "Kapitan's Office" on the public page |
+| `HEALTH_NURSE_ROLE` | "Public Health Nurse" | "Head Barangay Nurse" in her own Settings, and the hard-coded copies on the sidebar and both public pages |
+
+**Presentation only, in both cases.** `kapitan_status`,
+`kapitan_availability`, the `kapitan` tab id, `isKapitan`, every
+`.kapitan-*` class and all database values keep their names — renaming
+those buys nothing a reader sees and costs a migration.
+
+"Punong Barangay" won because the officials directory, the public cards
+and `barangay_officials.position` already used it, and the position is
+what drives the Kapitan/Treasurer/Secretary permission gates. "Public
+Health Nurse" won because it was already the wording on the two pages
+residents actually read. Her Settings card previously introduced her as
+"Barangay Health Nurse / Head Barangay Nurse" — a name and a title that
+were nearly the same words and disagreed with the sidebar.
+
 The nurse is labelled **"Barangay Health Nurse"**, a role rather than a
 person. The system previously carried an invented name and a stock photo
 of an unrelated person, both presented as barangay staff. Replace with
@@ -1137,11 +1208,18 @@ the real name and photo together when the barangay confirms them.
 - **Source maps ship to production** (~7 MB), so the original JSX is
   publicly reconstructable. `GENERATE_SOURCEMAP=false` in Vercel fixes it.
 - **`public/logo.png` is 984 KB and referenced by nothing.**
-- **Thin automated test coverage.** 39 tests in two suites: one smoke
+- **Thin automated test coverage.** 72 tests in four suites: one smoke
   test over `<App />`, which fails without `.env` because
-  `supabaseClient.js` throws at import time, and 38 pure unit tests over
-  the resident workflow rules. No component, integration or end-to-end
-  tests, and no test touches the database.
+  `supabaseClient.js` throws at import time, and 71 pure unit tests over
+  the resident workflow rules, the display labels and the ⋮ menu's
+  keyboard behaviour. No integration or end-to-end tests, and no test
+  touches the database.
+- **`kapitan_availability` has no administrative UI.** The weekly
+  consultation schedule shown on the public Officials page is read from
+  that table by `src/pages/Officials.jsx` and by nothing else, so it can
+  only be changed in SQL. Recorded as an observation, not built: nobody
+  has asked for the screen, and inventing one would be a feature rather
+  than a fix.
 - **An InfinityFree deployment** may still be serving an old broken build.
 - **No 404 page.** `path="*"` in `App.js` renders `Home`, so a mistyped
   URL looks like the homepage instead of reporting an error.

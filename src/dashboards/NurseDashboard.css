@@ -718,8 +718,12 @@
 .medicine-status-btn.is-active.medicine-low         { background: #fef3c7; color: #92400e; }
 .medicine-status-btn.is-active.medicine-unavailable { background: #fee2e2; color: #991b1b; }
 
+/* Holds a single ⋮ trigger now rather than Edit and Remove buttons.
+    `margin-left: auto` still pushes it to the end of the row, and the
+    mobile override below still releases that. */
 .medicine-admin-actions {
   display: flex;
+  align-items: center;
   gap: 6px;
   margin-left: auto;
 }
@@ -728,4 +732,27 @@
   .medicine-admin-actions { margin-left: 0; }
   .medicine-status-group { width: 100%; }
   .medicine-status-btn { flex: 1; text-align: center; }
+}
+
+/* ================================
+    COMPACT WEEKLY SCHEDULE
+    ================================
+    The clinic schedule table went from six columns to four: Time Start,
+    Time End and Lunch Break were three columns describing one thing, and
+    at mobile widths -- where each row becomes a card -- that meant six
+    labelled lines per weekday. Hours now carries the opening span with
+    the break under it, which reads the same as a table row and as a card. */
+
+.availability-hours {
+  display: block;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The break is secondary to the opening hours, and saying "Lunch" in the
+    value means the column heading does not have to. */
+.availability-break {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--fs-12);
+  color: #6b7280;
 }
