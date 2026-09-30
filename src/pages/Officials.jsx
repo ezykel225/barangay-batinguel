@@ -52,9 +52,20 @@ const Officials = () => {
 
   const fetchOfficials = async () => {
     try {
+      // Active officials only. Archived records are barangay history and
+      // must never appear here.
+      //
+      // This filter is defence in depth, NOT the control. Migration 018's
+      // SELECT policy is what stops an anonymous caller retrieving
+      // archived rows: the publishable key ships inside this bundle by
+      // design, so anyone can call the REST endpoint directly and a filter
+      // written here would hide nothing from them. It is kept because it
+      // documents the intent and keeps this page correct if a policy is
+      // ever changed carelessly.
       const { data, error } = await supabase
         .from('barangay_officials')
         .select('*')
+        .is('archived_at', null)
         .order('display_order', { ascending: true })
       if (!error) setOfficials(data || [])
     } catch (err) {

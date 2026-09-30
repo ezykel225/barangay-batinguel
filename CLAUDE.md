@@ -289,11 +289,91 @@ The proper fix is a `profile_id uuid references auth.users(id)` column on
 `barangay_officials`, with all lookups switched to it. Not done — it
 touches a lot of working code.
 
+**Migration 018 removed the worst half of this.** A partial unique index
+allows at most one *active* official per `full_name`, so two active rows
+can no longer share a name and break the `.single()` lookups. The
+zero-match half remains: an official with no active directory row still
+silently loses their position permissions, which is what the missing
+Kagawad below actually was.
+
+### The missing Kagawad, 2026-09-30
+
+One official's directory row was found missing while her account still
+existed. `display_order` 7 was an empty slot between 6 and 8, and
+`activity_log` held **zero** rows with `entity_type = 'official'` — so the
+removal never went through the UI and left no trace anywhere. Nothing
+records who removed it, when, or why.
+
+Restoring her needed one row inserted through the existing Add Official
+flow and **no code change at all**: the RLS policies, the audit trigger,
+the vocabulary and the photo mapping were already correct. The photo map
+had carried her exact name since August, waiting for a row to attach to.
+
+This is the concrete reason officials are now archived rather than
+deleted, and it is worth citing whenever someone asks why the archive
+exists.
+
+---
+
+## Officials archive
+
+**Officials are archived, never permanently deleted.** Migration 018.
+
+A row is archived iff `archived_at IS NOT NULL`. One column carries both
+the state and the timestamp, so the two can never disagree.
+
+| Behaviour | How |
+|---|---|
+| Archive | Leaves the current directory and the public page immediately. The photo is **not** deleted. |
+| Restore | Returns every field and the photo exactly as stored. |
+| Who / when | `archived_by` and `archived_at` are **stamped server-side** by `stamp_official_archive`; anything the client sends is discarded. |
+| Permanent delete | **No button anywhere.** The DELETE policy matches only rows that are already archived, so an active official cannot be deleted in one step. |
+| Position powers | Archiving **revokes** them: the Treasurer and Secretary policies now require `bo.archived_at IS NULL`. |
+| Audit | `archived` / `restored` on `official`, with the optional reason in `details`. **No vocabulary migration was needed** — migration 016 reserved both values for exactly this. |
+
+**Three things about the design that are easy to get wrong later:**
+
+- **Frontend filtering is not the control.** The old SELECT policy was
+  `USING (true)`, and the publishable key ships in the bundle, so a React
+  filter would have hidden archived officials from the pages and from
+  nobody else. The policy is now split: `anon`/resident/nurse see active
+  rows only, officials see all. The `.is('archived_at', null)` filters in
+  the four read paths are defence in depth on top of that, not instead of
+  it.
+- **The Treasurer/Secretary condition must be explicit.** Relying on the
+  new SELECT policy to hide archived rows inside those subqueries does not
+  work: for an authenticated official the policy grants the archived row,
+  so the subquery would still find it. Deleting the row used to revoke
+  those powers by accident; archive has to do it deliberately.
+- **`display_order` is never renumbered.** Archiving leaves the gap;
+  restoring into an occupied position **blocks** and asks for a free one
+  rather than moving anybody. There is deliberately **no** unique index on
+  active `display_order`: the Add form used to turn a blank field into `0`
+  (`Number(x) || 0`, now validated instead), and swapping two officials'
+  order needs a temporary value that a non-deferrable partial unique index
+  makes impossible.
+
+⚠️ **The self-archive guard is not a security boundary.** An official may
+not archive their own record — blocked in the UI, and again in the
+trigger. But the trigger compares `profiles.full_name` to the row's
+`full_name`, the same string join documented above, so it **fails open**
+on a mismatch. That is accepted: archiving yourself only *reduces* your
+own privileges, so it is a foot-gun rather than an escalation path. Treat
+it as mistake prevention and do not build anything on top of it.
+
+⚠️ **Archived rows are not immutable in the database.** `archived_at` and
+`archived_by` are protected by the trigger, but the other historical
+fields are guarded only by the UI exposing no Edit control on archived
+records. That is a deliberate Phase 3A boundary, not completeness. Full
+immutability would need an allowlist trigger shaped like
+`protect_reservation_status`, and it cannot simply block UPDATE on
+archived rows — **restore is itself an UPDATE**.
+
 ---
 
 ## Database notes
 
-**17 migrations**, `001` through `017`, all applied.
+**18 migrations**, `001` through `018`, all applied.
 
 **15 tables, RLS enabled on every one.**
 
@@ -304,7 +384,7 @@ touches a lot of working code.
 | `document_requests` | Document requests and their status |
 | `announcements` | Public announcements |
 | `events` | Public barangay events |
-| `barangay_officials` | The officials directory, including `position`, which drives permissions |
+| `barangay_officials` | The officials directory, including `position`, which drives permissions, and `archived_at`/`archived_by` since migration 018 |
 | `residents_registry` | The barangay's own resident list — currently dummy data |
 | `waste_schedule` | Collection days per purok |
 | `activity_log` | Append-only audit trail. INSERT and SELECT policies only |
@@ -520,6 +600,9 @@ Two of them carry more than their name suggests:
 - Residents Registry — the barangay's own record. Currently **dummy
   data**; the real list wasn't available for a student project, which is
   also the right call under the Data Privacy Act.
+- Officials Directory — also holds the **Archived Officials** panel, which
+  appears only once something has been archived. Archive replaced the old
+  permanent Delete; see *Officials archive*.
 - Reports, Activity Log
 
 ### Nurses
@@ -548,7 +631,9 @@ government ID.
 
 **Nothing is ever deleted.** An official refused someone a government
 service; that decision stays accountable. There is no DELETE policy on
-`profiles` at all.
+`profiles` at all. Since migration 018 the same principle governs the
+officials directory: officials are archived, not deleted — see *Officials
+archive* above.
 
 ### The registry match is a signal, never a decision
 

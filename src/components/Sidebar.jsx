@@ -84,11 +84,16 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {} }) => {
       setProfileName(profile.full_name)
 
       if (role === 'official') {
+        // Active records only, and maybeSingle() rather than single():
+        // an official whose directory record has been archived is no
+        // longer serving, so their position must stop resolving here too.
+        // They fall back to the generic label below rather than erroring.
         const { data: official } = await supabase
           .from('barangay_officials')
           .select('position, committee')
           .eq('full_name', profile.full_name)
-          .single()
+          .is('archived_at', null)
+          .maybeSingle()
 
         if (official) {
           const pos = official.committee
