@@ -198,7 +198,7 @@ const HealthCenter = () => {
 
       <Navbar />
 
-      <main id="main-content">
+      <main id="main-content" tabIndex={-1}>
 
       {/* Hero */}
       <section className="health-hero">
@@ -259,7 +259,7 @@ const HealthCenter = () => {
               </h3>
 
               {loadingNurse ? (
-                <p style={{ fontSize: '13px', color: '#6b7280' }}>Loading...</p>
+                <p style={{ fontSize: '13px', color: '#5f6775' }}>Loading...</p>
               ) : (
                 <>
                   {/* Status is live from the nurse_availability table */}
@@ -316,9 +316,9 @@ const HealthCenter = () => {
               )}
 
               {loadingSchedule ? (
-                <p style={{ fontSize: '13px', color: '#6b7280' }}>Loading...</p>
+                <p style={{ fontSize: '13px', color: '#5f6775' }}>Loading...</p>
               ) : weekSchedule.length === 0 ? (
-                <p style={{ fontSize: '13px', color: '#6b7280' }}>
+                <p style={{ fontSize: '13px', color: '#5f6775' }}>
                   Clinic hours have not been set yet.
                 </p>
               ) : (
@@ -420,9 +420,9 @@ const HealthCenter = () => {
               </div>
 
               {medicinesLoading ? (
-                <p style={{ fontSize: '13px', color: '#6b7280' }}>Loading medicines...</p>
+                <p style={{ fontSize: '13px', color: '#5f6775' }}>Loading medicines...</p>
               ) : medicines.length === 0 ? (
-                <p style={{ fontSize: '13px', color: '#6b7280' }}>
+                <p style={{ fontSize: '13px', color: '#5f6775' }}>
                   The medicine list has not been published yet.
                 </p>
               ) : (
@@ -477,9 +477,9 @@ const HealthCenter = () => {
               </div>
 
               {eventsLoading ? (
-                <p style={{ fontSize: '13px', color: '#6b7280' }}>Loading events...</p>
+                <p style={{ fontSize: '13px', color: '#5f6775' }}>Loading events...</p>
               ) : healthEvents.length === 0 ? (
-                <p style={{ fontSize: '13px', color: '#6b7280' }}>No health events yet.</p>
+                <p style={{ fontSize: '13px', color: '#5f6775' }}>No health events yet.</p>
               ) : (
                 <div className="bakuna-grid">
                   {healthEvents.map((event) => (

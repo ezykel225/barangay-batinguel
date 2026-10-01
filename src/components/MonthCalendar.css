@@ -70,7 +70,7 @@
   text-align: center;
   font-size: var(--fs-12);
   font-weight: 600;
-  color: #6b7280;
+  color: #5f6775;
   padding: 4px 0;
 }
 
@@ -124,7 +124,7 @@
 
 .mcal-tone-muted {
   background-color: #e5e7eb;
-  color: #6b7280;
+  color: #5f6775;
   border-color: #d1d5db;
 }
 
@@ -196,7 +196,7 @@
 .mcal-caption {
   margin-top: 10px;
   font-size: var(--fs-12);
-  color: #6b7280;
+  color: #5f6775;
   line-height: 1.5;
 }
 
@@ -244,7 +244,7 @@
 
 .mcal-day-empty {
   font-size: var(--fs-13);
-  color: #6b7280;
+  color: #5f6775;
 }
 
 .mcal-day-list {
@@ -282,7 +282,7 @@
 
 .mcal-day-item-meta {
   font-size: var(--fs-12);
-  color: #6b7280;
+  color: #5f6775;
 }
 
 /* ── The view toggle ──
@@ -305,7 +305,7 @@
   font-family: 'Poppins', sans-serif;
   font-size: var(--fs-13);
   font-weight: 600;
-  color: #6b7280;
+  color: #5f6775;
   cursor: pointer;
   display: inline-flex;
   align-items: center;

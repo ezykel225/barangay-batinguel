@@ -685,7 +685,7 @@ const Reservation = () => {
     <div className="reservation-page">
       <Navbar />
 
-      <main id="main-content">
+      <main id="main-content" tabIndex={-1}>
 
       <section className="reservation-hero">
         <div className="reservation-hero-content">
@@ -722,8 +722,8 @@ const Reservation = () => {
                   }}
                 >
                   <div className="form-group">
-                    <label>Full Name</label>
-                    <input
+                    <label htmlFor="res-full_name">Full Name</label>
+                    <input id="res-full_name"
                       type="text"
                       name="full_name"
                       value={formData.full_name}
@@ -765,8 +765,8 @@ const Reservation = () => {
                   </div>
 
                   <div className="form-group">
-                    <label>Contact Number</label>
-                    <input
+                    <label htmlFor="res-contact_number">Contact Number</label>
+                    <input id="res-contact_number"
                       type="text"
                       name="contact_number"
                       value={formData.contact_number}
@@ -777,8 +777,8 @@ const Reservation = () => {
                   </div>
 
                   <div className="form-group">
-                    <label>Email Address</label>
-                    <input
+                    <label htmlFor="res-email">Email Address</label>
+                    <input id="res-email"
                       type="email"
                       name="email"
                       value={formData.email}
@@ -789,8 +789,8 @@ const Reservation = () => {
                   </div>
 
                   <div className="form-group">
-                    <label>Residency Status</label>
-                    <select
+                    <label htmlFor="res-residency_status">Residency Status</label>
+                    <select id="res-residency_status"
                       name="residency_status"
                       value={formData.residency_status}
                       onChange={handleChange}
@@ -802,8 +802,8 @@ const Reservation = () => {
                     </select>
                   </div>
                   <div className="form-group">
-                    <label>Type of Activity</label>
-                    <select
+                    <label htmlFor="res-activity_type">Type of Activity</label>
+                    <select id="res-activity_type"
                       name="activity_type"
                       value={formData.activity_type}
                       onChange={handleChange}
@@ -814,14 +814,14 @@ const Reservation = () => {
                         <option key={type} value={type}>{type}</option>
                       ))}
                     </select>
-                    <p style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>
+                    <p style={{ fontSize: 12, color: '#5f6775', marginTop: 6 }}>
                       Shown publicly on the availability calendar so others can see
                       what the court is booked for. Your name and purpose stay private.
                     </p>
                   </div>
                   <div className="form-group">
-                    <label>Purpose</label>
-                    <input
+                    <label htmlFor="res-purpose">Purpose</label>
+                    <input id="res-purpose"
                       type="text"
                       name="purpose"
                       value={formData.purpose}
@@ -854,8 +854,8 @@ const Reservation = () => {
                   )}
 
                   <div className="form-group">
-                    <label>Preferred Date</label>
-                    <input
+                    <label htmlFor="res-preferred_date">Preferred Date</label>
+                    <input id="res-preferred_date"
                       type="date"
                       name="preferred_date"
                       value={formData.preferred_date}
@@ -866,8 +866,8 @@ const Reservation = () => {
                   </div>
 
                   <div className="form-group">
-                    <label>Duration (Hours)</label>
-                    <select
+                    <label htmlFor="res-duration_hours">Duration (Hours)</label>
+                    <select id="res-duration_hours"
                       name="duration_hours"
                       value={formData.duration_hours}
                       onChange={handleChange}
@@ -888,8 +888,8 @@ const Reservation = () => {
                   </div>
 
                   <div className="form-group">
-                    <label>Additional Notes</label>
-                    <textarea
+                    <label htmlFor="res-additional_notes">Additional Notes</label>
+                    <textarea id="res-additional_notes"
                       name="additional_notes"
                       value={formData.additional_notes}
                       onChange={handleChange}
@@ -903,7 +903,7 @@ const Reservation = () => {
                       "Ang tunay na yaman ay hindi sa kung ano ang natatanggap,
                       kundi sa kung ano ang naibabahagi."
                     </p>
-                    <p style={{ fontSize: 13, color: '#6b7280' }}>
+                    <p style={{ fontSize: 13, color: '#5f6775' }}>
                       This covered court is free to use. Any donation — big or small,
                       in cash or in kind, given in person at the Barangay Hall — helps
                       keep it clean and well-maintained for every family in the
@@ -935,7 +935,7 @@ const Reservation = () => {
 
                   <div className="payment-box">
                     <h3>Reserving the Court is Free</h3>
-                    <p style={{ fontSize: 13, color: '#6b7280' }}>
+                    <p style={{ fontSize: 13, color: '#5f6775' }}>
                       There is nothing to pay and nothing to upload — just submit
                       your reservation. If you'd like to support the court's
                       upkeep, donations are welcome in person at the Barangay
@@ -948,7 +948,7 @@ const Reservation = () => {
                     <button
                       type="button"
                       className="reservation-submit-btn"
-                      style={{ background: '#6b7280' }}
+                      style={{ background: '#5f6775' }}
                       onClick={() => setShowPaymentStep(false)}
                     >
                       ← Back to Details

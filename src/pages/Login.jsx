@@ -16,6 +16,7 @@ import toast from 'react-hot-toast'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import './Login.css'
+import { useModalA11y } from '../components/useModalA11y'
 
 // Supabase's browser auth lock is shared across ALL tabs of this
 // origin, not per-tab. With multiple tabs open, one tab's auth call
@@ -46,6 +47,13 @@ const Login = () => {
   const [showSupportModal, setShowSupportModal] = useState(false)
   const [forgotEmail, setForgotEmail] = useState('')
   const [forgotLoading, setForgotLoading] = useState(false)
+
+  // Escape, focus entry and focus restoration for the reset-password and
+  // support boxes. One call for both -- they are mutually exclusive.
+  useModalA11y(showForgotModal || showSupportModal, () => {
+    setShowForgotModal(false)
+    setShowSupportModal(false)
+  })
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -171,7 +179,7 @@ const Login = () => {
       <Navbar />
 
       {/* Login Container */}
-      <main className="login-container" id="main-content">
+      <main className="login-container" id="main-content" tabIndex={-1}>
         <div className="login-box">
 
           {/* Left Panel */}
@@ -291,12 +299,12 @@ const Login = () => {
 
               {/* Email */}
               <div className="login-form-group">
-                <label>Email</label>
+                <label htmlFor="login-email">Email</label>
                 <div className="login-input-wrapper">
                   <div className="login-input-icon">
                     <FaIdCard />
                   </div>
-                  <input
+                  <input id="login-email"
                     type="text"
                     placeholder="Enter your email"
                     value={systemId}
@@ -310,12 +318,12 @@ const Login = () => {
 
               {/* Password */}
               <div className="login-form-group">
-                <label>Password</label>
+                <label htmlFor="login-password">Password</label>
                 <div className="login-input-wrapper">
                   <div className="login-input-icon">
                     <FaKey />
                   </div>
-                  <input
+                  <input id="login-password"
                     type={showPassword
                       ? 'text' : 'password'}
                     placeholder="••••••••••••"
@@ -328,6 +336,8 @@ const Login = () => {
                   <button
                     type="button"
                     className="login-toggle-password"
+                    aria-pressed={showPassword}
+                    aria-label={showPassword ? 'Hide the password' : 'Show the password'}
                     onClick={() =>
                       setShowPassword(!showPassword)
                     }>
@@ -390,8 +400,8 @@ const Login = () => {
       {/* Forgot Access Modal */}
       {showForgotModal && (
         <div className="login-modal-overlay" onClick={() => setShowForgotModal(false)}>
-          <div className="login-modal" onClick={(e) => e.stopPropagation()}>
-            <h2>Reset your password</h2>
+          <div className="login-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="logindlg-1-title">
+            <h2 id="logindlg-1-title">Reset your password</h2>
             <p>
               Enter the email address tied to your official or nurse
               account. We'll send a password reset link to it.
@@ -428,8 +438,8 @@ const Login = () => {
       {/* Support Portal Modal */}
       {showSupportModal && (
         <div className="login-modal-overlay" onClick={() => setShowSupportModal(false)}>
-          <div className="login-modal" onClick={(e) => e.stopPropagation()}>
-            <h2>Support Portal</h2>
+          <div className="login-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="logindlg-2-title">
+            <h2 id="logindlg-2-title">Support Portal</h2>
             <p>
               For account access issues that a reset link can't fix,
               contact the Barangay Batinguel administrator directly:

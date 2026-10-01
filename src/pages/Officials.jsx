@@ -206,7 +206,7 @@ const Officials = () => {
     <div className="officials-page">
       <Navbar />
 
-      <main id="main-content">
+      <main id="main-content" tabIndex={-1}>
 
       {/* Hero */}
       <section className="officials-hero">
@@ -263,11 +263,11 @@ const Officials = () => {
                 Consultation Schedule
               </h4>
               {loadingSchedule ? (
-                <p style={{ fontSize: '13px', color: '#6b7280' }}>
+                <p style={{ fontSize: '13px', color: '#5f6775' }}>
                   Loading schedule...
                 </p>
               ) : schedule.length === 0 ? (
-                <p style={{ fontSize: '13px', color: '#6b7280' }}>
+                <p style={{ fontSize: '13px', color: '#5f6775' }}>
                   No schedule available.
                 </p>
               ) : (
@@ -301,7 +301,7 @@ const Officials = () => {
           </p>
 
           {loadingOfficials ? (
-            <p style={{ fontSize: '14px', color: '#6b7280' }}>
+            <p style={{ fontSize: '14px', color: '#5f6775' }}>
               Loading officials...
             </p>
           ) : (

@@ -38,7 +38,7 @@ const Announcements = () => {
     <div className="announcements-page">
       <Navbar />
 
-      <main id="main-content">
+      <main id="main-content" tabIndex={-1}>
 
       <section className="announcements-page-section">
         <div className="announcements-page-container">
@@ -67,7 +67,13 @@ const Announcements = () => {
                     </div>
                     <div className="announcement-card-body">
                       <span className="announcement-badge">{item.badge}</span>
-                      <h3>{item.title}</h3>
+                      {/* ⚠️ (X3) h2, not h3. This page's only other
+                          heading is its <h1>, so an <h3> here skips a
+                          level and a screen-reader user navigating by
+                          heading hears a gap. On Home the same card sits
+                          under a section <h2>, where h3 is correct --
+                          which is why the two pages differ. */}
+                      <h2>{item.title}</h2>
                       <p>{item.description}</p>
                       <div className="announcement-card-footer">
                         {new Date(item.date_posted).toLocaleDateString('en-US', {

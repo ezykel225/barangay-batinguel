@@ -23,6 +23,7 @@ import { pathFromPublicUrl } from '../utils/storagePath'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 import Sidebar from '../components/Sidebar'
+import { useModalA11y } from '../components/useModalA11y'
 import NotificationBell from '../components/NotificationBell'
 import { useNotifications } from '../components/useNotifications'
 import { PersonAvatar } from '../utils/officialPhotos'
@@ -365,6 +366,30 @@ const OfficialDashboard = () => {
   const [archivingOfficial, setArchivingOfficial] = useState(null)
   const [restoringOfficial, setRestoringOfficial] = useState(null)
   const [showWasteModal, setShowWasteModal] = useState(false)
+
+  // ── Modal accessibility ────────────────────────────────────────────
+  //
+  // Escape, focus entry and focus restoration for all NINE modals on
+  // this dashboard. One call, because they are mutually exclusive --
+  // see useModalA11y for why that is the shape. Before this, opening an
+  // Add form left focus on the button behind the overlay and Escape did
+  // nothing.
+  useModalA11y(
+    showAnnouncementModal || showEventModal || showOfficialModal ||
+    showWasteModal || showRegistryModal || !!decliningRequest ||
+    !!viewingId || !!ineligibleResident || !!rejectingResident,
+    () => {
+      setShowAnnouncementModal(false)
+      setShowEventModal(false)
+      setShowOfficialModal(false)
+      setShowWasteModal(false)
+      setShowRegistryModal(false)
+      setDecliningRequest(null)
+      setViewingId(null)
+      setIneligibleResident(null)
+      setRejectingResident(null)
+    }
+  )
   const [editingWaste, setEditingWaste] = useState(null)
   const [processingDocRequestIds, setProcessingDocRequestIds] = useState(new Set())
 
@@ -2302,7 +2327,7 @@ const OfficialDashboard = () => {
       />
 
       {/* Main Content */}
-      <main className="dashboard-main" id="main-content">
+      <main className="dashboard-main" id="main-content" tabIndex={-1}>
 
         {/* The DESKTOP bell. It sits here rather than inside each tab's
             own header, because there are thirteen of those and no shared
@@ -4057,9 +4082,9 @@ const OfficialDashboard = () => {
               </p>
 
               <div className="modal-form-group">
-                <label className="modal-form-label">New Password</label>
+                <label htmlFor="off-new-password" className="modal-form-label">New Password</label>
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <input
+                  <input id="off-new-password"
                     type={showNew ? 'text' : 'password'}
                     className="modal-form-input"
                     placeholder="Enter new password"
@@ -4068,6 +4093,9 @@ const OfficialDashboard = () => {
                     style={{ paddingRight: 40 }}
                   />
                   <button
+                    type="button"
+                    aria-pressed={showNew}
+                    aria-label={showNew ? 'Hide the new password' : 'Show the new password'}
                     onClick={() => setShowNew(!showNew)}
                     style={{
                       position: 'absolute', right: 12, background: 'none',
@@ -4080,9 +4108,9 @@ const OfficialDashboard = () => {
               </div>
 
               <div className="modal-form-group">
-                <label className="modal-form-label">Confirm New Password</label>
+                <label htmlFor="off-confirm-new-password" className="modal-form-label">Confirm New Password</label>
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <input
+                  <input id="off-confirm-new-password"
                     type={showConfirm ? 'text' : 'password'}
                     className="modal-form-input"
                     placeholder="Confirm new password"
@@ -4091,6 +4119,9 @@ const OfficialDashboard = () => {
                     style={{ paddingRight: 40 }}
                   />
                   <button
+                    type="button"
+                    aria-pressed={showConfirm}
+                    aria-label={showConfirm ? 'Hide the confirmed password' : 'Show the confirmed password'}
                     onClick={() => setShowConfirm(!showConfirm)}
                     style={{
                       position: 'absolute', right: 12, background: 'none',
@@ -4130,12 +4161,12 @@ const OfficialDashboard = () => {
       ======================== */}
       {showAnnouncementModal && (
         <div className="modal-overlay">
-          <div className="modal">
-            <h3>New Announcement</h3>
+          <div className="modal" role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="offdlg-1-title">
+            <h3 id="offdlg-1-title">New Announcement</h3>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Title</label>
-              <input
+              <label htmlFor="off-title" className="modal-form-label">Title</label>
+              <input id="off-title"
                 type="text"
                 className="modal-form-input"
                 placeholder="Announcement title"
@@ -4145,8 +4176,8 @@ const OfficialDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Badge / Category</label>
-              <input
+              <label htmlFor="off-badge-category" className="modal-form-label">Badge / Category</label>
+              <input id="off-badge-category"
                 type="text"
                 className="modal-form-input"
                 placeholder="e.g. PUBLIC WORKS, HEALTH"
@@ -4156,8 +4187,8 @@ const OfficialDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Description</label>
-              <textarea
+              <label htmlFor="off-description" className="modal-form-label">Description</label>
+              <textarea id="off-description"
                 className="modal-form-textarea"
                 placeholder="Announcement description"
                 value={newAnnouncement.description}
@@ -4182,12 +4213,12 @@ const OfficialDashboard = () => {
       ======================== */}
       {showEventModal && (
         <div className="modal-overlay">
-          <div className="modal">
-            <h3>{editingEvent ? 'Edit Event' : 'Add Event'}</h3>
+          <div className="modal" role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="offdlg-2-title">
+            <h3 id="offdlg-2-title">{editingEvent ? 'Edit Event' : 'Add Event'}</h3>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Event Title</label>
-              <input
+              <label htmlFor="off-event-title" className="modal-form-label">Event Title</label>
+              <input id="off-event-title"
                 type="text"
                 className="modal-form-input"
                 placeholder="Event title"
@@ -4197,8 +4228,8 @@ const OfficialDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Location</label>
-              <input
+              <label htmlFor="off-location" className="modal-form-label">Location</label>
+              <input id="off-location"
                 type="text"
                 className="modal-form-input"
                 placeholder="Event location"
@@ -4208,8 +4239,8 @@ const OfficialDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Event Date</label>
-              <input
+              <label htmlFor="off-event-date" className="modal-form-label">Event Date</label>
+              <input id="off-event-date"
                 type="date"
                 className="modal-form-input"
                 value={newEvent.event_date}
@@ -4244,12 +4275,12 @@ const OfficialDashboard = () => {
       ======================== */}
       {showOfficialModal && (
         <div className="modal-overlay">
-          <div className="modal">
-            <h3>{editingOfficial ? 'Edit Official' : 'Add Official'}</h3>
+          <div className="modal" role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="offdlg-3-title">
+            <h3 id="offdlg-3-title">{editingOfficial ? 'Edit Official' : 'Add Official'}</h3>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Full Name</label>
-              <input
+              <label htmlFor="off-full-name" className="modal-form-label">Full Name</label>
+              <input id="off-full-name"
                 type="text"
                 className="modal-form-input"
                 placeholder="e.g. Hon. Frankie Credo"
@@ -4259,8 +4290,8 @@ const OfficialDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Position</label>
-              <select
+              <label htmlFor="off-position" className="modal-form-label">Position</label>
+              <select id="off-position"
                 className="modal-form-input"
                 value={newOfficial.position}
                 onChange={(e) => setNewOfficial({ ...newOfficial, position: e.target.value })}
@@ -4275,8 +4306,8 @@ const OfficialDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Committee (optional)</label>
-              <input
+              <label htmlFor="off-committee-optional" className="modal-form-label">Committee (optional)</label>
+              <input id="off-committee-optional"
                 type="text"
                 className="modal-form-input"
                 placeholder="e.g. Health and Sanitation"
@@ -4286,8 +4317,8 @@ const OfficialDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Contact Number (optional)</label>
-              <input
+              <label htmlFor="off-contact-number-optional" className="modal-form-label">Contact Number (optional)</label>
+              <input id="off-contact-number-optional"
                 type="text"
                 className="modal-form-input"
                 placeholder="09XXXXXXXXX"
@@ -4297,8 +4328,8 @@ const OfficialDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Display Order</label>
-              <input
+              <label htmlFor="off-display-order" className="modal-form-label">Display Order</label>
+              <input id="off-display-order"
                 type="number"
                 className="modal-form-input"
                 placeholder="Lower numbers appear first"
@@ -4321,12 +4352,12 @@ const OfficialDashboard = () => {
 
       {showWasteModal && (
         <div className="modal-overlay">
-          <div className="modal">
-            <h3>{editingWaste ? 'Edit Schedule Entry' : 'Add Schedule Entry'}</h3>
+          <div className="modal" role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="offdlg-4-title">
+            <h3 id="offdlg-4-title">{editingWaste ? 'Edit Schedule Entry' : 'Add Schedule Entry'}</h3>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Purok</label>
-              <input
+              <label htmlFor="off-purok" className="modal-form-label">Purok</label>
+              <input id="off-purok"
                 type="text"
                 className="modal-form-input"
                 placeholder="e.g. Purok 3"
@@ -4336,8 +4367,8 @@ const OfficialDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Waste Type</label>
-              <select
+              <label htmlFor="off-waste-type" className="modal-form-label">Waste Type</label>
+              <select id="off-waste-type"
                 className="modal-form-input"
                 value={newWasteEntry.waste_type}
                 onChange={(e) => setNewWasteEntry({ ...newWasteEntry, waste_type: e.target.value })}
@@ -4349,8 +4380,8 @@ const OfficialDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Day of Week</label>
-              <select
+              <label htmlFor="off-day-of-week" className="modal-form-label">Day of Week</label>
+              <select id="off-day-of-week"
                 className="modal-form-input"
                 value={newWasteEntry.day_of_week}
                 onChange={(e) => setNewWasteEntry({ ...newWasteEntry, day_of_week: e.target.value })}
@@ -4363,8 +4394,8 @@ const OfficialDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Time (optional)</label>
-              <input
+              <label htmlFor="off-time-optional" className="modal-form-label">Time (optional)</label>
+              <input id="off-time-optional"
                 type="text"
                 className="modal-form-input"
                 placeholder="e.g. 6:00 AM - 8:00 AM"
@@ -4374,8 +4405,8 @@ const OfficialDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Notes (optional)</label>
-              <input
+              <label htmlFor="off-notes-optional" className="modal-form-label">Notes (optional)</label>
+              <input id="off-notes-optional"
                 type="text"
                 className="modal-form-input"
                 placeholder="e.g. Segregate before collection"
@@ -4398,12 +4429,12 @@ const OfficialDashboard = () => {
 
       {showRegistryModal && (
         <div className="modal-overlay">
-          <div className="modal">
-            <h3>{editingRegistryEntry ? 'Edit Voter Reference Entry' : 'Add Voter Reference Entry'}</h3>
+          <div className="modal" role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="offdlg-5-title">
+            <h3 id="offdlg-5-title">{editingRegistryEntry ? 'Edit Voter Reference Entry' : 'Add Voter Reference Entry'}</h3>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Full Name</label>
-              <input
+              <label htmlFor="off-full-name-2" className="modal-form-label">Full Name</label>
+              <input id="off-full-name-2"
                 type="text"
                 className="modal-form-input"
                 placeholder="e.g. Juan Dela Cruz"
@@ -4443,8 +4474,8 @@ const OfficialDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Household Number (optional)</label>
-              <input
+              <label htmlFor="off-household-number-optional" className="modal-form-label">Household Number (optional)</label>
+              <input id="off-household-number-optional"
                 type="text"
                 className="modal-form-input"
                 placeholder="e.g. HH-0012"
@@ -4454,8 +4485,8 @@ const OfficialDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Contact Number (optional)</label>
-              <input
+              <label htmlFor="off-contact-number-optional-2" className="modal-form-label">Contact Number (optional)</label>
+              <input id="off-contact-number-optional-2"
                 type="text"
                 className="modal-form-input"
                 placeholder="09xx xxx xxxx"
@@ -4478,15 +4509,15 @@ const OfficialDashboard = () => {
 
       {decliningRequest && (
         <div className="modal-overlay">
-          <div className="modal">
-            <h3>Decline {decliningRequest.document_type} Request</h3>
+          <div className="modal" role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="offdlg-6-title">
+            <h3 id="offdlg-6-title">Decline {decliningRequest.document_type} Request</h3>
             <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>
               This resident will see this explanation on their Document Requests page.
             </p>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Reason</label>
-              <textarea
+              <label htmlFor="off-reason" className="modal-form-label">Reason</label>
+              <textarea id="off-reason"
                 className="modal-form-textarea"
                 placeholder="e.g. Missing required signature, incomplete purpose, please visit the office"
                 value={declineNotes}
@@ -4512,8 +4543,8 @@ const OfficialDashboard = () => {
 
       {viewingId && (
         <div className="modal-overlay" onClick={() => setViewingId(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640 }}>
-            <h3>ID — {viewingId.resident.full_name}</h3>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640 }} role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="offdlg-7-title">
+            <h3 id="offdlg-7-title">ID — {viewingId.resident.full_name}</h3>
             <p style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
               This link expires in 2 minutes. Check that the name and address match
               what the resident entered.
@@ -4548,8 +4579,8 @@ const OfficialDashboard = () => {
 
       {ineligibleResident && (
         <div className="modal-overlay">
-          <div className="modal">
-            <h3>Mark {ineligibleResident.full_name} as Not a Resident</h3>
+          <div className="modal" role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="offdlg-8-title">
+            <h3 id="offdlg-8-title">Mark {ineligibleResident.full_name} as Not a Resident</h3>
             <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 8 }}>
               Use this when the applicant is not a resident of Barangay Batinguel.
               Unlike Reject, they cannot put themselves back in the queue — only an
@@ -4575,8 +4606,8 @@ const OfficialDashboard = () => {
             )}
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Reason</label>
-              <textarea
+              <label htmlFor="off-reason-2" className="modal-form-label">Reason</label>
+              <textarea id="off-reason-2"
                 className="modal-form-textarea"
                 placeholder="e.g. confirmed to be living in another barangay"
                 value={ineligibleNotes}
@@ -4603,15 +4634,15 @@ const OfficialDashboard = () => {
 
       {rejectingResident && (
         <div className="modal-overlay">
-          <div className="modal">
-            <h3>Reject {rejectingResident.full_name}'s Account</h3>
+          <div className="modal" role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="offdlg-9-title">
+            <h3 id="offdlg-9-title">Reject {rejectingResident.full_name}'s Account</h3>
             <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>
               This resident will see this explanation and can re-upload a new ID.
             </p>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Reason</label>
-              <textarea
+              <label htmlFor="off-reason-3" className="modal-form-label">Reason</label>
+              <textarea id="off-reason-3"
                 className="modal-form-textarea"
                 placeholder="e.g. ID photo is blurry, name doesn't match, please re-upload"
                 value={rejectNotes}

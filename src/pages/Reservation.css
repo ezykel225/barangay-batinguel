@@ -229,7 +229,7 @@
   text-align: center;
   font-size: var(--fs-12);
   font-weight: 600;
-  color: #6b7280;
+  color: #5f6775;
   padding: 4px 0;
 }
 
@@ -267,7 +267,7 @@
 
 .calendar-cell.unavailable {
   background-color: #e5e7eb;
-  color: #6b7280;
+  color: #5f6775;
   border-color: #d1d5db;
   cursor: not-allowed;
   filter: grayscale(100%);
@@ -285,7 +285,7 @@
   flex-wrap: wrap;
   margin-top: 12px;
   font-size: var(--fs-12);
-  color: #6b7280;
+  color: #5f6775;
 }
 
 .calendar-legend span {
@@ -505,7 +505,7 @@
    use. */
 .field-note {
   font-size: var(--fs-12);
-  color: #6b7280;
+  color: #5f6775;
   margin-top: 6px;
   line-height: 1.5;
 }

@@ -1,10 +1,15 @@
 import { useState } from 'react'
 import { FaFacebook } from 'react-icons/fa'
 import './Footer.css'
+import { useModalA11y } from './useModalA11y'
 import { BARANGAY_CONTACT, BARANGAY_OFFICE_HOURS, telHref } from '../constants/barangay'
 
 const Footer = () => {
   const [activeModal, setActiveModal] = useState(null)
+
+  // Escape, focus entry and focus restoration for the Privacy and Terms
+  // boxes. See useModalA11y -- these had none of it.
+  useModalA11y(!!activeModal, () => setActiveModal(null))
   const currentYear = new Date().getFullYear()
 
   const modalContent = {
@@ -133,9 +138,13 @@ const Footer = () => {
         >
           <div
             className="footer-modal"
+            role="dialog"
+            aria-modal="true"
+            tabIndex={-1}
+            aria-labelledby="footer-modal-title"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2>{modalContent[activeModal].title}</h2>
+            <h2 id="footer-modal-title">{modalContent[activeModal].title}</h2>
             <div className="footer-modal-content">
               {modalContent[activeModal].content}
             </div>

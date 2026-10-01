@@ -64,7 +64,13 @@
      `--grey-600` is the single most used colour in the codebase (96
      occurrences) and is also the approved replacement for the failing
      #9ca3af. */
-  --grey-600: #6b7280;
+  /* ⚠️ (X3) Darkened from #6b7280. At the old value this grey measured
+     4.41:1 on #f1f5f9 and 4.44:1 on #eff6ff -- just under the 4.5:1 AA
+     minimum for normal-size text, and it is the app's muted text colour
+     in 86 places (table headers, the clinic schedule, helper
+     paragraphs). #5f6775 is the same grey one step darker and measures
+     5.20:1 against the lightest background it is used on. */
+  --grey-600: #5f6775;
   --grey-100: #f3f4f6;
   --grey-50: #f9fafb;
   --slate-600: #475569;
@@ -72,12 +78,12 @@
   --blue-50: #eff6ff;
 
   --success: #15803d;
-  --success-strong: #16a34a;
+  --success-strong: #15803d;
   --success-light: #dcfce7;
   --success-pale: #f0fdf4;
   --teal: #0f766e;
 
-  --danger: #dc2626;
+  --danger: #b91c1c;
   --danger-light: #fee2e2;
 
   /* Amber pair. The text colour was #ca8a04 on this background —

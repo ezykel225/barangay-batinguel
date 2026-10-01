@@ -79,7 +79,7 @@ const Events = () => {
     <div className="events-page">
       <Navbar />
 
-      <main id="main-content">
+      <main id="main-content" tabIndex={-1}>
 
       <section className="events-page-section">
         <div className="events-page-container">

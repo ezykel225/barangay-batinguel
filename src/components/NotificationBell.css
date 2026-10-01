@@ -159,7 +159,11 @@
 
 .notif-item-when {
   font-size: 0.72rem;
-  color: #8a97a4;
+  /* ⚠️ (X3) Was #8a97a4, which measured 2.80:1 against the unread row's
+     #f4f9f6 tint -- the worst contrast in the application, and in code
+     added during the notifications work. This is the app's muted grey:
+     5.20:1 on white and 4.9:1 on the tint. */
+  color: #5f6775;
 }
 
 .notif-empty {

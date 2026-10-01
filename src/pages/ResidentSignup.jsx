@@ -184,7 +184,7 @@ const ResidentSignup = () => {
     <div className="login-page">
       <Navbar />
 
-      <main className="login-container" id="main-content">
+      <main className="login-container" id="main-content" tabIndex={-1}>
         <div className="login-box">
           <div className="login-left">
             <div className="login-left-logo">
@@ -223,10 +223,10 @@ const ResidentSignup = () => {
 
             <form className="login-form" onSubmit={handleSignup}>
               <div className="login-form-group">
-                <label>First Name</label>
+                <label htmlFor="signup-first_name">First Name</label>
                 <div className="login-input-wrapper">
                   <div className="login-input-icon"><FaUser /></div>
-                  <input
+                  <input id="signup-first_name"
                     type="text"
                     name="first_name"
                     placeholder="Juan"
@@ -238,10 +238,10 @@ const ResidentSignup = () => {
               </div>
 
               <div className="login-form-group">
-                <label>Middle Name <span className="field-optional">(optional)</span></label>
+                <label htmlFor="signup-middle_name">Middle Name <span className="field-optional">(optional)</span></label>
                 <div className="login-input-wrapper">
                   <div className="login-input-icon"><FaUser /></div>
-                  <input
+                  <input id="signup-middle_name"
                     type="text"
                     name="middle_name"
                     placeholder="Santos"
@@ -252,10 +252,10 @@ const ResidentSignup = () => {
               </div>
 
               <div className="login-form-group">
-                <label>Last Name</label>
+                <label htmlFor="signup-last_name">Last Name</label>
                 <div className="login-input-wrapper">
                   <div className="login-input-icon"><FaUser /></div>
-                  <input
+                  <input id="signup-last_name"
                     type="text"
                     name="last_name"
                     placeholder="Dela Cruz"
@@ -267,10 +267,10 @@ const ResidentSignup = () => {
               </div>
 
               <div className="login-form-group">
-                <label>Suffix <span className="field-optional">(optional)</span></label>
+                <label htmlFor="signup-suffix">Suffix <span className="field-optional">(optional)</span></label>
                 <div className="login-input-wrapper">
                   <div className="login-input-icon"><FaUser /></div>
-                  <input
+                  <input id="signup-suffix"
                     type="text"
                     name="suffix"
                     placeholder="Jr., Sr., III"
@@ -281,10 +281,10 @@ const ResidentSignup = () => {
               </div>
 
               <div className="login-form-group">
-                <label>Email</label>
+                <label htmlFor="signup-email">Email</label>
                 <div className="login-input-wrapper">
                   <div className="login-input-icon"><FaEnvelope /></div>
-                  <input
+                  <input id="signup-email"
                     type="email"
                     name="email"
                     placeholder="you@example.com"
@@ -296,10 +296,10 @@ const ResidentSignup = () => {
               </div>
 
               <div className="login-form-group">
-                <label>Contact Number</label>
+                <label htmlFor="signup-contact_number">Contact Number</label>
                 <div className="login-input-wrapper">
                   <div className="login-input-icon"><FaPhone /></div>
-                  <input
+                  <input id="signup-contact_number"
                     type="tel"
                     name="contact_number"
                     placeholder="09xx xxx xxxx"
@@ -310,10 +310,10 @@ const ResidentSignup = () => {
               </div>
 
               <div className="login-form-group">
-                <label>Purok</label>
+                <label htmlFor="signup-purok">Purok</label>
                 <div className="login-input-wrapper">
                   <div className="login-input-icon"><FaMapMarkerAlt /></div>
-                  <select
+                  <select id="signup-purok"
                     name="purok"
                     value={formData.purok}
                     onChange={handleChange}
@@ -333,10 +333,10 @@ const ResidentSignup = () => {
               </div>
 
               <div className="login-form-group">
-                <label>Password</label>
+                <label htmlFor="signup-password">Password</label>
                 <div className="login-input-wrapper">
                   <div className="login-input-icon"><FaLock /></div>
-                  <input
+                  <input id="signup-password"
                     type={showPassword ? 'text' : 'password'}
                     name="password"
                     placeholder="At least 6 characters"
@@ -347,6 +347,8 @@ const ResidentSignup = () => {
                   <button
                     type="button"
                     className="login-toggle-password"
+                    aria-pressed={showPassword}
+                    aria-label={showPassword ? 'Hide the password' : 'Show the password'}
                     onClick={() => setShowPassword(!showPassword)}
                   >
                     {showPassword ? <FaEyeSlash /> : <FaEye />}
@@ -355,10 +357,10 @@ const ResidentSignup = () => {
               </div>
 
               <div className="login-form-group">
-                <label>Confirm Password</label>
+                <label htmlFor="signup-confirm_password">Confirm Password</label>
                 <div className="login-input-wrapper">
                   <div className="login-input-icon"><FaLock /></div>
-                  <input
+                  <input id="signup-confirm_password"
                     type={showPassword ? 'text' : 'password'}
                     name="confirm_password"
                     placeholder="Re-enter your password"
@@ -370,17 +372,17 @@ const ResidentSignup = () => {
               </div>
 
               <div className="login-form-group">
-                <label>Valid ID (optional, but speeds up verification)</label>
+                <label htmlFor="signup-valid-id-optional-but-speeds-up-ve">Valid ID (optional, but speeds up verification)</label>
                 <div className="login-input-wrapper">
                   <div className="login-input-icon"><FaIdCard /></div>
-                  <input
+                  <input id="signup-valid-id-optional-but-speeds-up-ve"
                     type="file"
                     accept="image/*"
                     onChange={(e) => setIdFile(e.target.files?.[0] || null)}
                     style={{ padding: '10px 0' }}
                   />
                 </div>
-                <p style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>
+                <p style={{ fontSize: 12, color: '#5f6775', marginTop: 6 }}>
                   A photo of any valid government or barangay-issued ID, if you
                   have one. Don't have an ID? You can skip this and visit the
                   Barangay Hall so an official can verify you in person instead.

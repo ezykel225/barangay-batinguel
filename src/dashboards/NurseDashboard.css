@@ -22,7 +22,7 @@
 
 .nurse-dashboard-header p {
   font-size: var(--fs-14);
-  color: #6b7280;
+  color: #5f6775;
 }
 
 /* Status Badge */
@@ -31,7 +31,7 @@
   align-items: center;
   gap: 8px;
   background: #dcfce7;
-  color: #16a34a;
+  color: #15803d;
   padding: 8px 16px;
   border-radius: var(--radius-pill);
   font-size: var(--fs-13);
@@ -42,7 +42,7 @@
   width: 8px;
   height: 8px;
   border-radius: var(--radius-circle);
-  background-color: #16a34a;
+  background-color: #15803d;
   animation: pulse 2s infinite;
 }
 
@@ -126,7 +126,7 @@
 
 .bakuna-event-info p {
   font-size: var(--fs-12);
-  color: #6b7280;
+  color: #5f6775;
 }
 
 .bakuna-add-btn {
@@ -178,7 +178,7 @@
 
 .programs-subtitle {
   font-size: var(--fs-13);
-  color: #6b7280;
+  color: #5f6775;
   margin-bottom: 16px;
 }
 
@@ -208,14 +208,14 @@
 
 .program-item-schedule {
   font-size: var(--fs-12);
-  color: #16a34a;
+  color: #15803d;
   font-weight: 600;
   margin-bottom: 2px;
 }
 
 .program-item-time {
   font-size: var(--fs-12);
-  color: #6b7280;
+  color: #5f6775;
   margin-bottom: 8px;
 }
 
@@ -301,15 +301,15 @@
 }
 
 .nurse-status-option-btn.active {
-  border: 2px solid #16a34a;
+  border: 2px solid #15803d;
   background-color: #dcfce7;
-  color: #16a34a;
+  color: #15803d;
 }
 
 .nurse-status-option-btn.inactive {
   border: 2px solid #e5e7eb;
   background-color: white;
-  color: #6b7280;
+  color: #5f6775;
 }
 
 /* ================================
@@ -328,7 +328,7 @@
 
 .availability-header p {
   font-size: var(--fs-14);
-  color: #6b7280;
+  color: #5f6775;
 }
 
 /* ================================
@@ -347,7 +347,7 @@
 
 .health-events-header p {
   font-size: var(--fs-14);
-  color: #6b7280;
+  color: #5f6775;
 }
 
 /* ================================
@@ -366,7 +366,7 @@
 
 .settings-header p {
   font-size: var(--fs-14);
-  color: #6b7280;
+  color: #5f6775;
 }
 
 .settings-grid {
@@ -431,7 +431,7 @@
 
 .profile-role {
   font-size: var(--fs-13);
-  color: #6b7280;
+  color: #5f6775;
 }
 
 .profile-form {
@@ -531,7 +531,7 @@
 
 .security-desc {
   font-size: var(--fs-12);
-  color: #6b7280;
+  color: #5f6775;
   margin-bottom: 12px;
 }
 
@@ -589,7 +589,7 @@
   width: 44px;
   height: 24px;
   border-radius: var(--radius-md);
-  background: #16a34a;
+  background: #15803d;
   cursor: pointer;
   border: none;
 }
@@ -649,14 +649,14 @@
 /* ── Medicines tab ──────────────────────────────────────────── */
 .medicine-intro {
   font-size: var(--fs-13);
-  color: #6b7280;
+  color: #5f6775;
   line-height: 1.6;
   margin: 0 0 16px;
 }
 
 .medicine-field-hint {
   font-size: var(--fs-12);
-  color: #6b7280;
+  color: #5f6775;
   margin: 6px 0 0;
 }
 
@@ -687,8 +687,8 @@
   min-width: 0;
 }
 
-.medicine-admin-meta { font-size: var(--fs-12); color: #6b7280; }
-.medicine-admin-note { font-size: var(--fs-12); color: #6b7280; font-style: italic; }
+.medicine-admin-meta { font-size: var(--fs-12); color: #5f6775; }
+.medicine-admin-note { font-size: var(--fs-12); color: #5f6775; font-style: italic; }
 
 .medicine-status-group {
   display: inline-flex;
@@ -705,7 +705,7 @@
   font-weight: 600;
   padding: 6px 12px;
   cursor: pointer;
-  color: #6b7280;
+  color: #5f6775;
   white-space: nowrap;
 }
 
@@ -754,5 +754,5 @@
   display: block;
   margin-top: 2px;
   font-size: var(--fs-12);
-  color: #6b7280;
+  color: #5f6775;
 }

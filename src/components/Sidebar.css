@@ -218,7 +218,7 @@
 
 .sidebar-nav-badge {
   margin-left: auto;
-  background-color: #dc2626;
+  background-color: #b91c1c;
   color: white;
   font-size: var(--fs-12);
   font-weight: 700;
@@ -344,7 +344,7 @@
 
 .dashboard-header p {
   font-size: var(--fs-14);
-  color: #6b7280;
+  color: #5f6775;
 }
 
 /* Stats Cards */
@@ -387,7 +387,7 @@
 
 .stat-card-icon.green {
   background-color: #dcfce7;
-  color: #16a34a;
+  color: #15803d;
 }
 
 .stat-card-icon.yellow {
@@ -397,7 +397,7 @@
 
 .stat-card-icon.red {
   background-color: #fee2e2;
-  color: #dc2626;
+  color: #b91c1c;
 }
 
 .stat-card-value {
@@ -409,7 +409,7 @@
 
 .stat-card-label {
   font-size: var(--fs-13);
-  color: #6b7280;
+  color: #5f6775;
 }
 
 /* Dashboard Grid */
@@ -497,7 +497,7 @@
   text-align: left;
   font-size: var(--fs-12);
   font-weight: 600;
-  color: #6b7280;
+  color: #5f6775;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 8px 12px;
@@ -533,23 +533,23 @@
 
 .badge-approved {
   background-color: #dcfce7;
-  color: #16a34a;
+  color: #15803d;
 }
 
 .badge-declined {
   background-color: #fee2e2;
-  color: #dc2626;
+  color: #b91c1c;
 }
 
 .role-restricted-note {
   font-size: var(--fs-12);
-  color: #6b7280;
+  color: #5f6775;
   font-style: italic;
 }
 
 .badge-in-office {
   background-color: #dcfce7;
-  color: #16a34a;
+  color: #15803d;
 }
 
 .badge-on-field {
@@ -559,7 +559,7 @@
 
 .badge-unavailable {
   background-color: #fee2e2;
-  color: #dc2626;
+  color: #b91c1c;
 }
 
 .badge-ready {
@@ -603,7 +603,7 @@
   justify-content: center;
   gap: 6px;
   padding: 6px 12px;
-  background-color: #16a34a;
+  background-color: #15803d;
   color: white;
   border: none;
   border-radius: var(--radius-sm);
@@ -624,7 +624,7 @@
   justify-content: center;
   gap: 6px;
   padding: 6px 12px;
-  background-color: #dc2626;
+  background-color: #b91c1c;
   color: white;
   border: none;
   border-radius: var(--radius-sm);
@@ -664,12 +664,12 @@
 }
 
 .btn-add:disabled {
-  background-color: #6b7280;
+  background-color: #5f6775;
   cursor: not-allowed;
 }
 
 .btn-add:disabled:hover {
-  background-color: #6b7280;
+  background-color: #5f6775;
 }
 
 /* Kapitan Status */
@@ -1643,4 +1643,26 @@
 .filter-toggle-wrap input,
 .filter-toggle-wrap label {
   cursor: pointer;
+}
+
+/* ── (X3) The mobile card label colour ────────────────────────────────
+ *
+ * ⚠️ `.dashboard-table td::before` inside the protected block sets
+ * `color: #6b7280`, which measures 4.41:1 on the card background --
+ * under the 4.5:1 AA minimum for text this size. That grey was darkened
+ * to #5f6775 everywhere else in X3.
+ *
+ * The protected block is NOT edited for it. This rule sits after the
+ * block at the SAME specificity, so it wins on source order alone --
+ * the ordering rule X2 learned the hard way, applied deliberately this
+ * time rather than by accident.
+ *
+ * It overrides one declaration and nothing else: the content, weight,
+ * size, letter-spacing and flex behaviour all still come from the
+ * protected rule.
+ */
+@media (max-width: 768px) {
+  .dashboard-table td::before {
+    color: #5f6775;
+  }
 }

@@ -34,13 +34,20 @@
   flex-wrap: wrap;
 }
 
+/* ⚠️ (X3) These four were 18px tall with `padding: 0`, under the 24px
+   minimum in WCAG 2.2 SC 2.5.8 (Target Size, AA). They are a row of
+   controls rather than links inside a sentence, so the "inline"
+   exception does not cover them. 5px above and below takes the target
+   to 28px without moving the text or changing the row's layout -- the
+   flex gap already separates them. The phone numbers on the Home page
+   are left alone: those ARE inline in a sentence and are exempt. */
 .footer-bottom-links button {
   background: none;
   border: none;
   color: #bfdbfe;
   font-size: var(--fs-12);
   cursor: pointer;
-  padding: 0;
+  padding: 5px 0;
   font-family: inherit;
   transition: 0.2s ease;
 }

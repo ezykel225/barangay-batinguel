@@ -65,7 +65,7 @@ banned below: it silences the one check this project has.
 
 ### Tests
 
-Twelve suites, 292 tests:
+Fourteen suites, 307 tests:
 
 | File | What it covers |
 |---|---|
@@ -79,6 +79,8 @@ Twelve suites, 292 tests:
 | `src/utils/reservationCalendar.test.js` | 22 tests over court occupancy. The load-bearing one: `declined` and `cancelled` do **not** make a date look occupied |
 | `src/utils/notificationLabels.test.js` | 33 tests over the notification wording. The load-bearing ones walk **migration 022's whole `event` CHECK vocabulary** and assert every value produces a title with no underscore in it — so widening the migration without touching this module fails in Jest rather than printing `ready_for_pickup` on screen. Also a guard that this module **defines no status map of its own** |
 | `src/components/NotificationBell.test.js` | 24 tests over the bell: the unread count in the accessible name **as words**, Escape and focus restore, click-outside closing *without* stealing focus back, mark-read-then-navigate ordering, and that unread is carried by a class **and** the spoken word "New" rather than by colour |
+| `src/components/useModalA11y.test.js` | 9 tests over Escape, focus entry and focus restoration for the seventeen hand-rolled modals. Run **both directions**: with the hook stubbed, 4 of 9 fail. Includes the case where the opener is removed by the save the modal performed — focusing a detached node silently sends focus to `<body>` |
+| `src/components/Navbar.test.js` | 6 tests over the public mobile menu button, which had **no accessible name at all** before X3: the name changes with state, `aria-expanded` tracks it, and `aria-controls` points at an id that exists |
 | `src/utils/eventCalendar.test.js` | 24 tests over event placement and the upcoming split. The load-bearing one: the homepage filters **then** limits |
 | `src/utils/reservationWindow.test.js` | 46 tests over the 5–10 PM window, the per-slot and per-kind durations, the noon-spanning exception and the office-hours exception — deliberately mirroring the SQL cases in migration 020's header, so client and database are asserted to agree rather than each checked alone. The load-bearing one is that an exception is read from `exception_reason` and never from the hour |
 
@@ -92,7 +94,7 @@ imports the client. So a missing `.env` fails that test with a module
 error that never mentions `.env`. If `npm test` fails on a fresh
 checkout, check `.env` before debugging the test.
 
-The other eleven suites do **not** need it. `residentGroups.js`,
+The other thirteen suites do **not** need it. `residentGroups.js`,
 `displayLabels.js`, `reservationWindow.js`, `monthGrid.js`,
 `reservationCalendar.js`, `eventCalendar.js`, `notificationLabels.js`,
 `ActionMenu.jsx`, `MonthCalendar.jsx`, `NotificationBell.jsx` and
@@ -2032,6 +2034,147 @@ Supabase, so even the public pages were measured against **synthetic**
 fixtures — deliberately pathological ones (a 59-character unbreakable
 email, a 74-character event title), which is what exposed the `1fr`
 defects that real data does not reach.
+
+---
+
+## Accessibility (X3)
+
+A whole-application accessibility sweep, 2026-10-01. Audited with
+**axe-core 4.13** (WCAG 2.0/2.1 A + AA plus best-practice) across **50
+page-measurements** — every public route at 375 and 1280, plus the
+dashboard chrome, tables, calendar and dialogs — and then by **driving
+the keyboard in Chromium**, which is where the defects axe cannot see
+turned up.
+
+**Result: zero axe violations on real application content.** The one
+remaining finding is `page-has-heading-one` on a measurement fragment of
+my own that has no `<h1>` by construction.
+
+### What was wrong, and what fixed it
+
+| Defect | Severity | Fix |
+|---|---|---|
+| The **public mobile menu button had no accessible name** — icon-only, announced as "button" and nothing else, on 13 surfaces. The only way into navigation on a phone | critical | `aria-label` that changes with state, plus `aria-expanded` and `aria-controls`, matching the dashboard button that had all three already |
+| **72 of 81 `<label>` elements were not associated with their control.** axe only flagged the four with no `placeholder` to fall back on; the rest were silently unassociated, so clicking a label did not focus its field either | critical | `htmlFor`/`id` on **68** pairs across 7 files, ids derived from each control's existing `name` |
+| **Five icon-only password toggles had no name at all** (`{show ? <FaEyeSlash /> : <FaEye />}` and nothing else) | critical | `aria-label` naming *which* password, plus `aria-pressed` for the state |
+| **Seventeen modals had no dialog semantics** — no `role`, no `aria-modal`, no Escape, and focus left on the button behind the overlay | serious | `role="dialog"`, `aria-modal`, `aria-labelledby` pointing at each modal's own heading, and the shared `useModalA11y` hook |
+| **The skip link did not skip.** `<main id="main-content">` was not focusable, so following it moved the hash and left focus on `<body>` — the next Tab went back to the top, which is the exact thing the link exists to prevent. Measured: `inMain=false` | serious | `tabIndex={-1}` on all 14 `<main>` elements. Measured after: focus lands on `MAIN#main-content` |
+| **Contrast below AA in five places**, including `#8a97a4` on the unread-notification tint at **2.80:1** — the worst in the app, in code added during the notifications work | serious | see below |
+| The **sidebar's portal name and signed-in account belonged to no landmark** | moderate | `role="complementary"` with the portal name, on the existing `<div>` — every sidebar selector is class-based, so no tag changed |
+| **Announcements jumped `<h1>` to `<h3>`** | moderate | `<h2>` on that page. Home keeps `<h3>` because its cards sit under a section `<h2>`; the shared card styling now matches both tags |
+| **Eight controls under the 24px minimum** (WCAG 2.2 SC 2.5.8) | AA (2.2) | padding on the four footer legal buttons (18→28px) and the two "View All" links (21→27px) |
+
+### Contrast: measured, then minimally darkened
+
+Each value was computed against the lightest background it actually sits
+on, and moved the smallest distance that clears 4.5:1 with headroom.
+
+| Where | Was | Now | Ratio |
+|---|---|---|---|
+| `--grey-600`, the app's muted text in **86 places** + 45 inline styles | `#6b7280` | `#5f6775` | 4.41 → **5.20** |
+| Green buttons carrying white text | `#16a34a` | `#15803d` | 3.30 → **5.02** |
+| Notification timestamp on the unread tint | `#8a97a4` | `#5f6775` | **2.80** → 4.9 |
+| Error text | `#dc2626` | `#b91c1c` | 4.41 → **5.91** |
+| Green status badge text | `#15803d` | `#126c33` | 4.39 → **5.71** |
+
+⚠️ **`#15803d` was already in the palette**, so the green buttons reuse
+an existing colour rather than introducing one. No type was shrunk and
+no content was hidden to reach AA.
+
+### ⚠️ The protected block was NOT edited for contrast
+
+The global `#6b7280` replacement caught one declaration **inside**
+`Sidebar.css`'s protected mobile table-to-card block —
+`.dashboard-table td::before`, the card label colour. That block is
+byte-for-byte protected, so the byte was **restored** and the correction
+appended *after* the block at the **same specificity**, where it wins on
+source order alone.
+
+That is X2's cascade lesson applied deliberately rather than discovered
+by accident. Verified at 375px: the label renders `#5f6775` while the
+protected rule still supplies its content, weight, size, letter-spacing
+and flex behaviour.
+
+### `useModalA11y` — one call per component, not one per modal
+
+`src/components/useModalA11y.js`. The shared `useConfirm` dialog and
+`OfficialArchiveDialog` already had Escape, focus entry and focus
+restoration; the other seventeen modals had none.
+
+These modals are **mutually exclusive** — a dashboard never shows two at
+once — so the hook takes "is any modal open" plus a single close action.
+That turns nine separate wirings in a 4,600-line dashboard into one
+call, and avoids threading a ref through deeply nested JSX.
+
+It finds the open dialog by selector rather than by ref, for the same
+reason. A modal that does not carry `role="dialog"` simply gets no focus
+entry — visible, because its Escape still works and its focus does not
+move, rather than failing silently.
+
+⚠️ **Focus is not trapped.** The hook moves focus in, handles Escape and
+restores focus on close. It does **not** cycle Tab inside the dialog, so
+a keyboard user can still tab out into the page behind. The shared
+`useConfirm` dialog does trap. Containment for the other seventeen is
+**deferred to the final authenticated pass** — it needs each modal's
+first and last focusable element, which is worth doing against the live
+pages rather than against reproductions.
+
+### ⚠️ One finding was a measurement artifact, not a defect
+
+The keyboard probe reported the four public navigation links as having
+**no focus ring**: `matches(':focus-visible')` was true, the tokens
+resolved, and the computed outline was still `solid 0px currentColor`.
+A rule was added for them — and then a screenshot showed the ring was
+**already being painted**, before and after, identically.
+
+`getComputedStyle().outlineWidth` reports `0px` for those elements in
+this headless Chromium build even when an `!important` outline is
+applied. The added rule was redundant and was **reverted**.
+
+Recorded because the project's own rule caught it: *a negative test can
+fail for the wrong reason — always ask which step produced the result.*
+The paint-level screenshot was the only check that settled it.
+
+### Verified by driving the keyboard
+
+| Check | Result |
+|---|---|
+| Skip link → focus target | `MAIN#main-content`, `inMain=true` |
+| Login reset-password modal | `role="dialog"`, `aria-modal=true`, labelled, focus lands on the first input |
+| Escape on that modal | closes, focus **restored** to the exact opener |
+| Footer Privacy modal | same, verified independently |
+| Public menu toggle at 375px | found **by accessible name**; `aria-expanded` false→true; `aria-controls` target exists |
+| First 8 tab stops on Home | skip link first, then logo, nav, Login, hero — logical order, nothing off-screen |
+
+### Tests added
+
+`useModalA11y.test.js` (9) and `Navbar.test.js` (6). The hook's tests
+were run **both directions**: with the hook stubbed out, **4 of 9 fail**
+— focus entry, focus containment on open, Escape closing, and the
+detached-opener case. The other five pass trivially because a closed
+modal cannot misbehave, which is worth knowing about them.
+
+### What was NOT verified in a browser, and what is deferred
+
+The three dashboards are behind `ProtectedRoute` and this environment
+has no test account, so **no authenticated page was audited live**.
+Nothing was done to weaken authentication for a screenshot.
+
+The dashboard chrome, calendar and dialogs were audited from **real
+component output** captured through Jest; the table and modal bodies
+from faithful reproductions. So the dashboards' *markup* is covered by
+axe, and their *runtime keyboard behaviour* is covered by unit tests —
+but neither is the live page.
+
+**Deferred to the final authenticated regression pass:**
+
+- Tab containment inside the seventeen hand-rolled modals (above).
+- Screen-reader announcement order on the dashboards — axe checks
+  structure, not what a reader actually hears.
+- The notification bell's panel reached by keyboard on a live dashboard;
+  its behaviour is unit-tested but has never been driven in a browser
+  while signed in.
+- Any dashboard-only contrast pair that only appears with live data.
 
 ---
 

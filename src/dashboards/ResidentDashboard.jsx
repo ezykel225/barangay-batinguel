@@ -22,6 +22,7 @@ import { logActivity } from '../utils/activityLog'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 import Sidebar from '../components/Sidebar'
+import { useModalA11y } from '../components/useModalA11y'
 import NotificationBell from '../components/NotificationBell'
 import { useNotifications } from '../components/useNotifications'
 import '../components/Sidebar.css'
@@ -106,6 +107,10 @@ const ResidentDashboard = () => {
   const [submitting, setSubmitting] = useState(false)
   const [cancellingId, setCancellingId] = useState(null)
   const [showRequestModal, setShowRequestModal] = useState(false)
+
+  // Escape, focus entry and focus restoration for the document-request
+  // modal. The confirmation dialog above already has its own.
+  useModalA11y(showRequestModal, () => setShowRequestModal(false))
 
   const [newRequest, setNewRequest] = useState({
     document_type: DOCUMENT_TYPES[0],
@@ -696,7 +701,7 @@ const ResidentDashboard = () => {
         mobileHeaderAction={notificationBell}
       />
 
-      <main className="dashboard-main" id="main-content">
+      <main className="dashboard-main" id="main-content" tabIndex={-1}>
 
         {/* The DESKTOP bell. One place for all four tabs -- there is no
             shared dashboard header component, and four copies would be
@@ -992,8 +997,8 @@ const ResidentDashboard = () => {
                   )}
 
                   <div className="modal-form-group">
-                    <label className="modal-form-label">First Name</label>
-                    <input
+                    <label htmlFor="rd-first-name" className="modal-form-label">First Name</label>
+                    <input id="rd-first-name"
                       type="text"
                       className="modal-form-input"
                       value={details?.first_name ?? ''}
@@ -1004,8 +1009,8 @@ const ResidentDashboard = () => {
                   </div>
 
                   <div className="modal-form-group">
-                    <label className="modal-form-label">Middle Name (optional)</label>
-                    <input
+                    <label htmlFor="rd-middle-name-optional" className="modal-form-label">Middle Name (optional)</label>
+                    <input id="rd-middle-name-optional"
                       type="text"
                       className="modal-form-input"
                       value={details?.middle_name ?? ''}
@@ -1016,8 +1021,8 @@ const ResidentDashboard = () => {
                   </div>
 
                   <div className="modal-form-group">
-                    <label className="modal-form-label">Last Name</label>
-                    <input
+                    <label htmlFor="rd-last-name" className="modal-form-label">Last Name</label>
+                    <input id="rd-last-name"
                       type="text"
                       className="modal-form-input"
                       value={details?.last_name ?? ''}
@@ -1028,8 +1033,8 @@ const ResidentDashboard = () => {
                   </div>
 
                   <div className="modal-form-group">
-                    <label className="modal-form-label">Suffix (optional)</label>
-                    <input
+                    <label htmlFor="rd-suffix-optional" className="modal-form-label">Suffix (optional)</label>
+                    <input id="rd-suffix-optional"
                       type="text"
                       className="modal-form-input"
                       value={details?.suffix ?? ''}
@@ -1040,8 +1045,8 @@ const ResidentDashboard = () => {
                   </div>
 
                   <div className="modal-form-group">
-                    <label className="modal-form-label">Contact Number</label>
-                    <input
+                    <label htmlFor="rd-contact-number" className="modal-form-label">Contact Number</label>
+                    <input id="rd-contact-number"
                       type="tel"
                       className="modal-form-input"
                       value={details?.contact_number ?? ''}
@@ -1052,8 +1057,8 @@ const ResidentDashboard = () => {
                   </div>
 
                   <div className="modal-form-group">
-                    <label className="modal-form-label">Purok</label>
-                    <select
+                    <label htmlFor="rd-purok" className="modal-form-label">Purok</label>
+                    <select id="rd-purok"
                       className="modal-form-input"
                       value={details?.purok ?? ''}
                       onChange={(e) => setDetails((d) => ({ ...d, purok: e.target.value }))}
@@ -1176,9 +1181,9 @@ const ResidentDashboard = () => {
               </p>
 
               <div className="modal-form-group">
-                <label className="modal-form-label">New Password</label>
+                <label htmlFor="rd-new-password" className="modal-form-label">New Password</label>
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <input
+                  <input id="rd-new-password"
                     type={showNew ? 'text' : 'password'}
                     className="modal-form-input"
                     placeholder="Enter new password"
@@ -1187,6 +1192,9 @@ const ResidentDashboard = () => {
                     style={{ paddingRight: 40 }}
                   />
                   <button
+                    type="button"
+                    aria-pressed={showNew}
+                    aria-label={showNew ? 'Hide the new password' : 'Show the new password'}
                     onClick={() => setShowNew(!showNew)}
                     style={{
                       position: 'absolute', right: 12, background: 'none',
@@ -1199,9 +1207,9 @@ const ResidentDashboard = () => {
               </div>
 
               <div className="modal-form-group">
-                <label className="modal-form-label">Confirm New Password</label>
+                <label htmlFor="rd-confirm-new-password" className="modal-form-label">Confirm New Password</label>
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <input
+                  <input id="rd-confirm-new-password"
                     type={showConfirm ? 'text' : 'password'}
                     className="modal-form-input"
                     placeholder="Confirm new password"
@@ -1210,6 +1218,9 @@ const ResidentDashboard = () => {
                     style={{ paddingRight: 40 }}
                   />
                   <button
+                    type="button"
+                    aria-pressed={showConfirm}
+                    aria-label={showConfirm ? 'Hide the confirmed password' : 'Show the confirmed password'}
                     onClick={() => setShowConfirm(!showConfirm)}
                     style={{
                       position: 'absolute', right: 12, background: 'none',
@@ -1236,12 +1247,12 @@ const ResidentDashboard = () => {
       {/* New Document Request Modal */}
       {showRequestModal && (
         <div className="modal-overlay">
-          <div className="modal">
-            <h3>Request a Document</h3>
+          <div className="modal" role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="rddlg-1-title">
+            <h3 id="rddlg-1-title">Request a Document</h3>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Document Type</label>
-              <select
+              <label htmlFor="rd-document-type" className="modal-form-label">Document Type</label>
+              <select id="rd-document-type"
                 className="modal-form-input"
                 value={newRequest.document_type}
                 onChange={(e) => setNewRequest({ ...newRequest, document_type: e.target.value })}
@@ -1253,8 +1264,8 @@ const ResidentDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Purpose</label>
-              <input
+              <label htmlFor="rd-purpose" className="modal-form-label">Purpose</label>
+              <input id="rd-purpose"
                 type="text"
                 className="modal-form-input"
                 placeholder="e.g. Employment requirement"
@@ -1264,8 +1275,8 @@ const ResidentDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Additional Notes (optional)</label>
-              <textarea
+              <label htmlFor="rd-additional-notes-optional" className="modal-form-label">Additional Notes (optional)</label>
+              <textarea id="rd-additional-notes-optional"
                 className="modal-form-textarea"
                 placeholder="Anything else the official should know"
                 value={newRequest.additional_notes}

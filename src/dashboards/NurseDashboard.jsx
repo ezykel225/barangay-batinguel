@@ -15,6 +15,7 @@ import { supabase } from '../supabase/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 import Sidebar from '../components/Sidebar'
+import { useModalA11y } from '../components/useModalA11y'
 import { HEALTH_NURSE_NAME, HEALTH_NURSE_ROLE } from '../constants/barangay'
 import {
   availabilityStatusClass,
@@ -483,6 +484,17 @@ const NurseDashboard = () => {
   // ── Medicine availability ──────────────────────────────
   const [medicines, setMedicines] = useState([])
   const [showMedicineModal, setShowMedicineModal] = useState(false)
+
+  // Escape, focus entry and focus restoration for all four modals.
+  useModalA11y(
+    showEventModal || showAvailabilityModal || showMedicineModal || showProgramModal,
+    () => {
+      setShowEventModal(false)
+      setShowAvailabilityModal(false)
+      setShowMedicineModal(false)
+      setShowProgramModal(false)
+    }
+  )
   const [editingMedicine, setEditingMedicine] = useState(null)
   const [medicineForm, setMedicineForm] = useState({
     name: '', generic_name: '', form: 'Tablet',
@@ -826,7 +838,7 @@ const NurseDashboard = () => {
     <div className="dashboard-layout">
       <Sidebar role="nurse" activeTab={activeTab} setActiveTab={setActiveTab} />
 
-      <main className="dashboard-main" id="main-content">
+      <main className="dashboard-main" id="main-content" tabIndex={-1}>
 
         {/* DASHBOARD TAB */}
         {activeTab === 'dashboard' && (
@@ -1334,8 +1346,8 @@ const NurseDashboard = () => {
                 </div>
                 <div className="profile-form">
                   <div className="profile-form-group">
-                    <label className="profile-form-label">Email Address</label>
-                    <input
+                    <label htmlFor="nur-email-address" className="profile-form-label">Email Address</label>
+                    <input id="nur-email-address"
                       type="email"
                       className="profile-form-input"
                       value={user?.email || ''}
@@ -1354,11 +1366,19 @@ const NurseDashboard = () => {
                 </div>
                 <div className="security-form">
                   <div>
-                    <label className="security-label">Change Password</label>
+                    {/* ⚠️ NOT a <label>. "Change Password" names the
+                        section, not the first box -- associating the two
+                        made a screen reader announce the New Password
+                        field as "Change Password" and left Confirm
+                        nameless. The boxes carry their own names below.
+                        `.security-label` is a class selector, so the
+                        styling is unchanged. */}
+                    <p className="security-label">Change Password</p>
                     <p className="security-desc">Update your password regularly for better security.</p>
 
                     <div style={{ position: 'relative', marginBottom: 10 }}>
                       <input
+                        aria-label="New password"
                         type={showNew ? 'text' : 'password'}
                         className="security-input"
                         placeholder="New password (min. 6 characters)"
@@ -1376,6 +1396,7 @@ const NurseDashboard = () => {
 
                     <div style={{ position: 'relative', marginBottom: 10 }}>
                       <input
+                        aria-label="Confirm new password"
                         type={showConfirm ? 'text' : 'password'}
                         className="security-input"
                         placeholder="Confirm new password"
@@ -1409,8 +1430,8 @@ const NurseDashboard = () => {
       {/* HEALTH EVENT MODAL */}
       {showEventModal && (
         <div className="modal-overlay">
-          <div className="modal">
-            <h3>{editingHealthEvent ? 'Edit Health Event' : 'Add Health Event'}</h3>
+          <div className="modal" role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="nurdlg-1-title">
+            <h3 id="nurdlg-1-title">{editingHealthEvent ? 'Edit Health Event' : 'Add Health Event'}</h3>
             {[
               { label: 'Event Title *', key: 'title', type: 'text', placeholder: 'e.g. Vaccination Drive' },
               { label: 'Description', key: 'description', type: 'text', placeholder: 'Event description' },
@@ -1456,15 +1477,15 @@ const NurseDashboard = () => {
       {/* AVAILABILITY MODAL */}
       {showAvailabilityModal && (
         <div className="modal-overlay">
-          <div className="modal">
-            <h3>{editingAvail ? `Edit ${editingAvail.day_of_week}` : 'Add Availability'}</h3>
+          <div className="modal" role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="nurdlg-2-title">
+            <h3 id="nurdlg-2-title">{editingAvail ? `Edit ${editingAvail.day_of_week}` : 'Add Availability'}</h3>
 
             {!editingAvail && (
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ fontSize: '12px', fontWeight: '600', color: '#374151', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+                <label htmlFor="nur-day-of-week" style={{ fontSize: '12px', fontWeight: '600', color: '#374151', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
                   Day of Week *
                 </label>
-                <select
+                <select id="nur-day-of-week"
                   value={newAvailability.day_of_week}
                   onChange={(e) => setNewAvailability({ ...newAvailability, day_of_week: e.target.value })}
                   style={{ width: '100%', padding: '10px 14px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', fontFamily: 'Poppins, sans-serif', outline: 'none', backgroundColor: 'white' }}
@@ -1497,10 +1518,10 @@ const NurseDashboard = () => {
             ))}
 
             <div style={{ marginBottom: '16px' }}>
-              <label style={{ fontSize: '12px', fontWeight: '600', color: '#374151', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+              <label htmlFor="nur-status" style={{ fontSize: '12px', fontWeight: '600', color: '#374151', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
                 Status
               </label>
-              <select
+              <select id="nur-status"
                 value={newAvailability.status}
                 onChange={(e) => setNewAvailability({ ...newAvailability, status: e.target.value })}
                 style={{ width: '100%', padding: '10px 14px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', fontFamily: 'Poppins, sans-serif', outline: 'none', backgroundColor: 'white' }}
@@ -1524,12 +1545,12 @@ const NurseDashboard = () => {
       {/* MEDICAL PROGRAM MODAL */}
       {showMedicineModal && (
         <div className="modal-overlay">
-          <div className="modal">
-            <h3>{editingMedicine ? 'Edit Medicine' : 'Add Medicine'}</h3>
+          <div className="modal" role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="nurdlg-3-title">
+            <h3 id="nurdlg-3-title">{editingMedicine ? 'Edit Medicine' : 'Add Medicine'}</h3>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Medicine Name</label>
-              <input
+              <label htmlFor="nur-medicine-name" className="modal-form-label">Medicine Name</label>
+              <input id="nur-medicine-name"
                 className="modal-form-input"
                 placeholder="e.g. Paracetamol 500mg"
                 value={medicineForm.name}
@@ -1538,8 +1559,8 @@ const NurseDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Generic Name (optional)</label>
-              <input
+              <label htmlFor="nur-generic-name-optional" className="modal-form-label">Generic Name (optional)</label>
+              <input id="nur-generic-name-optional"
                 className="modal-form-input"
                 placeholder="e.g. Paracetamol"
                 value={medicineForm.generic_name}
@@ -1551,8 +1572,8 @@ const NurseDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Form</label>
-              <select
+              <label htmlFor="nur-form" className="modal-form-label">Form</label>
+              <select id="nur-form"
                 className="modal-form-input"
                 value={medicineForm.form}
                 onChange={(e) => setMedicineForm((f) => ({ ...f, form: e.target.value }))}
@@ -1564,8 +1585,8 @@ const NurseDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Category</label>
-              <select
+              <label htmlFor="nur-category" className="modal-form-label">Category</label>
+              <select id="nur-category"
                 className="modal-form-input"
                 value={medicineForm.category}
                 onChange={(e) => setMedicineForm((f) => ({ ...f, category: e.target.value }))}
@@ -1577,8 +1598,8 @@ const NurseDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Availability</label>
-              <select
+              <label htmlFor="nur-availability" className="modal-form-label">Availability</label>
+              <select id="nur-availability"
                 className="modal-form-input"
                 value={medicineForm.status}
                 onChange={(e) => setMedicineForm((f) => ({ ...f, status: e.target.value }))}
@@ -1590,8 +1611,8 @@ const NurseDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Note for residents (optional)</label>
-              <textarea
+              <label htmlFor="nur-note-for-residents-optional" className="modal-form-label">Note for residents (optional)</label>
+              <textarea id="nur-note-for-residents-optional"
                 className="modal-form-textarea"
                 placeholder="e.g. Bring your prescription. / Children's dose only."
                 value={medicineForm.notes}
@@ -1616,8 +1637,8 @@ const NurseDashboard = () => {
 
       {showProgramModal && (
         <div className="modal-overlay">
-          <div className="modal">
-            <h3>{editingProgram ? 'Edit Program' : 'Add Program'}</h3>
+          <div className="modal" role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="nurdlg-4-title">
+            <h3 id="nurdlg-4-title">{editingProgram ? 'Edit Program' : 'Add Program'}</h3>
             {[
               { label: 'Program Title *', key: 'title', placeholder: 'e.g. Child Immunization' },
               { label: 'Schedule *', key: 'schedule_label', placeholder: 'e.g. Every Tuesday' },

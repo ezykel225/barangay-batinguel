@@ -111,7 +111,7 @@ const Home = () => {
     <div className="home">
       <Navbar />
 
-      <main id="main-content">
+      <main id="main-content" tabIndex={-1}>
 
       <section className="hero">
         <div className="hero-container">

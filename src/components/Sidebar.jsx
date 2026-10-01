@@ -349,7 +349,17 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderActio
           relies on .dashboard-main being a following sibling of .sidebar
           -- true in all three dashboards. Don't wrap <Sidebar /> in an
           element without updating Sidebar.css. */}
-      <div className={`sidebar${collapsed ? ' is-collapsed' : ''}`}>
+      <div
+        className={`sidebar${collapsed ? ' is-collapsed' : ''}`}
+        /* ⚠️ (X3) The portal name and the signed-in account sit outside
+           the inner <nav>, so they belonged to no landmark at all and a
+           screen-reader user browsing by region could not reach them.
+           role="complementary" wraps the whole rail without changing the
+           tag -- every sidebar selector is class-based, including
+           `.sidebar.is-collapsed ~ .dashboard-main`, so nothing in the
+           layout depends on it being a <div>. */
+        role="complementary"
+        aria-label={`${portalName} sidebar`}>
         <div className="sidebar-header">
           <div className="sidebar-logo">
             <div className="sidebar-logo-icon">

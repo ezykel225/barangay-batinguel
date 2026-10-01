@@ -118,18 +118,31 @@ const Navbar = () => {
           )}
         </ul>
 
-        {/* Mobile Toggle Button */}
+        {/* Mobile Toggle Button.
+            ⚠️ (X3) This had NO accessible name at all -- an icon-only
+            button whose only content is an <svg>, so a screen reader
+            announced it as "button" and nothing else. It is the only way
+            into navigation on a phone.
+            The dashboard's own menu button has carried aria-label,
+            aria-expanded and aria-controls all along; this one is the
+            public twin of it and now matches. */}
         <button
+          type="button"
           className="navbar-toggle"
-          onClick={toggleMenu}>
-          {isOpen ? <FaTimes /> : <FaBars />}
+          onClick={toggleMenu}
+          aria-expanded={isOpen}
+          aria-controls="navbar-mobile-menu"
+          aria-label={isOpen ? 'Close navigation menu' : 'Open navigation menu'}>
+          {isOpen ? <FaTimes aria-hidden="true" /> : <FaBars aria-hidden="true" />}
         </button>
 
       </div>
 
-      {/* Mobile Menu */}
-      <ul className={`navbar-mobile 
-        ${isOpen ? 'open' : ''}`}>
+      {/* Mobile Menu. The id is what the toggle's aria-controls
+          points at. */}
+      <ul
+        id="navbar-mobile-menu"
+        className={`navbar-mobile ${isOpen ? 'open' : ''}`}>
         <li>
           <Link to="/" onClick={toggleMenu}>
             Home
