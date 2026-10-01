@@ -23,6 +23,8 @@ import { pathFromPublicUrl } from '../utils/storagePath'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 import Sidebar from '../components/Sidebar'
+import NotificationBell from '../components/NotificationBell'
+import { useNotifications } from '../components/useNotifications'
 import { PersonAvatar } from '../utils/officialPhotos'
 import { logActivity } from '../utils/activityLog'
 import { useConfirm } from '../components/ConfirmDialog'
@@ -238,6 +240,42 @@ const OfficialDashboard = () => {
   // several of these sit on top of the per-row processing locks.
   const [confirm, confirmDialog] = useConfirm()
   const [activeTab, setActiveTab] = useState('dashboard')
+
+  // ── Notifications ──────────────────────────────────────────────────
+  //
+  // ⚠️ The sidebar badges below are NOT repointed to this. They count
+  // what is still WAITING -- document requests at `pending`, accounts at
+  // `pending` -- which is a different question from "have you seen it".
+  // An official who has read a notification still has the work to do, so
+  // a badge driven by read state would clear while the queue stayed
+  // full. The resident portal is the opposite case and is repointed.
+  const {
+    notifications,
+    readIds: notifReadIds,
+    loading: notifLoading,
+    refresh: refreshNotifications,
+    markRead: markNotificationRead,
+    markAllRead: markAllNotificationsRead,
+  } = useNotifications(user?.id)
+
+  // Opening the tab a notification points at counts as having seen it,
+  // so the bell can be cleared without using the bell -- the same
+  // behaviour the resident portal already had for its unseen badges.
+  // Realtime is deferred, so a tab change is the refresh point: it is
+  // the moment the reader is asking to see that part of the dashboard
+  // anyway. Keyed on activeTab ALONE -- adding `notifications` here
+  // would make the refresh its own trigger.
+  useEffect(() => {
+    refreshNotifications()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
+
+  useEffect(() => {
+    notifications
+      .filter((n) => n.link_tab === activeTab && !notifReadIds.has(n.id))
+      .forEach((n) => { markNotificationRead(n) })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, notifications])
   const [reservations, setReservations] = useState([])
   const [announcements, setAnnouncements] = useState([])
   const [events, setEvents] = useState([])
@@ -2250,6 +2288,20 @@ const OfficialDashboard = () => {
 
       {/* Main Content */}
       <main className="dashboard-main" id="main-content">
+
+        {/* The bell sits here rather than inside each tab's own header,
+            because there are thirteen of those and no shared dashboard
+            header component exists. One place, every tab. */}
+        <div className="dashboard-topbar">
+          <NotificationBell
+            notifications={notifications}
+            readIds={notifReadIds}
+            loading={notifLoading}
+            onOpenTab={(tab) => setActiveTab(tab)}
+            onMarkRead={markNotificationRead}
+            onMarkAllRead={markAllNotificationsRead}
+          />
+        </div>
 
         {/* ========================
             DASHBOARD TAB

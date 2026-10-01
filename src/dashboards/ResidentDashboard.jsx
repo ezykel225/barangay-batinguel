@@ -22,6 +22,8 @@ import { logActivity } from '../utils/activityLog'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 import Sidebar from '../components/Sidebar'
+import NotificationBell from '../components/NotificationBell'
+import { useNotifications } from '../components/useNotifications'
 import '../components/Sidebar.css'
 import './ResidentDashboard.css'
 
@@ -81,6 +83,21 @@ const ResidentDashboard = () => {
   // the same one the Official and Nurse portals use. Replaced the two
   // remaining window.confirm calls in this file.
   const [confirm, confirmDialog] = useConfirm()
+
+  // ── Notifications ──────────────────────────────────────────────────
+  //
+  // `badges` is keyed by each notification's own `link_tab`, so the
+  // sidebar counts and the bell count are the same number from the same
+  // rows. They cannot disagree.
+  const {
+    notifications,
+    readIds: notifReadIds,
+    loading: notifLoading,
+    badges: notifBadges,
+    refresh: refreshNotifications,
+    markRead: markNotificationRead,
+    markAllRead: markAllNotificationsRead,
+  } = useNotifications(user?.id)
   const [activeTab, setActiveTab] = useState('dashboard')
   const [userProfile, setUserProfile] = useState(null)
   const [requests, setRequests] = useState([])
@@ -162,6 +179,16 @@ const ResidentDashboard = () => {
     }
   }, [user, fetchUserProfile, fetchMyRequests, fetchMyReservations])
 
+  // ⚠️ THIS NO LONGER FEEDS A BADGE. The sidebar badges now come from
+  // the notification read-state (migration 022), so there is ONE
+  // definition of unread in the app instead of two that answer different
+  // questions. `resident_viewed_at` stays in the schema and is still
+  // written below, because it marks a ROW as seen -- which is a useful
+  // record, and is what `protect_reservation_status` allows a resident
+  // to write -- but it cannot count EVENTS: a request that goes
+  // approved -> ready_for_pickup -> claimed is three things the resident
+  // needs telling, and one timestamp only remembers the last.
+  //
   // An item counts as "unseen" once an official has acted on it
   // (moved it past pending) and the resident hasn't opened that tab
   // since. A null updated_at means no tracked change (old data from
@@ -177,8 +204,6 @@ const ResidentDashboard = () => {
     return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)))
   }
 
-  const unseenRequestCount = requests.filter(isUnseen).length
-  const unseenReservationCount = myReservations.filter(isUnseen).length
 
   const markRequestsViewed = async () => {
     const unseenIds = requests.filter(isUnseen).map((r) => r.id)
@@ -215,6 +240,25 @@ const ResidentDashboard = () => {
     if (activeTab === 'reservations') markReservationsViewed()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
+
+  // Opening the tab a notification points at counts as having seen it,
+  // which is what previously cleared the unseen badge. Same behaviour,
+  // now reading the one authoritative record.
+  // Realtime is deferred, so a tab change is the refresh point: it is
+  // the moment the reader is asking to see that part of the dashboard
+  // anyway. Keyed on activeTab ALONE -- adding `notifications` here
+  // would make the refresh its own trigger.
+  useEffect(() => {
+    refreshNotifications()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
+
+  useEffect(() => {
+    notifications
+      .filter((n) => n.link_tab === activeTab && !notifReadIds.has(n.id))
+      .forEach((n) => { markNotificationRead(n) })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, notifications])
 
   // Every upload path here builds a fresh timestamped name, so without
   // this the file being replaced stays in the bucket forever, referenced
@@ -634,10 +678,24 @@ const ResidentDashboard = () => {
         role="resident"
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        badges={{ documents: unseenRequestCount, reservations: unseenReservationCount }}
+        badges={notifBadges}
       />
 
       <main className="dashboard-main" id="main-content">
+
+        {/* One place for all four tabs -- there is no shared dashboard
+            header component, and four copies would be four things to
+            keep in step. */}
+        <div className="dashboard-topbar">
+          <NotificationBell
+            notifications={notifications}
+            readIds={notifReadIds}
+            loading={notifLoading}
+            onOpenTab={(tab) => setActiveTab(tab)}
+            onMarkRead={markNotificationRead}
+            onMarkAllRead={markAllNotificationsRead}
+          />
+        </div>
         {activeTab === 'dashboard' && (
           <div>
             <div className="resident-dashboard-header">

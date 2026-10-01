@@ -1,0 +1,223 @@
+/* The notification bell and its panel.
+ *
+ * ⚠️ Nothing here touches Sidebar.css's protected mobile
+ * table-to-card block, and nothing here is inside a `.dashboard-table`.
+ * The panel is absolutely positioned, and `.table-wrapper`'s
+ * `overflow-x: auto` CLIPS absolutely-positioned children -- the
+ * constraint ActionMenu.jsx documents. The bell sits in a dashboard
+ * header, outside any table wrapper, which is why this works.
+ */
+
+.notif-bell {
+  position: relative;
+  display: inline-flex;
+}
+
+.notif-bell-trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid #d6dbe1;
+  border-radius: 50%;
+  background: #fff;
+  color: #2c3e50;
+  font-size: 1.05rem;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.notif-bell-trigger:hover {
+  background: #f3f6f9;
+  border-color: #b9c2cc;
+}
+
+/* A visible focus ring. The trigger is a circle, so the default outline
+ * sits oddly close -- the offset keeps it legible. */
+.notif-bell-trigger:focus-visible {
+  outline: 3px solid #1a73e8;
+  outline-offset: 2px;
+}
+
+/* The count is aria-hidden; the spoken name carries "3 unread". */
+.notif-bell-count {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: #c0392b;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+
+.notif-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 1100;
+  width: 340px;
+  max-width: calc(100vw - 32px);
+  background: #fff;
+  border: 1px solid #dfe4ea;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(20, 30, 45, 0.16);
+}
+
+.notif-panel:focus-visible {
+  outline: 3px solid #1a73e8;
+  outline-offset: 2px;
+}
+
+.notif-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid #eef1f4;
+}
+
+.notif-panel-head h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #2c3e50;
+}
+
+.notif-mark-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border: 1px solid #d6dbe1;
+  border-radius: 6px;
+  background: #fff;
+  color: #1a5f3f;
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+.notif-mark-all:hover { background: #f1f7f3; }
+.notif-mark-all:focus-visible { outline: 2px solid #1a73e8; outline-offset: 1px; }
+
+.notif-panel-list {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.notif-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 11px 14px 11px 12px;
+  border: 0;
+  border-bottom: 1px solid #f2f4f6;
+  /* The left bar is transparent rather than absent, so an unread item
+   * does not shift sideways when it is read. */
+  border-left: 3px solid transparent;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.notif-item:last-child { border-bottom: 0; }
+.notif-item:hover { background: #f7f9fb; }
+.notif-item:focus-visible { outline: 2px solid #1a73e8; outline-offset: -2px; }
+
+/* ⚠️ THREE CUES, NOT ONE. The tint is the least of them: the left bar is
+ * a shape change and the weight is a text change, so unread is still
+ * distinguishable without colour vision, and the accessible name says
+ * "New." regardless. */
+.notif-item-unread {
+  border-left-color: #1a5f3f;
+  background: #f4f9f6;
+}
+
+.notif-item-unread .notif-item-title { font-weight: 700; }
+
+.notif-item-title {
+  font-size: 0.86rem;
+  color: #2c3e50;
+  font-weight: 500;
+}
+
+.notif-item-body {
+  font-size: 0.78rem;
+  color: #5b6b7c;
+  /* A long document type or a reason must wrap rather than widen the
+   * panel. */
+  overflow-wrap: anywhere;
+}
+
+.notif-item-when {
+  font-size: 0.72rem;
+  color: #8a97a4;
+}
+
+.notif-empty {
+  margin: 0;
+  padding: 20px 14px;
+  color: #7a8794;
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+/* ── Phones ───────────────────────────────────────────────────────────
+ *
+ * Below 600px the panel stops being a dropdown and becomes a sheet
+ * pinned to both edges. At 340px wide it would otherwise hang off the
+ * right of a 320px screen, and `right: 0` cannot fix that when the
+ * trigger itself is near the edge.
+ *
+ * ⚠️ Sidebar.css renders a FIXED `.mobile-menu-button` at
+ * `top: 20px; right: 20px; z-index: 1050`. The sheet is z-index 1100 so
+ * it covers that rather than being punched through by it. */
+@media (max-width: 600px) {
+  .notif-panel {
+    position: fixed;
+    top: 72px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-width: none;
+  }
+
+  .notif-panel-list { max-height: calc(100vh - 160px); }
+}
+
+/* ── The bar that holds the bell ───────────────────────────────────────
+ *
+ * Lives here rather than in Sidebar.css on purpose. Sidebar.css carries
+ * the protected mobile table-to-card block, and the rule is that
+ * anything appended after it stays at equal or lower specificity --
+ * easiest honoured by not appending to that file at all. The topbar
+ * exists only to position this component, so it belongs with it.
+ *
+ * Both dashboards render it once, immediately inside `.dashboard-main`,
+ * so all thirteen official tabs and all four resident tabs get the bell
+ * without a shared header component having to be introduced.
+ */
+.dashboard-topbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+/* On a phone the sidebar's own fixed hamburger sits at top right
+ * (`top: 20px; right: 20px`), so the bell steps left of it instead of
+ * underneath it. */
+@media (max-width: 768px) {
+  .dashboard-topbar {
+    justify-content: flex-start;
+    margin-bottom: 8px;
+  }
+}

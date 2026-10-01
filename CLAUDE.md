@@ -65,7 +65,7 @@ banned below: it silences the one check this project has.
 
 ### Tests
 
-Ten suites, 235 tests:
+Twelve suites, 292 tests:
 
 | File | What it covers |
 |---|---|
@@ -77,6 +77,8 @@ Ten suites, 235 tests:
 | `src/utils/monthGrid.test.js` | 26 tests over the date-only arithmetic and the month grid: leap February, month-length refusal (`2026-02-30` is not a date and must not slide to March), December/January wrap, and the rule that **nothing in that module constructs a `Date` from a date string** |
 | `src/components/MonthCalendar.test.js` | 19 tests over the shared grid as rendered: the accessible name of every day, navigation naming the month it goes to, and that today and selection are carried by `aria-current` / `aria-pressed` rather than by colour |
 | `src/utils/reservationCalendar.test.js` | 22 tests over court occupancy. The load-bearing one: `declined` and `cancelled` do **not** make a date look occupied |
+| `src/utils/notificationLabels.test.js` | 33 tests over the notification wording. The load-bearing ones walk **migration 022's whole `event` CHECK vocabulary** and assert every value produces a title with no underscore in it — so widening the migration without touching this module fails in Jest rather than printing `ready_for_pickup` on screen. Also a guard that this module **defines no status map of its own** |
+| `src/components/NotificationBell.test.js` | 24 tests over the bell: the unread count in the accessible name **as words**, Escape and focus restore, click-outside closing *without* stealing focus back, mark-read-then-navigate ordering, and that unread is carried by a class **and** the spoken word "New" rather than by colour |
 | `src/utils/eventCalendar.test.js` | 24 tests over event placement and the upcoming split. The load-bearing one: the homepage filters **then** limits |
 | `src/utils/reservationWindow.test.js` | 46 tests over the 5–10 PM window, the per-slot and per-kind durations, the noon-spanning exception and the office-hours exception — deliberately mirroring the SQL cases in migration 020's header, so client and database are asserted to agree rather than each checked alone. The load-bearing one is that an exception is read from `exception_reason` and never from the hour |
 
@@ -90,10 +92,11 @@ imports the client. So a missing `.env` fails that test with a module
 error that never mentions `.env`. If `npm test` fails on a fresh
 checkout, check `.env` before debugging the test.
 
-The other nine suites do **not** need it. `residentGroups.js`,
+The other eleven suites do **not** need it. `residentGroups.js`,
 `displayLabels.js`, `reservationWindow.js`, `monthGrid.js`,
-`reservationCalendar.js`, `eventCalendar.js`, `ActionMenu.jsx`,
-`MonthCalendar.jsx` and `ConfirmDialog.jsx` have no Supabase import, which is the reason the resident workflow's rules, the
+`reservationCalendar.js`, `eventCalendar.js`, `notificationLabels.js`,
+`ActionMenu.jsx`, `MonthCalendar.jsx`, `NotificationBell.jsx` and
+`ConfirmDialog.jsx` have no Supabase import, which is the reason the resident workflow's rules, the
 label vocabulary and the booking window live in modules rather than
 inside the dashboard components.
 
@@ -154,6 +157,11 @@ src/
     Sidebar.jsx       Dashboard nav. Defines the tab lists for all three
                       roles: official (13), nurse (5), resident (4).
     ProtectedRoute    Role gate. Frontend only — RLS is the real control.
+    NotificationBell  The bell and its panel. Resident and Official
+                      portals only -- there is deliberately no nurse
+                      bell. Takes its data as props, no Supabase import.
+    useNotifications  Fetching for the bell, and the one definition of
+                      unread the sidebar badges also read.
     ActionMenu        The ⋮ overflow menu. Used in exactly one place --
                       read the constraint in its own header before
                       putting it anywhere else.
@@ -189,6 +197,10 @@ src/
     monthGrid         Date-only arithmetic and the month grid. ⚠️ Nothing
                       in it constructs a Date from a date string -- that
                       is the whole point. See *Calendars* below.
+    notificationLabels The words a notification shows. Borrows every
+                      status word from the module that already owns it
+                      and defines none of its own -- see Notifications.
+                      Pure and unit-tested.
     reservationCalendar Court occupancy for the calendar: which statuses
                       hold a slot, and how a day is toned. Pure.
     eventCalendar     Event placement, and `upcomingEvents`, which
@@ -590,9 +602,9 @@ such row.
 
 ## Database notes
 
-**21 migrations**, `001` through `021`, all applied.
+**23 migrations**, `001` through `023`, all applied.
 
-**17 tables, RLS enabled on every one.**
+**19 tables, RLS enabled on every one.**
 
 | Table | Holds |
 |---|---|
@@ -613,6 +625,8 @@ such row.
 | `medicine_stock` | Medicine availability as a status, not a count |
 | `barangay_terms` | One row per barangay term. **Empty** — schema only, migration 019A |
 | `barangay_term_members` | Who served in a term. **Empty** — schema only, migration 019A |
+| `notifications` | In-app notifications. **Client-read-only** — written only by triggers; see *Notifications* |
+| `notification_reads` | Who has seen which notification. Insert and select only |
 
 What each migration *changed* stays in that migration's own header, not
 here — this section says what exists now, the headers say how it got
@@ -694,6 +708,61 @@ and any column added later was unprotected by default. They now compare
 `to_jsonb(NEW) - '<allowed>'` against the same for `OLD`. When
 `activity_type` was added it was protected automatically, with no code
 change.
+
+### ⚠️ A GENERATED column breaks an allowlist trigger — migration 023
+
+**Migration 020's `slot_hour` silently broke two resident rights, and
+023 fixes it.** This is the second time the same Postgres fact has cost
+this project something.
+
+`slot_hour` is `GENERATED ALWAYS`, and **generated values are computed
+*after* before-triggers run**. CLAUDE.md already recorded that for the
+INSERT case — it is why `enforce_reservation_window()` calls
+`reservation_slot_hour()` instead of reading `NEW.slot_hour`. The same
+fact breaks `protect_reservation_status` (BEFORE UPDATE), and that was
+missed: inside the trigger `NEW.slot_hour` is **NULL** while
+`OLD.slot_hour` holds the stored value, so the allowlist comparison saw
+a column it had not been told to ignore and **every** resident UPDATE
+looked like an attempt to change something forbidden.
+
+Measured directly by attaching a probe trigger that printed the
+differing keys:
+
+```
+status=cancelled/was:pending   slot_hour=NULL/was:17
+```
+
+Measured as `authenticated`, before 023:
+
+| Resident action | Result |
+|---|---|
+| Cancel their own pending booking | `P0001` "You can only cancel this reservation, not change its details." |
+| Write `resident_viewed_at` | `P0001` "Only an official can change a reservation." |
+
+Both are documented resident rights. The second is the quieter half:
+`resident_viewed_at` is what cleared the unseen badge, so **the badge
+could never be cleared either**. This affected every booking created
+since 020 — which, since 020 constrained `preferred_time`, is all of
+them.
+
+`protect_document_request_status` is unaffected: that table has no
+generated column, and `reservations.slot_hour` is the **only** generated
+column in the schema.
+
+⚠️ **Subtracting `slot_hour` is not a denylist entry.** It is
+`GENERATED ALWAYS`, so Postgres itself refuses any client attempt to
+write it (`428C9`) before the trigger is reached — verified — and its
+value is a pure function of `preferred_time`, which the allowlist still
+protects. Excluding a column nobody can write, derived from one still
+guarded, leaves the guarantee intact. Both directions re-verified: the
+two broken paths work, and self-approval, cancel-plus-edit,
+cancel-plus-change-duration, cancelling somebody else's and cancelling a
+past date are all still refused.
+
+**Any future generated column on a table with a `protect_*` trigger
+needs the same treatment**, and will present exactly like this: a
+documented user action refused with the trigger's own message, for every
+row, with nothing in the diff to explain it.
 
 **Admin bypass.** The protect triggers allow the update through when
 `auth.role() IS NULL` — which happens only on a direct database
@@ -803,7 +872,9 @@ own domain with SPF, DKIM and DMARC.
   haven't passed — this releases the slot immediately
 - Correct their own name, contact number and purok (changing a verified
   name re-opens verification)
-- Unseen-status-change badges; pickup reminders; profile photo
+- A notification bell and sidebar badges, both reading **one**
+  definition of unread (migration 022's read marks, not
+  `resident_viewed_at`); pickup reminders; profile photo
 - Their own account status shown on the dashboard in the same words the
   official sees, verified included — the warning banner appears only when
   something is wrong, so its absence was being left to mean "you are
@@ -1081,6 +1152,258 @@ account. The name string is all there is. So this panel informs an official; it 
 Resolving the class properly needs the `profile_id` foreign key still
 listed under *Not built yet* — a schema change, which is why the panel
 was built without one.
+
+---
+
+## Notifications
+
+**In-app only.** Migration 022. There is **no browser push, no Web
+Push, no service worker, no VAPID, and no notification email**, and no
+new SMS — the existing `notify-reservation-sms` Edge Function is
+untouched and unrelated.
+
+Two tables:
+
+| Table | Holds |
+|---|---|
+| `notifications` | What happened, and who it is addressed to |
+| `notification_reads` | Who has seen which one. `(notification_id, user_id)` |
+
+### ⚠️ Clients never write a notification
+
+`notifications` has a SELECT policy and **no INSERT, UPDATE or DELETE
+policy at all**, and `INSERT`/`UPDATE`/`DELETE`/`TRUNCATE` are
+**revoked** from `anon` and `authenticated` — 019A's two-barrier
+pattern, so a forged notification is refused at the privilege layer
+(`42501`) before RLS is consulted. Verified. Rows are written only by
+three `SECURITY DEFINER` triggers, on `document_requests`,
+`reservations` and `profiles`.
+
+### Audience is resolved at READ time, never fanned out
+
+A queue notification stores `audience = 'secretary'` and no
+`recipient_id`. **Who that is gets decided when somebody reads it**, by
+`can_see_audience()` against the live directory.
+
+The alternative — one row per official, written at decision time — would
+have to resolve the position through the
+`profiles.full_name = barangay_officials.full_name` string join *at that
+moment* and freeze the answer. A newly appointed Secretary would never
+see the backlog and an archived one would keep receiving it. Resolving
+at read time means **archiving an official revokes their queue the same
+instant it revokes their position powers** (018). Verified: an archived
+Treasurer loses the treasurer queue and keeps only what any official
+sees.
+
+`can_see_audience` is `SECURITY DEFINER` for the reason
+`term_is_confirmed` is — an inline `EXISTS` would inherit the caller's
+own view of `profiles` and `barangay_officials`, so changing those
+policies later would silently change which notifications are visible.
+**It returns `false` for `'resident'`**: a resident notification is
+reached by `recipient_id`, never by audience.
+
+### The event matrix
+
+| Source | Event | Goes to |
+|---|---|---|
+| `document_requests` INSERT at `pending` | `submitted` | **Secretary** |
+| `document_requests` → `approved` / `declined` / `ready_for_pickup` / `claimed` | that status | the **requesting resident** |
+| `reservations` INSERT at `pending` | `submitted` | **Treasurer** |
+| `reservations` → `approved` / `declined` | that status | the **booking resident** |
+| `profiles` INSERT or → `pending` (resident) | `submitted` | **any official** |
+| `profiles` → `verified` / `rejected` / `ineligible` | that status | the **account owner** |
+
+- **A walk-in booking notifies nobody downstream.** `resident_id IS
+  NULL` is supported by design (008), so there is no account to tell —
+  the Treasurer still gets the queue item. Verified.
+- **`cancelled` is not announced.** The only parties who can reach it
+  are the resident themselves and a direct database connection.
+- **Self-actions produce nothing.** A resident cancelling their own
+  booking, or resetting their own account to `pending`, is not told what
+  they just did. Verified: 0 notifications.
+- **An office-hours exception is flagged *inside* the Treasurer's one
+  notification** (`is_exception`), not sent as a second one.
+- **No person's name is ever stored in a notification.** A queue item
+  says a request is waiting, not whose. The name is already in the
+  source table the official reads, and copying it here would duplicate
+  resident PII into a second place where it could also go stale.
+  `subject` holds a **raw stored value** — a document type verbatim, or
+  a reservation date as `YYYY-MM-DD` — and the client formats it.
+
+### ⚠️ Duplicate prevention is the transition guard, and nothing else
+
+**There is no unique index on `notifications`, and one must not be
+added.** Two were tried and both silently destroyed real notifications.
+
+The design review proposed `UNIQUE(audience, recipient_id, entity_type,
+entity_id, event)`. That asserts an entity produces each event at most
+once *ever*, which this system contradicts by design: `rejected` is
+resubmittable and a resident may return their own account to `pending`,
+so an account can legitimately cycle
+`pending → rejected → pending → rejected → pending`.
+
+022 then tried to rescue the idea with the same columns **plus
+`source_changed_at`** (`statement_timestamp()`), `NULLS NOT DISTINCT`,
+on the theory that two notifications collide only if they came from the
+same statement. **That failed on the first probe.**
+`statement_timestamp()` is per *statement*, not per row change, so five
+genuine transitions sent as one multi-statement batch all shared it:
+
+| | expected | measured |
+|---|---|---|
+| `officials` / `submitted` | 3 | **1** |
+| `resident` / `rejected` | 2 | **1** |
+| `resident` / `verified` | 1 | 1 |
+
+Four real notifications vanished, and the only trace was three
+`23505` lines in the Postgres log from the trigger's own
+`RAISE WARNING`. So duplicate prevention is:
+
+```sql
+IF NEW.status IS NOT DISTINCT FROM OLD.status THEN RETURN NULL; END IF;
+```
+
+It **cannot** suppress a genuine later cycle, because it only ever
+compares one row change against itself, and it covers every duplicate
+that can actually happen at runtime: a no-op write, an UPDATE of other
+columns, a double-clicked Approve, and two officials deciding
+concurrently (the second waits on the row lock and **re-reads** the row,
+so its `OLD` already carries the new status). Re-verified after the
+index was dropped: 3 / 2 / 1, and two no-op writes added nothing.
+
+`source_changed_at` survives as a **diagnostic column only**, and is
+commented as such in the database.
+
+### ⚠️ A notification must never roll back the decision it announces
+
+An exception raised in an AFTER trigger aborts the whole statement, so
+each trigger body is wrapped in its own exception block ending in
+`RAISE WARNING`. Verified in both directions: with every notification
+insert forced to fail, the document request still reached `claimed` and
+zero notifications were written; with the forcing removed, one was.
+
+The warning reaches the Postgres log and names the trigger, the entity,
+`SQLERRM` and `SQLSTATE`. **That log is the only reason the bad unique
+index above was diagnosable** — a swallowed exception with no signal is
+invisible.
+
+This is the same boundary the SMS Edge Function draws by answering 200
+with `{ sent: false, reason }`: telling somebody is not part of
+deciding. **`stamp_notification_read` is the deliberate exception — it
+raises**, because a read mark is not a business operation to protect.
+
+### Read marks verify visibility, they do not merely stamp
+
+`trg_stamp_notification_read` takes `user_id` from the caller's own
+token and **discards whatever the client sent** (015's pattern), and
+then refuses a mark against a notification the caller cannot see. The
+INSERT policy carries the same check through
+`notification_is_visible()`, which is the single authority both use — so
+"I can read it" and "I may mark it read" cannot drift apart.
+
+`user_id = auth.uid()` **alone would not be enough**: it would let a
+signed-in user mark any notification id as read, which is a write
+against a row they cannot see and also confirms the id exists.
+
+Verified as an authenticated resident: forging a notification `42501`;
+marking their own read, accepted; marking one they cannot see,
+refused; marking their own **as another user**, the forged `user_id` is
+*overwritten* with theirs; deleting a read mark `42501`. There is no
+UPDATE and no DELETE policy — a read mark is not un-made.
+
+### One definition of unread
+
+**The resident's sidebar badges now read the notification read-state**,
+keyed by each notification's own `link_tab`, so the badge counts and
+the bell count are the same number from the same rows.
+
+They previously counted rows whose `resident_viewed_at` was older than
+their `updated_at`, which answers a different question — it marks a
+**row** as seen, so a request going
+`approved → ready_for_pickup → claimed` could only ever remember the
+last of the three. `resident_viewed_at` **stays in the schema and is
+still written**; it just no longer feeds a badge.
+
+⚠️ **The official sidebar badges are deliberately NOT repointed.** They
+count what is still *waiting* — document requests at `pending`,
+accounts at `pending` — which is not the same as "have you seen it". An
+official who has read a notification still has the work to do, so a
+badge driven by read state would clear while the queue stayed full.
+
+### The bell
+
+`NotificationBell.jsx`, shared by the **Resident and Official portals
+only**. It takes its data as props and has **no Supabase import** — the
+fetching is in `useNotifications.js` — which is why it has unit tests
+that run without the env vars.
+
+- The unread count is in the accessible name **as words**
+  ("Notifications, 3 unread"), not only as a number in a coloured
+  circle.
+- **Unread is three cues, not one**: a left bar, a bolder title, and the
+  word "New" in the accessible name. The tint is the least of them.
+- Escape closes and returns focus to the bell. A click outside closes
+  **without** stealing focus back — the person is clicking elsewhere on
+  purpose, the same rule `ActionMenu` follows.
+- The empty state says `No notifications yet.` A panel that renders
+  nothing cannot be told apart from one that is broken.
+- Below 600px the panel becomes a sheet pinned to both edges, at
+  `z-index: 1100` so it covers `Sidebar.css`'s fixed
+  `.mobile-menu-button` (`z-index: 1050`) rather than being punched
+  through by it.
+- `.dashboard-topbar` lives in `NotificationBell.css`, **not** in
+  `Sidebar.css`, so nothing is appended after that file's protected
+  block.
+
+⚠️ **There is no nurse bell**, and that is a decision. Her work —
+medicine stock, clinic hours, health events — has no asynchronous
+decision waiting on anybody else, so a bell would be permanently empty.
+Adding one needs a nurse audience in migration 022 first.
+
+⚠️ **`link_tab` is a hint, not authorization.** It names the dashboard
+tab that answers the notification; RLS still decides what that tab may
+load, exactly as when it is reached from the sidebar. Navigation is
+through the existing `activeTab` state — **no new routes**.
+
+### Wording comes from the modules that already own it
+
+`src/utils/notificationLabels.js` **defines no status vocabulary of its
+own**, and a test asserts it. The `event` values *are* the stored status
+values they came from, so the outcome word is looked up in the same map
+the badge on the row uses:
+
+| Events | Read from |
+|---|---|
+| `approved` `declined` `ready_for_pickup` `claimed` | `DOCUMENT_STATUS_LABELS` |
+| `approved` `declined` (reservations) | `RESERVATION_STATUS_LABELS` |
+| `verified` `rejected` `ineligible` | `residentGroups.VERIFICATION_STATES` |
+
+A resident gets `residentLabel`, an official gets `label` — the
+distinction `residentGroups` already draws.
+
+⚠️ **It reads those maps directly rather than calling
+`documentStatusLabel()` / `reservationStatusLabel()`.** Those two
+deliberately **return an unknown value unchanged**, which is right for
+the Activity Log — the audit trail is the one surface where an
+unanticipated word must stay visible — and wrong here, where the
+passthrough would print `ready_for_pickup` on screen. An unrecognised
+event falls back to the heading alone. A test walks all 8 events across
+all 3 categories and asserts no title contains an underscore.
+
+`submitted` is the only event this module names itself, because no table
+stores it — it means "this arrived and nobody has dealt with it yet".
+
+### Deferred, deliberately
+
+- **Realtime.** `supabase_realtime` still publishes **zero tables** and
+  022 did not change that. The bell refreshes on tab change, which is
+  the moment the reader is asking to see that part of the dashboard
+  anyway. **There is no polling loop** — a repeating request against the
+  shared client is how the `getSession()` lock problem presented.
+- **Retention.** History is kept indefinitely; there is no pruning job,
+  no cron and no archival. A production deployment wants a retention
+  policy. This is a capstone dataset.
+- **Push of any kind**, per the scope above.
 
 ---
 
@@ -1660,6 +1983,12 @@ derives her initials from. It is no longer displayed as a label.
   known gap to revisit **if and when** the service is activated, not a
   Phase 1 defect — and it is not a reason to remove or redesign any of
   the existing SMS implementation.
+- ~~**In-app notifications**~~ — **built.** Migration 022, the bell on
+  the Resident and Official portals, and the resident sidebar badges
+  repointed to one definition of unread. See *Notifications*. What is
+  deliberately **not** built: browser push, Web Push, service workers,
+  VAPID, notification email, any new SMS, a nurse bell, Realtime, and a
+  retention policy — each noted where it belongs.
 - **Broadcast SMS by age group** — discussed, not built. Blocked on
   `profiles` having no birthdate, and on cost: ~₱1/SMS against 13,000+
   residents.
