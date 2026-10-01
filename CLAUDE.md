@@ -65,14 +65,14 @@ banned below: it silences the one check this project has.
 
 ### Tests
 
-Fifteen suites, 333 tests:
+Fifteen suites, 340 tests:
 
 | File | What it covers |
 |---|---|
 | `src/App.test.js` | One smoke test — renders `<App />` and asserts the brand name appears |
 | `src/utils/residentGroups.test.js` | 38 tests over the resident grouping, status vocabulary, search/filter, and the account ↔ voter-list cross-check — including the ones that hold "not on the voter list" at severity `expected` so a later edit cannot quietly promote ordinary residents into a list of problems |
 | `src/utils/displayLabels.test.js` | 30 tests over the shared status labels, the upcoming-event count, the Activity Log vocabulary, the Manila-vs-UTC date boundary (with fake timers), and a guard that this module never re-acquires a second verification vocabulary |
-| `src/components/ActionMenu.test.js` | 23 tests: 13 over the ⋮ menu's keyboard, Escape and focus-restore behaviour — the parts nobody catches by clicking — then 5 over `portal` (the popup leaves the clipping wrapper for `<body>` while the trigger stays in its row, and the whole keyboard contract survives the move) and 5 over **authorization**, the load-bearing ones: an action the caller may not perform is **absent from `items`**, not rendered disabled, so a menu cannot widen what a role can reach |
+| `src/components/ActionMenu.test.js` | 30 tests: 13 over the ⋮ menu's keyboard, Escape and focus-restore behaviour — the parts nobody catches by clicking — then 5 over `portal` (the popup leaves the clipping wrapper for `<body>` while the trigger stays in its row, and the whole keyboard contract survives the move), 5 over **authorization** (an action the caller may not perform is **absent from `items`**, not rendered disabled, so a menu cannot widen what a role can reach), and 7 over `subject`, which are what makes the one-word labels safe: the item reads "Edit" on screen and is **announced** "Edit Anti-Dengue Cleanup Drive". Run **both directions** — with the composition removed, **4 of the 7 fail**; the other three pass trivially because they cover the trigger's name and the no-subject caller |
 | `src/components/ConfirmDialog.test.js` | 4 tests over the shared confirmation hook. The load-bearing one: a second `confirm()` opened while the first is still showing used to leave the first promise **permanently pending**, hanging its handler with no write and no error. Latent while every caller was an official clicking one row at a time; reachable the moment the resident portal's blocking `window.confirm` calls became asynchronous. Verified both directions — the test fails with the fix removed |
 | `src/utils/monthGrid.test.js` | 26 tests over the date-only arithmetic and the month grid: leap February, month-length refusal (`2026-02-30` is not a date and must not slide to March), December/January wrap, and the rule that **nothing in that module constructs a `Date` from a date string** |
 | `src/components/MonthCalendar.test.js` | 19 tests over the shared grid as rendered: the accessible name of every day, navigation naming the month it goes to, and that today and selection are carried by `aria-current` / `aria-pressed` rather than by colour |
@@ -172,9 +172,11 @@ src/
     useNotifications  Fetching for the bell, and the one definition of
                       unread the sidebar badges also read.
     ActionMenu        The ⋮ overflow menu. Six places now, not one --
-                      `portal` lifted the clipping constraint. Read the
-                      header before putting it anywhere else: the
-                      PRIMARY-DECISION rule still stands.
+                      `portal` lifted the clipping constraint. Items read
+                      one word ("Edit"); `subject` puts the row back into
+                      every accessible name. Read the header before
+                      putting it anywhere else: the PRIMARY-DECISION rule
+                      still stands.
     MonthCalendar     THE month grid. One generic component behind four
                       calendars; owns the grid, navigation, today,
                       selection and accessibility, and NO business
@@ -2281,7 +2283,10 @@ is gone.
 
 It is now `.kapitan-compact` on the Dashboard overview: one navy row
 reading **who**, **what state**, and — for the Punong Barangay only —
-**one control** to change it.
+**one control** to change it. ⚠️ It first shipped as a full-width band
+under the stat cards and was **moved into the dashboard header** after
+review — see *Follow-up adjustments* below for the placement that is
+current.
 
 | | |
 |---|---|
@@ -2368,7 +2373,8 @@ this change made Document Requests the fourth.
 
 ### What was verified, and what was not
 
-The full suite (15 suites, 333 tests), a clean production build with no
+The full suite (15 suites, 333 tests at the time, 340 after the
+follow-up below), a clean production build with no
 ESLint warnings at **207 kB** gzipped — a healthy build; a dead one is
 ~90 kB — and `git diff --check` clean. The protected mobile
 table-to-card block hashes **identically to its pre-X2 bytes**; only its
@@ -2388,6 +2394,106 @@ produced the result — a `btn-decline` class that **does not exist**
 (the real one is `btn-deny`) reported a 20px button, and an anchoring
 probe that pushed the trigger 260px below the fold reported a flip
 failure that was not one.
+
+### Follow-up adjustments after manual review of the deploy preview
+
+Two changes, 2026-10-01, from the repo owner's own review of the
+deployed branch. Neither touches a handler, a permission, the
+confirmation flow, the portal, the keyboard behaviour or Document
+Requests.
+
+#### Menu items read one word, and are announced with the row
+
+The five management menus said *Edit announcement*, *Delete
+announcement*, *Edit event* and so on. The table heading and the row the
+⋮ sits in already say what the object is, so the entity noun was read
+past on every line. They now read **Edit** and **Delete** (and **Archive**
+in the Officials Directory — see below).
+
+⚠️ **A screen reader does not have the row for context**, so the words
+could not simply be deleted. `ActionMenu` takes a **`subject`** prop —
+the announcement's title, the official's name — and does two things with
+it:
+
+| | |
+|---|---|
+| Names the trigger | `More actions for <subject>`, which is the template five call sites used to each write out themselves |
+| Names each item | `aria-label` = `<item.label> <subject>`, so "Edit" is **announced** "Edit Anti-Dengue Cleanup Drive" |
+
+The menu itself also takes the trigger's name through `aria-labelledby`,
+so an assistive technology that announces the group on entry says which
+row it belongs to before reading the first item.
+
+⚠️ **The visible word is the FIRST word of the accessible name, never
+replaced by it.** WCAG 2.5.3 Label in Name requires the accessible name
+to contain the visible label, so a voice-control user saying "click
+Edit" still matches. An `aria-label` of "Edit Anti-Dengue Cleanup Drive"
+satisfies that; one reading "Change this announcement" would not. A test
+asserts the prefix on every item.
+
+Two deliberate exceptions:
+
+- **Officials Directory reads `Edit` / `Archive`, not `Edit` / `Delete`.**
+  Archive and delete are *different outcomes* here and the word is the
+  only thing on screen that says so — see *Officials archive*. Only the
+  redundant entity noun was dropped. ⚠️ This menu was **outside** the
+  literal "simply Edit/Delete" scope of the request; shortening it was a
+  judgment call for consistency across the five, and it is one line to
+  revert.
+- **The nurse's medicine list is unchanged** (`Edit details` / `Remove`).
+  It is a card list, not a management table, and it passes `label`
+  rather than `subject`, so its items carry no `aria-label` and their own
+  text speaks. `label` still wins over the derived name when both are
+  given.
+
+#### The compact status moved into the dashboard header
+
+It was a full-width navy band under the four stat cards. On a wide
+screen that is a second full-width row for one value, so it now sits
+**beside the greeting**, right-aligned in the header area:
+
+```
+Official Dashboard                    [ PUNONG BARANGAY        ]
+Good day, Alexis · Barangay Secretary [ Hon. Frankie Credo  ▾  ]
+```
+
+⚠️ **One element, one DOM node, no second copy.** Heading, stats and
+status are three children of `.dashboard-overview-top`, and the
+arrangement is a responsive layout:
+
+| | |
+|---|---|
+| **The default is the mobile layout, and it is nothing at all** | `display: block`, so the three stack in DOM order — heading, stats, status. There is **no `order` anywhere**: if both rules below vanished the phone layout would be unchanged. The accepted layout is the fallback, not the override |
+| **≥ 769px** | a two-column grid: heading at row 1 column 1, status at row 1 column 2 `justify-self: end`, stats spanning both columns in row 2 |
+
+**769px was measured, not assumed.** Forcing the side-by-side rule on at
+768 leaves the greeting paragraph **342px** — too narrow for a sentence
+naming the official and their position — so the breakpoint sits where
+every other dashboard breakpoint in this project does.
+
+Verified against the pre-change markup at 375 and 768: the heading,
+stats, status, select and first card are **pixel-identical**, every box,
+both widths. Adding the wrapper changes nothing narrow.
+
+At 1280 and 1440 the status is content-width and capped at `max-width:
+420px`, so it cannot become a third full-width band or out-grow the
+greeting. With a deliberately long 48-character name it wraps to two
+lines and the select drops below the name (138px tall rather than 67px)
+without pushing into the stats — bounded, and not a shape the real
+directory produces.
+
+⚠️ **The Punong Barangay's name is still derived**, from `officialsList`
+by position, exactly as before. Nothing about the permission moved:
+`isKapitan` is the only thing that renders a control, and the state text
+still renders only when the select does not.
+
+⚠️ **On a wide screen the visual order and the DOM order differ**: the
+status is painted beside the heading but comes third in the markup,
+after the stats. That is the accepted cost of leaving the narrow layout
+in pure document flow. Nothing interactive depends on the order — the
+only focusable thing in the element is the Kapitan's own select — and
+heading → stats → status is itself a meaningful sequence, which is what
+WCAG 1.3.2 asks for.
 
 ---
 
@@ -2578,9 +2684,9 @@ derives her initials from. It is no longer displayed as a label.
 - **Source maps ship to production** (~7 MB), so the original JSX is
   publicly reconstructable. `GENERATE_SOURCEMAP=false` in Vercel fixes it.
 - **`public/logo.png` is 984 KB and referenced by nothing.**
-- **Thin automated test coverage.** 333 tests in fifteen suites: one
+- **Thin automated test coverage.** 340 tests in fifteen suites: one
   smoke test over `<App />`, which fails without `.env` because
-  `supabaseClient.js` throws at import time, and 332 tests over the
+  `supabaseClient.js` throws at import time, and 339 tests over the
   resident workflow rules, the display labels, the booking window, the
   month grid and its three feature layers, the document-request filter,
   the ⋮ menu's keyboard and authorization behaviour, the modal

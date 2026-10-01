@@ -823,6 +823,71 @@
   }
 }
 
+/* ── The overview's top block ─────────────────────────────────────────
+ *
+ * Heading, the four stat cards and the Punong Barangay status, arranged
+ * from ONE set of DOM nodes.
+ *
+ * ⚠️ The DEFAULT here is the mobile layout, and it is nothing at all --
+ * plain document flow, so the three children stack in DOM order
+ * (heading, stats, status), which is the presentation already accepted
+ * at 375px. There is no `order` anywhere: if this rule and the one
+ * below both vanished, the phone layout would be unchanged. That is the
+ * point -- the accepted layout is the fallback, not the override.
+ *
+ * The wide layout is additive, below.
+ */
+.dashboard-overview-top {
+  display: block;
+}
+
+/* ⚠️ 769px, matching every other dashboard breakpoint in this project
+ * (Sidebar.css switches the drawer and the table-to-card block at 768).
+ * Below it the content area is the whole viewport, and the greeting
+ * paragraph plus a ~300px status side by side leaves the greeting too
+ * narrow to read -- measured at 768 before choosing this number, not
+ * assumed.
+ */
+@media (min-width: 769px) {
+  .dashboard-overview-top {
+    display: grid;
+    /* minmax(0, 1fr), never a bare 1fr: a bare track cannot shrink below
+       its content's min-content width, which is the single biggest
+       finding X2 recorded. The greeting holds a name somebody typed. */
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    column-gap: 24px;
+  }
+
+  /* Row 1: the greeting on the left, the status on its right. Both are
+     placed explicitly, so neither depends on DOM order -- which is why
+     the status can sit third in the markup and still render here. */
+  .dashboard-overview-top > .official-dashboard-header {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .dashboard-overview-top > .kapitan-compact {
+    grid-column: 2;
+    grid-row: 1;
+    /* Content width, pinned to the right edge. A stretched status would
+       be a second full-width band, which is what this move undoes. */
+    justify-self: end;
+    /* The heading's own 32px bottom margin already separates row 1 from
+       the stats; a second margin here would make the two rows disagree
+       about the gap. */
+    margin-bottom: 0;
+    /* Never wider than the greeting it sits beside. */
+    max-width: 420px;
+  }
+
+  /* Row 2: the stat cards keep the full width they had. */
+  .dashboard-overview-top > .dashboard-stats {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
 /* ── The compact Punong Barangay status (post-X3) ─────────────────────
  *
  * Replaces the full-width gradient panel that used to sit on the

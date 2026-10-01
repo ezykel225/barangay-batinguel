@@ -2474,6 +2474,19 @@ const OfficialDashboard = () => {
         ======================== */}
         {activeTab === 'dashboard' && (
           <div>
+            {/* ── The overview's top block ────────────────────────────
+                Heading, the four stat cards and the Punong Barangay
+                status, in ONE container so their arrangement is a
+                responsive layout rather than two copies of an element.
+
+                ⚠️ DOM ORDER IS THE MOBILE ORDER, and it is deliberately
+                left alone: heading, stats, status -- exactly the
+                presentation already accepted at 375px, in plain document
+                flow with no `order` anywhere to go wrong. The wide
+                layout places the status in row 1 column 2 with grid,
+                beside the greeting, and lets the stats span both columns
+                underneath. See .dashboard-overview-top. */}
+            <div className="dashboard-overview-top">
             <div className="official-dashboard-header">
               <h1>Official Dashboard</h1>
               <p>
@@ -2593,6 +2606,7 @@ const OfficialDashboard = () => {
                   </select>
                 </div>
               )}
+            </div>
             </div>
 
             {/* Pending Reservations */}
@@ -2749,17 +2763,17 @@ const OfficialDashboard = () => {
                           <td data-label="Action" className="action-cell">
                             <ActionMenu
                               portal
-                              label={`More actions for ${ann.title}`}
+                              subject={ann.title}
                               items={[
                                 {
                                   key: 'edit',
-                                  label: 'Edit announcement',
+                                  label: 'Edit',
                                   icon: <FaEdit />,
                                   onSelect: () => handleOpenEditAnnouncement(ann),
                                 },
                                 {
                                   key: 'delete',
-                                  label: 'Delete announcement',
+                                  label: 'Delete',
                                   icon: <FaTrash />,
                                   danger: true,
                                   // Still goes through the shared
@@ -2916,17 +2930,17 @@ const OfficialDashboard = () => {
                           <td data-label="Action" className="action-cell">
                             <ActionMenu
                               portal
-                              label={`More actions for ${event.title}`}
+                              subject={event.title}
                               items={[
                                 {
                                   key: 'edit',
-                                  label: 'Edit event',
+                                  label: 'Edit',
                                   icon: <FaEdit />,
                                   onSelect: () => handleOpenEditEvent(event),
                                 },
                                 {
                                   key: 'delete',
-                                  label: 'Delete event',
+                                  label: 'Delete',
                                   icon: <FaTrash />,
                                   danger: true,
                                   onSelect: () => handleDeleteEvent(event),
@@ -3403,17 +3417,17 @@ const OfficialDashboard = () => {
                           <td data-label="Action" className="action-cell">
                             <ActionMenu
                               portal
-                              label={`More actions for ${entry.purok || 'this schedule'}`}
+                              subject={entry.purok || 'this schedule'}
                               items={[
                                 {
                                   key: 'edit',
-                                  label: 'Edit schedule',
+                                  label: 'Edit',
                                   icon: <FaEdit />,
                                   onSelect: () => handleEditWaste(entry),
                                 },
                                 {
                                   key: 'delete',
-                                  label: 'Delete schedule',
+                                  label: 'Delete',
                                   icon: <FaTrash />,
                                   danger: true,
                                   onSelect: () => handleDeleteWaste(entry),
@@ -3841,17 +3855,17 @@ const OfficialDashboard = () => {
                           <td data-label="Action" className="action-cell">
                             <ActionMenu
                               portal
-                              label={`More actions for ${entry.full_name}`}
+                              subject={entry.full_name}
                               items={[
                                 {
                                   key: 'edit',
-                                  label: 'Edit entry',
+                                  label: 'Edit',
                                   icon: <FaEdit />,
                                   onSelect: () => handleEditRegistryEntry(entry),
                                 },
                                 {
                                   key: 'delete',
-                                  label: 'Delete entry',
+                                  label: 'Delete',
                                   icon: <FaTrash />,
                                   danger: true,
                                   onSelect: () => handleDeleteRegistryEntry(entry),
@@ -3931,17 +3945,22 @@ const OfficialDashboard = () => {
                                 control in this UI. */}
                             <ActionMenu
                               portal
-                              label={`More actions for ${official.full_name}`}
+                              subject={official.full_name}
                               items={[
                                 {
                                   key: 'edit',
-                                  label: 'Edit official',
+                                  label: 'Edit',
                                   icon: <FaEdit />,
                                   onSelect: () => handleEditOfficial(official),
                                 },
+                                // ⚠️ "Archive", never "Delete". The two are
+                                // different outcomes here and the word is
+                                // the only thing that says so -- see
+                                // *Officials archive*. Only the redundant
+                                // entity noun was dropped.
                                 ...(isOwnOfficialRecord(official) ? [] : [{
                                   key: 'archive',
-                                  label: 'Archive official',
+                                  label: 'Archive',
                                   icon: <FaArchive />,
                                   danger: true,
                                   onSelect: () => setArchivingOfficial(official),

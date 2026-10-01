@@ -58,13 +58,44 @@ import './ActionMenu.css'
 // because an absolutely-positioned menu would otherwise drift away from
 // the row it belongs to.
 //
+// ─── LABELS: SHORT ON SCREEN, FULL TO A SCREEN READER ─────────────────
+//
+// A menu item inside a management table reads **"Edit"**, not "Edit
+// announcement". The table's own heading and the row the ⋮ sits in
+// already say what the object is, so repeating the entity in every item
+// is noise a sighted reader has to read past.
+//
+// ⚠️ A screen reader does NOT have the row for context, so the words
+// cannot simply be dropped. `subject` carries the thing being acted on
+// (the announcement's title, the official's name) and the component
+// does two things with it:
+//
+//   1. names the TRIGGER   -- "More actions for <subject>"
+//   2. names each ITEM     -- aria-label "<item.label> <subject>", so
+//      "Edit" is announced as "Edit Anti-Dengue Cleanup Drive"
+//
+//      The visible word is the FIRST word of the accessible name, which
+//      is what WCAG 2.5.3 Label in Name requires -- a voice-control
+//      user saying "click Edit" still matches. An aria-label that
+//      replaced the visible text rather than extending it would break
+//      that, which is why the item label is never dropped from it.
+//
+// The menu itself also takes the trigger's name via `aria-labelledby`,
+// so an assistive technology that announces the group on entry says
+// which row it belongs to before reading the first item.
+//
+// `label` is still accepted for a caller with no single subject string
+// (the nurse's medicine list passes one directly) and wins over the
+// derived one when both are given.
+//
 // `items` is an array of { key, label, icon, onSelect, danger }.
-const ActionMenu = ({ items = [], label = 'More actions', portal = false }) => {
+const ActionMenu = ({ items = [], label, subject, portal = false }) => {
   const [open, setOpen] = useState(false)
   // Where to draw the popup when `portal` is set. Measured from the
   // trigger at open time; null until then.
   const [anchor, setAnchor] = useState(null)
   const menuId = useId()
+  const triggerId = useId()
   const triggerRef = useRef(null)
   const menuRef = useRef(null)
   // Which item is focused, so the arrow keys have something to move.
@@ -176,11 +207,17 @@ const ActionMenu = ({ items = [], label = 'More actions', portal = false }) => {
 
   if (items.length === 0) return null
 
+  const triggerLabel = label
+    || (subject ? `More actions for ${subject}` : 'More actions')
+  // Extends the visible word, never replaces it -- see the header.
+  const itemLabel = (item) => (subject ? `${item.label} ${subject}` : undefined)
+
   const popup = (
     <div
       className={`action-menu-list${portal ? ' is-portal' : ''}`}
       id={menuId}
       role="menu"
+      aria-labelledby={triggerId}
       ref={menuRef}
       style={portal && anchor ? anchor : undefined}
     >
@@ -190,6 +227,7 @@ const ActionMenu = ({ items = [], label = 'More actions', portal = false }) => {
           type="button"
           role="menuitem"
           className={`action-menu-item${item.danger ? ' is-danger' : ''}`}
+          aria-label={itemLabel(item)}
           ref={(node) => { itemRefs.current[index] = node }}
           onClick={() => choose(item)}
           onKeyDown={(event) => onItemKeyDown(event, index)}
@@ -205,12 +243,13 @@ const ActionMenu = ({ items = [], label = 'More actions', portal = false }) => {
     <div className="action-menu">
       <button
         type="button"
+        id={triggerId}
         className="action-menu-trigger"
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
-        aria-label={label}
-        title={label}
+        aria-label={triggerLabel}
+        title={triggerLabel}
         ref={triggerRef}
         onClick={() => setOpen((previous) => !previous)}
         onKeyDown={(event) => {

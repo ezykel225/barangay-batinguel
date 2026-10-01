@@ -287,3 +287,78 @@ describe('what the menu may contain', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
 })
+
+// ── Short labels, full accessible names ───────────────────────────────
+//
+// ⚠️ The management tables' items read "Edit" and "Delete". That is only
+// safe because `subject` puts the row back into every accessible name --
+// a screen-reader user has no row to read. These tests are the reason
+// shortening the visible text is not a regression, so they must fail if
+// `subject` ever stops composing the name.
+describe('subject-derived accessible names', () => {
+  const EDIT_DELETE = [
+    { key: 'edit', label: 'Edit', onSelect: () => {} },
+    { key: 'delete', label: 'Delete', danger: true, onSelect: () => {} },
+  ]
+  const open = (props) => {
+    render(<ActionMenu portal items={EDIT_DELETE} {...props} />)
+    fireEvent.click(screen.getByRole('button', { name: /More actions/ }))
+  }
+
+  it('names the trigger from the subject, so no caller repeats the template', () => {
+    render(<ActionMenu portal subject="Anti-Dengue Cleanup Drive" items={EDIT_DELETE} />)
+    expect(
+      screen.getByRole('button', { name: 'More actions for Anti-Dengue Cleanup Drive' })
+    ).toBeInTheDocument()
+  })
+
+  it('puts the subject into each item, so "Edit" is never announced bare', () => {
+    open({ subject: 'Anti-Dengue Cleanup Drive' })
+    expect(screen.getByRole('menuitem', { name: 'Edit Anti-Dengue Cleanup Drive' }))
+      .toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Delete Anti-Dengue Cleanup Drive' }))
+      .toBeInTheDocument()
+  })
+
+  it('still shows only the short word on screen', () => {
+    open({ subject: 'Anti-Dengue Cleanup Drive' })
+    // The visible text, as distinct from the accessible name above.
+    expect(screen.getByRole('menuitem', { name: /^Edit / })).toHaveTextContent(/^Edit$/)
+    expect(screen.getByRole('menuitem', { name: /^Delete / })).toHaveTextContent(/^Delete$/)
+  })
+
+  // WCAG 2.5.3 Label in Name: the accessible name must CONTAIN the
+  // visible label, so "click Edit" still works by voice. An aria-label
+  // that replaced the word rather than extending it would break that.
+  it('keeps the visible word at the start of the accessible name', () => {
+    open({ subject: 'Juan Dela Cruz' })
+    screen.getAllByRole('menuitem').forEach((item) => {
+      const visible = item.textContent.trim()
+      expect(item.getAttribute('aria-label')).toMatch(new RegExp(`^${visible}\\b`))
+    })
+  })
+
+  it('labels the menu itself from the trigger, naming the row on entry', () => {
+    open({ subject: 'Juan Dela Cruz' })
+    const menu = screen.getByRole('menu')
+    const trigger = screen.getByRole('button', { name: /More actions/ })
+    expect(menu).toHaveAttribute('aria-labelledby', trigger.id)
+    expect(trigger.id).not.toBe('')
+  })
+
+  it('adds no aria-label when there is no subject, leaving the text to speak', () => {
+    // The nurse's medicine list passes `label` and no subject; its items
+    // already name themselves ("Edit details", "Remove").
+    open({ label: 'More actions for Paracetamol' })
+    screen.getAllByRole('menuitem').forEach((item) => {
+      expect(item).not.toHaveAttribute('aria-label')
+    })
+  })
+
+  it('lets an explicit label win over the derived one', () => {
+    render(
+      <ActionMenu portal label="More actions for Paracetamol" subject="Ignored" items={EDIT_DELETE} />
+    )
+    expect(screen.getByRole('button', { name: 'More actions for Paracetamol' })).toBeInTheDocument()
+  })
+})
