@@ -65,7 +65,7 @@ banned below: it silences the one check this project has.
 
 ### Tests
 
-Six suites, 144 tests:
+Ten suites, 235 tests:
 
 | File | What it covers |
 |---|---|
@@ -74,6 +74,10 @@ Six suites, 144 tests:
 | `src/utils/displayLabels.test.js` | 30 tests over the shared status labels, the upcoming-event count, the Activity Log vocabulary, the Manila-vs-UTC date boundary (with fake timers), and a guard that this module never re-acquires a second verification vocabulary |
 | `src/components/ActionMenu.test.js` | 13 tests over the ⋮ menu's keyboard, Escape and focus-restore behaviour — the parts nobody catches by clicking |
 | `src/components/ConfirmDialog.test.js` | 4 tests over the shared confirmation hook. The load-bearing one: a second `confirm()` opened while the first is still showing used to leave the first promise **permanently pending**, hanging its handler with no write and no error. Latent while every caller was an official clicking one row at a time; reachable the moment the resident portal's blocking `window.confirm` calls became asynchronous. Verified both directions — the test fails with the fix removed |
+| `src/utils/monthGrid.test.js` | 26 tests over the date-only arithmetic and the month grid: leap February, month-length refusal (`2026-02-30` is not a date and must not slide to March), December/January wrap, and the rule that **nothing in that module constructs a `Date` from a date string** |
+| `src/components/MonthCalendar.test.js` | 19 tests over the shared grid as rendered: the accessible name of every day, navigation naming the month it goes to, and that today and selection are carried by `aria-current` / `aria-pressed` rather than by colour |
+| `src/utils/reservationCalendar.test.js` | 22 tests over court occupancy. The load-bearing one: `declined` and `cancelled` do **not** make a date look occupied |
+| `src/utils/eventCalendar.test.js` | 24 tests over event placement and the upcoming split. The load-bearing one: the homepage filters **then** limits |
 | `src/utils/reservationWindow.test.js` | 46 tests over the 5–10 PM window, the per-slot and per-kind durations, the noon-spanning exception and the office-hours exception — deliberately mirroring the SQL cases in migration 020's header, so client and database are asserted to agree rather than each checked alone. The load-bearing one is that an exception is read from `exception_reason` and never from the hour |
 
 Schema and policy changes are still verified by impersonating each role
@@ -86,9 +90,10 @@ imports the client. So a missing `.env` fails that test with a module
 error that never mentions `.env`. If `npm test` fails on a fresh
 checkout, check `.env` before debugging the test.
 
-The other five suites do **not** need it. `residentGroups.js`,
-`displayLabels.js`, `reservationWindow.js`, `ActionMenu.jsx` and
-`ConfirmDialog.jsx` have no Supabase import, which is the reason the resident workflow's rules, the
+The other nine suites do **not** need it. `residentGroups.js`,
+`displayLabels.js`, `reservationWindow.js`, `monthGrid.js`,
+`reservationCalendar.js`, `eventCalendar.js`, `ActionMenu.jsx`,
+`MonthCalendar.jsx` and `ConfirmDialog.jsx` have no Supabase import, which is the reason the resident workflow's rules, the
 label vocabulary and the booking window live in modules rather than
 inside the dashboard components.
 
@@ -152,6 +157,10 @@ src/
     ActionMenu        The ⋮ overflow menu. Used in exactly one place --
                       read the constraint in its own header before
                       putting it anywhere else.
+    MonthCalendar     THE month grid. One generic component behind four
+                      calendars; owns the grid, navigation, today,
+                      selection and accessibility, and NO business
+                      logic -- callers pass `renderDay`.
 
   pages/              Public routes: Home, Officials, HealthCenter,
                       Reservation, Login, ResidentSignup, ResetPassword,
@@ -177,6 +186,13 @@ src/
                       requests, reservations, availability. Also the
                       upcoming-event count. It does NOT own account
                       verification -- see below.
+    monthGrid         Date-only arithmetic and the month grid. ⚠️ Nothing
+                      in it constructs a Date from a date string -- that
+                      is the whole point. See *Calendars* below.
+    reservationCalendar Court occupancy for the calendar: which statuses
+                      hold a slot, and how a day is toned. Pure.
+    eventCalendar     Event placement, and `upcomingEvents`, which
+                      filters before it limits. Pure.
     reservationWindow The covered court's booking window: the start-time
                       list, the 5-10 PM rule, the per-kind duration caps,
                       what hours a booking occupies (coveredHours, which
@@ -828,11 +844,18 @@ Several of them carry more than their name suggests:
 - Officials Directory — also holds the **Archived Officials** panel, which
   appears only once something has been archived. Archive replaced the old
   permanent Delete; see *Officials archive*.
+- Events — `Table | Calendar`, with **Edit Event** alongside Add and
+  Delete since 2026-10-01
+- Reservations — `Queue | Calendar`; see *Calendars*
 - Reports, Activity Log
 
 ### Nurses
 - **Medicine availability**, clinic availability with lunch break,
-  medical programs, health events / bakuna calendar
+  medical programs, health events
+- Health Events — `Table | Calendar`, with **Edit Health Event**
+  alongside Add and Delete since 2026-10-01. Her dashboard's
+  "Bakuna Calendar" card was a three-row list and is now
+  **Upcoming Health Events**; see *Calendars*
 
 ---
 
@@ -1091,6 +1114,8 @@ was built without one.
   noon; see *Noon is not a closure for an exception* below. Never walk
   the label list to work out what a booking occupies; use
   `coveredHours()`.
+- **The Official Portal has a court calendar** since 2026-10-01 —
+  `Queue | Calendar`, Queue the default. See *Calendars* below.
 - `end_time` is the **end** of the booking (start + duration), not the
   start of its last slot — and it is a **display string the client
   computes and sends**, never derived or validated server-side. The
@@ -1344,6 +1369,148 @@ rule already does this in SQL for the same reason.
 
 ---
 
+## Calendars
+
+Two IT feedback items, implemented 2026-10-01: *"Calendar view for court
+schedule"* and *"Change and Update events to calendar"*. Four calendars,
+**one** month grid.
+
+| Surface | Views | Default | Authoritative data |
+|---|---|---|---|
+| Official → Reservations | `Queue` \| `Calendar` | **Queue** | the `reservations` state the dashboard already fetched |
+| Public `/events` | `Calendar` \| `List` | **Calendar** | `events.event_date` |
+| Official → Events | `Table` \| `Calendar` | **Table** | the `events` state the tab already fetched |
+| Nurse → Health Events | `Table` \| `Calendar` | **Table** | the `health_events` state the tab already fetched |
+
+**No Google Calendar, no OAuth, no external synchronisation, no second
+event store.** Supabase stays the only source for `events` and
+`health_events`.
+
+### The shared grid, and the line it does not cross
+
+`src/components/MonthCalendar.jsx` owns the grid, the weekday headings,
+previous/next navigation, today, selection, the responsive behaviour and
+the accessible names. It owns **no business logic** — it does not know
+what a reservation is, which statuses hold a slot, or where an event's
+detail page lives. Callers pass `renderDay(cell)`, which returns
+`{ tone, count, disabled, label }`.
+
+So the feature logic stays where it is tested:
+
+| Module | Owns |
+|---|---|
+| `monthGrid.js` | date-only arithmetic, the grid, `groupByDateKey`, `monthOf` |
+| `reservationCalendar.js` | occupancy, covered hours, pending/approved holding, exception counting, day tone |
+| `eventCalendar.js` | event placement, day labels, `upcomingEvents` / `pastEvents` |
+
+It was **extracted from** the public court-reservation calendar, which
+was the only month grid in the app. That page still renders its own grid
+with its own slot-availability tones — it is deliberately untouched,
+because it is the surface #23/#23.R verified most heavily and its cell
+states are about slot counts rather than about records on a date. The
+`mcal-` prefix exists so the two cannot collide.
+
+### ⚠️ The court calendar reads the official's own rows, not the public RPC
+
+`buildReservationCalendar` is given the `reservations` state the
+dashboard already fetched with `.select('*')`. It must **never** call
+`get_reservation_slots_range`: that is the anonymous view, five columns,
+deliberately without `full_name` and without `exception_reason`. An
+official calling it would be reading a poorer copy of their own data
+through a second source.
+
+**Occupancy is `status IN ('pending','approved')`** — the same
+definition as the exclusion constraint's partial `WHERE`, both public
+RPCs, and the booking form. `declined` and `cancelled` release their
+slots and must never make a date look occupied; a test asserts it.
+Extent comes from `coveredHours()`, so a multi-hour booking and a
+noon-spanning exception both hold every hour they occupy.
+
+Amber means a booking on that date still waits on an official; green
+means every booking on it has been decided; grey is the past. **Nothing
+is decided from the calendar** — Approve and Decline stay in the queue,
+and *Open these in the queue* sets a date filter and switches back.
+That filter is separate from the search box on purpose:
+`RESERVATION_SEARCH_FIELDS` does not include `preferred_date`, so a date
+typed into the search would match nothing.
+
+### ⚠️ Cells stay compact. Detail goes in the panel
+
+No resident name, email, purpose, exception reason or event title goes
+inside a calendar cell. Cells carry the day number and a count; the
+selected date's records render in `.mcal-day-panel` beside the grid on a
+wide screen and underneath it on a narrow one. Measured at 1280 / 768 /
+375: **zero document-level horizontal overflow**, cells 96px square on a
+tablet and 42px on a phone.
+
+Officials see in the panel exactly what the queue already shows them.
+Nothing new is exposed, and nothing is exposed publicly.
+
+### ⚠️ `event_date` is the date. `event_month`/`event_day` are not
+
+Those two are denormalised display copies, and they were written as
+`new Date(dateString)` then `.getDate()` / `.toLocaleString()`. The
+string parses as **UTC midnight** and both methods read it back in the
+**browser's** zone, so west of UTC they describe the previous day —
+verified: the same instant renders "Sep 30" in New York and "Oct 1" in
+Manila. Every stored row is correct only because every row was written
+from the Philippines.
+
+Both write paths now derive them from the characters of the date
+(`displayPartsFor`), so they can no longer disagree with `event_date`.
+The calendars read `event_date` and ignore them; the public event cards
+still render them, which is why they are kept.
+
+**Nothing in `monthGrid.js` constructs a `Date` from a date string.** A
+stored date is three integers and a label: `parseDateKey` splits the
+characters, `dateKey` reassembles them, and comparisons are string
+comparisons, which sort correctly for zero-padded ISO dates. The only
+`Date` in the module is built from explicit `(year, month, day)` numbers
+for the length of a month and the weekday of the 1st, where no parsing
+happens and the day cannot shift.
+
+### Home → Upcoming Events: filter, then limit
+
+The section was `order('event_date').limit(4)` with **no date filter**,
+so on live data it showed three events from 2024 first and the single
+genuinely upcoming one last, under a heading promising the opposite.
+`upcomingEvents()` filters against `manilaToday()` and limits
+afterwards. Limiting in SQL first would hand four rows to a filter with
+nothing upcoming left in them. Today counts as upcoming — an event this
+afternoon has not happened yet.
+
+### Edit Event and Edit Health Event — no migration needed
+
+Both tables already had an unused `UPDATE` policy. **Reconfirmed by
+impersonating each role over the API before implementing**, every case
+rolled back:
+
+| | |
+|---|---|
+| official → `events` | rows=1 |
+| official → `health_events` | rows=0 |
+| nurse → `health_events` | rows=1 |
+| nurse → `events` | rows=0 |
+| anon → `events` | rows=0 |
+
+So Edit uses the existing permission, with no schema change. One modal
+serves Add and Edit in each portal, so the fields cannot drift apart,
+and **the existing row is updated** — not deleted and recreated, which
+would break the public `/events/:id` link, lose `created_at` and file
+two audit entries for one correction. Both call `.select()` and check a
+row came back, because RLS filters rather than raising. Both log
+`edited` on `event` / `health_event`, already in the vocabulary.
+
+### The nurse's "Bakuna Calendar" was not a calendar
+
+It was `healthEvents.slice(0, 3)` — the first three rows whatever their
+date — under a heading saying Calendar. Renamed **Upcoming Health
+Events** and now fed by `upcomingEvents(…, { limit: 3 })`, so it shows
+the next three sessions rather than the first three rows. Not turned
+into a second grid: the real one is one tab away under Health Events.
+
+---
+
 ## Health centre
 
 **Medicine stock is a status, not a quantity** — Available / Low stock /
@@ -1525,11 +1692,12 @@ derives her initials from. It is no longer displayed as a label.
 - **Source maps ship to production** (~7 MB), so the original JSX is
   publicly reconstructable. `GENERATE_SOURCEMAP=false` in Vercel fixes it.
 - **`public/logo.png` is 984 KB and referenced by nothing.**
-- **Thin automated test coverage.** 144 tests in six suites: one smoke
+- **Thin automated test coverage.** 235 tests in ten suites: one smoke
   test over `<App />`, which fails without `.env` because
-  `supabaseClient.js` throws at import time, and 143 pure unit tests over
-  the resident workflow rules, the display labels, the booking window,
-  the ⋮ menu's keyboard behaviour and the confirmation dialog. No integration or end-to-end tests,
+  `supabaseClient.js` throws at import time, and 234 tests over the
+  resident workflow rules, the display labels, the booking window, the
+  month grid and its three feature layers, the ⋮ menu's keyboard
+  behaviour and the confirmation dialog. No integration or end-to-end tests,
   and **no test touches the database** — the reservation-window tests
   mirror migration 020's SQL cases rather than running them, so the two
   can still drift if only one is edited.

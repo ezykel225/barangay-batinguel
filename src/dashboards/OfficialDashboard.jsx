@@ -16,6 +16,7 @@ import {
   FaUndo,
   FaSearch,
   FaTimes,
+  FaList,
 } from 'react-icons/fa'
 import { supabase } from '../supabase/supabaseClient'
 import { pathFromPublicUrl } from '../utils/storagePath'
@@ -61,10 +62,42 @@ import {
   EXCEPTION_BADGE_LABEL,
   isExceptionRequest,
 } from '../utils/reservationWindow'
+import MonthCalendar from '../components/MonthCalendar'
+import {
+  buildReservationCalendar,
+  describeReservationDay,
+  reservationsOnDate,
+} from '../utils/reservationCalendar'
+import { buildEventCalendar, describeEventDay, eventsOnDate } from '../utils/eventCalendar'
+import { MONTH_NAMES, monthOf, parseDateKey, toDateKey } from '../utils/monthGrid'
 import '../components/Sidebar.css'
 import './OfficialDashboard.css'
 
 const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+// A date key as a heading. Through parseDateKey, so a 'YYYY-MM-DD' is
+// never handed to `new Date()` and cannot shift a day.
+const longDate = (key) => {
+  const parsed = parseDateKey(key)
+  return parsed ? `${parsed.day} ${MONTH_NAMES[parsed.month]} ${parsed.year}` : ''
+}
+
+// Queue | Calendar, Table | Calendar. One control, two tabs.
+const ViewToggle = ({ label, value, options, onChange }) => (
+  <div className="view-toggle" role="group" aria-label={label}>
+    {options.map((option) => (
+      <button
+        key={option.value}
+        type="button"
+        onClick={() => onChange(option.value)}
+        aria-pressed={value === option.value}
+      >
+        {option.icon}
+        {option.label}
+      </button>
+    ))}
+  </div>
+)
 
 // Search box + one optional dropdown + result count + reset. Shared by
 // the Residents tab, the Voter Reference List tab and the Reservations
@@ -243,6 +276,24 @@ const OfficialDashboard = () => {
   // because the two compose: "pending exceptions" is the queue an
   // official actually works through.
   const [reservationExceptionsOnly, setReservationExceptionsOnly] = useState(false)
+
+  // ── Calendar views ──
+  //
+  // Queue and Table stay the defaults. The calendars are an additional
+  // way to look at the same records, never a replacement for the
+  // management interface: approving, declining, searching, filtering and
+  // reading a resident's details all stay in the queue and the table.
+  const [reservationView, setReservationView] = useState('queue')
+  const [eventView, setEventView] = useState('table')
+  const [calendarDate, setCalendarDate] = useState('')
+  const [eventCalendarDate, setEventCalendarDate] = useState('')
+  const [reservationMonth, setReservationMonth] = useState(() => monthOf(manilaToday()))
+  // Set by the calendar when an official asks to work one date in the
+  // queue. A separate filter rather than a search term, because
+  // RESERVATION_SEARCH_FIELDS does not include preferred_date -- putting
+  // a date in the search box would match nothing.
+  const [reservationDateFilter, setReservationDateFilter] = useState('')
+  const [eventMonth, setEventMonth] = useState(() => monthOf(manilaToday()))
   const [reservationQuery, setReservationQuery] = useState('')
   const [announcementFilter, setAnnouncementFilter] = useState('all')
   const [eventFilter, setEventFilter] = useState('all')
@@ -265,6 +316,9 @@ const OfficialDashboard = () => {
   // Modal States
   const [showAnnouncementModal, setShowAnnouncementModal] = useState(false)
   const [showEventModal, setShowEventModal] = useState(false)
+  // Null when adding, the event's row when editing. One modal serves
+  // both, so the fields cannot drift apart.
+  const [editingEvent, setEditingEvent] = useState(null)
   const [showOfficialModal, setShowOfficialModal] = useState(false)
   const [editingOfficial, setEditingOfficial] = useState(null)
   // Officials archive (migration 018). `archivingOfficial` and
@@ -1767,6 +1821,94 @@ const OfficialDashboard = () => {
     }
   }
 
+  // ⚠️ `event_month` and `event_day` are denormalised display copies,
+  // and they are NOT the date. `event_date` is.
+  //
+  // They were written as `new Date(dateString)` then `.getDate()` /
+  // `.toLocaleString()`, which parses a UTC midnight and reads it back
+  // in the BROWSER's zone -- so west of UTC they describe the previous
+  // day. Every stored row happens to be correct because every row was
+  // written from the Philippines, but nothing enforced that.
+  //
+  // Derived from the characters of the date instead, so the two columns
+  // can no longer disagree with `event_date` whatever zone the official
+  // is in. They are kept because the public event cards still render
+  // them; the calendars read `event_date` and ignore them entirely.
+  const displayPartsFor = (dateString) => {
+    const parsed = parseDateKey(dateString)
+    if (!parsed) return { event_month: null, event_day: null }
+    return {
+      event_month: MONTH_SHORT[parsed.month].toUpperCase(),
+      event_day: String(parsed.day).padStart(2, '0'),
+    }
+  }
+
+  const handleOpenAddEvent = () => {
+    setEditingEvent(null)
+    setNewEvent({ title: '', location: '', event_date: '' })
+    setShowEventModal(true)
+  }
+
+  const handleOpenEditEvent = (event) => {
+    setEditingEvent(event)
+    setNewEvent({
+      title: event.title || '',
+      location: event.location || '',
+      // Normalised through the date-only helper, so the date input is
+      // populated from the stored value rather than from a Date.
+      event_date: toDateKey(event.event_date),
+    })
+    setShowEventModal(true)
+  }
+
+  // Updates the existing row. Deliberately NOT a delete-and-recreate:
+  // that would break the public /events/:id link, lose created_at, and
+  // file two audit entries for one correction.
+  const handleUpdateEvent = async () => {
+    if (submitting || !editingEvent) return
+    if (!newEvent.title || !newEvent.event_date) {
+      toast.error('Please fill in all fields!')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      // .select() matters: RLS filters rows rather than raising, so a
+      // blocked update returns success with zero rows affected. Without
+      // this the toast would report a save that never happened.
+      const { data, error } = await supabase
+        .from('events')
+        .update({
+          title: newEvent.title,
+          location: newEvent.location,
+          event_date: newEvent.event_date,
+          ...displayPartsFor(newEvent.event_date),
+        })
+        .eq('id', editingEvent.id)
+        .select('id')
+
+      if (error) {
+        toast.error('Failed to update event!')
+      } else if (!data || data.length === 0) {
+        toast.error('Nothing was updated — you may not have permission to change events.')
+      } else {
+        toast.success('Event updated.')
+        logActivity({
+          action: 'edited',
+          entityType: 'event',
+          entityId: editingEvent.id,
+          subject: newEvent.title,
+        })
+        setShowEventModal(false)
+        setEditingEvent(null)
+        setNewEvent({ title: '', location: '', event_date: '' })
+        fetchEvents()
+      }
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   const handleAddEvent = async () => {
     if (submitting) return
     if (!newEvent.title || !newEvent.event_date) {
@@ -1776,10 +1918,6 @@ const OfficialDashboard = () => {
 
     setSubmitting(true)
     try {
-      const date = new Date(newEvent.event_date)
-      const month = date.toLocaleString('en-US', { month: 'short' }).toUpperCase()
-      const day = String(date.getDate()).padStart(2, '0')
-
       // Readback returns the new id so the audit entry can point at the
       // row. Safe here: this table's SELECT policy covers whoever may
       // insert, so a successful insert is always readable by its author.
@@ -1789,8 +1927,7 @@ const OfficialDashboard = () => {
           title: newEvent.title,
           location: newEvent.location,
           event_date: newEvent.event_date,
-          event_month: month,
-          event_day: day,
+          ...displayPartsFor(newEvent.event_date),
         }])
         .select('id')
         .single()
@@ -1933,25 +2070,59 @@ const OfficialDashboard = () => {
     const byException = reservationExceptionsOnly
       ? byStatus.filter(isExceptionRequest)
       : byStatus
-    return filterRows(byException, {
+    // Compares the stored date as a string, which is correct for
+    // zero-padded ISO dates and needs no Date at all.
+    const byDate = reservationDateFilter
+      ? byException.filter((r) => toDateKey(r.preferred_date) === reservationDateFilter)
+      : byException
+    return filterRows(byDate, {
       query: reservationQuery,
       fields: RESERVATION_SEARCH_FIELDS,
     })
-  }, [reservations, reservationFilter, reservationExceptionsOnly, reservationQuery])
+  }, [
+    reservations, reservationFilter, reservationExceptionsOnly,
+    reservationDateFilter, reservationQuery,
+  ])
 
   const exceptionReservationCount = useMemo(
     () => reservations.filter(isExceptionRequest).length,
     [reservations]
   )
 
+  // ⚠️ Built from the `reservations` state this dashboard already
+  // fetched -- the same rows the queue renders. NOT from
+  // get_reservation_slots_range: that RPC is the anonymous view, with
+  // five columns and deliberately no names and no exception_reason, so
+  // an official calling it would be reading a poorer copy of their own
+  // data through a second source.
+  const reservationCalendar = useMemo(
+    () => buildReservationCalendar(reservations),
+    [reservations]
+  )
+  const calendarDayReservations = useMemo(
+    () => reservationsOnDate(reservationCalendar, calendarDate),
+    [reservationCalendar, calendarDate]
+  )
+
+  const officialEventCalendar = useMemo(() => buildEventCalendar(events), [events])
+  const eventCalendarDayEvents = useMemo(
+    () => eventsOnDate(officialEventCalendar, eventCalendarDate),
+    [officialEventCalendar, eventCalendarDate]
+  )
+
+  // Today in Manila, for the grid's today marker and its past shading.
+  const calendarToday = useMemo(() => manilaToday(), [])
+
   const reservationFiltersActive =
     reservationQuery.trim() !== ''
     || reservationFilter !== 'all'
     || reservationExceptionsOnly
+    || reservationDateFilter !== ''
   const resetReservationFilters = () => {
     setReservationQuery('')
     setReservationFilter('all')
     setReservationExceptionsOnly(false)
+    setReservationDateFilter('')
   }
 
   const visibleRegistryEntries = useMemo(
@@ -2344,7 +2515,20 @@ const OfficialDashboard = () => {
             <div className="dashboard-card">
               <div className="dashboard-card-header">
                 <h3>All Events</h3>
-                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                  {/* ⚠️ Table is the default and stays the management
+                      interface: Add, Edit and Delete live there. The
+                      calendar is an additional visual schedule over the
+                      same `events` rows. */}
+                  <ViewToggle
+                    label="How to view events"
+                    value={eventView}
+                    onChange={setEventView}
+                    options={[
+                      { value: 'table', label: 'Table', icon: <FaList aria-hidden="true" /> },
+                      { value: 'calendar', label: 'Calendar', icon: <FaCalendarAlt aria-hidden="true" /> },
+                    ]}
+                  />
                   <div className="filter-select-wrap">
                     <FaFilter style={{ fontSize: 12, color: '#6b7280' }} />
                     <select
@@ -2359,13 +2543,61 @@ const OfficialDashboard = () => {
                       <option value="past">Past</option>
                     </select>
                   </div>
-                  <button className="btn-add" onClick={() => setShowEventModal(true)}>
+                  <button className="btn-add" onClick={handleOpenAddEvent}>
                     <FaPlus /> Add Event
                   </button>
                 </div>
               </div>
 
-              {(() => {
+              {eventView === 'calendar' && (
+                <div className="dashboard-calendar-layout">
+                  <MonthCalendar
+                    year={eventMonth.year}
+                    month={eventMonth.month}
+                    onMonthChange={setEventMonth}
+                    selectedDate={eventCalendarDate}
+                    onSelectDate={setEventCalendarDate}
+                    today={calendarToday}
+                    idPrefix="official-events"
+                    renderDay={(cell) => describeEventDay(cell, officialEventCalendar)}
+                    caption={'Placed by event_date. Select a date to see what is '
+                      + 'scheduled; add, edit and delete stay in the table.'}
+                  />
+
+                  <div className="mcal-day-panel">
+                    {!eventCalendarDate ? (
+                      <p className="mcal-day-empty">Select a date to see its events.</p>
+                    ) : (
+                      <>
+                        <h4>{longDate(eventCalendarDate)}</h4>
+                        {eventCalendarDayEvents.length === 0 ? (
+                          <p className="mcal-day-empty">Nothing scheduled on this date.</p>
+                        ) : (
+                          <div className="mcal-day-list">
+                            {eventCalendarDayEvents.map((event) => (
+                              <div key={event.id} className="mcal-day-item">
+                                <span className="mcal-day-item-title">{event.title}</span>
+                                {event.location && (
+                                  <span className="mcal-day-item-meta">{event.location}</span>
+                                )}
+                                <button
+                                  type="button"
+                                  className="btn-add btn-sm"
+                                  onClick={() => handleOpenEditEvent(event)}
+                                >
+                                  <FaEdit aria-hidden="true" /> Edit
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {eventView === 'table' && (() => {
                 // ⚠️ Manila, not UTC. `new Date().toISOString()` is still
                 // on yesterday's date until 8 AM Philippine time, so an
                 // event dated today was filed under "past" for the first
@@ -2402,7 +2634,12 @@ const OfficialDashboard = () => {
                           <td data-label="Title">{event.title}</td>
                           <td data-label="Date">{event.event_date}</td>
                           <td data-label="Location">{event.location}</td>
-                          <td data-label="Action">
+                          <td data-label="Action" className="action-cell">
+                            <button
+                              className="btn-add btn-sm"
+                              onClick={() => handleOpenEditEvent(event)}>
+                              <FaEdit /> Edit
+                            </button>
                             <button
                               className="btn-deny"
                               onClick={() => handleDeleteEvent(event)}>
@@ -2433,173 +2670,275 @@ const OfficialDashboard = () => {
             <div className="dashboard-card">
               <div className="dashboard-card-header">
                 <h3>All Reservations</h3>
+                {/* ⚠️ Queue is the default and stays the management
+                    interface: search, status, the exceptions filter,
+                    Approve and Decline, the resident's contact details
+                    and the exception reason all live there. The calendar
+                    is an additional way to look at the same rows. */}
+                <ViewToggle
+                  label="How to view reservations"
+                  value={reservationView}
+                  onChange={setReservationView}
+                  options={[
+                    { value: 'queue', label: 'Queue', icon: <FaClipboardList aria-hidden="true" /> },
+                    { value: 'calendar', label: 'Calendar', icon: <FaCalendarAlt aria-hidden="true" /> },
+                  ]}
+                />
               </div>
 
-              {/* The status dropdown now sits in the shared filter bar
-                  beside the search box, so it reads as one set of controls
-                  narrowing one list. Same options as before plus
-                  Cancelled, and the two compose -- see
-                  visibleReservations. */}
-              <DashboardFilterBar
-                idPrefix="reservations"
-                searchLabel="Search reservations by name, contact number, email, purpose or purok"
-                placeholder="Search reservations..."
-                query={reservationQuery}
-                onQueryChange={setReservationQuery}
-                selectFilter={{
-                  label: 'Filter reservations by status',
-                  value: reservationFilter,
-                  onChange: setReservationFilter,
-                  options: RESERVATION_FILTER_OPTIONS,
-                }}
-                toggleFilter={{
-                  label: `Office-hours exceptions only (${exceptionReservationCount})`,
-                  checked: reservationExceptionsOnly,
-                  onChange: setReservationExceptionsOnly,
-                }}
-                resultText={
-                  reservationFiltersActive
-                    ? `Showing ${visibleReservations.length} of ${reservations.length}`
-                      + ` ${reservations.length === 1 ? 'reservation' : 'reservations'}`
-                    : `${reservations.length}`
-                      + ` ${reservations.length === 1 ? 'reservation' : 'reservations'}`
-                }
-                onReset={resetReservationFilters}
-                filtersActive={reservationFiltersActive}
-              />
+              {reservationView === 'calendar' && (
+                <div className="dashboard-calendar-layout">
+                  <MonthCalendar
+                    year={reservationMonth.year}
+                    month={reservationMonth.month}
+                    onMonthChange={setReservationMonth}
+                    selectedDate={calendarDate}
+                    onSelectDate={setCalendarDate}
+                    today={calendarToday}
+                    idPrefix="official-reservations"
+                    renderDay={(cell) => describeReservationDay(cell, reservationCalendar)}
+                    caption={'Amber means a booking on that date is still waiting on an '
+                      + 'official. Green means every booking on it has been decided. '
+                      + 'Declined and cancelled bookings release their slots and do not '
+                      + 'make a date look occupied.'}
+                  />
 
-              {(() => {
-                // Ordering is newest submission first, set by
-                // fetchReservations and unchanged; filtering preserves it.
-                const filteredReservations = visibleReservations
-
-                return filteredReservations.length === 0 ? (
-                  <p className="dashboard-empty">
-                    {reservationFiltersActive
-                      ? 'No reservations match this search.'
-                      : 'No reservations yet.'}
-                  </p>
-                ) : (
-                <div className="table-wrapper">
-                  <table className="dashboard-table">
-                    <thead>
-                      <tr>
-                        <th scope="col">Name</th>
-                        <th scope="col">Phone</th>
-                        <th scope="col">Email</th>
-                        <th scope="col">Purok</th>
-                        <th scope="col">Date</th>
-                        <th scope="col">Time</th>
-                        {/* "Hours" and "Filed" rather than "Duration" and
-                            "Submitted": an uppercase letter-spaced header
-                            was setting the minimum width of a column whose
-                            values are "3h" and a short date, so the header
-                            was costing more room than the data it labels. */}
-                        <th scope="col">Hours</th>
-                        <th scope="col">Purpose</th>
-                        <th scope="col">Filed</th>
-                        <th scope="col">Status</th>
-                        <th scope="col">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredReservations.map((res) => (
-                        <tr key={res.id}>
-                          <td data-label="Name">{res.full_name}</td>
-                          <td data-label="Phone">{res.contact_number || '—'}</td>
-                          {/* Truncated with an ellipsis rather than
-                              wrapped: a 57-character address broken
-                              character-by-character was taking four lines
-                              and making every other row that tall. The
-                              whole address is in the tooltip, and the
-                              truncation is released in card mode where
-                              the value must be complete. */}
-                          <td data-label="Email">
-                            {res.email ? (
-                              <span className="cell-truncate" title={res.email}>
-                                {res.email}
-                              </span>
-                            ) : '—'}
-                          </td>
-                          {/* The column is already headed Purok, so the
-                              cell says "4" rather than "Purok 4". Display
-                              only -- the stored value is untouched and is
-                              on the cell as a tooltip, which is also how
-                              a legacy free-text spelling stays visible. */}
-                          <td data-label="Purok" title={res.purok || undefined}>
-                            {purokShortLabel(res.purok) || '—'}
-                          </td>
-                          <td data-label="Date">{res.preferred_date}</td>
-                          {/* The badge sits with the time, because the
-                              time is what the exception is about. A
-                              booking from before migration 020 has no
-                              reason and gets no badge -- see
-                              isExceptionRequest, which reads the reason
-                              rather than the hour. */}
-                          <td data-label="Time">
-                            {res.preferred_time}
-                            {isExceptionRequest(res) && (
-                              <span
-                                className="badge badge-exception"
-                                title="Starts before 5:00 PM. The resident asked for an office-hours exception; an official decides it."
-                              >
-                                {EXCEPTION_BADGE_LABEL}
-                              </span>
-                            )}
-                          </td>
-                          <td data-label="Hours">{res.duration_hours}h</td>
-                          <td data-label="Purpose">
-                            {res.purpose}
-                            {isExceptionRequest(res) && (
-                              <span className="exception-reason-note">
-                                <strong>Office-hours reason:</strong>{' '}
-                                {res.exception_reason}
-                              </span>
-                            )}
-                          </td>
-                          <td data-label="Filed">
-                            {res.created_at ? new Date(res.created_at).toLocaleDateString() : '—'}
-                          </td>
-                          <td data-label="Status">
-                            {/* Was `badge-${res.status}` with the raw value
-                                as its text: a cancelled booking produced
-                                `badge-cancelled`, which no stylesheet
-                                defined, and an official read "pending"
-                                where the resident read "Pending". Both now
-                                come from the shared map. */}
-                            <span className={`badge ${reservationStatusClass(res.status)}`}>
-                              {reservationStatusLabel(res.status)}
-                            </span>
-                          </td>
-                          <td data-label="Action">
-                            {res.status === 'pending' && (
-                              isTreasurer ? (
-                                <>
-                                  <button
-                                    className="btn-approve"
-                                    disabled={processingReservationIds.has(res.id)}
-                                    onClick={() => handleApproveReservation(res)}>
-                                    Approve
-                                  </button>
-                                  <button
-                                    className="btn-deny"
-                                    disabled={processingReservationIds.has(res.id)}
-                                    onClick={() => handleDeclineReservation(res)}>
-                                    Deny
-                                  </button>
-                                </>
-                              ) : (
-                                <span className="role-restricted-note">Treasurer only</span>
-                              )
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  {/* Names, purposes and exception reasons go HERE, never
+                      inside a calendar cell. Same information the queue
+                      already shows this official -- nothing new is
+                      exposed, and nothing is exposed publicly. */}
+                  <div className="mcal-day-panel">
+                    {!calendarDate ? (
+                      <p className="mcal-day-empty">
+                        Select a date to see its bookings.
+                      </p>
+                    ) : (
+                      <>
+                        <h4>{longDate(calendarDate)}</h4>
+                        {calendarDayReservations.length === 0 ? (
+                          <p className="mcal-day-empty">No bookings on this date.</p>
+                        ) : (
+                          <>
+                            <div className="mcal-day-list">
+                              {calendarDayReservations.map((res) => (
+                                <div key={res.id} className="mcal-day-item">
+                                  <span className="mcal-day-item-time">
+                                    {res.preferred_time} · {res.duration_hours}h
+                                  </span>
+                                  <span className="mcal-day-item-title">{res.full_name}</span>
+                                  <span className={`badge ${reservationStatusClass(res.status)}`}>
+                                    {reservationStatusLabel(res.status)}
+                                  </span>
+                                  {isExceptionRequest(res) && (
+                                    <span className="badge badge-exception">
+                                      {EXCEPTION_BADGE_LABEL}
+                                    </span>
+                                  )}
+                                  <span className="mcal-day-item-meta">{res.purpose}</span>
+                                </div>
+                              ))}
+                            </div>
+                            {/* Decisions stay in the queue. This takes the
+                                official there with the date already in the
+                                search box, rather than duplicating Approve
+                                and Decline in a second place. */}
+                            <button
+                              type="button"
+                              className="btn-add btn-sm mcal-day-action"
+                              onClick={() => {
+                                setReservationDateFilter(calendarDate)
+                                setReservationView('queue')
+                              }}
+                            >
+                              Open these in the queue
+                            </button>
+                          </>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
-                )
-              })()}
+              )}
+
+              {/* ⚠️ The queue is the management interface and the
+                  default. Only its visibility is conditional here --
+                  nothing about the filtering, the ordering, the
+                  Treasurer-only gate or the decision handlers
+                  changed. */}
+              {reservationView === 'queue' && (
+                <>
+                {/* The status dropdown now sits in the shared filter bar
+                    beside the search box, so it reads as one set of controls
+                    narrowing one list. Same options as before plus
+                    Cancelled, and the two compose -- see
+                    visibleReservations. */}
+                <DashboardFilterBar
+                  idPrefix="reservations"
+                  searchLabel="Search reservations by name, contact number, email, purpose or purok"
+                  placeholder="Search reservations..."
+                  query={reservationQuery}
+                  onQueryChange={setReservationQuery}
+                  selectFilter={{
+                    label: 'Filter reservations by status',
+                    value: reservationFilter,
+                    onChange: setReservationFilter,
+                    options: RESERVATION_FILTER_OPTIONS,
+                  }}
+                  toggleFilter={{
+                    label: `Office-hours exceptions only (${exceptionReservationCount})`,
+                    checked: reservationExceptionsOnly,
+                    onChange: setReservationExceptionsOnly,
+                  }}
+                  resultText={
+                    reservationFiltersActive
+                      ? `Showing ${visibleReservations.length} of ${reservations.length}`
+                        + ` ${reservations.length === 1 ? 'reservation' : 'reservations'}`
+                        // Named, because the calendar can set this
+                        // filter and an official arriving in the queue
+                        // would otherwise see a short list with no
+                        // reason given.
+                        + (reservationDateFilter ? ` on ${longDate(reservationDateFilter)}` : '')
+                      : `${reservations.length}`
+                        + ` ${reservations.length === 1 ? 'reservation' : 'reservations'}`
+                  }
+                  onReset={resetReservationFilters}
+                  filtersActive={reservationFiltersActive}
+                />
+
+                {(() => {
+                  // Ordering is newest submission first, set by
+                  // fetchReservations and unchanged; filtering preserves it.
+                  const filteredReservations = visibleReservations
+
+                  return filteredReservations.length === 0 ? (
+                    <p className="dashboard-empty">
+                      {reservationFiltersActive
+                        ? 'No reservations match this search.'
+                        : 'No reservations yet.'}
+                    </p>
+                  ) : (
+                  <div className="table-wrapper">
+                    <table className="dashboard-table">
+                      <thead>
+                        <tr>
+                          <th scope="col">Name</th>
+                          <th scope="col">Phone</th>
+                          <th scope="col">Email</th>
+                          <th scope="col">Purok</th>
+                          <th scope="col">Date</th>
+                          <th scope="col">Time</th>
+                          {/* "Hours" and "Filed" rather than "Duration" and
+                              "Submitted": an uppercase letter-spaced header
+                              was setting the minimum width of a column whose
+                              values are "3h" and a short date, so the header
+                              was costing more room than the data it labels. */}
+                          <th scope="col">Hours</th>
+                          <th scope="col">Purpose</th>
+                          <th scope="col">Filed</th>
+                          <th scope="col">Status</th>
+                          <th scope="col">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredReservations.map((res) => (
+                          <tr key={res.id}>
+                            <td data-label="Name">{res.full_name}</td>
+                            <td data-label="Phone">{res.contact_number || '—'}</td>
+                            {/* Truncated with an ellipsis rather than
+                                wrapped: a 57-character address broken
+                                character-by-character was taking four lines
+                                and making every other row that tall. The
+                                whole address is in the tooltip, and the
+                                truncation is released in card mode where
+                                the value must be complete. */}
+                            <td data-label="Email">
+                              {res.email ? (
+                                <span className="cell-truncate" title={res.email}>
+                                  {res.email}
+                                </span>
+                              ) : '—'}
+                            </td>
+                            {/* The column is already headed Purok, so the
+                                cell says "4" rather than "Purok 4". Display
+                                only -- the stored value is untouched and is
+                                on the cell as a tooltip, which is also how
+                                a legacy free-text spelling stays visible. */}
+                            <td data-label="Purok" title={res.purok || undefined}>
+                              {purokShortLabel(res.purok) || '—'}
+                            </td>
+                            <td data-label="Date">{res.preferred_date}</td>
+                            {/* The badge sits with the time, because the
+                                time is what the exception is about. A
+                                booking from before migration 020 has no
+                                reason and gets no badge -- see
+                                isExceptionRequest, which reads the reason
+                                rather than the hour. */}
+                            <td data-label="Time">
+                              {res.preferred_time}
+                              {isExceptionRequest(res) && (
+                                <span
+                                  className="badge badge-exception"
+                                  title="Starts before 5:00 PM. The resident asked for an office-hours exception; an official decides it."
+                                >
+                                  {EXCEPTION_BADGE_LABEL}
+                                </span>
+                              )}
+                            </td>
+                            <td data-label="Hours">{res.duration_hours}h</td>
+                            <td data-label="Purpose">
+                              {res.purpose}
+                              {isExceptionRequest(res) && (
+                                <span className="exception-reason-note">
+                                  <strong>Office-hours reason:</strong>{' '}
+                                  {res.exception_reason}
+                                </span>
+                              )}
+                            </td>
+                            <td data-label="Filed">
+                              {res.created_at ? new Date(res.created_at).toLocaleDateString() : '—'}
+                            </td>
+                            <td data-label="Status">
+                              {/* Was `badge-${res.status}` with the raw value
+                                  as its text: a cancelled booking produced
+                                  `badge-cancelled`, which no stylesheet
+                                  defined, and an official read "pending"
+                                  where the resident read "Pending". Both now
+                                  come from the shared map. */}
+                              <span className={`badge ${reservationStatusClass(res.status)}`}>
+                                {reservationStatusLabel(res.status)}
+                              </span>
+                            </td>
+                            <td data-label="Action">
+                              {res.status === 'pending' && (
+                                isTreasurer ? (
+                                  <>
+                                    <button
+                                      className="btn-approve"
+                                      disabled={processingReservationIds.has(res.id)}
+                                      onClick={() => handleApproveReservation(res)}>
+                                      Approve
+                                    </button>
+                                    <button
+                                      className="btn-deny"
+                                      disabled={processingReservationIds.has(res.id)}
+                                      onClick={() => handleDeclineReservation(res)}>
+                                      Deny
+                                    </button>
+                                  </>
+                                ) : (
+                                  <span className="role-restricted-note">Treasurer only</span>
+                                )
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  )
+                })()}
+                </>
+              )}
             </div>
           </div>
         )}
@@ -3781,7 +4120,7 @@ const OfficialDashboard = () => {
       {showEventModal && (
         <div className="modal-overlay">
           <div className="modal">
-            <h3>Add New Event</h3>
+            <h3>{editingEvent ? 'Edit Event' : 'Add Event'}</h3>
 
             <div className="modal-form-group">
               <label className="modal-form-label">Event Title</label>
@@ -3816,10 +4155,20 @@ const OfficialDashboard = () => {
             </div>
 
             <div className="modal-buttons">
-              <button className="btn-cancel" onClick={() => setShowEventModal(false)}>
+              <button
+                className="btn-cancel"
+                onClick={() => {
+                  setShowEventModal(false)
+                  setEditingEvent(null)
+                }}
+              >
                 Cancel
               </button>
-              <button className="btn-save" onClick={handleAddEvent} disabled={submitting}>
+              <button
+                className="btn-save"
+                onClick={editingEvent ? handleUpdateEvent : handleAddEvent}
+                disabled={submitting}
+              >
                 {submitting ? 'Saving...' : 'Save Event'}
               </button>
             </div>

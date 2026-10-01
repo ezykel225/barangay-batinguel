@@ -12,6 +12,7 @@ import { pathFromPublicUrl } from '../utils/storagePath'
 import { BARANGAY_NAME, PUROKS } from '../constants/barangay'
 import { describeVerification } from '../utils/residentGroups'
 import { useConfirm } from '../components/ConfirmDialog'
+import { MONTH_NAMES, parseDateKey } from '../utils/monthGrid'
 import {
   DOCUMENT_STATUS_LABELS as STATUS_LABELS,
   RESERVATION_STATUS_LABELS,
@@ -56,6 +57,23 @@ const todayInManila = () =>
 const canCancel = (r) =>
   (r.status === 'pending' || r.status === 'approved') &&
   r.preferred_date >= todayInManila()
+
+// ⚠️ `preferred_date` is a date-only column, and it used to be rendered
+// as `new Date(r.preferred_date).toLocaleDateString()`. That parses the
+// string as UTC midnight and reads it back in the BROWSER's zone, so a
+// booking on the 1st displays as the 30th of the previous month
+// anywhere west of UTC -- the resident's own record of their own
+// booking, off by a day. Correct from the Philippines, which is why it
+// had never been seen.
+//
+// Found during the calendar work's self-review. Rendered from the
+// characters of the stored date instead. `created_at` elsewhere in this
+// file is a timestamptz, where `new Date()` is the right tool.
+const bookingDate = (value) => {
+  const parsed = parseDateKey(value)
+  if (!parsed) return '—'
+  return `${parsed.day} ${MONTH_NAMES[parsed.month]} ${parsed.year}`
+}
 
 const ResidentDashboard = () => {
   const { user } = useAuth()
@@ -823,7 +841,7 @@ const ResidentDashboard = () => {
                       {myReservations.map((r) => (
                         <tr key={r.id}>
                           <td data-label="Date">
-                            {r.preferred_date ? new Date(r.preferred_date).toLocaleDateString() : '—'}
+                            {bookingDate(r.preferred_date)}
                           </td>
                           <td data-label="Time">
                             {r.preferred_time}{r.end_time ? ` – ${r.end_time}` : ''}

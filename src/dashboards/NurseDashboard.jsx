@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
   FaUserNurse,
   FaPlus,
@@ -8,6 +8,8 @@ import {
   FaFilter,
   FaEdit,
   FaTrash,
+  FaList,
+  FaCalendarAlt,
 } from 'react-icons/fa'
 import { supabase } from '../supabase/supabaseClient'
 import { useAuth } from '../context/AuthContext'
@@ -20,6 +22,9 @@ import {
   manilaToday,
 } from '../utils/displayLabels'
 import ActionMenu from '../components/ActionMenu'
+import MonthCalendar from '../components/MonthCalendar'
+import { buildEventCalendar, describeEventDay, eventsOnDate, upcomingEvents } from '../utils/eventCalendar'
+import { MONTH_NAMES, monthOf, parseDateKey, toDateKey } from '../utils/monthGrid'
 import {
   MEDICINE_CATEGORIES, MEDICINE_FORMS, MEDICINE_STATUS, statusOf,
 } from '../constants/medicines'
@@ -29,12 +34,42 @@ import { useConfirm } from '../components/ConfirmDialog'
 import '../components/Sidebar.css'
 import './NurseDashboard.css'
 
+// A date key as a heading, through parseDateKey so a 'YYYY-MM-DD' is
+// never handed to `new Date()` and cannot shift a day.
+const longDate = (key) => {
+  const parsed = parseDateKey(key)
+  return parsed ? `${parsed.day} ${MONTH_NAMES[parsed.month]} ${parsed.year}` : ''
+}
+
+const ViewToggle = ({ label, value, options, onChange }) => (
+  <div className="view-toggle" role="group" aria-label={label}>
+    {options.map((option) => (
+      <button
+        key={option.value}
+        type="button"
+        onClick={() => onChange(option.value)}
+        aria-pressed={value === option.value}
+      >
+        {option.icon}
+        {option.label}
+      </button>
+    ))}
+  </div>
+)
+
 const NurseDashboard = () => {
   const { user } = useAuth()
   // Destructive actions go through this rather than acting on the first
   // click. confirm() resolves true/false, so each handler needs one
   // early return and nothing else changes.
   const [confirm, confirmDialog] = useConfirm()
+  // Table stays the default and the management interface; the calendar
+  // is an additional visual schedule over the same health_events rows.
+  const [healthEventView, setHealthEventView] = useState('table')
+  const [healthCalendarDate, setHealthCalendarDate] = useState('')
+  const [healthMonth, setHealthMonth] = useState(() => monthOf(manilaToday()))
+  // Null when adding, the row when editing. One modal serves both.
+  const [editingHealthEvent, setEditingHealthEvent] = useState(null)
   const [activeTab, setActiveTab] = useState('dashboard')
   const [healthEvents, setHealthEvents] = useState([])
   const [nurseAvailability, setNurseAvailability] = useState([])
@@ -150,6 +185,113 @@ const NurseDashboard = () => {
     setSavingStatus(false)
   }
 
+  const BLANK_EVENT = {
+    title: '', description: '', event_date: '', location: '', target_audience: '',
+  }
+
+  // ⚠️ `event_month`/`event_day` are denormalised display copies, not
+  // the date. They were written as `new Date(dateString)` then
+  // `.getDate()` / `.toLocaleString()`, which parses a UTC midnight and
+  // reads it back in the BROWSER's zone -- so west of UTC they describe
+  // the previous day. Derived from the characters of the date instead.
+  // The calendars read `event_date` and ignore these entirely; they are
+  // kept because the public Health Center cards still render them.
+  const displayPartsFor = (dateString) => {
+    const parsed = parseDateKey(dateString)
+    if (!parsed) return { event_month: null, event_day: null }
+    return {
+      event_month: MONTH_NAMES[parsed.month].slice(0, 3).toUpperCase(),
+      event_day: String(parsed.day).padStart(2, '0'),
+    }
+  }
+
+  const handleOpenAddHealthEvent = () => {
+    setEditingHealthEvent(null)
+    setNewEvent(BLANK_EVENT)
+    setShowEventModal(true)
+  }
+
+  const handleOpenEditHealthEvent = (event) => {
+    setEditingHealthEvent(event)
+    setNewEvent({
+      title: event.title || '',
+      description: event.description || '',
+      // Through the date-only helper, so the date input is populated
+      // from the stored characters rather than from a parsed Date.
+      event_date: toDateKey(event.event_date),
+      location: event.location || '',
+      target_audience: event.target_audience || '',
+    })
+    setShowEventModal(true)
+  }
+
+  // Updates the existing row rather than deleting and recreating it:
+  // that would lose created_at and file two audit entries for one
+  // correction.
+  const handleUpdateHealthEvent = async () => {
+    if (submitting || !editingHealthEvent) return
+    if (!newEvent.title || !newEvent.event_date) {
+      toast.error('Please fill in all required fields!')
+      return
+    }
+    setSubmitting(true)
+    try {
+      // .select() matters: RLS filters rows rather than raising, so a
+      // blocked update comes back as success with zero rows affected.
+      const { data, error } = await supabase
+        .from('health_events')
+        .update({
+          title: newEvent.title,
+          description: newEvent.description,
+          event_date: newEvent.event_date,
+          ...displayPartsFor(newEvent.event_date),
+          location: newEvent.location,
+          target_audience: newEvent.target_audience,
+        })
+        .eq('id', editingHealthEvent.id)
+        .select('id')
+
+      if (error) {
+        console.error('Update health event error:', error)
+        toast.error(error.message || 'Failed to update health event!')
+      } else if (!data || data.length === 0) {
+        toast.error('Nothing was updated — you may not have permission to change health events.')
+      } else {
+        toast.success('Health event updated.')
+        logActivity({
+          action: 'edited',
+          entityType: 'health_event',
+          entityId: editingHealthEvent.id,
+          subject: newEvent.title,
+        })
+        setShowEventModal(false)
+        setEditingHealthEvent(null)
+        setNewEvent(BLANK_EVENT)
+        await fetchHealthEvents()
+      }
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // Built from the `healthEvents` state this dashboard already fetched
+  // -- the same rows the table renders, not a second source.
+  const healthEventCalendar = useMemo(
+    () => buildEventCalendar(healthEvents),
+    [healthEvents]
+  )
+  const healthCalendarDayEvents = useMemo(
+    () => eventsOnDate(healthEventCalendar, healthCalendarDate),
+    [healthEventCalendar, healthCalendarDate]
+  )
+
+  // The dashboard card's three-item preview: the next sessions, not the
+  // first three rows whatever their date.
+  const upcomingHealthEvents = useMemo(
+    () => upcomingEvents(healthEvents, { limit: 3 }),
+    [healthEvents]
+  )
+
   const handleAddEvent = async () => {
     if (submitting) return
     if (!newEvent.title || !newEvent.event_date) {
@@ -158,10 +300,6 @@ const NurseDashboard = () => {
     }
     setSubmitting(true)
     try {
-      const date = new Date(newEvent.event_date)
-      const month = date.toLocaleString('en-US', { month: 'short' }).toUpperCase()
-      const day = String(date.getDate()).padStart(2, '0')
-
       // Readback returns the new id so the audit entry can point at the
       // row. Safe here: this table's SELECT policy covers whoever may
       // insert, so a successful insert is always readable by its author.
@@ -171,8 +309,7 @@ const NurseDashboard = () => {
           title: newEvent.title,
           description: newEvent.description,
           event_date: newEvent.event_date,
-          event_month: month,
-          event_day: day,
+          ...displayPartsFor(newEvent.event_date),
           location: newEvent.location,
           target_audience: newEvent.target_audience,
         }])
@@ -709,18 +846,22 @@ const NurseDashboard = () => {
 
             <div className="nurse-dashboard-grid">
 
-              {/* Bakuna Calendar */}
+              {/* ⚠️ Called "Bakuna Calendar" until the X1 follow-up, and
+                  it is not a calendar -- it is the next three sessions.
+                  The real month grid is one tab away under Health Events
+                  (Table | Calendar), so this is named for what it shows
+                  rather than being turned into a second copy of it. */}
               <div className="bakuna-calendar-card">
                 <div className="bakuna-calendar-header">
-                  <h3>💉 Bakuna Calendar</h3>
+                  <h3>💉 Upcoming Health Events</h3>
                   <button className="btn-add" onClick={() => setShowEventModal(true)}>Manage</button>
                 </div>
                 {loading ? (
                   <p className="loading-text">Loading...</p>
-                ) : healthEvents.length === 0 ? (
-                  <p className="empty-text">No health events yet.</p>
+                ) : upcomingHealthEvents.length === 0 ? (
+                  <p className="empty-text">No upcoming health events.</p>
                 ) : (
-                  healthEvents.slice(0, 3).map((event) => (
+                  upcomingHealthEvents.map((event) => (
                     <div key={event.id} className="bakuna-event-item">
                       <div className="bakuna-event-date">
                         <div className="month">{event.event_month}</div>
@@ -736,7 +877,7 @@ const NurseDashboard = () => {
                 {/* Same action as the Health Events tab's button, so the
                     same words. This said "Schedule New Event" while that
                     one says "Add New Event". */}
-                <button className="bakuna-add-btn" onClick={() => setShowEventModal(true)}>
+                <button className="bakuna-add-btn" onClick={handleOpenAddHealthEvent}>
                   <FaPlus /> Add Health Event
                 </button>
               </div>
@@ -1010,7 +1151,18 @@ const NurseDashboard = () => {
             <div className="dashboard-card">
               <div className="dashboard-card-header">
                 <h3>All Health Events</h3>
-                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                  {/* ⚠️ Table is the default and stays the management
+                      interface: Add, Edit and Delete live there. */}
+                  <ViewToggle
+                    label="How to view health events"
+                    value={healthEventView}
+                    onChange={setHealthEventView}
+                    options={[
+                      { value: 'table', label: 'Table', icon: <FaList aria-hidden="true" /> },
+                      { value: 'calendar', label: 'Calendar', icon: <FaCalendarAlt aria-hidden="true" /> },
+                    ]}
+                  />
                   <div className="filter-select-wrap">
                     <FaFilter style={{ fontSize: 12, color: '#6b7280' }} />
                     <select
@@ -1026,13 +1178,66 @@ const NurseDashboard = () => {
                       <option value="past">Past</option>
                     </select>
                   </div>
-                  <button className="btn-add" onClick={() => setShowEventModal(true)}>
+                  <button className="btn-add" onClick={handleOpenAddHealthEvent}>
                     <FaPlus /> Add Health Event
                   </button>
                 </div>
               </div>
 
-              {(() => {
+              {healthEventView === 'calendar' && (
+                <div className="dashboard-calendar-layout">
+                  <MonthCalendar
+                    year={healthMonth.year}
+                    month={healthMonth.month}
+                    onMonthChange={setHealthMonth}
+                    selectedDate={healthCalendarDate}
+                    onSelectDate={setHealthCalendarDate}
+                    today={manilaToday()}
+                    idPrefix="nurse-health-events"
+                    renderDay={(cell) => describeEventDay(cell, healthEventCalendar)}
+                    caption={'Placed by event_date. Select a date to see what is '
+                      + 'scheduled; add, edit and delete stay in the table.'}
+                  />
+
+                  <div className="mcal-day-panel">
+                    {!healthCalendarDate ? (
+                      <p className="mcal-day-empty">Select a date to see its sessions.</p>
+                    ) : (
+                      <>
+                        <h4>{longDate(healthCalendarDate)}</h4>
+                        {healthCalendarDayEvents.length === 0 ? (
+                          <p className="mcal-day-empty">Nothing scheduled on this date.</p>
+                        ) : (
+                          <div className="mcal-day-list">
+                            {healthCalendarDayEvents.map((event) => (
+                              <div key={event.id} className="mcal-day-item">
+                                <span className="mcal-day-item-title">{event.title}</span>
+                                {event.location && (
+                                  <span className="mcal-day-item-meta">{event.location}</span>
+                                )}
+                                {event.target_audience && (
+                                  <span className="mcal-day-item-meta">
+                                    {event.target_audience}
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  className="btn-add btn-sm"
+                                  onClick={() => handleOpenEditHealthEvent(event)}
+                                >
+                                  <FaEdit aria-hidden="true" /> Edit
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {healthEventView === 'table' && (() => {
                 // ⚠️ Manila, not UTC. `new Date().toISOString()` is still
                 // on yesterday's date until 8 AM Philippine time, so a
                 // bakuna session dated today was filed under "past" for
@@ -1071,6 +1276,11 @@ const NurseDashboard = () => {
                           <td data-label="Location">{event.location}</td>
                           <td data-label="Target">{event.target_audience}</td>
                           <td data-label="Action" className="action-cell">
+                            <button
+                              className="btn-add btn-sm"
+                              onClick={() => handleOpenEditHealthEvent(event)}>
+                              <FaEdit /> Edit
+                            </button>
                             <button className="btn-deny btn-sm" onClick={() => handleDeleteEvent(event)}>
                               <FaTrash /> Delete
                             </button>
@@ -1200,7 +1410,7 @@ const NurseDashboard = () => {
       {showEventModal && (
         <div className="modal-overlay">
           <div className="modal">
-            <h3>Add New Health Event</h3>
+            <h3>{editingHealthEvent ? 'Edit Health Event' : 'Add Health Event'}</h3>
             {[
               { label: 'Event Title *', key: 'title', type: 'text', placeholder: 'e.g. Vaccination Drive' },
               { label: 'Description', key: 'description', type: 'text', placeholder: 'Event description' },
@@ -1222,8 +1432,20 @@ const NurseDashboard = () => {
               </div>
             ))}
             <div className="modal-buttons">
-              <button className="btn-cancel" onClick={() => setShowEventModal(false)}>Cancel</button>
-              <button className="btn-save" onClick={handleAddEvent} disabled={submitting}>
+              <button
+                className="btn-cancel"
+                onClick={() => {
+                  setShowEventModal(false)
+                  setEditingHealthEvent(null)
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn-save"
+                onClick={editingHealthEvent ? handleUpdateHealthEvent : handleAddEvent}
+                disabled={submitting}
+              >
                 {submitting ? 'Saving...' : 'Save Event'}
               </button>
             </div>
