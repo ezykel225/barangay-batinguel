@@ -65,14 +65,14 @@ banned below: it silences the one check this project has.
 
 ### Tests
 
-Fourteen suites, 307 tests:
+Fifteen suites, 333 tests:
 
 | File | What it covers |
 |---|---|
 | `src/App.test.js` | One smoke test — renders `<App />` and asserts the brand name appears |
 | `src/utils/residentGroups.test.js` | 38 tests over the resident grouping, status vocabulary, search/filter, and the account ↔ voter-list cross-check — including the ones that hold "not on the voter list" at severity `expected` so a later edit cannot quietly promote ordinary residents into a list of problems |
 | `src/utils/displayLabels.test.js` | 30 tests over the shared status labels, the upcoming-event count, the Activity Log vocabulary, the Manila-vs-UTC date boundary (with fake timers), and a guard that this module never re-acquires a second verification vocabulary |
-| `src/components/ActionMenu.test.js` | 13 tests over the ⋮ menu's keyboard, Escape and focus-restore behaviour — the parts nobody catches by clicking |
+| `src/components/ActionMenu.test.js` | 23 tests: 13 over the ⋮ menu's keyboard, Escape and focus-restore behaviour — the parts nobody catches by clicking — then 5 over `portal` (the popup leaves the clipping wrapper for `<body>` while the trigger stays in its row, and the whole keyboard contract survives the move) and 5 over **authorization**, the load-bearing ones: an action the caller may not perform is **absent from `items`**, not rendered disabled, so a menu cannot widen what a role can reach |
 | `src/components/ConfirmDialog.test.js` | 4 tests over the shared confirmation hook. The load-bearing one: a second `confirm()` opened while the first is still showing used to leave the first promise **permanently pending**, hanging its handler with no write and no error. Latent while every caller was an official clicking one row at a time; reachable the moment the resident portal's blocking `window.confirm` calls became asynchronous. Verified both directions — the test fails with the fix removed |
 | `src/utils/monthGrid.test.js` | 26 tests over the date-only arithmetic and the month grid: leap February, month-length refusal (`2026-02-30` is not a date and must not slide to March), December/January wrap, and the rule that **nothing in that module constructs a `Date` from a date string** |
 | `src/components/MonthCalendar.test.js` | 19 tests over the shared grid as rendered: the accessible name of every day, navigation naming the month it goes to, and that today and selection are carried by `aria-current` / `aria-pressed` rather than by colour |
@@ -82,6 +82,7 @@ Fourteen suites, 307 tests:
 | `src/components/useModalA11y.test.js` | 9 tests over Escape, focus entry and focus restoration for the seventeen hand-rolled modals. Run **both directions**: with the hook stubbed, 4 of 9 fail. Includes the case where the opener is removed by the save the modal performed — focusing a detached node silently sends focus to `<body>` |
 | `src/components/Navbar.test.js` | 6 tests over the public mobile menu button, which had **no accessible name at all** before X3: the name changes with state, `aria-expanded` tracks it, and `aria-controls` points at an id that exists |
 | `src/utils/eventCalendar.test.js` | 24 tests over event placement and the upcoming split. The load-bearing one: the homepage filters **then** limits |
+| `src/utils/documentFilter.test.js` | 16 tests over `filterDocumentRequests` — the status narrowing, the five searched fields, and that an unknown status yields nothing rather than everything |
 | `src/utils/reservationWindow.test.js` | 46 tests over the 5–10 PM window, the per-slot and per-kind durations, the noon-spanning exception and the office-hours exception — deliberately mirroring the SQL cases in migration 020's header, so client and database are asserted to agree rather than each checked alone. The load-bearing one is that an exception is read from `exception_reason` and never from the hour |
 
 Schema and policy changes are still verified by impersonating each role
@@ -94,7 +95,7 @@ imports the client. So a missing `.env` fails that test with a module
 error that never mentions `.env`. If `npm test` fails on a fresh
 checkout, check `.env` before debugging the test.
 
-The other thirteen suites do **not** need it. `residentGroups.js`,
+The other fourteen suites do **not** need it. `residentGroups.js`,
 `displayLabels.js`, `reservationWindow.js`, `monthGrid.js`,
 `reservationCalendar.js`, `eventCalendar.js`, `notificationLabels.js`,
 `ActionMenu.jsx`, `MonthCalendar.jsx`, `NotificationBell.jsx` and
@@ -157,7 +158,10 @@ src/
                       "8:00 AM - 5:00 PM" straight through and omitted
                       the lunch closure the Home page states.
     Sidebar.jsx       Dashboard nav. Defines the tab lists for all three
-                      roles: official (13), nurse (5), resident (4).
+                      roles: official (12), nurse (5), resident (4).
+                      Official was 13 until the Punong Barangay Status
+                      tab was folded into the overview -- see *The
+                      compact Punong Barangay status*.
                       Also renders the MOBILE DASHBOARD HEADER -- brand,
                       notification bell, menu button -- for all three
                       portals; see *Responsive layout (X2)*.
@@ -167,9 +171,10 @@ src/
                       bell. Takes its data as props, no Supabase import.
     useNotifications  Fetching for the bell, and the one definition of
                       unread the sidebar badges also read.
-    ActionMenu        The ⋮ overflow menu. Used in exactly one place --
-                      read the constraint in its own header before
-                      putting it anywhere else.
+    ActionMenu        The ⋮ overflow menu. Six places now, not one --
+                      `portal` lifted the clipping constraint. Read the
+                      header before putting it anywhere else: the
+                      PRIMARY-DECISION rule still stands.
     MonthCalendar     THE month grid. One generic component behind four
                       calendars; owns the grid, navigation, today,
                       selection and accessibility, and NO business
@@ -178,13 +183,13 @@ src/
   pages/              Public routes: Home, Officials, HealthCenter,
                       Reservation, Login, ResidentSignup, ResetPassword,
                       Announcements(+Details), Events(+Details).
-                      Reservation.jsx is the largest at ~950 lines.
+                      Reservation.jsx is the largest at ~1,160 lines.
 
   dashboards/         One component per role; each holds every tab's state
                       and its own data fetching.
-    OfficialDashboard ~2,875 lines. The position gates live here.
-    NurseDashboard    ~1,216 lines.
-    ResidentDashboard ~1,136 lines.
+    OfficialDashboard ~4,920 lines. The position gates live here.
+    NurseDashboard    ~1,674 lines.
+    ResidentDashboard ~1,303 lines.
 
   constants/
     barangay.js       Purok list, contact numbers, hall hours, nurse label.
@@ -224,7 +229,10 @@ src/
                       account-registry reconciliation checks. Pure, and
                       unit-tested. Shared by both dashboards so an
                       official and a resident cannot be shown different
-                      words for the same stored state.
+                      words for the same stored state. Also holds
+                      `filterDocumentRequests`, which reuses the same
+                      `filterRows` normalisation so two tabs' searches
+                      cannot drift apart.
 
   supabase/
     supabaseClient.js The single Supabase client. Throws at import time
@@ -887,15 +895,21 @@ own domain with SPF, DKIM and DMARC.
 
 ### Officials
 
-Thirteen sidebar tabs, defined in `Sidebar.jsx` as `officialNavItems`:
+**Twelve** sidebar tabs, defined in `Sidebar.jsx` as `officialNavItems`:
 Dashboard, Announcements, Events, Reservations, Document Requests, Waste
-Management, Punong Barangay Status, Officials Directory, Residents, Voter
-Reference List, Reports, Activity Log, Settings.
+Management, Officials Directory, Residents, Voter Reference List,
+Reports, Activity Log, Settings.
 
-The tab **ids** are unchanged — the Voter Reference List is still
-`registry` internally and the Punong Barangay Status tab is still
-`kapitan`. Those are the values `activeTab` is matched against, not
-something anybody reads.
+It was thirteen until **Punong Barangay Status** was folded into the
+Dashboard overview — see *The compact Punong Barangay status* below.
+Nothing about the feature was removed; it stopped being a destination.
+
+The remaining tab **ids** are unchanged — the Voter Reference List is
+still `registry` internally. Those are the values `activeTab` is matched
+against, not something anybody reads. ⚠️ **`isKapitan`, the
+`kapitan_status` table, `kapitan_availability` and every `.kapitan-*`
+class keep their names**, exactly as *One word per thing* records; only
+the nav entry is gone.
 
 **Two tabs carry sidebar badges**, from data the dashboard already
 fetched: Document Requests shows requests at `pending`, and Residents
@@ -922,7 +936,14 @@ Several of them carry more than their name suggests:
   permanent Delete; see *Officials archive*.
 - Events — `Table | Calendar`, with **Edit Event** alongside Add and
   Delete since 2026-10-01
+- Announcements — **Edit Announcement** alongside Add and Delete since
+  2026-10-01; no migration was needed, see *Official Portal workflow
+  adjustments (post-X3)*
+- Document Requests — search and a status filter over state the tab
+  already holds, with **two different empty states**; same section
 - Reservations — `Queue | Calendar`; see *Calendars*
+- Dashboard — carries the **compact Punong Barangay status** that
+  replaced the tab of that name; same section
 - Reports, Activity Log
 
 ### Nurses
@@ -2178,6 +2199,198 @@ but neither is the live page.
 
 ---
 
+## Official Portal workflow adjustments (post-X3)
+
+Four changes to how an official works, 2026-10-01, after X3 was
+accepted. **No migration, no schema change and no permission change** —
+each was checked against the live policies first, and in every case the
+permission already existed.
+
+### Edit Announcement — the UPDATE policy already allowed it
+
+Announcements could be added and deleted but **not corrected**: a typo
+meant deleting the post and writing it again, which changes the id the
+public `/announcements/:id` link depends on and files two Activity Log
+entries for one fix.
+
+**Verified before writing any UI**, by impersonating each role over the
+API and rolling every case back:
+
+| | |
+|---|---|
+| official → `announcements` UPDATE | rows=1 |
+| resident → `announcements` UPDATE | rows=0 |
+| nurse → `announcements` UPDATE | rows=0 |
+| anon → `announcements` UPDATE | rows=0 |
+
+So the policy was already correct and **no migration was created merely
+to let the UI do something the database already permitted** — the same
+finding, and the same conclusion, as Edit Event and Edit Health Event
+under *Calendars*.
+
+Shape follows those two exactly: **one modal serves Add and Edit**, so
+the fields cannot drift apart; the **existing row is updated** rather
+than deleted and recreated; the write calls `.select()` and checks a row
+came back, because RLS filters rather than raising; and it logs `edited`
+on `announcement`, already in migration 016's vocabulary.
+
+⚠️ **The column is `description`, not `content`.** Assuming `content`
+cost a round trip — the project's own rule about verifying against the
+actual schema.
+
+### Document Requests — search and filter
+
+The queue had no way to narrow it. It now carries the same
+`DashboardFilterBar` the Residents tab, the Voter Reference List and the
+Reservations queue already use — a **fourth caller of one component**,
+not a fourth filter implementation.
+
+- **Client-side, over state already fetched.** `filterDocumentRequests`
+  in `src/utils/residentGroups.js` filters the `documentRequests` array
+  the tab already holds. **No second data source and no new query** —
+  the dashboard would otherwise have two answers for what is in the
+  queue.
+- It lives in `residentGroups.js` beside `filterRows` and reuses it, so
+  search normalisation cannot drift between the two tabs.
+  `DOCUMENT_SEARCH_FIELDS` is `full_name`, `document_type`, `purpose`,
+  `contact_number`, `purok`.
+- The status dropdown's labels come from **`documentStatusLabel()`**, so
+  the words in the filter are the same words on the badges beside them.
+  No raw stored value reaches the dropdown, per *Who owns a status
+  label*. The option **values** are the stored ones, which is what the
+  filter compares against.
+- ⚠️ **Two different empty states.** `No document requests yet.` and
+  `No document requests match this search.` are different facts.
+  Showing the first while a filter is applied tells an official the
+  queue is empty when it is not — which, on a queue of requests for
+  government documents, is the one wrong thing this tab can say.
+- The filter bar renders only when at least one request exists, so an
+  empty queue does not offer controls that can narrow nothing.
+
+`documentFilter.test.js` covers the status narrowing, each searched
+field, the two composing, and that an unrecognised status yields
+**nothing rather than everything** — the direction that fails open.
+
+### The compact Punong Barangay status
+
+**Punong Barangay Status is no longer a sidebar tab.** It was a whole
+destination for one value that changes a few times a day, and it pushed
+the official nav to thirteen entries. The feature, its data, its
+permission and its wording are all unchanged; only the navigation entry
+is gone.
+
+It is now `.kapitan-compact` on the Dashboard overview: one navy row
+reading **who**, **what state**, and — for the Punong Barangay only —
+**one control** to change it.
+
+| | |
+|---|---|
+| Permission | ⚠️ **Unchanged.** `isKapitan` is still the only thing that renders a control, `handleUpdateKapitanStatus` still returns early for anybody else, and the `kapitan_status` UPDATE policy was not touched. An official who is not the Punong Barangay sees the state and no control, exactly as before |
+| Wording | `KAPITAN_STATUS_OPTIONS` is the same constant the four-button grid used — same options, same order, same words. A `<select>` replaces the grid because one control fits on a dashboard row and four buttons do not |
+| Label | `PUNONG_BARANGAY_LABEL`, as *One word per thing* requires |
+
+⚠️ **The state text and the control are never both shown.** Rendering
+`.kapitan-compact-state` beside the select put **"✅ Available" on
+screen twice, side by side** — the same near-identical-strings-stacked
+fault `HEALTH_NURSE_ROLE` exists to prevent, and it was found by
+screenshotting the element rather than by reading the JSX. A select
+reports its own state; a second copy of it is not information. So the
+state div renders only when `!isKapitan`.
+
+### ⋮ row actions, and the portal that made them possible
+
+`ActionMenu`'s own header used to say it could go in **exactly one
+place**, for two reasons. **One of them is now solved and one still
+stands.**
+
+- ✅ **The clipping reason is fixed.** `.table-wrapper` has
+  `overflow-x: auto` and `overflow-y: auto`, and an overflow container
+  clips absolutely-positioned descendants — measured: a menu in a
+  table's action cell ended 69px past the wrapper and
+  `elementFromPoint` at its own centre returned `.dashboard-main`, i.e.
+  it was not painted at all. The new `portal` prop renders the popup
+  into `<body>` with `position: fixed`, anchored from the trigger's
+  measured rect, right-aligned and **flipped above** when there is not
+  enough room below. Re-measured in Chromium: `insideWrapper=false`,
+  and `elementFromPoint` returns `action-menu-item`. The flip was
+  verified in its own direction at 375/768/1280/1440 with the trigger
+  60px above the fold — `flipUp=true`, menu fully inside the viewport,
+  painted.
+- ⚠️ **The primary-decision reason still stands, and is why Document
+  Requests was NOT converted.** See below.
+
+Converted — five tables whose action cells held only *secondary*
+management actions:
+
+| Table | In the menu |
+|---|---|
+| Announcements | Edit, Delete |
+| Events | Edit, Delete |
+| Waste Management | Edit, Delete |
+| Voter Reference List | Edit, Delete |
+| Officials Directory | Edit, Archive |
+
+⚠️ **Deliberately NOT converted, and this is a departure from the
+request worth reading:** **Document Requests** was named explicitly, and
+was left alone. Its action cell holds nothing but the Secretary's
+primary decisions — Approve and Decline at `pending`, and a single
+`Mark Ready` or `Mark Claimed` otherwise. `ActionMenu`'s own rule is
+that *a primary decision must never be hidden behind it*, naming
+Approve/Decline on document requests by name, and a one-button cell
+behind a ⋮ is strictly worse than the button. Reservations, the
+overview's pending list, the Residents tab, Archived Officials (one
+Restore) and the Activity Log (no actions) are left alone for the same
+reasons.
+
+⚠️ **A menu must never widen what a role can reach.** The dashboards
+build `items` with the **same conditionals the buttons had**, so an
+action a role may not perform is simply **absent from the array** —
+never present and disabled. The Officials Directory self-archive guard
+is the worked case: an official's own row gets a menu with Edit and no
+Archive, and the explanatory note still renders beside it.
+`ActionMenu.test.js` asserts both directions.
+
+### A padded wrapper is not a target — found while measuring this
+
+The shared filter bar's search `<input>` and status `<select>` are
+borderless and padding-less inside padded wrappers, so the field that
+*looks* 52px tall could only be hit over **20px** of itself, and the
+select over **17px** — both under WCAG 2.2 SC 2.5.8's 24px minimum,
+and both missed by X3.
+
+Measured with `elementFromPoint` stepped down each wrapper's box: the
+padding returned the **wrapper**, not the control. `align-self: stretch`
+(overriding the wrappers' `align-items: center`) plus `min-height: 24px`
+makes each control fill its wrapper's content box. Re-measured: input
+**34px**, select **24px**, and the pointer now reaches the control
+across the padding. Pre-existing on four tabs, not introduced here — but
+this change made Document Requests the fourth.
+
+### What was verified, and what was not
+
+The full suite (15 suites, 333 tests), a clean production build with no
+ESLint warnings at **207 kB** gzipped — a healthy build; a dead one is
+~90 kB — and `git diff --check` clean. The protected mobile
+table-to-card block hashes **identically to its pre-X2 bytes**; only its
+line offset moved.
+
+Responsive: **zero document-level horizontal overflow across 20
+measurements** — four surfaces at 375/768/1280/1440.
+
+⚠️ **The dashboards are still behind `ProtectedRoute` and this
+environment still has no test account, so no authenticated page was
+loaded in a browser.** The ⋮ menu was measured from **real component
+output** captured through Jest and rendered against the shipped CSS
+bundle; the Document Requests tab and the compact status row are
+**faithful reproductions**, not the live pages. Two of this round's
+findings came from reproduction errors caught by asking which step
+produced the result — a `btn-decline` class that **does not exist**
+(the real one is `btn-deny`) reported a 20px button, and an anchoring
+probe that pushed the trigger 260px below the fold reported a flip
+failure that was not one.
+
+---
+
 ## Health centre
 
 **Medicine stock is a status, not a quantity** — Available / Low stock /
@@ -2237,7 +2450,7 @@ for one person in one product:
 
 | Constant | Value | Replaces |
 |---|---|---|
-| `PUNONG_BARANGAY_LABEL` | "Punong Barangay" | "Kapitan" in the sidebar tab, the status tab heading and its toast, and "Kapitan's Office" on the public page |
+| `PUNONG_BARANGAY_LABEL` | "Punong Barangay" | "Kapitan" in the status heading and its toast, and "Kapitan's Office" on the public page. It named the sidebar tab too, until that tab was folded into the overview — it now names the **compact status row** there |
 | `HEALTH_NURSE_ROLE` | "Public Health Nurse" | "Head Barangay Nurse" in her own Settings, and the hard-coded copies on the sidebar and both public pages |
 
 **Presentation only, in both cases.** `kapitan_status`,
@@ -2365,12 +2578,14 @@ derives her initials from. It is no longer displayed as a label.
 - **Source maps ship to production** (~7 MB), so the original JSX is
   publicly reconstructable. `GENERATE_SOURCEMAP=false` in Vercel fixes it.
 - **`public/logo.png` is 984 KB and referenced by nothing.**
-- **Thin automated test coverage.** 235 tests in ten suites: one smoke
-  test over `<App />`, which fails without `.env` because
-  `supabaseClient.js` throws at import time, and 234 tests over the
+- **Thin automated test coverage.** 333 tests in fifteen suites: one
+  smoke test over `<App />`, which fails without `.env` because
+  `supabaseClient.js` throws at import time, and 332 tests over the
   resident workflow rules, the display labels, the booking window, the
-  month grid and its three feature layers, the ⋮ menu's keyboard
-  behaviour and the confirmation dialog. No integration or end-to-end tests,
+  month grid and its three feature layers, the document-request filter,
+  the ⋮ menu's keyboard and authorization behaviour, the modal
+  accessibility hook, the public navbar and the confirmation dialog.
+  No integration or end-to-end tests,
   and **no test touches the database** — the reservation-window tests
   mirror migration 020's SQL cases rather than running them, so the two
   can still drift if only one is edited.

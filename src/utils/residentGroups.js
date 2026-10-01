@@ -234,10 +234,37 @@ export const RESERVATION_SEARCH_FIELDS = [
   'full_name', 'contact_number', 'email', 'purpose', 'activity_type', 'purok',
 ]
 
+// The Document Requests queue, which had no search or filter at all --
+// an official scrolled the whole table looking for one resident.
+//
+// `purpose` is included because a request's purpose is often the only
+// thing that distinguishes two Certificates of Indigency from the same
+// person. `contact_number` and `purok` match the reservation fields, so
+// an official can search either queue the same way.
+export const DOCUMENT_SEARCH_FIELDS = [
+  'full_name', 'document_type', 'purpose', 'contact_number', 'purok',
+]
+
 export const filterRows = (list = [], { query = '', purok = 'all', fields }) =>
   list.filter(
     (row) => matchesSearch(row, query, fields) && purokMatchesFilter(row?.purok, purok)
   )
+
+// Status first, then search. Pure, so the Official Portal's Document
+// Requests queue can be filtered the same way in a test as on screen --
+// the reservation queue composes its two filters inline in the
+// dashboard, which is why that combination has no unit test.
+//
+// `status: 'all'` means no status narrowing, matching the dropdown's
+// first option. An unrecognised status simply matches nothing, rather
+// than falling back to everything: a filter that silently stops
+// filtering is worse than one that shows an empty list.
+export const filterDocumentRequests = (list = [], { query = '', status = 'all' } = {}) => {
+  const byStatus = status === 'all'
+    ? (list || [])
+    : (list || []).filter((row) => row?.status === status)
+  return filterRows(byStatus, { query, fields: DOCUMENT_SEARCH_FIELDS })
+}
 
 // ── D6: account ↔ voter reference list cross-check ────────────
 //

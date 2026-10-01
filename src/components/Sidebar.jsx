@@ -5,7 +5,6 @@ import {
   FaBullhorn,
   FaCalendarAlt,
   FaClipboardList,
-  FaUserTie,
   FaUsers,
   FaUserFriends,
   FaAddressBook,
@@ -29,7 +28,7 @@ import { supabase } from '../supabase/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
-import { HEALTH_NURSE_ROLE, PUNONG_BARANGAY_LABEL } from '../constants/barangay'
+import { HEALTH_NURSE_ROLE } from '../constants/barangay'
 import { PersonAvatar } from '../utils/officialPhotos'
 import './Sidebar.css'
 
@@ -223,12 +222,12 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderActio
     { id: 'reservations', label: 'Reservations', icon: <FaClipboardList /> },
     { id: 'documents', label: 'Document Requests', icon: <FaFileAlt /> },
     { id: 'waste', label: 'Waste Management', icon: <FaTrashAlt /> },
-    // "Punong Barangay", not "Kapitan": the officials directory, the
-    // public cards and barangay_officials.position all use the formal
-    // title, so the informal one here was a second name for one person.
-    // The tab id and everything else in the implementation keep the old
-    // word -- see PUNONG_BARANGAY_LABEL.
-    { id: 'kapitan', label: `${PUNONG_BARANGAY_LABEL} Status`, icon: <FaUserTie /> },
+    // ⚠️ There is no `kapitan` tab here any more. The Punong Barangay's
+    // status was a whole destination for one value that changes a few
+    // times a day; it now lives as a compact row on the Dashboard
+    // overview. NOTHING about the feature was removed -- the data, the
+    // `kapitan_status` policy and the `isKapitan` gate are untouched,
+    // and PUNONG_BARANGAY_LABEL still supplies the wording there.
     { id: 'officials', label: 'Officials Directory', icon: <FaUsers /> },
     { id: 'residents', label: 'Residents', icon: <FaUserFriends /> },
     // Voter Reference List, not "Residents Registry": the table holds the

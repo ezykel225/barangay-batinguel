@@ -485,6 +485,17 @@
   font-size: var(--fs-13);
   color: #374151;
   cursor: pointer;
+  /* The wrapper is padded and the select is not, and a pointer landing
+     on that padding activates NOTHING -- measured with
+     elementFromPoint across the wrapper box: only the middle ~17px
+     returned the <select>. That is under WCAG 2.2 SC 2.5.8's 24px
+     minimum even though the control LOOKS 37px tall.
+     `align-self: stretch` overrides the wrapper's `align-items: center`
+     so the select fills the wrapper's content box instead of sitting
+     in the middle of it, and the min-height guarantees the 24px when
+     the font metrics would otherwise fall short. */
+  align-self: stretch;
+  min-height: 24px;
 }
 
 /* Table Styles */

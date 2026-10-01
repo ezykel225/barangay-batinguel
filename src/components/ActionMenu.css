@@ -43,6 +43,28 @@
   color: #1f2937;
 }
 
+/* ⚠️ `position: fixed` and rendered into <body> by a portal.
+ *
+ * `.table-wrapper` has `overflow-x: auto` AND `overflow-y: auto`, and an
+ * overflow container CLIPS absolutely-positioned descendants. Measured
+ * before this: a menu in a table's action cell ended 69px past the
+ * wrapper's bottom edge and `elementFromPoint` at its centre returned
+ * `.dashboard-main` -- the menu was not painted at all, so it was
+ * invisible and unclickable.
+ *
+ * The portal takes the popup out of that container entirely. Its
+ * coordinates are measured from the trigger each time it opens; see
+ * ActionMenu.jsx. */
+.action-menu-list.is-portal {
+  position: fixed;
+  top: auto;
+  right: auto;
+  width: 180px;
+  /* Above the dashboard chrome (1050) and the drawer (1100), because a
+     row menu must not be covered by the mobile header. */
+  z-index: 1200;
+}
+
 .action-menu-list {
   position: absolute;
   top: calc(100% + 6px);

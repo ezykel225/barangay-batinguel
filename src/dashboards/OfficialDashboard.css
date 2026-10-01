@@ -567,6 +567,12 @@
   font-family: 'Poppins', sans-serif;
   font-size: var(--fs-13);
   color: #374151;
+  /* Same reason as `.filter-select` in Sidebar.css: the 8px of wrapper
+     padding above and below is not part of the target, so the field a
+     user sees as 52px tall could only be hit over 20px of it. Stretch
+     makes the input fill the wrapper's content box. */
+  align-self: stretch;
+  min-height: 24px;
 }
 
 .resident-search-input::placeholder {
@@ -814,5 +820,113 @@
 @media (max-width: 1100px) {
   .dashboard-calendar-layout {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ── The compact Punong Barangay status (post-X3) ─────────────────────
+ *
+ * Replaces the full-width gradient panel that used to sit on the
+ * dashboard and the dedicated sidebar tab behind it. One row: who,
+ * what state, and -- for the Punong Barangay only -- one control to
+ * change it.
+ *
+ * It keeps the navy treatment the old panel had, because that is what
+ * marks it as the barangay's own status rather than another data card,
+ * but at a fraction of the height.
+ */
+.kapitan-compact {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  padding: 14px 18px;
+  margin-bottom: 24px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, #1e3a8a, #1e40af);
+  color: #ffffff;
+  box-shadow: var(--shadow-md);
+}
+
+.kapitan-compact-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  /* Takes the leftover room so the state and the control sit together
+     at the right on a wide screen, and min-width: 0 lets a long name
+     wrap instead of widening the row. */
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.kapitan-compact-icon {
+  flex-shrink: 0;
+  font-size: var(--fs-20);
+  opacity: 0.9;
+}
+
+.kapitan-compact-role {
+  display: block;
+  font-size: var(--fs-12);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #bfdbfe;
+}
+
+.kapitan-compact-name {
+  display: block;
+  font-size: var(--fs-14);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.kapitan-compact-state {
+  flex-shrink: 0;
+}
+
+.kapitan-compact-control {
+  flex-shrink: 0;
+}
+
+/* A real control on a dark surface: the default select is nearly
+   invisible against navy. */
+.kapitan-compact-select {
+  padding: 8px 10px;
+  /* 38px tall with the padding and font size, comfortably over the
+     24px target minimum X3 settled on. */
+  min-height: 38px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: var(--radius-sm);
+  background-color: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  font-family: inherit;
+  font-size: var(--fs-13);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* The option list is drawn by the OS, which does not inherit the dark
+   surface -- without this the text is white on white. */
+.kapitan-compact-select option {
+  color: #1f2937;
+  background-color: #ffffff;
+}
+
+/* index.css turns the focus ring white on the project's dark surfaces;
+   this is a new one, so it is named here too. */
+.kapitan-compact :focus-visible {
+  outline-color: #ffffff;
+}
+
+@media (max-width: 600px) {
+  /* Stacked on a phone: the three parts each take the full width rather
+     than squeezing a select beside a badge. */
+  .kapitan-compact {
+    align-items: stretch;
+  }
+
+  .kapitan-compact-control,
+  .kapitan-compact-select {
+    width: 100%;
   }
 }

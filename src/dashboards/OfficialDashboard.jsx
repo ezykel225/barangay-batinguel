@@ -5,6 +5,7 @@ import {
   FaCalendarAlt,
   FaUsers,
   FaUser,
+  FaUserTie,
   FaPlus,
   FaLock,
   FaEye,
@@ -23,6 +24,7 @@ import { pathFromPublicUrl } from '../utils/storagePath'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 import Sidebar from '../components/Sidebar'
+import ActionMenu from '../components/ActionMenu'
 import { useModalA11y } from '../components/useModalA11y'
 import NotificationBell from '../components/NotificationBell'
 import { useNotifications } from '../components/useNotifications'
@@ -48,6 +50,7 @@ import {
   RESIDENT_GROUPS,
   RESIDENT_SEARCH_FIELDS,
   REGISTRY_SEARCH_FIELDS,
+  filterDocumentRequests,
   RESERVATION_SEARCH_FIELDS,
   PUROK_FILTER_UNLISTED,
   describeVerification,
@@ -225,6 +228,18 @@ const PUROK_FILTER_OPTIONS = [
 // may cancel their own pending or approved booking, so those rows exist
 // and were visible under "All Statuses" -- but there was no way to filter
 // to them, and no way to filter them out.
+// The five stored values of document_requests.status, in the order a
+// request moves through them. Wording comes from displayLabels so the
+// filter cannot name a status differently from the badge beside it.
+const DOCUMENT_FILTER_OPTIONS = [
+  { value: 'all', label: 'All Statuses' },
+  { value: 'pending', label: documentStatusLabel('pending') },
+  { value: 'approved', label: documentStatusLabel('approved') },
+  { value: 'ready_for_pickup', label: documentStatusLabel('ready_for_pickup') },
+  { value: 'claimed', label: documentStatusLabel('claimed') },
+  { value: 'declined', label: documentStatusLabel('declined') },
+]
+
 const RESERVATION_FILTER_OPTIONS = [
   { value: 'all', label: 'All Statuses' },
   { value: 'pending', label: 'Pending' },
@@ -333,6 +348,15 @@ const OfficialDashboard = () => {
   // a date in the search box would match nothing.
   const [reservationDateFilter, setReservationDateFilter] = useState('')
   const [eventMonth, setEventMonth] = useState(() => monthOf(manilaToday()))
+  // ── Document Requests filtering ────────────────────────────────────
+  //
+  // Client-side, over the `documentRequests` state the tab already
+  // fetched. No second query and no second data source: the list is
+  // small, already in memory, and a server round-trip per keystroke
+  // would be slower and could disagree with what is on screen.
+  const [documentQuery, setDocumentQuery] = useState('')
+  const [documentFilter, setDocumentFilter] = useState('all')
+
   const [reservationQuery, setReservationQuery] = useState('')
   const [announcementFilter, setAnnouncementFilter] = useState('all')
   const [eventFilter, setEventFilter] = useState('all')
@@ -354,6 +378,10 @@ const OfficialDashboard = () => {
 
   // Modal States
   const [showAnnouncementModal, setShowAnnouncementModal] = useState(false)
+  // Null when the modal is adding, the row when it is editing. One modal
+  // serves both, so the fields cannot drift apart -- the same shape the
+  // Edit Event work settled on.
+  const [editingAnnouncement, setEditingAnnouncement] = useState(null)
   const [showEventModal, setShowEventModal] = useState(false)
   // Null when adding, the event's row when editing. One modal serves
   // both, so the fields cannot drift apart.
@@ -1307,6 +1335,15 @@ const OfficialDashboard = () => {
 
   // Only Punong Barangay can update kapitan status
   const isKapitan = officialInfo?.position === 'Punong Barangay'
+
+  // Who the Punong Barangay is, for the compact status element. Read
+  // from the directory the dashboard already fetched -- `officialsList`
+  // is already filtered to active officials, so an archived one cannot
+  // be named here. Falls back to the barangay's name rather than
+  // inventing a person when the directory has no active holder, which is
+  // the state the missing-Kagawad incident left behind for a month.
+  const punongBarangayName = officialsList
+    .find((o) => o.position === 'Punong Barangay')?.full_name || ''
   // Only the Treasurer approves/denies court reservations — they're the
   // one who actually receives the GCash payment and can verify it.
   const isTreasurer = officialInfo?.position === 'Barangay Treasurer'
@@ -1807,6 +1844,79 @@ const OfficialDashboard = () => {
     }
   }
 
+  const handleOpenAddAnnouncement = () => {
+    setEditingAnnouncement(null)
+    setNewAnnouncement({ title: '', description: '', badge: '' })
+    setShowAnnouncementModal(true)
+  }
+
+  const handleOpenEditAnnouncement = (ann) => {
+    setEditingAnnouncement(ann)
+    // Every field is loaded, so saving cannot blank one the official did
+    // not touch. `badge` and `description` are nullable in the table, so
+    // they fall back to '' rather than rendering "null" in the input.
+    setNewAnnouncement({
+      title: ann.title || '',
+      description: ann.description || '',
+      badge: ann.badge || '',
+    })
+    setShowAnnouncementModal(true)
+  }
+
+  // ⚠️ UPDATES THE EXISTING ROW. Not delete-and-recreate: that would
+  // change the announcement's id (which the public detail page links
+  // to), lose `date_posted`, and file two audit entries for one
+  // correction. Same reasoning as Edit Event.
+  //
+  // Permission verified before this was written, by impersonating each
+  // role over the API in a rolled-back transaction: official 1 row,
+  // resident 0, nurse 0, anon 0. The existing
+  // "Admin and official can update announcements" policy already covers
+  // it, so NO MIGRATION was needed.
+  const handleUpdateAnnouncement = async () => {
+    if (submitting || !editingAnnouncement) return
+    if (!newAnnouncement.title || !newAnnouncement.description) {
+      toast.error('Please fill in all fields!')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      // .select() matters: RLS filters rows rather than raising, so a
+      // blocked update returns success with zero rows affected. Without
+      // this the toast would report a save that never happened.
+      const { data, error } = await supabase
+        .from('announcements')
+        .update({
+          title: newAnnouncement.title,
+          description: newAnnouncement.description,
+          badge: newAnnouncement.badge,
+        })
+        .eq('id', editingAnnouncement.id)
+        .select('id')
+
+      if (error) {
+        toast.error('Failed to update announcement!')
+      } else if (!data || data.length === 0) {
+        toast.error('No announcement was updated. You may not have permission to edit it.')
+      } else {
+        toast.success('Announcement updated.')
+        logActivity({
+          action: 'edited',
+          entityType: 'announcement',
+          entityId: editingAnnouncement.id,
+          subject: newAnnouncement.title,
+        })
+        setShowAnnouncementModal(false)
+        setEditingAnnouncement(null)
+        setNewAnnouncement({ title: '', description: '', badge: '' })
+        fetchAnnouncements()
+      }
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   const handleAddAnnouncement = async () => {
     if (submitting) return
     if (!newAnnouncement.title || !newAnnouncement.description) {
@@ -2119,6 +2229,26 @@ const OfficialDashboard = () => {
   // narrows what is left. Choosing Pending and typing a name shows that
   // resident's pending bookings and nothing else.
   //
+  // Status first, then the shared `filterRows` -- the same function the
+  // Residents, Voter Reference List and Reservations tabs use, so
+  // case-insensitivity and whitespace handling are identical across
+  // every search box in the portal.
+  const visibleDocumentRequests = useMemo(
+    () => filterDocumentRequests(documentRequests, {
+      query: documentQuery,
+      status: documentFilter,
+    }),
+    [documentRequests, documentFilter, documentQuery]
+  )
+
+  const documentFiltersActive =
+    documentFilter !== 'all' || documentQuery.trim() !== ''
+
+  const resetDocumentFilters = () => {
+    setDocumentQuery('')
+    setDocumentFilter('all')
+  }
+
   // Same `filterRows` the other two tabs use, so case-insensitivity and
   // whitespace trimming behave identically everywhere and are covered by
   // the same tests.
@@ -2402,22 +2532,66 @@ const OfficialDashboard = () => {
               </div>
             </div>
 
-            {/* Punong Barangay status — compact summary only. Full controls
-                live on the dedicated status tab to avoid duplicating the
-                same control in two places. */}
-            <div className="kapitan-status-section">
-              <h3>{isKapitan ? 'My Status' : `${PUNONG_BARANGAY_LABEL} Status`}</h3>
-              <div className="kapitan-current-display">
-                {kapitanStatusDisplay(kapitanStatus)}
+            {/* ── Punong Barangay status, compact ──────────────────────
+                The dedicated sidebar tab is gone, so this is now the ONLY
+                place the status is read and set. It therefore carries the
+                Kapitan's own controls rather than linking to them.
+
+                A <select> replaces the four-button grid: one control
+                instead of four, which is what makes it fit on a dashboard
+                row. The options, their order and their wording are
+                unchanged -- KAPITAN_STATUS_OPTIONS is the same constant
+                the grid used, so nothing a user reads has moved.
+
+                ⚠️ The permission is unchanged. `isKapitan` is still the
+                only thing that renders a control, handleUpdateKapitanStatus
+                still returns early for anyone else, and the database
+                policy was not touched. An official who is not the Punong
+                Barangay sees the status and no control, exactly as
+                before. */}
+            <div className="kapitan-compact">
+              <div className="kapitan-compact-identity">
+                <FaUserTie className="kapitan-compact-icon" aria-hidden="true" />
+                <div>
+                  <span className="kapitan-compact-role">{PUNONG_BARANGAY_LABEL}</span>
+                  <span className="kapitan-compact-name">
+                    {punongBarangayName || 'Barangay Batinguel'}
+                  </span>
+                </div>
               </div>
+
+              {/* ⚠️ Shown only to an official who is NOT the Punong
+                  Barangay. For the Kapitan the <select> below already
+                  carries the current value, and rendering both put
+                  "✅ Available" on screen twice, side by side -- the
+                  same near-identical-strings-stacked fault
+                  HEALTH_NURSE_ROLE exists to prevent. A select reports
+                  its own state; a second copy of it is not information.
+                  Measured in the browser before removing it. */}
+              {!isKapitan && (
+                <div className="kapitan-compact-state">
+                  {kapitanStatusDisplay(kapitanStatus)}
+                </div>
+              )}
+
               {isKapitan && (
-                <button
-                  className="view-all-link"
-                  style={{ marginTop: 8 }}
-                  onClick={() => setActiveTab('kapitan')}
-                >
-                  Update Status →
-                </button>
+                <div className="kapitan-compact-control">
+                  <label className="visually-hidden" htmlFor="kapitan-status-select">
+                    Set your availability status
+                  </label>
+                  <select
+                    id="kapitan-status-select"
+                    className="kapitan-compact-select"
+                    value={kapitanStatus}
+                    onChange={(event) => handleUpdateKapitanStatus(event.target.value)}
+                  >
+                    {KAPITAN_STATUS_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.emoji} {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               )}
             </div>
 
@@ -2536,7 +2710,7 @@ const OfficialDashboard = () => {
                       ))}
                     </select>
                   </div>
-                  <button className="btn-add" onClick={() => setShowAnnouncementModal(true)}>
+                  <button className="btn-add" onClick={handleOpenAddAnnouncement}>
                     <FaPlus /> Add Announcement
                   </button>
                 </div>
@@ -2572,12 +2746,29 @@ const OfficialDashboard = () => {
                           <td data-label="Date Posted">
                             {new Date(ann.date_posted).toLocaleDateString()}
                           </td>
-                          <td data-label="Action">
-                            <button
-                              className="btn-deny"
-                              onClick={() => handleDeleteAnnouncement(ann)}>
-                              Delete
-                            </button>
+                          <td data-label="Action" className="action-cell">
+                            <ActionMenu
+                              portal
+                              label={`More actions for ${ann.title}`}
+                              items={[
+                                {
+                                  key: 'edit',
+                                  label: 'Edit announcement',
+                                  icon: <FaEdit />,
+                                  onSelect: () => handleOpenEditAnnouncement(ann),
+                                },
+                                {
+                                  key: 'delete',
+                                  label: 'Delete announcement',
+                                  icon: <FaTrash />,
+                                  danger: true,
+                                  // Still goes through the shared
+                                  // confirmation dialog -- the menu only
+                                  // changes where the control lives.
+                                  onSelect: () => handleDeleteAnnouncement(ann),
+                                },
+                              ]}
+                            />
                           </td>
                         </tr>
                       ))}
@@ -2723,16 +2914,25 @@ const OfficialDashboard = () => {
                           <td data-label="Date">{event.event_date}</td>
                           <td data-label="Location">{event.location}</td>
                           <td data-label="Action" className="action-cell">
-                            <button
-                              className="btn-add btn-sm"
-                              onClick={() => handleOpenEditEvent(event)}>
-                              <FaEdit /> Edit
-                            </button>
-                            <button
-                              className="btn-deny"
-                              onClick={() => handleDeleteEvent(event)}>
-                              Delete
-                            </button>
+                            <ActionMenu
+                              portal
+                              label={`More actions for ${event.title}`}
+                              items={[
+                                {
+                                  key: 'edit',
+                                  label: 'Edit event',
+                                  icon: <FaEdit />,
+                                  onSelect: () => handleOpenEditEvent(event),
+                                },
+                                {
+                                  key: 'delete',
+                                  label: 'Delete event',
+                                  icon: <FaTrash />,
+                                  danger: true,
+                                  onSelect: () => handleDeleteEvent(event),
+                                },
+                              ]}
+                            />
                           </td>
                         </tr>
                       ))}
@@ -3035,45 +3235,6 @@ const OfficialDashboard = () => {
             KAPITAN STATUS TAB
             (Only visible to Punong Barangay via Sidebar)
         ======================== */}
-        {activeTab === 'kapitan' && (
-          <div>
-            <div className="kapitan-page-header">
-              {/* Formal title throughout, matching the officials directory
-                  and barangay_officials.position. Implementation names --
-                  the `kapitan` tab id, kapitan_status, isKapitan, the
-                  .kapitan-* classes -- are untouched. */}
-              <h1>{PUNONG_BARANGAY_LABEL} Status Tracker</h1>
-              <p>Maintain transparency by providing real-time updates on your availability.</p>
-            </div>
-
-            {isKapitan ? (
-              <div className="kapitan-status-section">
-                <h3>Set Your Status</h3>
-                <div className="kapitan-current-display">
-                  {kapitanStatusDisplay(kapitanStatus)}
-                </div>
-                <div className="kapitan-status-grid">
-                  {KAPITAN_STATUS_OPTIONS.map((option) => (
-                    <button
-                      key={option.value}
-                      className={`kapitan-status-option ${kapitanStatus === option.value ? 'active' : ''}`}
-                      onClick={() => handleUpdateKapitanStatus(option.value)}>
-                      {option.emoji} {option.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="kapitan-status-section">
-                <h3>Current {PUNONG_BARANGAY_LABEL} Status</h3>
-                <div className="kapitan-current-display">
-                  {kapitanStatusDisplay(kapitanStatus)}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
         {/* ========================
             DOCUMENT REQUESTS TAB
         ======================== */}
@@ -3085,8 +3246,39 @@ const OfficialDashboard = () => {
             </div>
 
             <div className="dashboard-card">
+              {documentRequests.length > 0 && (
+                <DashboardFilterBar
+                  idPrefix="documents"
+                  searchLabel="Search document requests by resident name, document type, purpose, contact number or purok"
+                  placeholder="Search requests..."
+                  query={documentQuery}
+                  onQueryChange={setDocumentQuery}
+                  selectFilter={{
+                    label: 'Filter document requests by status',
+                    value: documentFilter,
+                    onChange: setDocumentFilter,
+                    options: DOCUMENT_FILTER_OPTIONS,
+                  }}
+                  resultText={
+                    documentFiltersActive
+                      ? `Showing ${visibleDocumentRequests.length} of ${documentRequests.length}`
+                        + ` ${documentRequests.length === 1 ? 'request' : 'requests'}`
+                      : ''
+                  }
+                  onReset={resetDocumentFilters}
+                  filtersActive={documentFiltersActive}
+                />
+              )}
+
+              {/* ⚠️ Two different empty states. "No document requests
+                  yet" and "nothing matches your filters" are different
+                  facts, and showing the first while a filter is applied
+                  would tell an official the queue is empty when it is
+                  not. */}
               {documentRequests.length === 0 ? (
                 <p className="dashboard-empty">No document requests yet.</p>
+              ) : visibleDocumentRequests.length === 0 ? (
+                <p className="dashboard-empty">No document requests match this search.</p>
               ) : (
                 <div className="table-wrapper">
                   <table className="dashboard-table">
@@ -3102,7 +3294,7 @@ const OfficialDashboard = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {documentRequests.map((req) => (
+                      {visibleDocumentRequests.map((req) => (
                         <tr key={req.id}>
                           <td data-label="Resident">{req.full_name}</td>
                           <td data-label="Document">{req.document_type}</td>
@@ -3209,16 +3401,25 @@ const OfficialDashboard = () => {
                           <td data-label="Time">{entry.time_label || '—'}</td>
                           <td data-label="Notes">{entry.notes || '—'}</td>
                           <td data-label="Action" className="action-cell">
-                            <button
-                              className="btn-add btn-sm"
-                              onClick={() => handleEditWaste(entry)}>
-                              <FaEdit /> Edit
-                            </button>
-                            <button
-                              className="btn-deny"
-                              onClick={() => handleDeleteWaste(entry)}>
-                              <FaTrash /> Delete
-                            </button>
+                            <ActionMenu
+                              portal
+                              label={`More actions for ${entry.purok || 'this schedule'}`}
+                              items={[
+                                {
+                                  key: 'edit',
+                                  label: 'Edit schedule',
+                                  icon: <FaEdit />,
+                                  onSelect: () => handleEditWaste(entry),
+                                },
+                                {
+                                  key: 'delete',
+                                  label: 'Delete schedule',
+                                  icon: <FaTrash />,
+                                  danger: true,
+                                  onSelect: () => handleDeleteWaste(entry),
+                                },
+                              ]}
+                            />
                           </td>
                         </tr>
                       ))}
@@ -3638,16 +3839,25 @@ const OfficialDashboard = () => {
                           <td data-label="Household #">{entry.household_number || '—'}</td>
                           <td data-label="Contact">{entry.contact_number || '—'}</td>
                           <td data-label="Action" className="action-cell">
-                            <button
-                              className="btn-add btn-sm"
-                              onClick={() => handleEditRegistryEntry(entry)}>
-                              <FaEdit /> Edit
-                            </button>
-                            <button
-                              className="btn-deny"
-                              onClick={() => handleDeleteRegistryEntry(entry)}>
-                              <FaTrash /> Delete
-                            </button>
+                            <ActionMenu
+                              portal
+                              label={`More actions for ${entry.full_name}`}
+                              items={[
+                                {
+                                  key: 'edit',
+                                  label: 'Edit entry',
+                                  icon: <FaEdit />,
+                                  onSelect: () => handleEditRegistryEntry(entry),
+                                },
+                                {
+                                  key: 'delete',
+                                  label: 'Delete entry',
+                                  icon: <FaTrash />,
+                                  danger: true,
+                                  onSelect: () => handleDeleteRegistryEntry(entry),
+                                },
+                              ]}
+                            />
                           </td>
                         </tr>
                       ))}
@@ -3709,29 +3919,39 @@ const OfficialDashboard = () => {
                           <td data-label="Committee">{official.committee || '—'}</td>
                           <td data-label="Contact">{official.contact_number || '—'}</td>
                           <td data-label="Action" className="action-cell">
-                            <button
-                              className="btn-add btn-sm"
-                              onClick={() => handleEditOfficial(official)}>
-                              <FaEdit /> Edit
-                            </button>
-                            {/* Archive, not Delete. An official who leaves
-                                office is kept as barangay history. There is
-                                no permanent-delete control in this UI.
-
-                                An official may not archive their own record.
-                                The reason is stated in text rather than left
-                                to a disabled button, which explains nothing
-                                on its own. */}
-                            {isOwnOfficialRecord(official) ? (
+                            {/* ⚠️ The self-archive guard is preserved
+                                exactly: when this is the signed-in
+                                official's own record the Archive item is
+                                NOT in the menu, and the reason is still
+                                stated in text rather than left to a
+                                disabled control that explains nothing.
+                                Archive, not Delete -- an official who
+                                leaves office is kept as barangay
+                                history, and there is no permanent-delete
+                                control in this UI. */}
+                            <ActionMenu
+                              portal
+                              label={`More actions for ${official.full_name}`}
+                              items={[
+                                {
+                                  key: 'edit',
+                                  label: 'Edit official',
+                                  icon: <FaEdit />,
+                                  onSelect: () => handleEditOfficial(official),
+                                },
+                                ...(isOwnOfficialRecord(official) ? [] : [{
+                                  key: 'archive',
+                                  label: 'Archive official',
+                                  icon: <FaArchive />,
+                                  danger: true,
+                                  onSelect: () => setArchivingOfficial(official),
+                                }]),
+                              ]}
+                            />
+                            {isOwnOfficialRecord(official) && (
                               <span className="official-archive-blocked">
                                 Your own record — another official must archive it
                               </span>
-                            ) : (
-                              <button
-                                className="btn-deny"
-                                onClick={() => setArchivingOfficial(official)}>
-                                <FaArchive /> Archive
-                              </button>
                             )}
                           </td>
                         </tr>
@@ -4162,7 +4382,9 @@ const OfficialDashboard = () => {
       {showAnnouncementModal && (
         <div className="modal-overlay">
           <div className="modal" role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="offdlg-1-title">
-            <h3 id="offdlg-1-title">New Announcement</h3>
+            <h3 id="offdlg-1-title">
+              {editingAnnouncement ? 'Edit Announcement' : 'New Announcement'}
+            </h3>
 
             <div className="modal-form-group">
               <label htmlFor="off-title" className="modal-form-label">Title</label>
@@ -4197,11 +4419,20 @@ const OfficialDashboard = () => {
             </div>
 
             <div className="modal-buttons">
-              <button className="btn-cancel" onClick={() => setShowAnnouncementModal(false)}>
+              <button
+                className="btn-cancel"
+                onClick={() => { setShowAnnouncementModal(false); setEditingAnnouncement(null) }}
+              >
                 Cancel
               </button>
-              <button className="btn-save" onClick={handleAddAnnouncement} disabled={submitting}>
-                {submitting ? 'Saving...' : 'Save Announcement'}
+              <button
+                className="btn-save"
+                onClick={editingAnnouncement ? handleUpdateAnnouncement : handleAddAnnouncement}
+                disabled={submitting}
+              >
+                {submitting
+                  ? 'Saving...'
+                  : editingAnnouncement ? 'Save Changes' : 'Save Announcement'}
               </button>
             </div>
           </div>

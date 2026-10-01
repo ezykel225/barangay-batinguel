@@ -141,3 +141,149 @@ describe('ActionMenu', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 })
+
+// ── Portal mode (post-X3) ─────────────────────────────────────────────
+//
+// The five Official Portal management tables moved their Edit/Delete
+// button pairs into this menu. They could not use it before: a
+// `.table-wrapper` has `overflow-x: auto` and `overflow-y: auto`, and an
+// overflow container CLIPS absolutely-positioned descendants. Measured
+// before the portal: the menu ended 69px past the wrapper's bottom edge
+// and `elementFromPoint` at its centre returned `.dashboard-main` -- the
+// menu was not painted at all.
+describe('portal mode', () => {
+  const Table = ({ items }) => (
+    <div className="table-wrapper">
+      <table className="dashboard-table">
+        <tbody>
+          <tr>
+            <td data-label="Name">Juan Dela Cruz</td>
+            <td data-label="Action">
+              <ActionMenu portal label="More actions for Juan Dela Cruz" items={items} />
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  )
+  const EDIT_DELETE = [
+    { key: 'edit', label: 'Edit entry', onSelect: () => {} },
+    { key: 'delete', label: 'Delete entry', danger: true, onSelect: () => {} },
+  ]
+
+  it('renders the popup outside the clipping wrapper', () => {
+    const { container } = render(<Table items={EDIT_DELETE} />)
+    fireEvent.click(screen.getByRole('button', { name: 'More actions for Juan Dela Cruz' }))
+    const menu = screen.getByRole('menu')
+    // In the document, but NOT inside the table wrapper that would clip
+    // it. That is the whole point of the portal.
+    expect(menu).toBeInTheDocument()
+    expect(container.querySelector('.table-wrapper').contains(menu)).toBe(false)
+  })
+
+  it('marks the portalled popup so it can be positioned as fixed', () => {
+    render(<Table items={EDIT_DELETE} />)
+    fireEvent.click(screen.getByRole('button', { name: /More actions/ }))
+    expect(screen.getByRole('menu').className).toMatch(/is-portal/)
+  })
+
+  it('keeps the whole keyboard contract through the portal', () => {
+    render(<Table items={EDIT_DELETE} />)
+    const trigger = screen.getByRole('button', { name: /More actions/ })
+    fireEvent.click(trigger)
+    // Focus enters the menu...
+    expect(screen.getByRole('menuitem', { name: 'Edit entry' })).toHaveFocus()
+    // ...arrows move within it...
+    fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Edit entry' }), { key: 'ArrowDown' })
+    expect(screen.getByRole('menuitem', { name: 'Delete entry' })).toHaveFocus()
+    // ...and Escape closes it and hands focus back to the trigger.
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(trigger).toHaveFocus()
+  })
+
+  it('still reports its state on the trigger, which stays in the row', () => {
+    const { container } = render(<Table items={EDIT_DELETE} />)
+    const trigger = screen.getByRole('button', { name: /More actions/ })
+    expect(container.querySelector('td[data-label="Action"]').contains(trigger)).toBe(true)
+    expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(trigger)
+    expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    expect(trigger).toHaveAttribute('aria-controls', screen.getByRole('menu').id)
+  })
+
+  it('names the row it belongs to, so two menus are told apart', () => {
+    render(<Table items={EDIT_DELETE} />)
+    expect(screen.getByRole('button', { name: 'More actions for Juan Dela Cruz' })).toBeInTheDocument()
+  })
+})
+
+// ── Authorization ─────────────────────────────────────────────────────
+//
+// ⚠️ Moving an action into a menu must never make a restricted action
+// reachable by someone who could not see the button. The dashboards
+// build `items` with the same conditionals the buttons had, so an action
+// a role may not perform is simply not in the array.
+describe('what the menu may contain', () => {
+  it('omits an action the caller is not allowed, rather than disabling it', () => {
+    // The Officials Directory case: an official may not archive their
+    // OWN record, so that item is absent from their own row's menu.
+    const ownRow = [{ key: 'edit', label: 'Edit official', onSelect: () => {} }]
+    render(<ActionMenu portal label="More actions for ZZ Official" items={ownRow} />)
+    fireEvent.click(screen.getByRole('button', { name: /More actions/ }))
+    expect(screen.getByRole('menuitem', { name: 'Edit official' })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /Archive/ })).not.toBeInTheDocument()
+  })
+
+  it('includes it for somebody else’s row', () => {
+    const otherRow = [
+      { key: 'edit', label: 'Edit official', onSelect: () => {} },
+      { key: 'archive', label: 'Archive official', danger: true, onSelect: () => {} },
+    ]
+    render(<ActionMenu portal label="More actions for Somebody Else" items={otherRow} />)
+    fireEvent.click(screen.getByRole('button', { name: /More actions/ }))
+    expect(screen.getByRole('menuitem', { name: 'Archive official' })).toBeInTheDocument()
+  })
+
+  it('renders no trigger at all when the caller may do nothing', () => {
+    // Not an empty menu a keyboard user can open and find nothing in.
+    const { container } = render(<ActionMenu portal label="More actions" items={[]} />)
+    expect(container.querySelector('.action-menu')).toBeNull()
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it('marks a destructive item by class, not by colour alone', () => {
+    const items = [
+      { key: 'edit', label: 'Edit entry', onSelect: () => {} },
+      { key: 'delete', label: 'Delete entry', danger: true, onSelect: () => {} },
+    ]
+    render(<ActionMenu portal label="More actions" items={items} />)
+    fireEvent.click(screen.getByRole('button', { name: /More actions/ }))
+    expect(screen.getByRole('menuitem', { name: 'Delete entry' }).className).toMatch(/is-danger/)
+    expect(screen.getByRole('menuitem', { name: 'Edit entry' }).className).not.toMatch(/is-danger/)
+  })
+
+  it('restores focus to the trigger BEFORE running the handler', () => {
+    // ⚠️ This is about focus, not about the DOM. `close()` calls
+    // `setOpen(false)` -- a batched React update, so the menu is still
+    // in the document on this tick -- but it focuses the trigger
+    // synchronously, and that is the part that matters: ConfirmDialog
+    // remembers whatever is focused when it opens and returns focus
+    // there when it closes. If that were still a menu item, focus would
+    // be handed back to an element about to be unmounted.
+    let focusedWhenHandlerRan = null
+    const items = [{
+      key: 'delete',
+      label: 'Delete entry',
+      danger: true,
+      onSelect: () => { focusedWhenHandlerRan = document.activeElement },
+    }]
+    render(<ActionMenu portal label="More actions" items={items} />)
+    const trigger = screen.getByRole('button', { name: /More actions/ })
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete entry' }))
+    expect(focusedWhenHandlerRan).toBe(trigger)
+    // And the menu is gone once React has committed.
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+})
