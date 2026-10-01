@@ -170,20 +170,30 @@
   text-align: center;
 }
 
-/* ── Phones ───────────────────────────────────────────────────────────
+/* ── Phones and tablets ───────────────────────────────────────────────
  *
- * Below 600px the panel stops being a dropdown and becomes a sheet
- * pinned to both edges. At 340px wide it would otherwise hang off the
- * right of a 320px screen, and `right: 0` cannot fix that when the
+ * At and below 768px the panel stops being a dropdown and becomes a
+ * sheet pinned to both edges. At 340px wide it would otherwise hang off
+ * the right of a 320px screen, and `right: 0` cannot fix that when the
  * trigger itself is near the edge.
  *
- * ⚠️ Sidebar.css renders a FIXED `.mobile-menu-button` at
- * `top: 20px; right: 20px; z-index: 1050`. The sheet is z-index 1100 so
- * it covers that rather than being punched through by it. */
-@media (max-width: 600px) {
+ * ⚠️ 768px, NOT 600px, because that is the width at which the bell moves
+ * into `.dash-mobile-header`. Matching the two breakpoints means the
+ * panel is a sheet exactly when the bell is in the header and a dropdown
+ * exactly when it is in `.dashboard-topbar` -- between 601 and 768 it
+ * used to be a dropdown anchored inside the fixed header, which is a
+ * third behaviour nobody designed.
+ *
+ * `top: 68px` clears the header: 8px padding + 44px control + 8px
+ * padding = 60px, plus 8px of gap. The header grows past 60px when the
+ * brand wraps to two lines, so the sheet can sit under a slightly
+ * taller header -- acceptable, because it is pinned to the viewport
+ * rather than to the header, and 68px still clears the single-line case
+ * everywhere the brand fits. */
+@media (max-width: 768px) {
   .notif-panel {
     position: fixed;
-    top: 72px;
+    top: 68px;
     right: 12px;
     left: 12px;
     width: auto;
@@ -212,12 +222,31 @@
   margin-bottom: 4px;
 }
 
-/* On a phone the sidebar's own fixed hamburger sits at top right
- * (`top: 20px; right: 20px`), so the bell steps left of it instead of
- * underneath it. */
+/* ⚠️ On a phone the bell lives in `.dash-mobile-header` instead, so this
+   bar must not render a second one floating over the page content.
+ *
+ * This rule has to be HERE, in the same file as the `display: flex`
+ * above. Both selectors are `.dashboard-topbar` (0,1,0) and a media
+ * query adds no specificity, so the later rule in the emitted bundle
+ * wins at every width. The same rule written in Sidebar.css was emitted
+ * ~6.7KB earlier and lost: measured as two visible bells at 375px.
+ *
+ * `display: none` also removes the hidden copy from the accessibility
+ * tree, so nobody is offered two Notifications buttons. */
 @media (max-width: 768px) {
   .dashboard-topbar {
-    justify-content: flex-start;
-    margin-bottom: 8px;
+    display: none;
   }
 }
+
+/* ⚠️ At and below 768px this bar is HIDDEN, by a rule in Sidebar.css --
+ * the bell is rendered again inside `.dash-mobile-header` there, beside
+ * the brand and the menu button.
+ *
+ * So two <NotificationBell> elements are mounted on the Resident and
+ * Official portals, and exactly one is ever displayed. That is
+ * deliberate: it keeps the desktop placement byte-identical while giving
+ * the phone a single row of chrome, and `display: none` removes the
+ * hidden copy from the accessibility tree, so nobody is offered two
+ * Notifications buttons. The only duplicated state is each copy's own
+ * open/closed flag, which is not shared state worth lifting. */

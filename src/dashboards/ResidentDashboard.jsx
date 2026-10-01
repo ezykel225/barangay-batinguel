@@ -672,6 +672,20 @@ const ResidentDashboard = () => {
     )
   }
 
+  // One definition, rendered twice -- once in the desktop topbar and
+  // once in the mobile header -- so the two placements cannot be given
+  // different props.
+  const notificationBell = (
+    <NotificationBell
+      notifications={notifications}
+      readIds={notifReadIds}
+      loading={notifLoading}
+      onOpenTab={(tab) => setActiveTab(tab)}
+      onMarkRead={markNotificationRead}
+      onMarkAllRead={markAllNotificationsRead}
+    />
+  )
+
   return (
     <div className="dashboard-layout">
       <Sidebar
@@ -679,22 +693,19 @@ const ResidentDashboard = () => {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         badges={notifBadges}
+        mobileHeaderAction={notificationBell}
       />
 
       <main className="dashboard-main" id="main-content">
 
-        {/* One place for all four tabs -- there is no shared dashboard
-            header component, and four copies would be four things to
-            keep in step. */}
+        {/* The DESKTOP bell. One place for all four tabs -- there is no
+            shared dashboard header component, and four copies would be
+            four things to keep in step.
+
+            ⚠️ Hidden at and below 768px, where Sidebar renders the same
+            bell inside .dash-mobile-header. See NotificationBell.css. */}
         <div className="dashboard-topbar">
-          <NotificationBell
-            notifications={notifications}
-            readIds={notifReadIds}
-            loading={notifLoading}
-            onOpenTab={(tab) => setActiveTab(tab)}
-            onMarkRead={markNotificationRead}
-            onMarkAllRead={markAllNotificationsRead}
-          />
+          {notificationBell}
         </div>
         {activeTab === 'dashboard' && (
           <div>

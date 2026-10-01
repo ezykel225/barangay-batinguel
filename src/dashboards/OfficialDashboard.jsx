@@ -2272,6 +2272,20 @@ const OfficialDashboard = () => {
   const maxMonthly = Math.max(1, ...monthlyCounts.map((b) => Math.max(b.documents, b.reservations)))
   const maxDay = Math.max(1, ...busiestDays.map((d) => d.count))
 
+  // One definition, rendered twice -- once in the desktop topbar and
+  // once in the mobile header -- so the two placements cannot be given
+  // different props.
+  const notificationBell = (
+    <NotificationBell
+      notifications={notifications}
+      readIds={notifReadIds}
+      loading={notifLoading}
+      onOpenTab={(tab) => setActiveTab(tab)}
+      onMarkRead={markNotificationRead}
+      onMarkAllRead={markAllNotificationsRead}
+    />
+  )
+
   return (
     <div className="dashboard-layout">
 
@@ -2284,23 +2298,20 @@ const OfficialDashboard = () => {
           documents: pendingDocRequestCount,
           residents: awaitingVerificationCount,
         }}
+        mobileHeaderAction={notificationBell}
       />
 
       {/* Main Content */}
       <main className="dashboard-main" id="main-content">
 
-        {/* The bell sits here rather than inside each tab's own header,
-            because there are thirteen of those and no shared dashboard
-            header component exists. One place, every tab. */}
+        {/* The DESKTOP bell. It sits here rather than inside each tab's
+            own header, because there are thirteen of those and no shared
+            dashboard header component exists. One place, every tab.
+
+            ⚠️ Hidden at and below 768px, where Sidebar renders the same
+            bell inside .dash-mobile-header. See NotificationBell.css. */}
         <div className="dashboard-topbar">
-          <NotificationBell
-            notifications={notifications}
-            readIds={notifReadIds}
-            loading={notifLoading}
-            onOpenTab={(tab) => setActiveTab(tab)}
-            onMarkRead={markNotificationRead}
-            onMarkAllRead={markAllNotificationsRead}
-          />
+          {notificationBell}
         </div>
 
         {/* ========================

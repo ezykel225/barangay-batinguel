@@ -29,6 +29,14 @@
   max-width: 440px;
   padding: 24px;
   font-family: 'Poppins', sans-serif;
+  /* Same cap as .modal, for the same reason -- this overlay is fixed
+     too. Today's longest message fits a 375x667 phone with room to
+     spare, so this is a guard rather than a fix: a longer message, or a
+     landscape phone at 375x375, would otherwise put the buttons out of
+     reach. See the note on .modal in Sidebar.css. */
+  max-height: calc(100vh - 40px);
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
 }
 
 .confirm-dialog-title {

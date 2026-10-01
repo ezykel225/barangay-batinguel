@@ -156,6 +156,9 @@ src/
                       the lunch closure the Home page states.
     Sidebar.jsx       Dashboard nav. Defines the tab lists for all three
                       roles: official (13), nurse (5), resident (4).
+                      Also renders the MOBILE DASHBOARD HEADER -- brand,
+                      notification bell, menu button -- for all three
+                      portals; see *Responsive layout (X2)*.
     ProtectedRoute    Role gate. Frontend only — RLS is the real control.
     NotificationBell  The bell and its panel. Resident and Official
                       portals only -- there is deliberately no nurse
@@ -1834,6 +1837,204 @@ into a second grid: the real one is one tab away under Health Events.
 
 ---
 
+## Responsive layout (X2)
+
+A whole-application responsive sweep, 2026-10-01, measured in Chromium at
+**375 / 768 / 1280 / 1440** rather than read off the stylesheets.
+
+**Result: zero document-level horizontal overflow** on every public route
+and every dashboard surface measured, at every width. The one table that
+scrolls internally does so on purpose — see below.
+
+### ⚠️ A bare `1fr` grid track is `minmax(auto, 1fr)`
+
+This was the single biggest finding, and it is the **same mechanism**
+already documented for the mobile table-to-card block: a `1fr` track
+cannot shrink below its content's **min-content** width, so one
+unbreakable value sets a floor and the whole document scrolls sideways.
+
+Measured at 375px with a long email address as the unbreakable token —
+the realistic case, and the one that bit the tables before:
+
+| Surface | Before |
+|---|---|
+| Home | **+310px** |
+| Announcements | **+232px** |
+| Health Center | **+193px** |
+
+⚠️ **Collapsing to one column does not fix it.** A single `1fr` track is
+just as much `minmax(auto, 1fr)` as three of them, which is why the
+existing `grid-template-columns: 1fr` mobile rules did not help.
+
+Every card/section grid now uses `minmax(0, 1fr)`, and the elements that
+hold **text a person typed** — an event title and location, an
+announcement title and body, a medicine name — carry
+`overflow-wrap: anywhere`. Flex items that hold such text (`.event-info`,
+`.health-sidebar > *`, `.medicine-item-main`) carry `min-width: 0`,
+because a flex item's default `min-width: auto` is its min-content width
+too.
+
+**Not `word-break: break-all`.** That hyphenates ordinary prose
+mid-word; `overflow-wrap: anywhere` only breaks a word that cannot
+otherwise fit, and it is applied to the handful of elements that hold
+user text rather than globally.
+
+### ⚠️ A modal could put its own submit button out of reach
+
+`.modal-overlay` is `position: fixed; inset: 0` and centres its child.
+`.modal` had **no `max-height` and no `overflow`**, so a form taller than
+the viewport overflowed both edges with nothing able to scroll — the page
+behind is covered by a fixed overlay, and the modal did not scroll
+itself.
+
+Measured with the 9-field Add Registry Entry form (979px tall):
+
+| Viewport | Before |
+|---|---|
+| 375x667 | title at **-156px**, Save button **124px below the fold** |
+| 375x812 | Save button 52px below the fold |
+| **1280x800** | Save button 58px below the fold — **not a mobile-only bug** |
+
+`.modal` and `.confirm-dialog` are now capped at
+`calc(100vh - 40px)` with `overflow-y: auto`, plus a `100dvh` line for
+mobile browsers whose toolbars make `100vh` taller than the visible area
+(a browser that does not know the unit ignores that declaration). The cap
+only binds when the modal is too tall, so short modals are pixel-
+identical. Verified afterwards at all four sizes: the modal scrolls to
+**both** ends.
+
+### The mobile dashboard header
+
+All three portals share one fixed strip at the top, below 769px, rendered
+by `Sidebar.jsx`:
+
+**brand (logo + "Barangay Batinguel E-Services") · notification bell ·
+menu button**
+
+Before, that same 76px strip held the menu button **alone** — an
+otherwise empty band — while the bell floated separately above the page
+content, so a phone carried two pieces of chrome where one row would do.
+
+| | |
+|---|---|
+| Brand | links to **`/`**, the public home page. It is the system's identity, and a resident reading their portal is still a citizen browsing a public site — the same reasoning that lands residents on Home after login |
+| Logo | the existing `assets/images/logo.png`, the same asset the public `Navbar` uses. No duplicate asset |
+| Brand text | wraps to two lines rather than shrinking; a brand smaller than the body text around it is worse than a wrapped one. Measured: it fits on **one** line at 375px beside both controls |
+| Bell | immediately left of the menu button. **The nurse has none** — there is deliberately no nurse bell, so her header is brand + menu |
+| Menu | far right, 44px, 12px from the edge |
+| `z-index` | 1050 — above the drawer overlay (1000), below the drawer itself (1100), so an open drawer covers the header instead of leaving a strip floating over it |
+
+Measured at 375px: brand at x=12 (245px wide), bell 269–311, menu
+319–363 of 375. No overlap, nothing off-screen, unread badge visible,
+and the notification sheet opens at y=68 fully inside the viewport.
+
+⚠️ **Two `<NotificationBell>` elements are mounted, and exactly one is
+ever displayed.** The desktop one is in `.dashboard-topbar`; the mobile
+one is in the header. That keeps the desktop placement byte-identical
+while giving the phone a single row, and `display: none` removes the
+hidden copy from the accessibility tree so nobody is offered two
+Notifications buttons. Both are rendered from **one** `notificationBell`
+const per dashboard, so the two placements cannot be given different
+props.
+
+### ⚠️ The hide rule has to live beside the rule it overrides
+
+`.dashboard-topbar { display: none }` was first written into
+`Sidebar.css`. It **silently never applied** — measured as two visible
+bells at 375px.
+
+Both selectors are `.dashboard-topbar` (0,1,0), and **a media query adds
+no specificity**, so the rule the bundler emits *last* wins at every
+width. Sidebar.css was emitted ~6.7KB earlier and lost. The rule now sits
+in `NotificationBell.css`, immediately after the `display: flex` it
+overrides.
+
+The general lesson, worth more than this one rule: when two files style
+the same class, a media query is **not** a tiebreaker. Put the override
+in the same file, or raise specificity deliberately.
+
+### The drawer
+
+Portal identity (`Resident Portal` / `Official Portal` /
+`Health Center Portal`), the signed-in account, every nav item and
+Logout are all unchanged. The account row got two declarations: without
+them the 36px avatar is a flex item free to shrink, and a long name
+squeezed it to **23x36** — an ellipse. It now holds 36x36 and the name
+block takes the remaining width, with **0px** of slack. No system brand
+is repeated inside the drawer; the mobile header already carries it.
+
+### Tables: what each one is meant to do
+
+| Table | Behaviour |
+|---|---|
+| Reservations (11 columns) | **Internal horizontal scroll, on purpose.** 1163px of real content in ~956px of content area at 1280 with the sidebar expanded |
+| Document Requests, Residents, Voter Reference List, Activity Log | Fit without internal scrolling at 1280+ |
+| All of them, ≤768px | Convert to cards (the protected block). Measured: row width equals the available width, and the **Action cell stays visible** at 301px |
+
+⚠️ **Name and Email stay separate columns, and the reservations table
+keeps its internal scrollbar.** Both were settled before X2 and were not
+revisited: forcing eleven columns of real data into ~650px would make
+them unreadable, and the scrollbar is styled to be visible so a column
+off the end reads as scrollable rather than missing. **No action is ever
+hidden to make a table fit.**
+
+### The calendars
+
+The shared `MonthCalendar` was measured in both layouts. Cell sizes:
+
+| Width | Public Events | Inside a dashboard |
+|---|---|---|
+| 375 | 42px | 42px |
+| 768 | 96px | 96px |
+| 1024 | — | 41px (two columns beside the panel) |
+| 1280 | — | 59px |
+| 1440 | — | 71px |
+
+All comfortably usable; day detail stays in `.mcal-day-panel` outside the
+grid, so a long event title never has to fit in a cell. `.mcal-grid` was
+moved to `minmax(0, 1fr)` for consistency with the above — nothing
+overflows there today, since a cell holds only a number and a count.
+
+⚠️ **An 18px cell was measured at 1024 and was a HARNESS BUG, not a
+defect.** The measurement page wrapped the capture in
+`.dashboard-layout > .dashboard-main` when the capture already contained
+them, so the sidebar's 260px margin was applied **twice**. Worth
+recording because the number was alarming and nearly led to a fix for a
+problem that does not exist — the project's own rule about asking which
+step produced a result.
+
+**The public Covered Court booking calendar was left alone.** It has its
+own grid with slot-availability tones, it is the surface #23/#23.R
+verified most heavily, and it showed no overflow at any width. It was
+deliberately **not** refactored into `MonthCalendar` for consistency.
+
+### What was NOT browser-verified
+
+The three dashboards are behind `ProtectedRoute` and this environment has
+no test account, so **no authenticated page was loaded in a browser.**
+Nothing was done to weaken or bypass authentication for a screenshot.
+
+Instead, `Sidebar`, `NotificationBell`, `MonthCalendar` and the
+confirmation dialog were rendered through Jest — the **real** components,
+with only their data sources stood in for — and the captured markup was
+measured against the **shipped CSS bundle** in Chromium. The tables and
+the tall modal are faithful reproductions of the dashboard JSX (same
+columns, same `data-label` attributes, same `.cell-truncate` wrappers),
+not the live pages.
+
+So the chrome, the calendars and the dialogs are measured from real
+component output; the **table and modal bodies are measured from
+reproductions**, and the live authenticated pages remain unverified in a
+browser.
+
+Outbound HTTPS from the container's browser is not permitted to reach
+Supabase, so even the public pages were measured against **synthetic**
+fixtures — deliberately pathological ones (a 59-character unbreakable
+email, a 74-character event title), which is what exposed the `1fr`
+defects that real data does not reach.
+
+---
+
 ## Health centre
 
 **Medicine stock is a status, not a quantity** — Available / Low stock /
@@ -2031,7 +2232,8 @@ derives her initials from. It is no longer displayed as a label.
   mirror migration 020's SQL cases rather than running them, so the two
   can still drift if only one is edited.
 - **Desktop at 1024px with the sidebar expanded still scrolls the widest
-  table.** 1024 minus a 260px sidebar minus padding leaves ~650px, and
+  table.** Re-measured in X2 and unchanged — see *Responsive layout
+  (X2)*, which records it as the one deliberate internal scroll. 1024 minus a 260px sidebar minus padding leaves ~650px, and
   eleven columns of real reservation data need ~784px even with the Email
   and Purpose caps. `.table-wrapper` scrolls, and its scrollbar is now
   styled to be visible rather than an invisible overlay, so a column that

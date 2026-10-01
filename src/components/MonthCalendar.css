@@ -56,7 +56,13 @@
 .mcal-weekdays,
 .mcal-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  /* minmax(0, …) rather than a bare 1fr. A cell's content is only a day
+     number and a count, so nothing overflows today -- but a bare `1fr`
+     is `minmax(auto, 1fr)`, and the same track type is what pushed the
+     event and announcement cards past the viewport at 375px. Consistent
+     with the rest of the app, and a cheap guard if a cell ever gains
+     wider content. */
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 4px;
 }
 

@@ -731,6 +731,27 @@
   padding: 20px;
 }
 
+/* ⚠️ (X2) A TALL MODAL MUST NOT PUT ITS SUBMIT BUTTON OFF-SCREEN.
+ *
+ * `.modal-overlay` is `position: fixed; inset: 0` and centres its child,
+ * so a form taller than the viewport overflowed BOTH edges with nothing
+ * able to scroll: the page behind is covered by a fixed overlay, and the
+ * modal itself had no max-height and no overflow.
+ *
+ * Measured with the Add Registry Entry form (9 fields), before this:
+ *
+ *   375x667   modal 979px, title at -156px, Save button 124px below the
+ *             fold and unreachable
+ *   375x812   Save button 52px below the fold
+ *   1280x800  Save button 58px below the fold  <- NOT a mobile-only bug
+ *
+ * Capping the height and letting the modal scroll itself fixes all
+ * three. `max-height` only binds when the modal is too tall, so short
+ * modals are pixel-identical to before.
+ *
+ * The `dvh` line is for mobile browsers whose toolbars make `100vh`
+ * taller than the visible area; a browser that does not know the unit
+ * ignores the declaration and keeps the `vh` line above it. */
 .modal {
   background-color: white;
   border-radius: var(--radius-lg);
@@ -738,6 +759,9 @@
   width: 100%;
   max-width: 500px;
   box-shadow: var(--shadow-lg);
+  max-height: calc(100vh - 40px);
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
 }
 
 .modal h3 {
@@ -954,12 +978,90 @@
    Keep mobile navigation reachable while leaving page content
    unobstructed. Same position for every portal; hidden on desktop, where
    the sidebar is the navigation. */
-.mobile-menu-button {
+/* ── The mobile dashboard header (X2) ─────────────────────────────────
+ *
+ * One fixed strip across the top of all three portals, holding the
+ * system brand, the notification bell and the menu button. Hidden above
+ * 768px, where the sidebar is the navigation and the bell lives in
+ * .dashboard-topbar.
+ *
+ * Before this, the same 76px strip was reserved and held the menu button
+ * alone -- an otherwise empty band -- while the bell floated separately
+ * above the page content, giving a phone two pieces of chrome stacked
+ * where one row would do.
+ *
+ * White with a shadow, matching the public .navbar, because the brand it
+ * carries is the same brand.
+ *
+ * ⚠️ z-index 1050 sits ABOVE the drawer overlay (1000) and BELOW the
+ * drawer itself (1100), so an open drawer covers the header rather than
+ * leaving a strip of it floating over the top. The notification panel is
+ * a child of this element, so it paints inside this stacking context --
+ * above .dashboard-main, which is what it needs.
+ */
+.dash-mobile-header {
   display: none;
   position: fixed;
-  top: 20px;
-  right: 20px;
+  top: 0;
+  left: 0;
+  right: 0;
   z-index: 1050;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  background-color: #ffffff;
+  box-shadow: var(--shadow-sm);
+}
+
+.dash-mobile-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /* The brand is the one thing here that may take the leftover room, and
+     min-width: 0 lets it shrink so the two controls on the right are
+     never pushed off the edge. */
+  flex: 1 1 auto;
+  min-width: 0;
+  text-decoration: none;
+  color: inherit;
+}
+
+.dash-mobile-brand-logo {
+  /* flex-shrink: 0 so the logo never squashes to an ellipse when the
+     name wraps. */
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-circle);
+  object-fit: cover;
+}
+
+/* ⚠️ Wraps to two lines rather than shrinking. At 375px the full name
+   does not fit on one line beside two 44px controls, and the brief's
+   choice -- and the right one -- is to wrap: a brand shrunk to fit would
+   be smaller than the body text around it. 1.15 line-height keeps two
+   lines inside the strip. */
+.dash-mobile-brand-name {
+  font-size: var(--fs-13);
+  font-weight: 700;
+  line-height: 1.15;
+  color: #1e3a8a;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.dash-mobile-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* Never shrinks: the bell and the menu keep their full touch targets
+     and the brand gives up space instead. */
+  flex: 0 0 auto;
+}
+
+.mobile-menu-button {
+  display: none;
   align-items: center;
   justify-content: center;
   /* 44px square: the usual minimum for a comfortable touch target. */
@@ -993,17 +1095,31 @@
   .dashboard-main {
     margin-left: 0;
     padding: 20px;
-    /* Reserves the strip the menu button occupies, so a page heading
-       never starts underneath it. 20px (top inset) + 44px (button) +
-       12px (breathing room) = 76px. The bottom clearance that used to be
-       here existed only for the fixed bottom bar, which is gone; the
-       20px from the shorthand is the page's own spacing. */
+    /* Reserves the fixed .dash-mobile-header, so a page heading never
+       starts underneath it. 8px + 44px (the taller of the two controls)
+       + 8px = 60px of header, plus 12px of breathing room. The brand may
+       wrap to two lines, which grows the header past 60px -- hence
+       min-height below rather than a fixed height, and hence the
+       generous 76px kept here. The bottom clearance that used to be in
+       this rule existed only for the fixed bottom bar, which is gone. */
     padding-top: 76px;
+  }
+
+  .dash-mobile-header {
+    display: flex;
+    min-height: 60px;
   }
 
   .mobile-menu-button {
     display: flex;
   }
+
+  /* ⚠️ `.dashboard-topbar` is hidden at this width, but the rule lives in
+     NotificationBell.css, NOT here. Both rules are `.dashboard-topbar`
+     (0,1,0) and a media query adds no specificity, so whichever file the
+     bundler emits LAST wins at every width. It emitted this file first,
+     so the hide silently never applied -- measured: two bells visible at
+     375px. The rule belongs beside the declaration it overrides. */
 
   .dashboard-stats {
     grid-template-columns: repeat(2, 1fr);
@@ -1233,6 +1349,18 @@
   gap: 12px;
   padding: 16px 20px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* (X2) The avatar is a fixed 36px circle, and without this it is a flex
+   item free to shrink -- a long name squeezed it into an ellipse and
+   left the row looking mis-set. The name block takes the remaining
+   width instead, so the row has no slack on either side. */
+.nav-drawer-user .sidebar-user-avatar {
+  flex: 0 0 auto;
+}
+
+.nav-drawer-user .sidebar-user-info {
+  flex: 1 1 auto;
 }
 
 /* Long names wrap rather than pushing the drawer sideways. */

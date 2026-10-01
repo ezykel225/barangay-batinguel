@@ -96,7 +96,11 @@
   max-width: 1200px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 1fr 2fr;
+  /* minmax(0, …) for the reason given in Home.css: a bare `1fr` track is
+     `minmax(auto, 1fr)` and cannot shrink below its content's
+     min-content width, so one long medicine name set the width of the
+     whole page. Measured at 375px before this: +193px. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
   gap: 32px;
 }
 
@@ -107,6 +111,14 @@
   display: flex;
   flex-direction: column;
   gap: 24px;
+  /* A flex item's default `min-width: auto` is its min-content width,
+     so without this a long medicine or programme name widens the whole
+     sidebar column. */
+  min-width: 0;
+}
+
+.health-sidebar > * {
+  min-width: 0;
 }
 
 /* On Duty Status Card */
@@ -434,7 +446,7 @@
 
 .bakuna-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
 }
 
@@ -509,7 +521,7 @@
 
 .health-tips-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 16px;
 }
 
@@ -658,16 +670,17 @@
     min-width: 0;
   }
 
+  /* A single column is still minmax(auto, 1fr) without this. */
   .health-main-container {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .bakuna-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .health-tips-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .health-main {
@@ -804,7 +817,7 @@
   display: grid;
   /* Name column flexes, badge column stays its natural width so the
      statuses line up down the page instead of drifting. */
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 4px 12px;
   padding: 10px 12px;
@@ -819,9 +832,18 @@
   align-items: baseline;
   flex-wrap: wrap;
   gap: 8px;
+  min-width: 0;
 }
 
-.medicine-name { font-size: var(--fs-14); font-weight: 600; color: #111827; }
+/* A medicine name is data a nurse typed, and some of them are one long
+   chemical token. It wraps rather than widening the card. */
+.medicine-name {
+  font-size: var(--fs-14);
+  font-weight: 600;
+  color: #111827;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 .medicine-form { font-size: var(--fs-12); color: #6b7280; }
 
 .medicine-generic,

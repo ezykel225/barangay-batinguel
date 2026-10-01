@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   FaShieldAlt,
   FaTachometerAlt,
@@ -64,7 +64,12 @@ const writeCollapsed = (value) => {
 // crosses it; the matching CSS value lives in Sidebar.css.
 const DESKTOP_QUERY = '(min-width: 769px)'
 
-const Sidebar = ({ role, activeTab, setActiveTab, badges = {} }) => {
+// `mobileHeaderAction` is rendered in the mobile header, immediately left
+// of the menu button. The Resident and Official portals pass their
+// notification bell; the nurse passes nothing, because there is
+// deliberately no nurse bell (see Notifications in CLAUDE.md), and the
+// header simply has brand + menu.
+const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderAction = null }) => {
   const navigate = useNavigate()
   const { user } = useAuth()
   const [profileName, setProfileName] = useState('')
@@ -292,24 +297,51 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {} }) => {
 
   return (
     <>
-      {/* The mobile entry point into navigation. Fixed at the top right on
-          every tab of every portal, so it is in the same place whatever
-          the page. Hidden above the breakpoint, where the sidebar itself
-          is the navigation.
+      {/* ── The mobile dashboard header ──────────────────────────────
+          Fixed at the top on every tab of every portal, so the brand,
+          the bell and the menu are in the same place whatever the page.
+          Hidden above the breakpoint, where the sidebar is the
+          navigation and the bell sits in .dashboard-topbar.
 
-          .dashboard-main reserves room for it at mobile widths, so it
-          never sits on top of a page heading. */}
-      <button
-        type="button"
-        className="mobile-menu-button"
-        onClick={() => setDrawerOpen(true)}
-        aria-expanded={drawerOpen}
-        aria-controls="nav-drawer"
-        aria-label="Open navigation menu"
-        ref={menuButtonRef}
-      >
-        <FaBars />
-      </button>
+          This strip used to hold the menu button alone, floating over an
+          otherwise empty band, while the notification bell floated
+          separately above the page content. Both are now in one row.
+
+          .dashboard-main reserves the strip's height at mobile widths,
+          so a page heading never starts underneath it.
+
+          ⚠️ The brand goes to the PUBLIC home page, not to the
+          dashboard's own Dashboard tab. It is the system's identity, and
+          a resident reading their portal is still a citizen browsing a
+          public site -- the same reason residents land on Home after
+          login rather than on their dashboard. */}
+      <header className="dash-mobile-header">
+        <Link to="/" className="dash-mobile-brand">
+          <img
+            src={require('../assets/images/logo.png')}
+            alt=""
+            className="dash-mobile-brand-logo"
+          />
+          <span className="dash-mobile-brand-name">
+            Barangay Batinguel E-Services
+          </span>
+        </Link>
+
+        <div className="dash-mobile-actions">
+          {mobileHeaderAction}
+          <button
+            type="button"
+            className="mobile-menu-button"
+            onClick={() => setDrawerOpen(true)}
+            aria-expanded={drawerOpen}
+            aria-controls="nav-drawer"
+            aria-label="Open navigation menu"
+            ref={menuButtonRef}
+          >
+            <FaBars />
+          </button>
+        </div>
+      </header>
 
       {/* Desktop Sidebar. `is-collapsed` narrows it to an icon rail; the
           matching margin on .dashboard-main is applied from CSS with a

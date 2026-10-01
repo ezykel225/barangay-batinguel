@@ -264,9 +264,15 @@
   text-decoration: underline;
 }
 
+/* ⚠️ minmax(0, 1fr), not 1fr. A bare `1fr` track is `minmax(auto, 1fr)`,
+   so it cannot shrink below its content's MIN-CONTENT width -- one
+   unbreakable value (a long email address, a long single-token name)
+   sets the floor and the card pushes the whole document sideways. Same
+   mechanism as the mobile table-to-card block's table box. Measured at
+   375px before this: +310px of document overflow. */
 .announcements-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 24px;
 }
 
@@ -316,6 +322,12 @@
   color: var(--text);
   margin-bottom: 8px;
   line-height: 1.45;
+  /* A title is user-entered text -- see the note on .event-info. */
+  overflow-wrap: anywhere;
+}
+
+.announcement-card-body p {
+  overflow-wrap: anywhere;
 }
 
 .announcement-card-body p {
@@ -340,7 +352,7 @@
 
 .events-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 24px;
 }
 
@@ -386,16 +398,28 @@
   line-height: 1;
 }
 
+/* ⚠️ `.event-card` is a flex row and `.event-info` is a flex item, whose
+   default `min-width: auto` is its own min-content width. Without the 0
+   the title or location word decides how wide the card is. The
+   `overflow-wrap` is on the two elements that hold TEXT A PERSON TYPED
+   -- a title and a location -- and nowhere else. Not `break-all`: that
+   would hyphenate ordinary prose mid-word. */
+.event-info {
+  min-width: 0;
+}
+
 .event-info h3 {
   font-size: var(--fs-16);
   font-weight: 600;
   color: var(--text);
   margin-bottom: 5px;
+  overflow-wrap: anywhere;
 }
 
 .event-info p {
   font-size: var(--fs-13);
   color: var(--text-light);
+  overflow-wrap: anywhere;
 }
 
 .events-calendar-btn {
@@ -519,7 +543,7 @@
   }
 
   .announcements-grid {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 }
 
@@ -536,12 +560,15 @@
     height: 280px;
   }
 
+  /* ⚠️ A SINGLE column still needs minmax(0, …). One `1fr` track is
+     just as much `minmax(auto, 1fr)` as three of them, which is why
+     collapsing to one column did not stop the overflow on its own. */
   .announcements-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .events-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .contact-info-container {
