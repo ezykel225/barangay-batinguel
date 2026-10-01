@@ -1,0 +1,182 @@
+/* ================================
+   E-SERVICES DROPDOWN (public navbar)
+   ================================
+
+   Matches `.navbar-menu a` deliberately: the trigger sits in the same
+   row as Home / Officials / Health Center and must not read as a
+   different kind of control. Same colour, size, weight and the same
+   2px underline treatment for hover and the active route. */
+.eservices-menu {
+  position: relative;
+}
+
+.eservices-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  /* Matching the siblings, which are links with no button chrome. */
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: 'Poppins', sans-serif;
+  color: #374151;
+  font-size: var(--fs-14);
+  font-weight: 500;
+  padding: 0 0 4px;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  /* WCAG 2.2 SC 2.5.8. The siblings are inline links and exempt; this
+     is a standalone control and is not. */
+  min-height: 24px;
+}
+
+.eservices-trigger:hover,
+.eservices-trigger[aria-expanded='true'] {
+  color: #1e3a8a;
+  border-bottom-color: #1e3a8a;
+}
+
+.eservices-trigger.active {
+  color: #1e3a8a;
+  border-bottom-color: #1e3a8a;
+  font-weight: 600;
+}
+
+.eservices-chevron {
+  font-size: 10px;
+  transition: transform 0.2s;
+}
+
+.eservices-trigger[aria-expanded='true'] .eservices-chevron {
+  transform: rotate(180deg);
+}
+
+/* ── The panel ─────────────────────────────────────────────────────
+   z-index 1200 matches ActionMenu's portalled popup, which is the
+   highest thing this application puts over page content. */
+.eservices-panel {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  min-width: 290px;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  padding: 8px;
+  z-index: 1200;
+}
+
+.eservices-panel-all {
+  display: block;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: #1e3a8a;
+  text-decoration: none;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 4px;
+}
+
+.eservices-panel-all:hover {
+  background-color: #eff6ff;
+}
+
+.eservices-group + .eservices-group {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid #f3f4f6;
+}
+
+.eservices-group-label {
+  margin: 0;
+  padding: 8px 12px 4px;
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: #5f6775;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.eservices-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.eservices-item {
+  display: block;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  /* min-content width floor is the X2 lesson: a service label is text
+     somebody wrote and must be allowed to wrap. */
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.eservices-item:hover {
+  background-color: #f9fafb;
+}
+
+.eservices-item-label {
+  display: block;
+  font-size: var(--fs-14);
+  font-weight: 500;
+  color: #374151;
+}
+
+/* ⚠️ The access requirement is TEXT, never colour alone -- a resident
+   who cannot see the grey has to be told in words that an account is
+   needed, and told before the click rather than after the form. */
+.eservices-item-access {
+  display: block;
+  font-size: var(--fs-12);
+  color: #5f6775;
+  margin-top: 1px;
+}
+
+/* ── Mobile: the same services, inline in the drawer ───────────────
+   No disclosure on a phone. The drawer is already a disclosure, and
+   nesting a second one inside it buys nothing but another tap. */
+.navbar-mobile .eservices-mobile-label {
+  margin: 0;
+  padding: 12px 20px 4px;
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: #5f6775;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.navbar-mobile .eservices-mobile-access {
+  display: block;
+  font-size: var(--fs-12);
+  font-weight: 400;
+  color: #5f6775;
+  margin-top: 1px;
+}
+
+/* The service list inside the mobile drawer. `.navbar-mobile li`
+   already supplies the row padding and separator, so this only has to
+   indent the children and stop the <ul> looking like a bullet list. */
+.navbar-mobile-sublist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.navbar-mobile-sublist li {
+  padding: 0;
+  border: none;
+}
+
+.navbar-mobile-sublist a {
+  display: block;
+  padding: 10px 20px 10px 32px;
+  /* A service label is text somebody wrote: let it wrap rather than
+     set a min-content floor on the drawer (X2). */
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
