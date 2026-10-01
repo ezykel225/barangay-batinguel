@@ -169,12 +169,6 @@
   color: #bfdbfe;
 }
 
-.sidebar-role {
-  font-size: var(--fs-12);
-  color: #bfdbfe;
-  margin-top: 8px;
-}
-
 /* Sidebar Navigation */
 .sidebar-nav {
   flex: 1;
@@ -241,12 +235,6 @@
 .sidebar-nav-home:hover {
   background-color: rgba(255, 255, 255, 0.1);
   color: white;
-}
-
-.sidebar-nav-divider {
-  height: 1px;
-  background-color: rgba(255, 255, 255, 0.1);
-  margin: 8px 20px;
 }
 
 .sidebar-nav-label {
@@ -331,22 +319,6 @@
   min-height: 100vh;
 }
 
-.dashboard-header {
-  margin-bottom: 32px;
-}
-
-.dashboard-header h1 {
-  font-size: var(--fs-28);
-  font-weight: 700;
-  color: #1f2937;
-  margin-bottom: 4px;
-}
-
-.dashboard-header p {
-  font-size: var(--fs-14);
-  color: #5f6775;
-}
-
 /* Stats Cards */
 .dashboard-stats {
   display: grid;
@@ -410,21 +382,6 @@
 .stat-card-label {
   font-size: var(--fs-13);
   color: #5f6775;
-}
-
-/* Dashboard Grid */
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-  margin-bottom: 24px;
-}
-
-.dashboard-grid-3 {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 24px;
-  margin-bottom: 24px;
 }
 
 /* Dashboard Cards */
@@ -558,16 +515,6 @@
   font-style: italic;
 }
 
-.badge-in-office {
-  background-color: #dcfce7;
-  color: #15803d;
-}
-
-.badge-on-field {
-  background-color: #fef9c3;
-  color: #b45309;
-}
-
 .badge-unavailable {
   background-color: #fee2e2;
   color: #b91c1c;
@@ -683,53 +630,6 @@
   background-color: #5f6775;
 }
 
-/* Kapitan Status */
-.kapitan-status-card {
-  background: linear-gradient(135deg,
-      #1e3a8a,
-      #1e40af);
-  border-radius: var(--radius-md);
-  padding: 24px;
-  color: white;
-  margin-bottom: 24px;
-}
-
-.kapitan-status-card h3 {
-  font-size: var(--fs-14);
-  font-weight: 600;
-  color: #bfdbfe;
-  margin-bottom: 16px;
-}
-
-.kapitan-status-buttons {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin-bottom: 16px;
-}
-
-.kapitan-status-btn {
-  padding: 10px;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
-  font-size: var(--fs-13);
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-family: 'Poppins', sans-serif;
-}
-
-.kapitan-status-btn.active {
-  border-color: white;
-  background: rgba(255, 255, 255, 0.2);
-}
-
-.kapitan-status-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
-}
-
 /* Modal */
 .modal-overlay {
   position: fixed;
@@ -815,29 +715,6 @@
 
 /* Responsive */
 @media (max-width: 1024px) {
-  .dashboard-stats {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .dashboard-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .dashboard-grid-3 {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 768px) {
-  .sidebar {
-    display: none;
-  }
-
-  .dashboard-main {
-    margin-left: 0;
-    padding: 20px;
-  }
-
   .dashboard-stats {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -1134,14 +1011,6 @@
 
   .dashboard-stats {
     grid-template-columns: repeat(2, 1fr);
-  }
-
-  .dashboard-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .kapitan-status-grid {
-    grid-template-columns: 1fr;
   }
 }
 

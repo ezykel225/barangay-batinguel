@@ -150,19 +150,6 @@
   animation: pulse 2s infinite;
 }
 
-@keyframes pulse {
-  0% {
-    opacity: 1;
-  }
-
-  50% {
-    opacity: 0.4;
-  }
-
-  100% {
-    opacity: 1;
-  }
-}
 
 .health-nurse-item {
   display: flex;
@@ -257,16 +244,6 @@
 
 .status-badge.unavailable::before {
   background-color: #b91c1c;
-}
-
-.status-badge.on-duty {
-  background-color: rgba(30, 58, 138, 0.08);
-  color: #1e3a8a;
-  border: 1px solid rgba(30, 58, 138, 0.2);
-}
-
-.status-badge.on-duty::before {
-  background-color: #1e3a8a;
 }
 
 /* Clinic Hours Card */

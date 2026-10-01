@@ -161,19 +161,6 @@ body {
   background-color: #fca5a5;
 }
 
-@keyframes pulse {
-  0% {
-    opacity: 1;
-  }
-
-  50% {
-    opacity: 0.4;
-  }
-
-  100% {
-    opacity: 1;
-  }
-}
 
 .kapitan-left h2 {
   font-size: var(--fs-13);
@@ -272,12 +259,6 @@ body {
   color: #b45309;
 }
 
-.schedule-time {
-  font-size: var(--fs-12);
-  color: #5f6775;
-  margin-top: 4px;
-}
-
 /* ================================
    EXECUTIVE COUNCIL
 ================================ */
@@ -368,24 +349,6 @@ body {
   color: #5f6775;
   line-height: 1.6;
   margin-bottom: 16px;
-}
-
-.council-card-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background-color: #eff6ff;
-  color: #1e3a8a;
-  padding: 8px 16px;
-  border-radius: var(--radius-sm);
-  font-size: var(--fs-13);
-  font-weight: 500;
-  text-decoration: none;
-  transition: background-color 0.2s;
-}
-
-.council-card-btn:hover {
-  background-color: #dbeafe;
 }
 
 .council-grid {
@@ -548,22 +511,6 @@ body {
   margin-bottom: 16px;
 }
 
-.health-dept-btn {
-  display: inline-block;
-  background-color: #f0fdf4;
-  color: #15803d;
-  padding: 6px 14px;
-  border-radius: var(--radius-sm);
-  font-size: var(--fs-12);
-  font-weight: 500;
-  text-decoration: none;
-  transition: background-color 0.2s;
-}
-
-.health-dept-btn:hover {
-  background-color: #dcfce7;
-}
-
 /* ================================
    COUNCIL ROW CENTER
    Row 1: Punong Barangay centered
@@ -672,12 +619,6 @@ body {
   border: 1px solid rgba(239, 68, 68, 0.25);
 }
 
-.health-badge-onduty {
-  background-color: rgba(30, 58, 138, 0.08);
-  color: #1e3a8a;
-  border: 1px solid rgba(30, 58, 138, 0.2);
-}
-
 .health-badge-loading {
   background-color: #f3f4f6;
   color: #5f6775;
@@ -698,8 +639,4 @@ body {
 
 .dot-unavailable {
   background-color: #b91c1c;
-}
-
-.dot-onduty {
-  background-color: #1e3a8a;
 }

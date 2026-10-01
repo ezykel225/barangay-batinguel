@@ -2497,6 +2497,119 @@ WCAG 1.3.2 asks for.
 
 ---
 
+## Dead CSS cleanup (X4)
+
+2026-10-01, after the post-X3 adjustments were accepted. **Removal
+only** — no renaming, no consolidation for its own sake, no change to
+the colour system, the type scale or the spacing tokens.
+
+**461 net lines of CSS removed** across nine stylesheets; the shipped
+bundle went 19.14 kB → **18.38 kB**. The JS bundle is byte-identical,
+because nothing in any component changed.
+
+### How "dead" was established, since grep is not enough
+
+`className` in this project is sometimes built at runtime
+(`` `badge badge-${tone}` ``, `` `reconcile-${severity}` ``,
+`` `mcal-tone-${tone}` ``), so a class can be live with no literal
+anywhere. The scan therefore collected every class token in every CSS
+selector, then checked each against **word-boundary** matches across all
+60 JS/JSX files *and* against every template-literal prefix the code
+constructs. **There is no `classList` manipulation anywhere in the
+application** — every class reaches the DOM through a `className` prop —
+which is what makes the analysis closed rather than best-effort.
+
+Of 644 class tokens, 37 were removed. The six that look unreferenced and
+are **not** (`badge-ineligible`, the two `mcal-tone-*`, the three
+`reconcile-*`) are each produced by one of those template literals, and
+all six were kept.
+
+### Proof that nothing changed, rather than an assurance
+
+The pre-X4 bundle was built from the previous commit and kept, and every
+measurement surface was rendered against **both** bundles:
+
+| Check | Result |
+|---|---|
+| Full computed style of **every element**, 25 surfaces × 4 widths | **100 comparisons, zero differences** |
+| Full-page screenshot hash, 14 surfaces × 4 widths | **56 renders, all pixel-identical** |
+| Document-level horizontal overflow at 375/768/1280/1440 | 0 failures across 32 measurements |
+| ActionMenu portal anchoring and the flip-up path | unchanged at all four widths |
+
+⚠️ **The first style-diff run reported a difference and it was a
+measurement artifact** — `.nav-drawer`'s `transform` differed by
+**0.17px** at 375 and 768, which was the drawer's slide-in animation
+sampled at two slightly different moments. Waiting on
+`document.getAnimations()` before dumping removed it. The project's own
+rule again: ask which step produced the result.
+
+### `@keyframes` is global — `pulse` was declared three times
+
+`@keyframes pulse` existed in `NurseDashboard.css`, `HealthCenter.css`
+**and** `Officials.css`. Keyframes are **not scoped to the file that
+declares them**, so only whichever the bundler emitted last was ever in
+effect, and editing either of the other two would have silently done
+nothing. All three bodies were identical, so the trap was invisible.
+
+It is now declared **once, in `index.css`**, and the four animating
+elements keep their own `animation:` lines. Same reasoning as
+`tokens.css`: a global owned by one page is dishonest.
+
+⚠️ **Verified both directions, because `animation-name` is a false
+friend.** With the keyframe present, all four dots report
+`getAnimations().length > 0` and three resolved keyframes. With
+`@keyframes pulse` deleted from the bundle, `animation-name` **still
+reads `pulse`** on all four while `getAnimations()` returns empty — so
+checking the property alone would have passed a broken page.
+
+### Deliberately retained
+
+- ⚠️ **One dead rule inside the protected block.**
+  `.kapitan-status-grid` at the end of `Sidebar.css`'s mobile
+  table-to-card block belongs to the removed Punong Barangay tab and
+  can never match. It stays, because that block is byte-for-byte
+  protected and a dead declaration is cheaper than editing it. The
+  block still hashes to its pre-X2 bytes. Anyone who ever reopens that
+  block legitimately can take this rule with them.
+- **Seventeen `tokens.css` custom properties that nothing reads.**
+  That file is a deliberate palette whose own header records that the
+  72 remaining hex literals were **not** migrated to `var()` — so a
+  token ahead of its consumers is the documented state, not an orphan.
+  Removing them would be changing the colour system. One of the
+  seventeen, `--shadow-brand-strong`, became unused *in this pass*: its
+  only consumer was `.events-calendar-btn:hover`, removed here.
+- **Every appended override** from X2 and X3 — the rules that sit after
+  the protected block at equal specificity, and `.dashboard-topbar`'s
+  hide rule in `NotificationBell.css`. They read as duplicates and are
+  the opposite: they are what makes the cascade come out right.
+
+### What the removals were
+
+Four groups, each proven against the live markup rather than by search
+alone:
+
+| Group | Why it was dead |
+|---|---|
+| The old **Punong Barangay tab** — nine classes across `OfficialDashboard.css` and `Sidebar.css` (`kapitan-status-card/-section/-option/-btn/-buttons`, `kapitan-page-header`, `kapitan-current-status/-display`) | The tab was folded into the overview; `.kapitan-compact-*` replaced all of it |
+| **Fee-model leftovers** in `Reservation.css` (`.payment-note`, `.residency-box`) | Migration 006 dropped all ten money columns and the `reservation-payments` / `residency-proofs` buckets were deleted on 2026-09-10 |
+| **Status classes no label map emits** — `.badge-in-office`, `.badge-on-field`, `.status-badge.on-duty`, `.health-badge-onduty`, `.dot-onduty` | The live vocabularies are `displayLabels.js`'s five availability labels and Officials.jsx's own `in-office`/`on-field` on a *different* selector |
+| **Never-built UI** — a nurse notification-preferences block, an outreach stats card, a login role list, `.dashboard-grid`/`-grid-3`, `.dashboard-header`, `.sidebar-role`, `.sidebar-nav-divider`, two unused buttons on the Officials page | No component renders any of them |
+
+One superseded `@media (max-width: 768px)` block in `Sidebar.css` was
+also removed: all three of its rules were re-declared later in the same
+file, identically or more completely (the later `.dashboard-main` adds
+the mobile header's `padding-top: 76px`). Measured at 375/768/1024/
+1280/1440 before and after: every computed value identical.
+
+### Not done
+
+No authenticated page was loaded in a browser — the dashboards are
+behind `ProtectedRoute` and this environment still has no test account.
+The surfaces compared above are the same real-component captures and
+reproductions X2 and X3 used, rendered against both bundles.
+
+---
+
 ## Health centre
 
 **Medicine stock is a status, not a quantity** — Available / Low stock /

@@ -434,31 +434,6 @@
   padding: 3px 0;
 }
 
-.events-calendar-btn {
-  display: block;
-  text-align: center;
-  margin-top: 28px;
-  background: linear-gradient(135deg,
-      #1e3a8a,
-      #1e40af);
-  color: var(--white);
-  padding: 12px 28px;
-  border-radius: var(--radius-sm);
-  font-weight: 600;
-  text-decoration: none;
-  width: fit-content;
-  margin-left: auto;
-  margin-right: auto;
-  transition: 0.25s ease;
-  box-shadow: var(--shadow-brand);
-}
-
-.events-calendar-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-brand-strong);
-  filter: brightness(1.05);
-}
-
 /* ================================
    WASTE COLLECTION SCHEDULE
 ================================ */

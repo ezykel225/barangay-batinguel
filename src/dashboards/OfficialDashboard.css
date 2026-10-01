@@ -23,68 +23,6 @@
 }
 
 /* ================================
-    KAPITAN STATUS CARD
-  ================================ */
-.kapitan-status-section {
-  background: linear-gradient(135deg,
-      #1e3a8a,
-      #1e40af);
-  border-radius: var(--radius-md);
-  padding: 24px;
-  color: white;
-  margin-bottom: 24px;
-}
-
-.kapitan-status-section h3 {
-  font-size: var(--fs-14);
-  font-weight: 600;
-  color: #bfdbfe;
-  margin-bottom: 16px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.kapitan-status-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin-bottom: 16px;
-}
-
-.kapitan-status-option {
-  padding: 10px;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
-  font-size: var(--fs-13);
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-family: 'Poppins', sans-serif;
-  text-align: center;
-}
-
-.kapitan-status-option.active {
-  border-color: white;
-  background: rgba(255, 255, 255, 0.2);
-}
-
-.kapitan-status-option:hover {
-  background: rgba(255, 255, 255, 0.15);
-}
-
-.kapitan-current-status {
-  font-size: var(--fs-14);
-  color: #bfdbfe;
-}
-
-.kapitan-current-status strong {
-  color: white;
-  margin-left: 8px;
-}
-
-/* ================================
     ANNOUNCEMENTS PAGE
   ================================ */
 .announcements-header {
@@ -139,32 +77,6 @@
 .reservations-header p {
   font-size: var(--fs-14);
   color: #5f6775;
-}
-
-/* ================================
-    KAPITAN STATUS PAGE
-  ================================ */
-.kapitan-page-header {
-  margin-bottom: 32px;
-}
-
-.kapitan-page-header h1 {
-  font-size: var(--fs-28);
-  font-weight: 700;
-  color: #1f2937;
-  margin-bottom: 4px;
-}
-
-.kapitan-page-header p {
-  font-size: var(--fs-14);
-  color: #5f6775;
-}
-
-.kapitan-current-display {
-  font-size: var(--fs-24);
-  font-weight: 700;
-  margin-bottom: 16px;
-  color: white;
 }
 
 /* ================================
@@ -273,12 +185,6 @@
 /* ================================
     RESPONSIVE
   ================================ */
-@media (max-width: 1024px) {
-  .kapitan-status-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
 @media (max-width: 768px) {
   .official-dashboard-header h1 {
     font-size: var(--fs-22);

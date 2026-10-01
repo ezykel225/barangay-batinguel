@@ -138,46 +138,6 @@
   margin-bottom: 24px;
 }
 
-.login-left-roles {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  position: relative;
-  z-index: 1;
-}
-
-.login-left-role-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  border-radius: var(--radius-sm);
-  background-color: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  transition: all 0.2s;
-  font-size: var(--fs-20);
-  color: #bfdbfe;
-}
-
-.login-left-role-item.active {
-  background-color: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.4);
-  color: white;
-}
-
-.login-left-role-item div span {
-  display: block;
-  font-size: var(--fs-13);
-  font-weight: 600;
-  color: white;
-}
-
-.login-left-role-item div p {
-  font-size: var(--fs-12);
-  color: #bfdbfe;
-  margin: 0;
-}
-
 .login-left-footer {
   position: relative;
   z-index: 1;

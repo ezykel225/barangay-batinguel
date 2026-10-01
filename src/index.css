@@ -60,10 +60,31 @@ body {
    The sidebar and the two hero panels are the dark backgrounds in this
    project. */
 .sidebar :focus-visible,
-.mobile-nav :focus-visible,
 .officials-hero :focus-visible,
 .kapitan-card :focus-visible {
   outline-color: #ffffff;
+}
+
+/* ================================
+   PULSE
+   ================================
+   The "live status" pulse behind the nurse's availability dot, the
+   Health Center status dot and the two on the public Officials page.
+
+   ⚠️ It lives here because @keyframes is GLOBAL -- it is not scoped to
+   the file that declares it. It used to be declared three times, in
+   NurseDashboard.css, HealthCenter.css and Officials.css; all three
+   bodies were identical, so the triplication was invisible, but only
+   the last one the bundler emitted was ever in effect and an edit to
+   either of the others would have silently done nothing.
+
+   Same reasoning as tokens.css: a global owned by one page is
+   dishonest. Animating components keep their own `animation:` lines --
+   only the shared definition moved. */
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.4; }
+  100% { opacity: 1; }
 }
 
 /* ================================

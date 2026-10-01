@@ -443,17 +443,6 @@
   margin-bottom: 8px;
 }
 
-.payment-note {
-  font-size: var(--fs-12) !important;
-  color: #475569 !important;
-  margin-top: 8px;
-}
-
-.residency-box {
-  background-color: #f0fdf4;
-  border: 1px solid #bbf7d0;
-}
-
 /* The booking window, and the way into the office-hours exception.
    Migration 020 and src/utils/reservationWindow.js hold the rule; this
    only has to make the exception read as a request rather than as

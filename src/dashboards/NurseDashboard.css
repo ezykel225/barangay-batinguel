@@ -46,11 +46,6 @@
   animation: pulse 2s infinite;
 }
 
-@keyframes pulse {
-  0% { opacity: 1; }
-  50% { opacity: 0.4; }
-  100% { opacity: 1; }
-}
 
 /* ================================
    DASHBOARD GRID
@@ -232,37 +227,6 @@
 
 .program-edit-btn:hover {
   text-decoration: underline;
-}
-
-/* ================================
-   OUTREACH STATS CARD
-================================ */
-.outreach-card {
-  background: linear-gradient(
-    135deg,
-    #1e3a8a,
-    #1e40af
-  );
-  border-radius: var(--radius-md);
-  padding: 24px;
-  color: white;
-}
-
-.outreach-label {
-  font-size: var(--fs-13);
-  color: #bfdbfe;
-  margin-bottom: 8px;
-}
-
-.outreach-number {
-  font-size: var(--fs-48);
-  font-weight: 700;
-  margin-bottom: 4px;
-}
-
-.outreach-sublabel {
-  font-size: var(--fs-13);
-  color: #bfdbfe;
 }
 
 /* ================================
@@ -469,28 +433,6 @@
   box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.1);
 }
 
-.profile-save-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  width: 100%;
-  padding: 10px;
-  background-color: #1e3a8a;
-  color: white;
-  border: none;
-  border-radius: var(--radius-sm);
-  font-size: var(--fs-13);
-  font-weight: 600;
-  cursor: pointer;
-  font-family: 'Poppins', sans-serif;
-  transition: background-color 0.2s;
-}
-
-.profile-save-btn:hover {
-  background-color: #1e40af;
-}
-
 /* Security Card */
 .security-card {
   background-color: #ffffff;
@@ -555,43 +497,6 @@
   display: flex;
   align-items: center;
   gap: 6px;
-}
-
-.notification-section {
-  border-top: 1px solid #e5e7eb;
-  padding-top: 16px;
-}
-
-.notification-label {
-  font-size: var(--fs-12);
-  font-weight: 600;
-  color: #374151;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  display: block;
-  margin-bottom: 12px;
-}
-
-.notification-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 0;
-  border-bottom: 1px solid #f3f4f6;
-}
-
-.notification-item-label {
-  font-size: var(--fs-13);
-  color: #374151;
-}
-
-.notification-toggle {
-  width: 44px;
-  height: 24px;
-  border-radius: var(--radius-md);
-  background: #15803d;
-  cursor: pointer;
-  border: none;
 }
 
 .security-save-btn {
