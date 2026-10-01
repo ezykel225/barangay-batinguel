@@ -11,6 +11,7 @@ import { supabase } from '../supabase/supabaseClient'
 import { pathFromPublicUrl } from '../utils/storagePath'
 import { BARANGAY_NAME, PUROKS } from '../constants/barangay'
 import { describeVerification } from '../utils/residentGroups'
+import { useConfirm } from '../components/ConfirmDialog'
 import {
   DOCUMENT_STATUS_LABELS as STATUS_LABELS,
   RESERVATION_STATUS_LABELS,
@@ -58,6 +59,10 @@ const canCancel = (r) =>
 
 const ResidentDashboard = () => {
   const { user } = useAuth()
+  // Destructive and consequential actions go through the shared dialog,
+  // the same one the Official and Nurse portals use. Replaced the two
+  // remaining window.confirm calls in this file.
+  const [confirm, confirmDialog] = useConfirm()
   const [activeTab, setActiveTab] = useState('dashboard')
   const [userProfile, setUserProfile] = useState(null)
   const [requests, setRequests] = useState([])
@@ -265,10 +270,24 @@ const ResidentDashboard = () => {
 
     // Releasing an approved booking loses a slot the resident waited
     // for, so a misclick shouldn't do it silently.
-    const ok = window.confirm(
-      `Cancel your booking for ${reservation.preferred_date} at ${reservation.preferred_time}?\n\n` +
-      'The slot will be released for someone else. Booking again means waiting for approval again.'
-    )
+    //
+    // The shared dialog rather than window.confirm, which is what the
+    // Official and Nurse portals already use -- so a resident gets the
+    // same focus trap, Escape handling, Enter-defaults-to-Cancel and
+    // aria-modal that a native dialog cannot be given.
+    //
+    // ⚠️ cancelLabel is set deliberately. The default pair would read
+    // "Cancel" next to "Cancel booking", which is unreadable when the
+    // action itself is called cancelling.
+    const ok = await confirm({
+      title: 'Cancel this booking?',
+      message: `The court is held for you on ${reservation.preferred_date} at `
+        + `${reservation.preferred_time}. Cancelling releases the slot for someone `
+        + 'else straight away, and booking again means waiting for an official to '
+        + 'approve it again.',
+      confirmLabel: 'Cancel booking',
+      cancelLabel: 'Keep booking',
+    })
     if (!ok) return
 
     setCancellingId(reservation.id)
@@ -410,12 +429,23 @@ const ResidentDashboard = () => {
       suffix !== (userProfile?.suffix || '')
 
     if (nameChanged && status === 'verified') {
-      const confirmed = window.confirm(
-        'Changing your name means an official has to check it against your ID again.\n\n' +
-        'Your account will go back to "pending", and you will not be able to request ' +
-        'documents until it has been re-verified.\n\n' +
-        'Continue?'
-      )
+      // `destructive: false` -- the dialog defaults to the red confirm,
+      // and this is a consequence to accept rather than something being
+      // deleted. Nothing about the name-change or the verification reset
+      // itself is altered here; only how the resident is asked.
+      //
+      // "Awaiting review" is the approved resident-facing wording for
+      // `pending` (residentGroups.VERIFICATION_STATES). The native
+      // dialog this replaces printed the raw stored value.
+      const confirmed = await confirm({
+        title: 'Change your name?',
+        message: 'An official will have to check your new name against your ID '
+          + 'again. Your account goes back to "Awaiting review", and you will not '
+          + 'be able to request documents until it has been verified again.',
+        confirmLabel: 'Change name',
+        cancelLabel: 'Keep current name',
+        destructive: false,
+      })
       if (!confirmed) return
     }
 
@@ -564,7 +594,7 @@ const ResidentDashboard = () => {
           </>
         ) : isRejected ? (
           <>
-            <strong>Your ID verification was declined.</strong>{' '}
+            <strong>Your ID verification was rejected.</strong>{' '}
             {userProfile.verification_notes || 'Please visit the Barangay Hall for assistance.'}{' '}
             You can correct your details under Settings and upload a clearer ID.
           </>
@@ -680,7 +710,7 @@ const ResidentDashboard = () => {
                             </span>
                             {r.status === 'ready_for_pickup' && (
                               <div className={`pickup-reminder ${daysSince(r.updated_at) >= 7 ? 'pickup-reminder-urgent' : ''}`}>
-                                Ready for {daysSince(r.updated_at)} day{daysSince(r.updated_at) === 1 ? '' : 's'}
+                                Ready for {daysSince(r.updated_at)} day{daysSince(r.updated_at) === 1 ? '' : 's'} — please claim soon
                               </div>
                             )}
                           </td>
@@ -1167,6 +1197,8 @@ const ResidentDashboard = () => {
           </div>
         </div>
       )}
+
+      {confirmDialog}
     </div>
   )
 }

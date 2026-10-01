@@ -65,14 +65,15 @@ banned below: it silences the one check this project has.
 
 ### Tests
 
-Five suites, 130 tests:
+Six suites, 144 tests:
 
 | File | What it covers |
 |---|---|
 | `src/App.test.js` | One smoke test — renders `<App />` and asserts the brand name appears |
 | `src/utils/residentGroups.test.js` | 38 tests over the resident grouping, status vocabulary, search/filter, and the account ↔ voter-list cross-check — including the ones that hold "not on the voter list" at severity `expected` so a later edit cannot quietly promote ordinary residents into a list of problems |
-| `src/utils/displayLabels.test.js` | 20 tests over the shared status labels, the upcoming-event count, and a guard that this module never re-acquires a second verification vocabulary |
+| `src/utils/displayLabels.test.js` | 30 tests over the shared status labels, the upcoming-event count, the Activity Log vocabulary, the Manila-vs-UTC date boundary (with fake timers), and a guard that this module never re-acquires a second verification vocabulary |
 | `src/components/ActionMenu.test.js` | 13 tests over the ⋮ menu's keyboard, Escape and focus-restore behaviour — the parts nobody catches by clicking |
+| `src/components/ConfirmDialog.test.js` | 4 tests over the shared confirmation hook. The load-bearing one: a second `confirm()` opened while the first is still showing used to leave the first promise **permanently pending**, hanging its handler with no write and no error. Latent while every caller was an official clicking one row at a time; reachable the moment the resident portal's blocking `window.confirm` calls became asynchronous. Verified both directions — the test fails with the fix removed |
 | `src/utils/reservationWindow.test.js` | 46 tests over the 5–10 PM window, the per-slot and per-kind durations, the noon-spanning exception and the office-hours exception — deliberately mirroring the SQL cases in migration 020's header, so client and database are asserted to agree rather than each checked alone. The load-bearing one is that an exception is read from `exception_reason` and never from the hour |
 
 Schema and policy changes are still verified by impersonating each role
@@ -85,9 +86,9 @@ imports the client. So a missing `.env` fails that test with a module
 error that never mentions `.env`. If `npm test` fails on a fresh
 checkout, check `.env` before debugging the test.
 
-The other four suites do **not** need it. `residentGroups.js`,
-`displayLabels.js`, `reservationWindow.js` and `ActionMenu.jsx` have no
-Supabase import, which is the reason the resident workflow's rules, the
+The other five suites do **not** need it. `residentGroups.js`,
+`displayLabels.js`, `reservationWindow.js`, `ActionMenu.jsx` and
+`ConfirmDialog.jsx` have no Supabase import, which is the reason the resident workflow's rules, the
 label vocabulary and the booking window live in modules rather than
 inside the dashboard components.
 
@@ -140,7 +141,11 @@ src/
 
   components/
     Navbar.jsx        Public header.
-    Footer.jsx        Public footer; contact details come from constants.
+    Footer.jsx        Public footer. Contact details AND the office
+                      hours come from constants/barangay.js -- the hours
+                      used to be a second hard-coded copy that said
+                      "8:00 AM - 5:00 PM" straight through and omitted
+                      the lunch closure the Home page states.
     Sidebar.jsx       Dashboard nav. Defines the tab lists for all three
                       roles: official (13), nurse (5), resident (4).
     ProtectedRoute    Role gate. Frontend only — RLS is the real control.
@@ -932,7 +937,29 @@ stay gone — re-adding them would give one status two answers again.
 ⚠️ **No raw database value is shown to a user.** The Official Dashboard
 used to print `pending` and, through a regex, `ready for pickup` in the
 same table where the resident portal read "Pending Review" and "Ready for
-Pickup". Both now read from one map. Three related defects were fixed
+Pickup". Both now read from one map.
+
+The **Activity Log tab was the last place this rule was not wired up**,
+and it was found by the X1 wording inspection rather than by anybody
+looking at the screen. It rendered `entry.action.replace(/_/g, ' ')` and
+the same for `entity_type`, so an official read "ready for pickup",
+"marked ineligible", "resident account" and "medical program" straight
+from the table. `ACTIVITY_ACTION_LABELS` and `ACTIVITY_ENTITY_LABELS` in
+`displayLabels.js` now cover all 14 actions and 11 entity types.
+
+Two things about those maps:
+
+- **An unknown value is returned exactly as stored** — not blank, not
+  guessed. The audit trail is the one surface where a word nobody
+  anticipated must stay visible, and the vocabulary is widened by
+  migration (015, 016, 017) more often than this file is edited. A test
+  walks `activityLog.js`'s own `ACTIONS` and `ENTITY_TYPES`, so widening
+  one without the other now fails in Jest rather than on screen.
+- **`registry_entry` was the latent half.** It would have rendered as
+  "registry entry" — the term the Voter Reference List naming exists to
+  keep off the screen, and the one this file's own table says is "never
+  displayed". No such row exists yet, so it had never been seen. It now
+  reads "Voter reference entry", asserted by a test. Three related defects were fixed
 with it: `badge-cancelled` was generated from the status string and
 defined in no stylesheet, so a cancelled booking rendered as an unstyled
 pill; the nurse's weekly schedule coloured everything that was not
@@ -1229,6 +1256,94 @@ durations 1–4), but the trigger does not depend on that staying true.
 
 ---
 
+## Wording and UI consistency (X1)
+
+A full-application wording inspection, 2026-10-01. The conventions it
+established, so they are not re-litigated:
+
+| | |
+|---|---|
+| Nav labels, table headers, field labels, standing action buttons | Title Case |
+| Confirmation-dialog titles, messages and buttons | sentence case |
+| Status badges | `displayLabels.js` decides; document statuses are Title Case because that wording already shipped |
+| Spelling | **US** — `Health Center`, `Program`, `Grayed`, `Unrecognized` |
+| Empty states | `No X yet.` when nothing exists, `No X match this filter.` / `this search` when one is applied |
+| Add buttons | `Add <Thing>` |
+| Loading labels | three dots, `Saving...`, not `…` |
+| Quotes in user-facing strings | straight, not curly |
+| Page headings | match the navigation item that leads to them |
+
+**Headings match the nav.** The Official Portal had invented headings —
+*Administrative Hub*, *Community Voice*, *Facility Booking Queue*,
+*Leadership Directory* — so a user clicked **Reservations** and landed on
+a page titled something else. A dashboard tab may name its portal
+("Official Dashboard", "Health Center Dashboard"); every other tab takes
+the nav item's own words.
+
+**`end_time`, `Filed` and the toast punctuation were deliberately left
+alone.** `Filed` stays in the reservations table: eleven columns need the
+width, and the three other tables' `Submitted` is the inconsistency the
+project accepts. The app has 81 toasts ending in `!` and 77 in `.`;
+rewriting all of them is churn for nothing, so new and directly-edited
+messages take the full stop and the rest stay.
+
+⚠️ **Two things that are NOT typography and must not be "tidied" back.**
+
+- **`System ID` and `Security Key` were wrong, not just formal.**
+  `profiles.system_id` is a real column and is **null on every resident
+  account**, so the login form named something the account does not
+  have, above a placeholder that already said "email". The fields are
+  `Email` and `Password`, matching signup, Settings and the reset page.
+  The state variables are still `systemId` / `securityKey` — renaming
+  them buys nothing a user sees.
+- **The Voter Reference List delete dialog said "the barangay's own
+  resident record".** The exact framing the rename exists to remove. See
+  *What `residents_registry` actually holds*.
+
+**`window.confirm` is now gone from the application.** The resident
+portal's last two — cancelling a booking, and changing a verified name —
+use the shared `useConfirm`, so a resident gets the same focus trap,
+Escape handling, Enter-defaults-to-Cancel and `aria-modal` as an
+official. Two details worth keeping:
+
+- Cancelling a booking sets `cancelLabel: 'Keep booking'`. The default
+  pair reads "Cancel" beside "Cancel booking", which is unreadable when
+  the action itself is called cancelling.
+- ⚠️ **The conversion exposed a real bug in `useConfirm`**, now fixed
+  and tested: a second `confirm()` while one was open overwrote the
+  resolver, so the first promise never settled and its handler hung for
+  the rest of the session — no write, no error, nothing on screen. It
+  was latent for the Official and Nurse portals, whose buttons disable
+  per row rather than across rows; `window.confirm` blocked the page, so
+  the resident portal could not hit it until now. An abandoned question
+  settles **`false`**: a question nobody saw must never come back true,
+  because true is the answer that causes a write.
+- The name-change dialog passes **`destructive: false`** (the dialog
+  defaults to `true`) and says *"Awaiting review"*, the approved
+  resident-facing wording for `pending`. The native dialog it replaced
+  printed the raw stored value.
+
+### ⚠️ The UTC date bug, fixed in two places
+
+`OfficialDashboard`'s events filter and `NurseDashboard`'s health-events
+filter classified upcoming vs past with
+`new Date().toISOString().slice(0, 10)` — the **UTC** date. Manila is
+UTC+8, so between midnight and 8 AM Philippine time that string is still
+*yesterday*, and an event dated today was filed under "past" — while the
+**Upcoming Events card on the same dashboard**, which already used
+`manilaToday()`, counted it as upcoming. One dataset, two surfaces,
+different answers, every morning.
+
+Both now call `manilaToday()`. `displayLabels.test.js` pins it with fake
+timers at `2026-09-30T17:30:00Z` — 01:30 the next day in Manila — where
+the UTC string and the Manila string genuinely differ.
+
+**Anything that compares an event or reservation date against "today"
+uses `manilaToday()`.** Never `toISOString()`. The reservation cancel
+rule already does this in SQL for the same reason.
+
+---
+
 ## Health centre
 
 **Medicine stock is a status, not a quantity** — Available / Low stock /
@@ -1304,10 +1419,23 @@ residents actually read. Her Settings card previously introduced her as
 "Barangay Health Nurse / Head Barangay Nurse" — a name and a title that
 were nearly the same words and disagreed with the sidebar.
 
-The nurse is labelled **"Barangay Health Nurse"**, a role rather than a
-person. The system previously carried an invented name and a stock photo
-of an unrelated person, both presented as barangay staff. Replace with
-the real name and photo together when the barangay confirms them.
+The nurse is identified **by role, not by person** — the system
+previously carried an invented name and a stock photo of an unrelated
+person, both presented as barangay staff. Replace with the real name and
+photo together when the barangay confirms them.
+
+⚠️ **One role string on screen, not two.** `HEALTH_NURSE_NAME`
+("Barangay Health Nurse") and `HEALTH_NURSE_ROLE` ("Public Health
+Nurse") were being rendered one above the other on the Health Center
+page, the public Officials card **and** her own Settings card — two
+near-identical strings stacked, which reads as a fault. That is the same
+defect `HEALTH_NURSE_ROLE` was introduced to fix, relocated rather than
+removed. All three now show the role with "Barangay Health Center"
+beneath it.
+
+`HEALTH_NURSE_NAME` is **still used and must not be deleted**: it is
+written to `nurse_availability.nurse_name` and is what `PersonAvatar`
+derives her initials from. It is no longer displayed as a label.
 
 ---
 
@@ -1397,11 +1525,11 @@ the real name and photo together when the barangay confirms them.
 - **Source maps ship to production** (~7 MB), so the original JSX is
   publicly reconstructable. `GENERATE_SOURCEMAP=false` in Vercel fixes it.
 - **`public/logo.png` is 984 KB and referenced by nothing.**
-- **Thin automated test coverage.** 130 tests in five suites: one smoke
+- **Thin automated test coverage.** 144 tests in six suites: one smoke
   test over `<App />`, which fails without `.env` because
-  `supabaseClient.js` throws at import time, and 129 pure unit tests over
-  the resident workflow rules, the display labels, the booking window and
-  the ⋮ menu's keyboard behaviour. No integration or end-to-end tests,
+  `supabaseClient.js` throws at import time, and 143 pure unit tests over
+  the resident workflow rules, the display labels, the booking window,
+  the ⋮ menu's keyboard behaviour and the confirmation dialog. No integration or end-to-end tests,
   and **no test touches the database** — the reservation-window tests
   mirror migration 020's SQL cases rather than running them, so the two
   can still drift if only one is edited.

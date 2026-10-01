@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { FaFacebook } from 'react-icons/fa'
 import './Footer.css'
-import { BARANGAY_CONTACT, telHref } from '../constants/barangay'
+import { BARANGAY_CONTACT, BARANGAY_OFFICE_HOURS, telHref } from '../constants/barangay'
 
 const Footer = () => {
   const [activeModal, setActiveModal] = useState(null)
@@ -13,7 +13,16 @@ const Footer = () => {
       content: (
         <>
           <p><strong>Address:</strong> Barangay Batinguel, Dumaguete City, Negros Oriental, Philippines</p>
-          <p><strong>Office Hours:</strong> Monday - Friday, 8:00 AM - 5:00 PM</p>
+          {/* Rendered from BARANGAY_OFFICE_HOURS rather than repeated.
+              This line used to read "8:00 AM - 5:00 PM" straight through
+              and omitted the lunch closure the Home page states, so the
+              two pages told a resident different things about when the
+              hall is open. */}
+          <p>
+            <strong>Office Hours:</strong> {BARANGAY_OFFICE_HOURS.days},{' '}
+            {BARANGAY_OFFICE_HOURS.morning} and {BARANGAY_OFFICE_HOURS.afternoon}
+          </p>
+          <p>{BARANGAY_OFFICE_HOURS.breakNote} · {BARANGAY_OFFICE_HOURS.closedNote}</p>
           <p>
             <strong>Landline:</strong>{' '}
             <a href={telHref(BARANGAY_CONTACT.landline)}>{BARANGAY_CONTACT.landline}</a>

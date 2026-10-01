@@ -76,7 +76,7 @@ const Login = () => {
           )
         } else {
           setError(
-            'Invalid System ID or Security Key. Please try again.'
+            'Incorrect email or password. Please try again.'
           )
         }
         setLoading(false)
@@ -141,7 +141,7 @@ const Login = () => {
     e.preventDefault()
     if (forgotLoading) return
     if (!forgotEmail) {
-      toast.error('Please enter your System ID (email).')
+      toast.error('Please enter your email address.')
       return
     }
 
@@ -194,10 +194,10 @@ const Login = () => {
                 <FaLock />
                 Secure Gateway Access
               </div>
-              <h1>Portal Authentication</h1>
+              <h1>Log in</h1>
               <p>
-                Please verify your identity to
-                proceed to your workstation.
+                Sign in to continue to your
+                barangay dashboard.
               </p>
             </div>
 
@@ -211,11 +211,11 @@ const Login = () => {
 
           {/* Right Panel */}
           <div className="login-right">
-            <h2>Portal Authentication</h2>
-            <p>
-              Please verify your identity to proceed
-              to your workstation.
-            </p>
+            {/* The form's own heading, as on the signup and reset pages.
+                This used to repeat the left panel's h1 and its sentence
+                word for word, which is why only the wording changed
+                here rather than the structure. */}
+            <h2>Sign in</h2>
 
             {/* Error Message */}
             {error && (
@@ -289,9 +289,9 @@ const Login = () => {
               className="login-form"
               onSubmit={handleLogin}>
 
-              {/* System ID */}
+              {/* Email */}
               <div className="login-form-group">
-                <label>System ID</label>
+                <label>Email</label>
                 <div className="login-input-wrapper">
                   <div className="login-input-icon">
                     <FaIdCard />
@@ -308,9 +308,9 @@ const Login = () => {
                 </div>
               </div>
 
-              {/* Security Key */}
+              {/* Password */}
               <div className="login-form-group">
-                <label>Security Key</label>
+                <label>Password</label>
                 <div className="login-input-wrapper">
                   <div className="login-input-icon">
                     <FaKey />
@@ -351,8 +351,8 @@ const Login = () => {
                 disabled={loading}>
                 <FaShieldAlt />
                 {loading
-                  ? 'Authenticating...'
-                  : 'Authorize Access'}
+                  ? 'Logging in...'
+                  : 'Log in'}
               </button>
 
             </form>
@@ -371,7 +371,7 @@ const Login = () => {
                 className="login-link-btn"
                 onClick={() => setShowForgotModal(true)}
               >
-                Forgot Access?
+                Forgot your password?
               </button>
               <span className="login-divider">|</span>
               <button
@@ -391,9 +391,9 @@ const Login = () => {
       {showForgotModal && (
         <div className="login-modal-overlay" onClick={() => setShowForgotModal(false)}>
           <div className="login-modal" onClick={(e) => e.stopPropagation()}>
-            <h2>Reset Your Access</h2>
+            <h2>Reset your password</h2>
             <p>
-              Enter the System ID (email) tied to your official or nurse
+              Enter the email address tied to your official or nurse
               account. We'll send a password reset link to it.
             </p>
             <form onSubmit={handleForgotAccess}>

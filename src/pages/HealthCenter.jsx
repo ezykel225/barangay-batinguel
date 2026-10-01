@@ -17,7 +17,7 @@ import { MdOutlineEventAvailable, MdPersonSearch } from 'react-icons/md'
 import { supabase } from '../supabase/supabaseClient'
 import { MEDICINE_CATEGORIES, statusOf } from '../constants/medicines'
 import {
-  BARANGAY_CONTACT, HEALTH_NURSE_NAME, HEALTH_NURSE_ROLE, telHref,
+  BARANGAY_CONTACT, HEALTH_NURSE_ROLE, telHref,
 } from '../constants/barangay'
 import {
   formatTime, isOnScheduledBreak, manilaWeekday,
@@ -268,8 +268,12 @@ const HealthCenter = () => {
                       <FaUserNurse />
                     </div>
                     <div className="health-nurse-info">
-                      <h4>{HEALTH_NURSE_NAME}</h4>
-                      <p>{HEALTH_NURSE_ROLE}</p>
+                      {/* One role, not two. This read
+                          "Barangay Health Nurse" over "Public Health
+                          Nurse" -- two near-identical strings stacked,
+                          which reads as a fault. */}
+                      <h4>{HEALTH_NURSE_ROLE}</h4>
+                      <p>Barangay Health Center</p>
                     </div>
                     <div className="health-nurse-status">
                       <span className={`status-badge ${isAvailable ? 'available' : 'unavailable'}`}>
@@ -288,12 +292,26 @@ const HealthCenter = () => {
               {/* The one line a resident standing outside actually
                   needs. Shown above the week, because "are they open
                   right now" beats "what are Thursday's hours". */}
+              {/* ⚠️ Two different states reach this block, and it used to
+                  assert a lunch break for both. `onBreakNow` is true for
+                  the SCHEDULED break worked out from break_start /
+                  break_end, and also for the manual `on-break` status,
+                  which the shared availability vocabulary calls simply
+                  "On break" -- the nurse may have stepped out for
+                  anything. Only the scheduled case names lunch. */}
               {onBreakNow && (
                 <div className="clinic-break-now">
-                  <strong>On lunch break right now.</strong>{' '}
-                  {onScheduledBreak && todaySchedule?.break_end
-                    ? `The clinic reopens at ${formatTime(todaySchedule.break_end)}.`
-                    : 'The nurse has stepped out — please come back shortly.'}
+                  {onScheduledBreak && todaySchedule?.break_end ? (
+                    <>
+                      <strong>On lunch break right now.</strong>{' '}
+                      {`The clinic reopens at ${formatTime(todaySchedule.break_end)}.`}
+                    </>
+                  ) : (
+                    <>
+                      <strong>On break right now.</strong>{' '}
+                      The nurse has stepped out — please come back shortly.
+                    </>
+                  )}
                 </div>
               )}
 

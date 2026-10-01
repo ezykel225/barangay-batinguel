@@ -51,7 +51,7 @@ const Events = () => {
           {loading ? (
             <div className="loading-text">Loading events...</div>
           ) : events.length === 0 ? (
-            <div className="empty-text">No events found.</div>
+            <div className="empty-text">No events yet.</div>
           ) : (
             <div className="events-page-grid">
               {events.map((event) => (

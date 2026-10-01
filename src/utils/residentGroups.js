@@ -154,10 +154,10 @@ export const VERIFICATION_STATES = {
 // and findReconciliationIssues reports it as well.
 export const UNKNOWN_STATE = {
   group: 'requests',
-  label: 'Unrecognised status',
+  label: 'Unrecognized status',
   residentLabel: 'Awaiting review',
   tone: 'pending',
-  meaning: 'This account holds a verification status the app does not recognise.',
+  meaning: 'This account holds a verification status the app does not recognize.',
 }
 
 export const describeVerification = (status) =>
@@ -334,7 +334,7 @@ export const findReconciliationIssues = ({
     {
       id: 'not-resident-in-registry',
       severity: 'warning',
-      title: 'Accounts marked “Not a resident” whose name is on the voter reference list',
+      title: 'Accounts marked "Not a resident" whose name is on the voter reference list',
       explanation:
         'Two barangay records disagree: the account says this person is not a '
         + 'resident of Batinguel, the voter reference list carries the name. One '
@@ -382,7 +382,7 @@ export const findReconciliationIssues = ({
     {
       id: 'unrecognised-status',
       severity: 'warning',
-      title: 'Accounts holding an unrecognised verification status',
+      title: 'Accounts holding an unrecognized verification status',
       explanation:
         'The stored value is not one of the four this app knows. Such an account '
         + 'is shown under Requests so that it cannot disappear from every group '
@@ -392,13 +392,13 @@ export const findReconciliationIssues = ({
         .map((r) => ({
           key: r.id,
           label: r.full_name,
-          detail: `stored as “${r.verification_status ?? 'null'}”`,
+          detail: `stored as "${r.verification_status ?? 'null'}"`,
         })),
     },
     {
       id: 'account-purok-unlisted',
       severity: 'notice',
-      title: 'Accounts whose purok is blank or not on the barangay’s list',
+      title: "Accounts whose purok is blank or not on the barangay's list",
       explanation:
         'Free-text entry predates the purok dropdown, so some accounts hold a '
         + 'spelling the system cannot group or match. Existing values are left '
@@ -410,13 +410,13 @@ export const findReconciliationIssues = ({
         .map((r) => ({
           key: r.id,
           label: r.full_name,
-          detail: r.purok ? `recorded as “${r.purok}”` : 'no purok recorded',
+          detail: r.purok ? `recorded as "${r.purok}"` : 'no purok recorded',
         })),
     },
     {
       id: 'registry-purok-unlisted',
       severity: 'notice',
-      title: 'Voter reference entries whose purok is blank or not on the barangay’s list',
+      title: "Voter reference entries whose purok is blank or not on the barangay's list",
       explanation:
         'Same cause as above, on the voter reference data. Editing the entry now '
         + 'offers the purok list.',
@@ -425,7 +425,7 @@ export const findReconciliationIssues = ({
         .map((e) => ({
           key: e.id,
           label: e.full_name,
-          detail: e.purok ? `recorded as “${e.purok}”` : 'no purok recorded',
+          detail: e.purok ? `recorded as "${e.purok}"` : 'no purok recorded',
         })),
     },
     {

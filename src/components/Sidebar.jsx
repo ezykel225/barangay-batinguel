@@ -258,7 +258,7 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {} }) => {
         : officialNavItems
 
   const portalName =
-    role === 'nurse' ? 'Health Portal'
+    role === 'nurse' ? 'Health Center Portal'
       : role === 'resident' ? 'Resident Portal'
         : 'Official Portal'
 

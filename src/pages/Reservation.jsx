@@ -758,7 +758,7 @@ const Reservation = () => {
                       ))}
                       {formData.purok && !isKnownPurok(formData.purok) && (
                         <option value={formData.purok}>
-                          {formData.purok} (as recorded)
+                          {formData.purok} (as recorded — not on the list)
                         </option>
                       )}
                     </select>
@@ -967,8 +967,13 @@ const Reservation = () => {
 
             <div className="reservation-slots-card">
               <h3>Check Availability</h3>
+              {/* A cell is greyed when `cell.isPast || cell.isFull`, so
+                  most greyed dates in the current month are simply past.
+                  The note used to say only "fully booked", which the
+                  cell's own tooltip ("Past date") contradicted. */}
               <p className="slots-note">
-                Grayed-out dates are fully booked. Pick an open date to see its time slots.
+                Past dates and fully-booked dates are greyed out. Pick an open
+                date to see its time slots.
               </p>
 
               <div className="availability-calendar">

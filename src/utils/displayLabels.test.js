@@ -11,9 +11,13 @@
 
 import * as labels from './displayLabels'
 import {
+  ACTIVITY_ACTION_LABELS,
+  ACTIVITY_ENTITY_LABELS,
   AVAILABILITY_STATUS_LABELS,
   DOCUMENT_STATUS_LABELS,
   RESERVATION_STATUS_LABELS,
+  activityActionLabel,
+  activityEntityLabel,
   availabilityStatusClass,
   availabilityStatusLabel,
   countUpcoming,
@@ -23,6 +27,8 @@ import {
   reservationStatusClass,
   reservationStatusLabel,
 } from './displayLabels'
+import { ACTIONS, ENTITY_TYPES } from './activityLog'
+import { VERIFICATION_STATES } from './residentGroups'
 
 describe('document request labels', () => {
   it('labels every status the workflow can hold', () => {
@@ -171,6 +177,107 @@ describe('counting what is upcoming', () => {
   })
 })
 
+describe('the date boundary the event filters use', () => {
+  // ⚠️ The bug these protect against: the Announcements/Events tab and
+  // the nurse's Health Events tab classified upcoming vs past with
+  // `new Date().toISOString().slice(0, 10)`, which is the UTC date.
+  // Manila is UTC+8, so between midnight and 8 AM Philippine time the
+  // UTC date is still YESTERDAY -- and an event dated today was filed
+  // under "past" while the Upcoming Events card on the same dashboard,
+  // which already used manilaToday(), counted it as upcoming. Two
+  // surfaces, one dataset, different answers, every morning.
+
+  afterEach(() => {
+    jest.useRealTimers()
+  })
+
+  it("is Manila's date, which differs from UTC early in the morning", () => {
+    // 01:30 Manila on 2026-10-01 is 17:30 UTC on 2026-09-30.
+    jest.useFakeTimers().setSystemTime(new Date('2026-09-30T17:30:00Z'))
+
+    expect(new Date().toISOString().slice(0, 10)).toBe('2026-09-30')
+    expect(labels.manilaToday()).toBe('2026-10-01')
+  })
+
+  it('counts an event dated today as upcoming inside that window', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-09-30T17:30:00Z'))
+
+    const event = { event_date: '2026-10-01' }
+
+    // What the filters do now.
+    expect(isUpcoming(event.event_date, labels.manilaToday())).toBe(true)
+    expect(countUpcoming([event], 'event_date')).toBe(1)
+
+    // What they did before: the same event read as past.
+    const utcToday = new Date().toISOString().slice(0, 10)
+    expect(event.event_date >= utcToday).toBe(true)
+    expect(isUpcoming('2026-09-30', labels.manilaToday())).toBe(false)
+  })
+
+  it('agrees with UTC once Manila and UTC share a date', () => {
+    // 20:00 Manila on 2026-10-01 is 12:00 UTC the same day.
+    jest.useFakeTimers().setSystemTime(new Date('2026-10-01T12:00:00Z'))
+
+    expect(new Date().toISOString().slice(0, 10)).toBe('2026-10-01')
+    expect(labels.manilaToday()).toBe('2026-10-01')
+  })
+})
+
+describe('the Activity Log vocabulary', () => {
+  // ⚠️ These exist because the Activity Log tab rendered the stored
+  // values straight to the screen through `replace(/_/g, ' ')`. On live
+  // data that produced "ready for pickup", "marked ineligible",
+  // "resident account" and "medical program" in an official's table.
+  it('covers every action the audit trail may hold', () => {
+    // Against activityLog.js's own list, so widening the vocabulary in a
+    // migration without adding a label here fails here rather than on
+    // screen. Migration 016 widened it and 017 widened the trigger; this
+    // is the third place that has to keep up.
+    ACTIONS.forEach((action) => {
+      expect(ACTIVITY_ACTION_LABELS[action]).toBeTruthy()
+    })
+  })
+
+  it('covers every entity type', () => {
+    ENTITY_TYPES.forEach((type) => {
+      expect(ACTIVITY_ENTITY_LABELS[type]).toBeTruthy()
+    })
+  })
+
+  it('never puts the words "registry entry" on screen', () => {
+    // The whole point of the Voter Reference List naming. There are no
+    // `registry_entry` rows in the log yet, so this leak had never been
+    // seen -- which is exactly why it needs a test rather than a look.
+    expect(ACTIVITY_ENTITY_LABELS.registry_entry).toBe('Voter reference entry')
+    expect(activityEntityLabel('registry_entry')).not.toMatch(/registry/i)
+  })
+
+  it('shows no raw stored value for the two that leaked', () => {
+    expect(activityActionLabel('ready_for_pickup')).toBe('Ready for pickup')
+    expect(activityActionLabel('marked ineligible')).not.toMatch(/ineligible/i)
+    expect(activityEntityLabel('resident_account')).toBe('Resident account')
+    expect(activityEntityLabel('medical_program')).toBe('Medical program')
+  })
+
+  it('agrees with the approved verification wording', () => {
+    // `ineligible` is "Not a resident" to a user, so the action that
+    // sets it cannot say "ineligible". Asserted against residentGroups
+    // rather than importing it into displayLabels, which would couple
+    // two modules that are independent on purpose.
+    expect(activityActionLabel('marked ineligible').toLowerCase())
+      .toContain(VERIFICATION_STATES.ineligible.label.toLowerCase())
+  })
+
+  it('returns an unknown value EXACTLY as stored', () => {
+    // The audit trail is the one surface where a word nobody
+    // anticipated must stay visible. Not blank, not guessed.
+    expect(activityActionLabel('escalated')).toBe('escalated')
+    expect(activityEntityLabel('barangay_term')).toBe('barangay_term')
+    expect(activityActionLabel(undefined)).toBe('')
+    expect(activityEntityLabel(null)).toBe('')
+  })
+})
+
 describe('the module does not own account verification', () => {
   // ⚠️ This is a regression guard, not a style check.
   //
@@ -189,5 +296,13 @@ describe('the module does not own account verification', () => {
   it('exports no purok helpers, which residentGroups already owns', () => {
     expect(labels.purokLabel).toBeUndefined()
     expect(labels.isRecognisedPurok).toBeUndefined()
+  })
+
+  it('still exports no verification map, now that it has action labels', () => {
+    // The Activity Log maps label an ACTION recorded in the audit trail,
+    // not `profiles.verification_status`. Re-checked here so adding them
+    // cannot be read as permission to bring the status map back.
+    expect(labels.VERIFICATION_STATUS_LABELS).toBeUndefined()
+    expect(labels.ACTIVITY_ACTION_LABELS.verified).toBe('Verified')
   })
 })

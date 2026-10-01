@@ -17,6 +17,7 @@ import { HEALTH_NURSE_NAME, HEALTH_NURSE_ROLE } from '../constants/barangay'
 import {
   availabilityStatusClass,
   availabilityStatusLabel,
+  manilaToday,
 } from '../utils/displayLabels'
 import ActionMenu from '../components/ActionMenu'
 import {
@@ -474,11 +475,10 @@ const NurseDashboard = () => {
   }
 
   const handleDeleteMedicine = async (medicine) => {
-    // The last window.confirm in this portal. The other three deletes
-    // here already used the shared dialog, so this one was the odd
-    // browser-styled box in an otherwise consistent set -- and an
-    // unstyled prompt reads as a security warning rather than a question
-    // about a medicine.
+    // Was the last window.confirm in this portal; the resident portal's
+    // two were converted in the X1 pass, so there are none left in the
+    // app. An unstyled browser prompt reads as a security warning
+    // rather than a question about a medicine.
     const ok = await confirm({
       title: `Remove ${medicine.name} from the list?`,
       message: 'If it is only out of stock, set it to "Out of stock" instead — '
@@ -591,7 +591,7 @@ const NurseDashboard = () => {
         if (error) {
           toast.error('Failed to add program!')
         } else if (!inserted?.id) {
-          toast.error('Saved, but the programme could not be read back. Refresh to confirm it is there.')
+          toast.error('Saved, but the program could not be read back. Refresh to confirm it is there.')
         } else {
           toast.success('Program added!')
           logActivity({
@@ -612,10 +612,10 @@ const NurseDashboard = () => {
 
   const handleDeleteProgram = async (program) => {
     const ok = await confirm({
-      title: 'Remove this medical programme?',
+      title: 'Remove this medical program?',
       message: `"${program.title}" will no longer be listed on the public Health `
         + 'Center page, and cannot be recovered.',
-      confirmLabel: 'Remove programme',
+      confirmLabel: 'Remove program',
     })
     if (!ok) return
 
@@ -631,7 +631,7 @@ const NurseDashboard = () => {
     if (error) {
       toast.error('Failed to delete program!')
     } else if (!data || data.length === 0) {
-      toast.error('Nothing was removed — you may not have permission to change programmes.')
+      toast.error('Nothing was removed — you may not have permission to change programs.')
     } else {
       toast.success('Program removed!')
       logActivity({
@@ -733,8 +733,11 @@ const NurseDashboard = () => {
                     </div>
                   ))
                 )}
+                {/* Same action as the Health Events tab's button, so the
+                    same words. This said "Schedule New Event" while that
+                    one says "Add New Event". */}
                 <button className="bakuna-add-btn" onClick={() => setShowEventModal(true)}>
-                  <FaPlus /> Schedule New Event
+                  <FaPlus /> Add Health Event
                 </button>
               </div>
 
@@ -743,7 +746,7 @@ const NurseDashboard = () => {
                 <div className="programs-card-header">
                   <h3>Active Medical Programs</h3>
                   <button className="btn-add" onClick={handleOpenAddProgram}>
-                    <FaPlus /> Add
+                    <FaPlus /> Add Program
                   </button>
                 </div>
                 <p className="programs-subtitle">Update schedules and program availability</p>
@@ -814,7 +817,7 @@ const NurseDashboard = () => {
         {activeTab === 'medicines' && (
           <div>
             <div className="nurse-dashboard-header">
-              <h1>Medicine Availability</h1>
+              <h1>Medicines</h1>
               <p>
                 What the health center has today. This list is public — residents
                 see it on the Health Center page, so they know whether a trip is
@@ -911,7 +914,7 @@ const NurseDashboard = () => {
         {activeTab === 'availability' && (
           <div>
             <div className="availability-header">
-              <h1>Nurse Availability</h1>
+              <h1>Availability</h1>
               {/* The old copy said "Click a row to edit its status". No row
                   has ever had a click handler -- editing is the Edit button
                   in each row -- so the instruction described something that
@@ -1015,19 +1018,27 @@ const NurseDashboard = () => {
                       value={healthEventFilter}
                       onChange={(e) => setHealthEventFilter(e.target.value)}
                     >
-                      <option value="all">All Events</option>
+                      {/* Names the dimension being filtered, not the
+                          entity -- and this sat inside a card already
+                          headed with the entity. */}
+                      <option value="all">All Dates</option>
                       <option value="upcoming">Upcoming</option>
                       <option value="past">Past</option>
                     </select>
                   </div>
                   <button className="btn-add" onClick={() => setShowEventModal(true)}>
-                    <FaPlus /> Add New Event
+                    <FaPlus /> Add Health Event
                   </button>
                 </div>
               </div>
 
               {(() => {
-                const todayStr = new Date().toISOString().slice(0, 10)
+                // ⚠️ Manila, not UTC. `new Date().toISOString()` is still
+                // on yesterday's date until 8 AM Philippine time, so a
+                // bakuna session dated today was filed under "past" for
+                // the first eight hours of every day. Same helper the
+                // upcoming-event count already uses.
+                const todayStr = manilaToday()
                 const filteredHealthEvents = healthEventFilter === 'all'
                   ? healthEvents
                   : healthEventFilter === 'upcoming'
@@ -1035,7 +1046,11 @@ const NurseDashboard = () => {
                     : healthEvents.filter((ev) => ev.event_date < todayStr)
 
                 return filteredHealthEvents.length === 0 ? (
-                <p className="empty-text">No health events found.</p>
+                <p className="empty-text">
+                  {healthEventFilter === 'all'
+                    ? 'No health events yet.'
+                    : 'No health events match this filter.'}
+                </p>
               ) : (
                 <div className="table-wrapper">
                   <table className="dashboard-table">
@@ -1092,12 +1107,20 @@ const NurseDashboard = () => {
                       className="profile-avatar-photo"
                     />
                   </div>
-                  <div className="profile-name">{nurseName}</div>
-                  {/* One role label, from constants/barangay.js. This card
-                      used to read "Barangay Health Nurse / Head Barangay
-                      Nurse" -- a name and a title that were nearly the same
-                      words and disagreed with the sidebar. */}
-                  <div className="profile-role">{HEALTH_NURSE_ROLE}</div>
+                  {/* ⚠️ One role label, not two. This card has now been
+                      through two passes of the same defect: it used to read
+                      "Barangay Health Nurse / Head Barangay Nurse", then
+                      "Barangay Health Nurse / Public Health Nurse" -- still
+                      two near-identical strings stacked. Found during the
+                      X1 pass while fixing the same thing on the two public
+                      pages, which this one had been missed by because it
+                      renders `nurseName` rather than the constant.
+
+                      ⚠️ `nurseName` itself is unchanged: it is written to
+                      nurse_availability.nurse_name and is what PersonAvatar
+                      derives initials from. Display only. */}
+                  <div className="profile-name">{HEALTH_NURSE_ROLE}</div>
+                  <div className="profile-role">Barangay Health Center</div>
                 </div>
                 <div className="profile-form">
                   <div className="profile-form-group">

@@ -7,20 +7,27 @@ import {
 import { MdVerified } from 'react-icons/md'
 import { supabase } from '../supabase/supabaseClient'
 import {
-  HEALTH_NURSE_NAME, HEALTH_NURSE_ROLE, PUNONG_BARANGAY_LABEL,
+  HEALTH_NURSE_ROLE, PUNONG_BARANGAY_LABEL,
 } from '../constants/barangay'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { PersonAvatar } from '../utils/officialPhotos'
 import './Officials.css'
 
-// Health Department — the barangay has one nurse. Named by role, not
-// by person: see HEALTH_NURSE_NAME.
+// Health Department — the barangay has one nurse, identified by role
+// rather than by person until the barangay confirms a name and a photo
+// together. See HEALTH_NURSE_ROLE in constants/barangay.js.
 const healthDept = [
   {
     id: 1,
-    name: HEALTH_NURSE_NAME,
-    role: HEALTH_NURSE_ROLE,
+    // One role string, not two. This card used to render
+    // HEALTH_NURSE_NAME ("Barangay Health Nurse") directly above
+    // HEALTH_NURSE_ROLE ("Public Health Nurse") -- the same defect
+    // HEALTH_NURSE_ROLE's own comment describes, moved from her
+    // Settings card to the public pages. The role is the honest label
+    // until the barangay confirms a name and photo together.
+    name: HEALTH_NURSE_ROLE,
+    role: 'Barangay Health Center',
     desc: 'Oversees local community immunization drives, maternal care programs, and clinical health tracking.',
     liveAvailability: true,
   },
@@ -215,9 +222,13 @@ const Officials = () => {
               and resident-focused governance.
             </p>
           </div>
+          {/* Not "Official Portal": that is what the sidebar calls the
+              staff dashboard, and this is the public directory. A visitor
+              reading it here would think they were inside the staff
+              area. */}
           <div className="officials-hero-badge available">
             <MdVerified />
-            Official Portal
+            Official Directory
           </div>
         </div>
       </section>

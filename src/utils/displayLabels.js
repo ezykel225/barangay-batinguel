@@ -95,6 +95,64 @@ export const RESIDENCY_STATUS_LABELS = {
   'non-resident': { label: 'Not from Batinguel', className: 'badge-unavailable' },
 }
 
+// ── The Activity Log's own vocabulary ─────────────────────────────────
+//
+// ⚠️ Added because the Activity Log tab was printing the stored values
+// straight to the screen through `String.replace(/_/g, ' ')`. On live
+// data that produced "ready for pickup", "marked ineligible",
+// "resident account" and "medical program" in an official's table --
+// the same defect this module exists to prevent, in the one place
+// nobody had wired it up.
+//
+// The worst of it was latent rather than visible: `registry_entry`
+// would have rendered as "registry entry", and keeping that term off
+// the screen is the entire point of the Voter Reference List naming.
+// There are no such rows yet, so the leak had never been seen.
+//
+// Every value in activityLog.js's ACTIONS and ENTITY_TYPES has an entry
+// here. A value that is not in either map is returned EXACTLY as
+// stored -- no blank, no guess -- because the audit trail is the one
+// surface where an unexpected value must stay visible, and because the
+// vocabulary is widened by migration (015, 016, 017) more often than
+// this file is edited.
+//
+// Three of these actions describe verification decisions, and their
+// wording is deliberately the same as `residentGroups.VERIFICATION_STATES`
+// -- "Not a resident" rather than the stored "ineligible".
+// `displayLabels.test.js` asserts that agreement rather than importing
+// that module, which would couple two modules that are independent on
+// purpose.
+export const ACTIVITY_ACTION_LABELS = {
+  approved: 'Approved',
+  declined: 'Declined',
+  verified: 'Verified',
+  rejected: 'Rejected',
+  'marked ineligible': 'Marked not a resident',
+  cancelled: 'Cancelled',
+  added: 'Added',
+  edited: 'Edited',
+  deleted: 'Deleted',
+  archived: 'Archived',
+  restored: 'Restored',
+  reopened: 'Reopened',
+  ready_for_pickup: 'Ready for pickup',
+  claimed: 'Claimed',
+}
+
+export const ACTIVITY_ENTITY_LABELS = {
+  reservation: 'Court reservation',
+  document_request: 'Document request',
+  resident_account: 'Resident account',
+  official: 'Official',
+  announcement: 'Announcement',
+  event: 'Event',
+  waste_schedule: 'Waste schedule',
+  registry_entry: 'Voter reference entry',
+  medicine: 'Medicine',
+  health_event: 'Health event',
+  medical_program: 'Medical program',
+}
+
 // ── Lookups ───────────────────────────────────────────────────────────
 //
 // An unknown value keeps its stored text and gets no badge class, so it
@@ -113,6 +171,13 @@ export const availabilityStatusClass = (v) => lookUpClass(AVAILABILITY_STATUS_LA
 
 export const residencyStatusLabel = (v) => lookUp(RESIDENCY_STATUS_LABELS, v)
 export const residencyStatusClass = (v) => lookUpClass(RESIDENCY_STATUS_LABELS, v)
+
+// These two take the stored value and return it unchanged when it is not
+// in the map, which is what the Activity Log needs: a word nobody
+// anticipated should appear in the audit trail as it was stored, not be
+// replaced or dropped.
+export const activityActionLabel = (v) => ACTIVITY_ACTION_LABELS[v] ?? (v ?? '')
+export const activityEntityLabel = (v) => ACTIVITY_ENTITY_LABELS[v] ?? (v ?? '')
 
 // ── Counting what is actually upcoming ────────────────────────────────
 //

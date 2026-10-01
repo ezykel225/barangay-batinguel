@@ -52,7 +52,7 @@ const Announcements = () => {
           {loading ? (
             <div className="loading-text">Loading announcements...</div>
           ) : announcements.length === 0 ? (
-            <div className="empty-text">No announcements found.</div>
+            <div className="empty-text">No announcements yet.</div>
           ) : (
             <div className="announcements-page-grid">
               {announcements.map((item) => (

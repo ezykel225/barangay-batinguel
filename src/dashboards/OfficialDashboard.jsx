@@ -31,7 +31,10 @@ import {
 } from '../components/OfficialArchiveDialog'
 import { PUROKS, PUNONG_BARANGAY_LABEL } from '../constants/barangay'
 import {
+  activityActionLabel,
+  activityEntityLabel,
   countUpcoming,
+  manilaToday,
   documentStatusClass,
   documentStatusLabel,
   reservationStatusClass,
@@ -177,7 +180,7 @@ const DashboardFilterBar = ({
 // because they are the same job from an official's side: a value that
 // cannot be grouped or matched.
 const PUROK_FILTER_OPTIONS = [
-  { value: 'all', label: 'All puroks' },
+  { value: 'all', label: 'All Puroks' },
   ...PUROKS.map((purok) => ({ value: purok, label: purok })),
   { value: PUROK_FILTER_UNLISTED, label: 'Blank or not on the list' },
 ]
@@ -698,8 +701,11 @@ const OfficialDashboard = () => {
   const handleDeleteRegistryEntry = async (entry) => {
     const ok = await confirm({
       title: 'Remove this voter reference entry?',
-      message: `${entry.full_name} will be removed from the barangay's own resident `
-        + 'record. This does not change their account if they have one, but the '
+      // ⚠️ "the barangay's own resident record" is what this said, which
+      // is the exact framing the Voter Reference List naming exists to
+      // remove: these rows are voter data, not a roll of residents.
+      message: `${entry.full_name} will be removed from the Voter Reference `
+        + 'List. This does not change their account if they have one, but the '
         + 'name will no longer appear as a voter list match during verification.',
       confirmLabel: 'Remove entry',
     })
@@ -2080,7 +2086,7 @@ const OfficialDashboard = () => {
         {activeTab === 'dashboard' && (
           <div>
             <div className="official-dashboard-header">
-              <h1>Administrative Hub</h1>
+              <h1>Official Dashboard</h1>
               <p>
                 Good day, <strong>{firstName}</strong>
                 {positionLabel ? ` · ${positionLabel}` : ''}.
@@ -2250,7 +2256,7 @@ const OfficialDashboard = () => {
         {activeTab === 'announcements' && (
           <div>
             <div className="announcements-header">
-              <h1>Community Voice</h1>
+              <h1>Announcements</h1>
               <p>Manage your broadcast communications and keep the community informed.</p>
             </div>
 
@@ -2272,7 +2278,7 @@ const OfficialDashboard = () => {
                     </select>
                   </div>
                   <button className="btn-add" onClick={() => setShowAnnouncementModal(true)}>
-                    <FaPlus /> New Announcement
+                    <FaPlus /> Add Announcement
                   </button>
                 </div>
               </div>
@@ -2283,7 +2289,11 @@ const OfficialDashboard = () => {
                   : announcements.filter((a) => a.badge === announcementFilter)
 
                 return filteredAnnouncements.length === 0 ? (
-                  <p className="dashboard-empty">No announcements found.</p>
+                  <p className="dashboard-empty">
+                    {announcementFilter === 'all'
+                      ? 'No announcements yet.'
+                      : 'No announcements match this filter.'}
+                  </p>
                 ) : (
                 <div className="table-wrapper">
                   <table className="dashboard-table">
@@ -2327,7 +2337,7 @@ const OfficialDashboard = () => {
         {activeTab === 'events' && (
           <div>
             <div className="events-header">
-              <h1>Community Events</h1>
+              <h1>Events</h1>
               <p>Manage upcoming neighborhood activities and events.</p>
             </div>
 
@@ -2342,19 +2352,27 @@ const OfficialDashboard = () => {
                       value={eventFilter}
                       onChange={(e) => setEventFilter(e.target.value)}
                     >
-                      <option value="all">All Events</option>
+                      {/* Names the dimension, not the entity -- this sat
+                          inside a card already headed "All Events". */}
+                      <option value="all">All Dates</option>
                       <option value="upcoming">Upcoming</option>
                       <option value="past">Past</option>
                     </select>
                   </div>
                   <button className="btn-add" onClick={() => setShowEventModal(true)}>
-                    <FaPlus /> Add New Event
+                    <FaPlus /> Add Event
                   </button>
                 </div>
               </div>
 
               {(() => {
-                const todayStr = new Date().toISOString().slice(0, 10)
+                // ⚠️ Manila, not UTC. `new Date().toISOString()` is still
+                // on yesterday's date until 8 AM Philippine time, so an
+                // event dated today was filed under "past" for the first
+                // eight hours of every day -- while the Upcoming Events
+                // card on the same dashboard, which already uses this
+                // helper, counted it as upcoming. The two disagreed.
+                const todayStr = manilaToday()
                 const filteredEvents = eventFilter === 'all'
                   ? events
                   : eventFilter === 'upcoming'
@@ -2362,7 +2380,11 @@ const OfficialDashboard = () => {
                     : events.filter((ev) => ev.event_date < todayStr)
 
                 return filteredEvents.length === 0 ? (
-                  <p className="dashboard-empty">No events found.</p>
+                  <p className="dashboard-empty">
+                    {eventFilter === 'all'
+                      ? 'No events yet.'
+                      : 'No events match this filter.'}
+                  </p>
                 ) : (
                 <div className="table-wrapper">
                   <table className="dashboard-table">
@@ -2404,7 +2426,7 @@ const OfficialDashboard = () => {
         {activeTab === 'reservations' && (
           <div>
             <div className="reservations-header">
-              <h1>Facility Booking Queue</h1>
+              <h1>Reservations</h1>
               <p>Review pending court reservations and manage time slots.</p>
             </div>
 
@@ -2455,7 +2477,7 @@ const OfficialDashboard = () => {
                   <p className="dashboard-empty">
                     {reservationFiltersActive
                       ? 'No reservations match this search.'
-                      : 'No reservations found.'}
+                      : 'No reservations yet.'}
                   </p>
                 ) : (
                 <div className="table-wrapper">
@@ -2505,7 +2527,7 @@ const OfficialDashboard = () => {
                               on the cell as a tooltip, which is also how
                               a legacy free-text spelling stays visible. */}
                           <td data-label="Purok" title={res.purok || undefined}>
-                            {purokShortLabel(res.purok)}
+                            {purokShortLabel(res.purok) || '—'}
                           </td>
                           <td data-label="Date">{res.preferred_date}</td>
                           {/* The badge sits with the time, because the
@@ -2732,7 +2754,7 @@ const OfficialDashboard = () => {
               <div className="dashboard-card-header">
                 <h3>Collection Schedule</h3>
                 <button className="btn-add" onClick={handleOpenAddWaste}>
-                  <FaPlus /> Add Entry
+                  <FaPlus /> Add Schedule Entry
                 </button>
               </div>
 
@@ -2754,7 +2776,7 @@ const OfficialDashboard = () => {
                     <tbody>
                       {wasteSchedule.map((entry) => (
                         <tr key={entry.id}>
-                          <td data-label="Purok">{entry.purok}</td>
+                          <td data-label="Purok">{entry.purok || '—'}</td>
                           <td data-label="Waste Type">{entry.waste_type}</td>
                           <td data-label="Day">{entry.day_of_week}</td>
                           <td data-label="Time">{entry.time_label || '—'}</td>
@@ -2890,8 +2912,8 @@ const OfficialDashboard = () => {
                         <tr key={resident.id}>
                           <td data-label="Name">{resident.full_name}</td>
                           <td data-label="Contact">{resident.contact_number || '—'}</td>
-                          <td data-label="Purok">
-                            {resident.purok || '—'}
+                          <td data-label="Purok" title={resident.purok || undefined}>
+                            {purokShortLabel(resident.purok) || '—'}
                             {/* A value the purok list does not contain cannot be
                                 grouped or matched. Flagged in words, not left to
                                 be noticed -- and never rewritten here. */}
@@ -3126,7 +3148,7 @@ const OfficialDashboard = () => {
               <div className="dashboard-card-header">
                 <h3>Voter Reference Entries</h3>
                 <button className="btn-add" onClick={handleOpenAddRegistryEntry}>
-                  <FaPlus /> Add Entry
+                  <FaPlus /> Add Voter Entry
                 </button>
               </div>
 
@@ -3175,8 +3197,8 @@ const OfficialDashboard = () => {
                       {visibleRegistryEntries.map((entry) => (
                         <tr key={entry.id}>
                           <td data-label="Name">{entry.full_name}</td>
-                          <td data-label="Purok">
-                            {entry.purok || '—'}
+                          <td data-label="Purok" title={entry.purok || undefined}>
+                            {purokShortLabel(entry.purok) || '—'}
                             {entry.purok && !isKnownPurok(entry.purok) && (
                               <span
                                 className="resident-purok-flag"
@@ -3215,7 +3237,7 @@ const OfficialDashboard = () => {
         {activeTab === 'officials' && (
           <div>
             <div className="officials-dir-header">
-              <h1>Leadership Directory</h1>
+              <h1>Officials Directory</h1>
               <p>Manage the digital face of your community leadership.</p>
             </div>
 
@@ -3550,10 +3572,16 @@ const OfficialDashboard = () => {
                                 : ['declined', 'rejected', 'cancelled'].includes(entry.action) ? 'declined'
                                   : 'pending'
                             }`}>
-                              {entry.action.replace(/_/g, ' ')}
+                              {/* Was `entry.action.replace(/_/g, ' ')`, which
+                                  put "ready for pickup" and "marked
+                                  ineligible" on screen. An action the maps
+                                  do not know is still shown exactly as
+                                  stored -- the audit trail is the one place
+                                  an unexpected value must stay visible. */}
+                              {activityActionLabel(entry.action)}
                             </span>
                           </td>
-                          <td data-label="Type">{entry.entity_type.replace(/_/g, ' ')}</td>
+                          <td data-label="Type">{activityEntityLabel(entry.entity_type)}</td>
                           <td data-label="Subject">{entry.subject || '—'}</td>
                           <td data-label="Notes">{entry.details || '—'}</td>
                         </tr>
@@ -4154,7 +4182,7 @@ const OfficialDashboard = () => {
                 onClick={handleConfirmIneligible}
                 disabled={submitting}
               >
-                {submitting ? 'Saving...' : 'Confirm'}
+                {submitting ? 'Saving...' : 'Confirm Not a Resident'}
               </button>
             </div>
           </div>
