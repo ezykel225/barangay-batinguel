@@ -15,8 +15,10 @@ import {
   PUROK_FILTER_UNLISTED,
   RESIDENT_SEARCH_FIELDS,
   REGISTRY_SEARCH_FIELDS,
+  RESERVATION_SEARCH_FIELDS,
   normalizeName,
   isKnownPurok,
+  purokShortLabel,
   purokMatchesFilter,
   describeVerification,
   groupIdForStatus,
@@ -393,5 +395,125 @@ describe('the voter reference list is not a resident list', () => {
     expect(VOTER_LIST_CAVEAT).toMatch(/does not yet have a complete list/i)
     expect(VOTER_LIST_CAVEAT).toMatch(/voter records/i)
     expect(VOTER_LIST_CAVEAT).toMatch(/city/i)
+  })
+})
+
+describe('purokShortLabel', () => {
+  // Display only. The column is already headed Purok, so repeating the
+  // word in every cell says nothing -- but the stored value must survive
+  // untouched, which is why an unrecognised spelling comes back as it
+  // went in rather than being blanked or guessed at.
+  it('reduces a recognised value to its number', () => {
+    expect(purokShortLabel('Purok 4')).toBe('4')
+    expect(purokShortLabel('purok 7')).toBe('7')
+    expect(purokShortLabel('PUROK  2')).toBe('2')
+    expect(purokShortLabel('Purok4')).toBe('4')
+  })
+
+  it('accepts a bare number and drops leading zeros', () => {
+    expect(purokShortLabel('4')).toBe('4')
+    expect(purokShortLabel('04')).toBe('4')
+    expect(purokShortLabel(' 5 ')).toBe('5')
+  })
+
+  it('returns an unrecognised value exactly as stored', () => {
+    // These are the legacy free-text spellings actually in the data. A
+    // shortener that hid them would hide the thing the purok flag exists
+    // to surface.
+    expect(purokShortLabel('purol 5')).toBe('purol 5')
+    expect(purokShortLabel('asd')).toBe('asd')
+    expect(purokShortLabel('Purok 4A')).toBe('Purok 4A')
+  })
+
+  it('returns an empty string for nothing, and does not throw', () => {
+    expect(purokShortLabel(null)).toBe('')
+    expect(purokShortLabel(undefined)).toBe('')
+    expect(purokShortLabel('')).toBe('')
+    expect(purokShortLabel('   ')).toBe('')
+  })
+
+  it('never claims a purok the value does not contain', () => {
+    // A number that is not a purok number must not be shortened into one.
+    expect(purokShortLabel('Purok 123')).toBe('Purok 123')
+  })
+})
+
+describe('reservation search', () => {
+  const booking = (overrides = {}) => ({
+    id: 'r1',
+    full_name: 'Ana Reyes',
+    contact_number: '0919 896 2588',
+    email: 'ana.reyes@example.test',
+    purpose: 'Basketball league elimination round',
+    activity_type: 'Sports',
+    purok: 'Purok 4',
+    status: 'pending',
+    ...overrides,
+  })
+
+  const find = (rows, query) =>
+    filterRows(rows, { query, fields: RESERVATION_SEARCH_FIELDS }).map((r) => r.id)
+
+  it('searches every field the brief names', () => {
+    const rows = [booking()]
+    expect(find(rows, 'ana')).toEqual(['r1'])          // name
+    expect(find(rows, '896')).toEqual(['r1'])          // phone
+    expect(find(rows, 'example.test')).toEqual(['r1']) // email
+    expect(find(rows, 'basketball')).toEqual(['r1'])   // purpose
+    expect(find(rows, 'sports')).toEqual(['r1'])       // activity
+    expect(find(rows, 'purok 4')).toEqual(['r1'])      // purok as stored
+  })
+
+  it('matches a purok by the number the column displays', () => {
+    // The cell shows "4" while the row stores "Purok 4"; a substring test
+    // matches both without any special handling.
+    expect(find([booking()], '4')).toEqual(['r1'])
+  })
+
+  it('is case-insensitive and ignores surrounding whitespace', () => {
+    const rows = [booking()]
+    expect(find(rows, 'ANA REYES')).toEqual(['r1'])
+    expect(find(rows, '   basketball   ')).toEqual(['r1'])
+  })
+
+  it('treats an empty or whitespace-only query as no filter', () => {
+    const rows = [booking(), booking({ id: 'r2', full_name: 'Ben Cruz' })]
+    expect(find(rows, '')).toEqual(['r1', 'r2'])
+    expect(find(rows, '    ')).toEqual(['r1', 'r2'])
+  })
+
+  it('excludes rows that do not match', () => {
+    const rows = [booking(), booking({ id: 'r2', full_name: 'Ben Cruz', purpose: 'Wedding reception', email: null })]
+    expect(find(rows, 'wedding')).toEqual(['r2'])
+    expect(find(rows, 'zumba')).toEqual([])
+  })
+
+  it('does not throw on a row with missing optional fields', () => {
+    const sparse = booking({ id: 'r3', email: null, purpose: null, activity_type: null, contact_number: null })
+    expect(find([sparse], 'ana')).toEqual(['r3'])
+    expect(find([sparse], 'basketball')).toEqual([])
+  })
+
+  it('composes with a status filter the way the tab does', () => {
+    // The tab narrows by status first, then searches what is left.
+    // Each row needs its OWN email: the first version of this test left
+    // Ben Cruz holding Ana's address from the fixture default, and
+    // searching "ana" matched him through it. The search was right and
+    // the fixture was wrong -- which is the search reaching the email
+    // field, working as specified.
+    const rows = [
+      booking({ id: 'p1', full_name: 'Ana Reyes', status: 'pending' }),
+      booking({ id: 'a1', full_name: 'Ana Reyes', status: 'approved' }),
+      booking({
+        id: 'p2', full_name: 'Ben Cruz', status: 'pending',
+        email: 'ben.cruz@example.test', purpose: 'Wedding reception',
+      }),
+    ]
+    const pending = rows.filter((r) => r.status === 'pending')
+    expect(find(pending, 'ana')).toEqual(['p1'])
+    expect(find(pending, 'cruz')).toEqual(['p2'])
+    // And a name that exists only under another status finds nothing.
+    const declined = rows.filter((r) => r.status === 'declined')
+    expect(find(declined, 'ana')).toEqual([])
   })
 })

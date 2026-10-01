@@ -16,7 +16,9 @@ import {
 import { MdOutlineEventAvailable, MdPersonSearch } from 'react-icons/md'
 import { supabase } from '../supabase/supabaseClient'
 import { MEDICINE_CATEGORIES, statusOf } from '../constants/medicines'
-import { BARANGAY_CONTACT, HEALTH_NURSE_NAME, telHref } from '../constants/barangay'
+import {
+  BARANGAY_CONTACT, HEALTH_NURSE_ROLE, telHref,
+} from '../constants/barangay'
 import {
   formatTime, isOnScheduledBreak, manilaWeekday,
 } from '../utils/clinicHours'
@@ -196,7 +198,7 @@ const HealthCenter = () => {
 
       <Navbar />
 
-      <main id="main-content">
+      <main id="main-content" tabIndex={-1}>
 
       {/* Hero */}
       <section className="health-hero">
@@ -257,7 +259,7 @@ const HealthCenter = () => {
               </h3>
 
               {loadingNurse ? (
-                <p style={{ fontSize: '13px', color: '#6b7280' }}>Loading...</p>
+                <p style={{ fontSize: '13px', color: '#5f6775' }}>Loading...</p>
               ) : (
                 <>
                   {/* Status is live from the nurse_availability table */}
@@ -266,8 +268,12 @@ const HealthCenter = () => {
                       <FaUserNurse />
                     </div>
                     <div className="health-nurse-info">
-                      <h4>{HEALTH_NURSE_NAME}</h4>
-                      <p>Public Health Nurse</p>
+                      {/* One role, not two. This read
+                          "Barangay Health Nurse" over "Public Health
+                          Nurse" -- two near-identical strings stacked,
+                          which reads as a fault. */}
+                      <h4>{HEALTH_NURSE_ROLE}</h4>
+                      <p>Barangay Health Center</p>
                     </div>
                     <div className="health-nurse-status">
                       <span className={`status-badge ${isAvailable ? 'available' : 'unavailable'}`}>
@@ -286,19 +292,33 @@ const HealthCenter = () => {
               {/* The one line a resident standing outside actually
                   needs. Shown above the week, because "are they open
                   right now" beats "what are Thursday's hours". */}
+              {/* ⚠️ Two different states reach this block, and it used to
+                  assert a lunch break for both. `onBreakNow` is true for
+                  the SCHEDULED break worked out from break_start /
+                  break_end, and also for the manual `on-break` status,
+                  which the shared availability vocabulary calls simply
+                  "On break" -- the nurse may have stepped out for
+                  anything. Only the scheduled case names lunch. */}
               {onBreakNow && (
                 <div className="clinic-break-now">
-                  <strong>On lunch break right now.</strong>{' '}
-                  {onScheduledBreak && todaySchedule?.break_end
-                    ? `The clinic reopens at ${formatTime(todaySchedule.break_end)}.`
-                    : 'The nurse has stepped out — please come back shortly.'}
+                  {onScheduledBreak && todaySchedule?.break_end ? (
+                    <>
+                      <strong>On lunch break right now.</strong>{' '}
+                      {`The clinic reopens at ${formatTime(todaySchedule.break_end)}.`}
+                    </>
+                  ) : (
+                    <>
+                      <strong>On break right now.</strong>{' '}
+                      The nurse has stepped out — please come back shortly.
+                    </>
+                  )}
                 </div>
               )}
 
               {loadingSchedule ? (
-                <p style={{ fontSize: '13px', color: '#6b7280' }}>Loading...</p>
+                <p style={{ fontSize: '13px', color: '#5f6775' }}>Loading...</p>
               ) : weekSchedule.length === 0 ? (
-                <p style={{ fontSize: '13px', color: '#6b7280' }}>
+                <p style={{ fontSize: '13px', color: '#5f6775' }}>
                   Clinic hours have not been set yet.
                 </p>
               ) : (
@@ -400,9 +420,9 @@ const HealthCenter = () => {
               </div>
 
               {medicinesLoading ? (
-                <p style={{ fontSize: '13px', color: '#6b7280' }}>Loading medicines...</p>
+                <p style={{ fontSize: '13px', color: '#5f6775' }}>Loading medicines...</p>
               ) : medicines.length === 0 ? (
-                <p style={{ fontSize: '13px', color: '#6b7280' }}>
+                <p style={{ fontSize: '13px', color: '#5f6775' }}>
                   The medicine list has not been published yet.
                 </p>
               ) : (
@@ -457,9 +477,9 @@ const HealthCenter = () => {
               </div>
 
               {eventsLoading ? (
-                <p style={{ fontSize: '13px', color: '#6b7280' }}>Loading events...</p>
+                <p style={{ fontSize: '13px', color: '#5f6775' }}>Loading events...</p>
               ) : healthEvents.length === 0 ? (
-                <p style={{ fontSize: '13px', color: '#6b7280' }}>No health events yet.</p>
+                <p style={{ fontSize: '13px', color: '#5f6775' }}>No health events yet.</p>
               ) : (
                 <div className="bakuna-grid">
                   {healthEvents.map((event) => (

@@ -98,7 +98,7 @@ const ResetPassword = () => {
     <div className="login-page">
       <Navbar />
 
-      <main className="login-container" id="main-content">
+      <main className="login-container" id="main-content" tabIndex={-1}>
         <div className="login-box">
           <div className="login-left">
             <div className="login-left-logo">
@@ -144,10 +144,10 @@ const ResetPassword = () => {
                 </button>
               </>
             ) : !ready ? (
-              <p style={{ color: '#6b7280', fontSize: 14 }}>Verifying your reset link...</p>
+              <p style={{ color: '#5f6775', fontSize: 14 }}>Verifying your reset link...</p>
             ) : (
               <>
-                <p style={{ color: '#6b7280', fontSize: 14, marginBottom: 20 }}>
+                <p style={{ color: '#5f6775', fontSize: 14, marginBottom: 20 }}>
                   Enter a new password below.
                 </p>
 
@@ -155,10 +155,10 @@ const ResetPassword = () => {
 
                 <form className="login-form" onSubmit={handleSubmit}>
                   <div className="login-form-group">
-                    <label>New Password</label>
+                    <label htmlFor="reset-new-password">New Password</label>
                     <div className="login-input-wrapper">
                       <div className="login-input-icon"><FaLock /></div>
-                      <input
+                      <input id="reset-new-password"
                         type={showPassword ? 'text' : 'password'}
                         placeholder="At least 6 characters"
                         value={newPassword}
@@ -168,6 +168,8 @@ const ResetPassword = () => {
                       <button
                         type="button"
                         className="login-toggle-password"
+                        aria-pressed={showPassword}
+                        aria-label={showPassword ? 'Hide the password' : 'Show the password'}
                         onClick={() => setShowPassword(!showPassword)}
                       >
                         {showPassword ? <FaEyeSlash /> : <FaEye />}
@@ -176,10 +178,10 @@ const ResetPassword = () => {
                   </div>
 
                   <div className="login-form-group">
-                    <label>Confirm New Password</label>
+                    <label htmlFor="reset-confirm-new-password">Confirm New Password</label>
                     <div className="login-input-wrapper">
                       <div className="login-input-icon"><FaLock /></div>
-                      <input
+                      <input id="reset-confirm-new-password"
                         type={showPassword ? 'text' : 'password'}
                         placeholder="Re-enter your new password"
                         value={confirmPassword}

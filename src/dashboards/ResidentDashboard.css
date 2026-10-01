@@ -16,7 +16,7 @@
 
 .resident-dashboard-header p {
   font-size: var(--fs-14);
-  color: #6b7280;
+  color: #5f6775;
 }
 
 .resident-stats-grid {
@@ -44,7 +44,7 @@
 
 .resident-stat-label {
   font-size: var(--fs-12);
-  color: #6b7280;
+  color: #5f6775;
   font-weight: 500;
 }
 
@@ -123,7 +123,7 @@
 }
 
 .pickup-reminder-urgent {
-  color: #dc2626;
+  color: #b91c1c;
 }
 
 @media (max-width: 768px) {
@@ -146,11 +146,23 @@
   gap: 8px;
   margin-top: 10px;
   font-size: var(--fs-13);
-  color: #6b7280;
+  color: #5f6775;
 }
 
 .badge-ineligible {
   background-color: #fee2e2;
   color: #7f1d1d;
   border: 1px solid #fca5a5;
+}
+
+/* A pending office-hours request, under its status pill. Neutral
+   colours on purpose: it is not a warning and not a refusal, it is a
+   request the barangay has not answered yet. */
+.reservation-exception-note {
+  display: block;
+  margin-top: 4px;
+  font-size: var(--fs-12);
+  line-height: 1.4;
+  color: #b45309;
+  overflow-wrap: anywhere;
 }

@@ -1,0 +1,330 @@
+/* The shared month grid.
+ *
+ * Extracted from the public court-reservation calendar, which was the
+ * only month grid in the app and was written inline in Reservation.css.
+ * The visual language is deliberately unchanged -- the same blue cells,
+ * the same 7-column grid, the same 4px gap -- so adopting it on four
+ * new surfaces does not introduce a second calendar style.
+ *
+ * Prefixed `mcal-` rather than reusing `.calendar-*`, because
+ * Reservation.css still defines `.calendar-legend` and the slot-state
+ * classes that belong to that page's own legend.
+ */
+
+.mcal {
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-md);
+  padding: 14px;
+  background-color: #ffffff;
+}
+
+.mcal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  gap: 8px;
+}
+
+.mcal-month {
+  font-weight: 600;
+  font-size: var(--fs-15);
+  color: #1f2937;
+  text-align: center;
+}
+
+.mcal-nav {
+  border: 1px solid #e5e7eb;
+  background: white;
+  color: #1e3a8a;
+  border-radius: var(--radius-sm);
+  /* 36px rather than the old 30px: this is a touch target on a phone,
+     and 30 was below the 44px guidance with no padding around it. */
+  min-width: 36px;
+  height: 36px;
+  font-size: var(--fs-18);
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  font-family: 'Poppins', sans-serif;
+}
+
+.mcal-nav:hover {
+  background-color: #eff6ff;
+}
+
+.mcal-weekdays,
+.mcal-grid {
+  display: grid;
+  /* minmax(0, …) rather than a bare 1fr. A cell's content is only a day
+     number and a count, so nothing overflows today -- but a bare `1fr`
+     is `minmax(auto, 1fr)`, and the same track type is what pushed the
+     event and announcement cards past the viewport at 375px. Consistent
+     with the rest of the app, and a cheap guard if a cell ever gains
+     wider content. */
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.mcal-weekday {
+  text-align: center;
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: #5f6775;
+  padding: 4px 0;
+}
+
+.mcal-cell {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border: 1px solid #cbd5e1;
+  background-color: #eff6ff;
+  color: #1e3a8a;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-13);
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Poppins', sans-serif;
+  /* Cells stay square and compact at every width. Long content belongs
+     in the selected-day panel, never inside a cell. */
+  min-width: 0;
+  overflow: hidden;
+}
+
+.mcal-cell:hover:not(:disabled) {
+  background-color: #dbeafe;
+}
+
+.mcal-blank {
+  border: none;
+  background: none;
+  cursor: default;
+}
+
+/* ── Tones ──
+ * Named by what they mean to a reader, not by the feature: `has`
+ * = something is on this day, `warn` = partly taken, `muted` = nothing
+ * can be done here. Each consumer maps its own state onto one of them.
+ */
+.mcal-tone-has {
+  background-color: #dcfce7;
+  border-color: #86efac;
+  color: #166534;
+}
+
+.mcal-tone-warn {
+  background-color: #fef9c3;
+  border-color: #fde68a;
+  color: #854d0e;
+}
+
+.mcal-tone-muted {
+  background-color: #e5e7eb;
+  color: #5f6775;
+  border-color: #d1d5db;
+}
+
+.mcal-cell:disabled {
+  cursor: not-allowed;
+}
+
+/* ── Today and selection are never colour alone ──
+ * Today gets an inset ring; selection gets a solid fill AND an outer
+ * ring. Both also change the accessible name, in MonthCalendar.jsx.
+ */
+.mcal-today {
+  box-shadow: inset 0 0 0 2px #1d4ed8;
+  font-weight: 700;
+}
+
+.mcal-selected {
+  background-color: #1e3a8a;
+  color: white;
+  border-color: #1e3a8a;
+  box-shadow: 0 0 0 2px #93c5fd;
+  font-weight: 700;
+}
+
+.mcal-selected.mcal-today {
+  /* Both states at once: keep the outer ring, drop the inset one, which
+     would be invisible against the dark fill anyway. */
+  box-shadow: 0 0 0 2px #93c5fd;
+}
+
+.mcal-daynum {
+  line-height: 1;
+}
+
+/* The indicator. Positioned rather than inline so it never pushes the
+   day number out of the centre of the cell. */
+.mcal-dot {
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 6px;
+  height: 6px;
+  padding: 0 3px;
+  border-radius: var(--radius-pill);
+  background-color: currentColor;
+  font-size: 9px;
+  line-height: 6px;
+  font-weight: 700;
+  color: inherit;
+}
+
+/* A count needs room for its digits and readable contrast, so it stops
+   being a dot and becomes a pill. */
+.mcal-dot:not(:empty) {
+  height: auto;
+  min-width: 12px;
+  padding: 1px 4px;
+  line-height: 1.1;
+  background-color: #1e3a8a;
+  color: #ffffff;
+}
+
+.mcal-selected .mcal-dot:not(:empty) {
+  background-color: #ffffff;
+  color: #1e3a8a;
+}
+
+.mcal-caption {
+  margin-top: 10px;
+  font-size: var(--fs-12);
+  color: #5f6775;
+  line-height: 1.5;
+}
+
+/* ── Mobile ──
+ * The grid is seven fractional columns, so it already fits any width
+ * without horizontal scrolling. Only the breathing room shrinks.
+ */
+@media (max-width: 480px) {
+  .mcal {
+    padding: 10px;
+  }
+
+  .mcal-weekdays,
+  .mcal-grid {
+    gap: 3px;
+  }
+
+  .mcal-cell {
+    font-size: var(--fs-12);
+  }
+
+  .mcal-dot {
+    bottom: 2px;
+  }
+}
+
+/* ── The selected-day panel ──
+ * Where a consumer puts the detail that must never go inside a cell:
+ * names, purposes, reasons, event titles.
+ */
+.mcal-day-panel {
+  margin-top: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  background-color: #f9fafb;
+}
+
+.mcal-day-panel h4 {
+  font-size: var(--fs-14);
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 8px;
+}
+
+.mcal-day-empty {
+  font-size: var(--fs-13);
+  color: #5f6775;
+}
+
+.mcal-day-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mcal-day-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  padding: 8px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-sm);
+  background-color: #ffffff;
+  font-size: var(--fs-13);
+  color: #374151;
+  /* A long name or title wraps instead of widening the panel. */
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.mcal-day-item-time {
+  font-weight: 600;
+  color: #1f2937;
+  white-space: nowrap;
+}
+
+.mcal-day-item-title {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.mcal-day-item-meta {
+  font-size: var(--fs-12);
+  color: #5f6775;
+}
+
+/* ── The view toggle ──
+ * Queue | Calendar, Table | Calendar, Calendar | List. One control,
+ * four places. Buttons, so they are keyboard-operable for free, with
+ * `aria-pressed` carrying the state rather than colour alone.
+ */
+.view-toggle {
+  display: inline-flex;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background-color: #f9fafb;
+}
+
+.view-toggle button {
+  border: none;
+  background: none;
+  padding: 7px 14px;
+  font-family: 'Poppins', sans-serif;
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: #5f6775;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.view-toggle button + button {
+  border-left: 1px solid #e5e7eb;
+}
+
+.view-toggle button:hover {
+  color: #1f2937;
+}
+
+/* The pressed state is a fill AND a weight change, not colour alone,
+   and `aria-pressed` is what assistive technology reads. */
+.view-toggle button[aria-pressed='true'] {
+  background-color: #1e3a8a;
+  color: #ffffff;
+  font-weight: 700;
+}

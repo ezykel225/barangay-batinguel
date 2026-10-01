@@ -5,6 +5,7 @@ import {
   FaCalendarAlt,
   FaUsers,
   FaUser,
+  FaUserTie,
   FaPlus,
   FaLock,
   FaEye,
@@ -16,12 +17,17 @@ import {
   FaUndo,
   FaSearch,
   FaTimes,
+  FaList,
 } from 'react-icons/fa'
 import { supabase } from '../supabase/supabaseClient'
 import { pathFromPublicUrl } from '../utils/storagePath'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 import Sidebar from '../components/Sidebar'
+import ActionMenu from '../components/ActionMenu'
+import { useModalA11y } from '../components/useModalA11y'
+import NotificationBell from '../components/NotificationBell'
+import { useNotifications } from '../components/useNotifications'
 import { PersonAvatar } from '../utils/officialPhotos'
 import { logActivity } from '../utils/activityLog'
 import { useConfirm } from '../components/ConfirmDialog'
@@ -29,11 +35,23 @@ import {
   ArchiveOfficialDialog,
   RestoreOfficialDialog,
 } from '../components/OfficialArchiveDialog'
-import { PUROKS } from '../constants/barangay'
+import { PUROKS, PUNONG_BARANGAY_LABEL } from '../constants/barangay'
+import {
+  activityActionLabel,
+  activityEntityLabel,
+  countUpcoming,
+  manilaToday,
+  documentStatusClass,
+  documentStatusLabel,
+  reservationStatusClass,
+  reservationStatusLabel,
+} from '../utils/displayLabels'
 import {
   RESIDENT_GROUPS,
   RESIDENT_SEARCH_FIELDS,
   REGISTRY_SEARCH_FIELDS,
+  filterDocumentRequests,
+  RESERVATION_SEARCH_FIELDS,
   PUROK_FILTER_UNLISTED,
   describeVerification,
   filterRows,
@@ -42,16 +60,65 @@ import {
   isActionableSeverity,
   isKnownPurok,
   normalizeName,
+  purokShortLabel,
   RECONCILE_SEVERITIES,
   VOTER_LIST_CAVEAT,
 } from '../utils/residentGroups'
+import {
+  EXCEPTION_BADGE_LABEL,
+  isExceptionRequest,
+} from '../utils/reservationWindow'
+import MonthCalendar from '../components/MonthCalendar'
+import {
+  buildReservationCalendar,
+  describeReservationDay,
+  reservationsOnDate,
+} from '../utils/reservationCalendar'
+import { buildEventCalendar, describeEventDay, eventsOnDate } from '../utils/eventCalendar'
+import { MONTH_NAMES, monthOf, parseDateKey, toDateKey } from '../utils/monthGrid'
 import '../components/Sidebar.css'
 import './OfficialDashboard.css'
 
 const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-// Search box + purok filter + result count + reset, shared by the
-// Residents and Voter Reference List tabs.
+// A date key as a heading. Through parseDateKey, so a 'YYYY-MM-DD' is
+// never handed to `new Date()` and cannot shift a day.
+const longDate = (key) => {
+  const parsed = parseDateKey(key)
+  return parsed ? `${parsed.day} ${MONTH_NAMES[parsed.month]} ${parsed.year}` : ''
+}
+
+// Queue | Calendar, Table | Calendar. One control, two tabs.
+const ViewToggle = ({ label, value, options, onChange }) => (
+  <div className="view-toggle" role="group" aria-label={label}>
+    {options.map((option) => (
+      <button
+        key={option.value}
+        type="button"
+        onClick={() => onChange(option.value)}
+        aria-pressed={value === option.value}
+      >
+        {option.icon}
+        {option.label}
+      </button>
+    ))}
+  </div>
+)
+
+// Search box + one optional dropdown + result count + reset. Shared by
+// the Residents tab, the Voter Reference List tab and the Reservations
+// queue, which is why the dropdown is a prop rather than the purok select
+// it started as: Reservations needs the status filter in that slot.
+//
+// `selectFilter` is { label, value, onChange, options: [{ value, label }] }
+// or absent, in which case only the search box is rendered.
+//
+// `toggleFilter` is { label, checked, onChange } or absent: one checkbox
+// for a yes/no narrowing that is not a status. Reservations uses it for
+// office-hours exceptions, which cut across every status -- a pending
+// exception and an approved one are both exceptions -- so it could not
+// be another entry in the status dropdown without making two different
+// dimensions look like one.
 //
 // ⚠️ Declared at module scope, NOT inside OfficialDashboard. A component
 // defined in a render body is a brand-new component type on every
@@ -59,15 +126,14 @@ const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Se
 // which throws the text cursor out of the search box after the first
 // keystroke and makes the field feel broken. Same reason the filter
 // state lives in the dashboard rather than in here.
-const ResidentFilterBar = ({
+const DashboardFilterBar = ({
   idPrefix,
   searchLabel,
   placeholder,
   query,
   onQueryChange,
-  purokLabel,
-  purok,
-  onPurokChange,
+  selectFilter,
+  toggleFilter,
   resultText,
   onReset,
   filtersActive,
@@ -102,26 +168,36 @@ const ResidentFilterBar = ({
       )}
     </div>
 
-    <div className="filter-select-wrap">
-      <FaFilter style={{ fontSize: 12, color: '#6b7280' }} aria-hidden="true" />
-      <label className="visually-hidden" htmlFor={`${idPrefix}-purok`}>
-        {purokLabel}
-      </label>
-      <select
-        id={`${idPrefix}-purok`}
-        className="filter-select"
-        value={purok}
-        onChange={(event) => onPurokChange(event.target.value)}
-      >
-        <option value="all">All puroks</option>
-        {PUROKS.map((option) => (
-          <option key={option} value={option}>{option}</option>
-        ))}
-        {/* Blank and off-list share one option because they are the same
-            job from here: a value that cannot be grouped or matched. */}
-        <option value={PUROK_FILTER_UNLISTED}>Blank or not on the list</option>
-      </select>
-    </div>
+    {selectFilter && (
+      <div className="filter-select-wrap">
+        <FaFilter style={{ fontSize: 12, color: '#6b7280' }} aria-hidden="true" />
+        <label className="visually-hidden" htmlFor={`${idPrefix}-filter`}>
+          {selectFilter.label}
+        </label>
+        <select
+          id={`${idPrefix}-filter`}
+          className="filter-select"
+          value={selectFilter.value}
+          onChange={(event) => selectFilter.onChange(event.target.value)}
+        >
+          {selectFilter.options.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+      </div>
+    )}
+
+    {toggleFilter && (
+      <div className="filter-toggle-wrap">
+        <input
+          id={`${idPrefix}-toggle`}
+          type="checkbox"
+          checked={toggleFilter.checked}
+          onChange={(event) => toggleFilter.onChange(event.target.checked)}
+        />
+        <label htmlFor={`${idPrefix}-toggle`}>{toggleFilter.label}</label>
+      </div>
+    )}
 
     {/* role="status" so the count is announced as the list narrows --
         otherwise a screen reader user types into a box and hears
@@ -139,6 +215,39 @@ const ResidentFilterBar = ({
   </div>
 )
 
+// The purok dropdown's options. Blank and off-list share one entry
+// because they are the same job from an official's side: a value that
+// cannot be grouped or matched.
+const PUROK_FILTER_OPTIONS = [
+  { value: 'all', label: 'All Puroks' },
+  ...PUROKS.map((purok) => ({ value: purok, label: purok })),
+  { value: PUROK_FILTER_UNLISTED, label: 'Blank or not on the list' },
+]
+
+// The reservation status dropdown. `cancelled` is new here: a resident
+// may cancel their own pending or approved booking, so those rows exist
+// and were visible under "All Statuses" -- but there was no way to filter
+// to them, and no way to filter them out.
+// The five stored values of document_requests.status, in the order a
+// request moves through them. Wording comes from displayLabels so the
+// filter cannot name a status differently from the badge beside it.
+const DOCUMENT_FILTER_OPTIONS = [
+  { value: 'all', label: 'All Statuses' },
+  { value: 'pending', label: documentStatusLabel('pending') },
+  { value: 'approved', label: documentStatusLabel('approved') },
+  { value: 'ready_for_pickup', label: documentStatusLabel('ready_for_pickup') },
+  { value: 'claimed', label: documentStatusLabel('claimed') },
+  { value: 'declined', label: documentStatusLabel('declined') },
+]
+
+const RESERVATION_FILTER_OPTIONS = [
+  { value: 'all', label: 'All Statuses' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'approved', label: 'Approved' },
+  { value: 'declined', label: 'Declined' },
+  { value: 'cancelled', label: 'Cancelled' },
+]
+
 const OfficialDashboard = () => {
   const { user } = useAuth()
   // Destructive actions go through this rather than acting on the first
@@ -147,6 +256,42 @@ const OfficialDashboard = () => {
   // several of these sit on top of the per-row processing locks.
   const [confirm, confirmDialog] = useConfirm()
   const [activeTab, setActiveTab] = useState('dashboard')
+
+  // ── Notifications ──────────────────────────────────────────────────
+  //
+  // ⚠️ The sidebar badges below are NOT repointed to this. They count
+  // what is still WAITING -- document requests at `pending`, accounts at
+  // `pending` -- which is a different question from "have you seen it".
+  // An official who has read a notification still has the work to do, so
+  // a badge driven by read state would clear while the queue stayed
+  // full. The resident portal is the opposite case and is repointed.
+  const {
+    notifications,
+    readIds: notifReadIds,
+    loading: notifLoading,
+    refresh: refreshNotifications,
+    markRead: markNotificationRead,
+    markAllRead: markAllNotificationsRead,
+  } = useNotifications(user?.id)
+
+  // Opening the tab a notification points at counts as having seen it,
+  // so the bell can be cleared without using the bell -- the same
+  // behaviour the resident portal already had for its unseen badges.
+  // Realtime is deferred, so a tab change is the refresh point: it is
+  // the moment the reader is asking to see that part of the dashboard
+  // anyway. Keyed on activeTab ALONE -- adding `notifications` here
+  // would make the refresh its own trigger.
+  useEffect(() => {
+    refreshNotifications()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
+
+  useEffect(() => {
+    notifications
+      .filter((n) => n.link_tab === activeTab && !notifReadIds.has(n.id))
+      .forEach((n) => { markNotificationRead(n) })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, notifications])
   const [reservations, setReservations] = useState([])
   const [announcements, setAnnouncements] = useState([])
   const [events, setEvents] = useState([])
@@ -181,6 +326,38 @@ const OfficialDashboard = () => {
 
   // Filters
   const [reservationFilter, setReservationFilter] = useState('all')
+  // Office-hours exceptions only. Separate from the status filter
+  // because the two compose: "pending exceptions" is the queue an
+  // official actually works through.
+  const [reservationExceptionsOnly, setReservationExceptionsOnly] = useState(false)
+
+  // ── Calendar views ──
+  //
+  // Queue and Table stay the defaults. The calendars are an additional
+  // way to look at the same records, never a replacement for the
+  // management interface: approving, declining, searching, filtering and
+  // reading a resident's details all stay in the queue and the table.
+  const [reservationView, setReservationView] = useState('queue')
+  const [eventView, setEventView] = useState('table')
+  const [calendarDate, setCalendarDate] = useState('')
+  const [eventCalendarDate, setEventCalendarDate] = useState('')
+  const [reservationMonth, setReservationMonth] = useState(() => monthOf(manilaToday()))
+  // Set by the calendar when an official asks to work one date in the
+  // queue. A separate filter rather than a search term, because
+  // RESERVATION_SEARCH_FIELDS does not include preferred_date -- putting
+  // a date in the search box would match nothing.
+  const [reservationDateFilter, setReservationDateFilter] = useState('')
+  const [eventMonth, setEventMonth] = useState(() => monthOf(manilaToday()))
+  // ── Document Requests filtering ────────────────────────────────────
+  //
+  // Client-side, over the `documentRequests` state the tab already
+  // fetched. No second query and no second data source: the list is
+  // small, already in memory, and a server round-trip per keystroke
+  // would be slower and could disagree with what is on screen.
+  const [documentQuery, setDocumentQuery] = useState('')
+  const [documentFilter, setDocumentFilter] = useState('all')
+
+  const [reservationQuery, setReservationQuery] = useState('')
   const [announcementFilter, setAnnouncementFilter] = useState('all')
   const [eventFilter, setEventFilter] = useState('all')
 
@@ -201,7 +378,14 @@ const OfficialDashboard = () => {
 
   // Modal States
   const [showAnnouncementModal, setShowAnnouncementModal] = useState(false)
+  // Null when the modal is adding, the row when it is editing. One modal
+  // serves both, so the fields cannot drift apart -- the same shape the
+  // Edit Event work settled on.
+  const [editingAnnouncement, setEditingAnnouncement] = useState(null)
   const [showEventModal, setShowEventModal] = useState(false)
+  // Null when adding, the event's row when editing. One modal serves
+  // both, so the fields cannot drift apart.
+  const [editingEvent, setEditingEvent] = useState(null)
   const [showOfficialModal, setShowOfficialModal] = useState(false)
   const [editingOfficial, setEditingOfficial] = useState(null)
   // Officials archive (migration 018). `archivingOfficial` and
@@ -210,6 +394,30 @@ const OfficialDashboard = () => {
   const [archivingOfficial, setArchivingOfficial] = useState(null)
   const [restoringOfficial, setRestoringOfficial] = useState(null)
   const [showWasteModal, setShowWasteModal] = useState(false)
+
+  // ── Modal accessibility ────────────────────────────────────────────
+  //
+  // Escape, focus entry and focus restoration for all NINE modals on
+  // this dashboard. One call, because they are mutually exclusive --
+  // see useModalA11y for why that is the shape. Before this, opening an
+  // Add form left focus on the button behind the overlay and Escape did
+  // nothing.
+  useModalA11y(
+    showAnnouncementModal || showEventModal || showOfficialModal ||
+    showWasteModal || showRegistryModal || !!decliningRequest ||
+    !!viewingId || !!ineligibleResident || !!rejectingResident,
+    () => {
+      setShowAnnouncementModal(false)
+      setShowEventModal(false)
+      setShowOfficialModal(false)
+      setShowWasteModal(false)
+      setShowRegistryModal(false)
+      setDecliningRequest(null)
+      setViewingId(null)
+      setIneligibleResident(null)
+      setRejectingResident(null)
+    }
+  )
   const [editingWaste, setEditingWaste] = useState(null)
   const [processingDocRequestIds, setProcessingDocRequestIds] = useState(new Set())
 
@@ -358,10 +566,21 @@ const OfficialDashboard = () => {
   }
 
   const fetchReservations = async () => {
+    // Newest submission first, which is the existing and intended order:
+    // the queue is worked from the top and a booking made this morning
+    // should not be below one from last month.
+    //
+    // `id` is a tie-break, not a change of order. `created_at` alone is
+    // not a total order -- two rows sharing a timestamp have no defined
+    // relative position, and Postgres may return them either way round
+    // between fetches, so a row could swap places after an unrelated
+    // refetch. Sorting on the primary key after it makes the list
+    // deterministic without moving anything a reader would notice.
     const { data, error } = await supabase
       .from('reservations')
       .select('*')
       .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
 
     if (!error) setReservations(data)
     setLoading(false)
@@ -627,8 +846,11 @@ const OfficialDashboard = () => {
   const handleDeleteRegistryEntry = async (entry) => {
     const ok = await confirm({
       title: 'Remove this voter reference entry?',
-      message: `${entry.full_name} will be removed from the barangay's own resident `
-        + 'record. This does not change their account if they have one, but the '
+      // ⚠️ "the barangay's own resident record" is what this said, which
+      // is the exact framing the Voter Reference List naming exists to
+      // remove: these rows are voter data, not a roll of residents.
+      message: `${entry.full_name} will be removed from the Voter Reference `
+        + 'List. This does not change their account if they have one, but the '
         + 'name will no longer appear as a voter list match during verification.',
       confirmLabel: 'Remove entry',
     })
@@ -700,8 +922,30 @@ const OfficialDashboard = () => {
     }
   }
 
-  const handleVerifyResident = (resident) =>
-    withVerificationGuard(resident.id, async () => {
+  // Asked BEFORE the guard is taken, not inside it. The guard exists to
+  // stop a double-click firing the same write twice; holding it while a
+  // dialog waits for an answer would leave the row's buttons disabled for
+  // as long as the official is reading. The early `has` check below stops
+  // a second dialog opening for a row that already has one in flight.
+  const handleVerifyResident = async (resident) => {
+    if (processingVerificationIds.has(resident.id)) return
+    const state = describeVerification(resident.verification_status)
+    const ok = await confirm({
+      title: resident.verification_status === 'ineligible'
+        ? `Reinstate ${resident.full_name}?`
+        : `Verify ${resident.full_name}?`,
+      message: resident.verification_status === 'ineligible'
+        ? 'This account was marked as not a resident of this barangay. Verifying it '
+          + 'reopens it and lets them request documents again. Check the ID or their '
+          + 'record first — only an official can set or lift this state.'
+        : `This confirms you have checked their ID. They will be able to request `
+          + `barangay documents immediately. Currently: ${state.label}.`,
+      confirmLabel: resident.verification_status === 'ineligible'
+        ? 'Reinstate account'
+        : 'Verify account',
+    })
+    if (!ok) return
+    return withVerificationGuard(resident.id, async () => {
       const { error } = await supabase
         .from('profiles')
         .update({
@@ -725,6 +969,7 @@ const OfficialDashboard = () => {
         fetchResidentsList()
       }
     })
+  }
 
   const handleOpenReject = (resident) => {
     setRejectingResident(resident)
@@ -901,6 +1146,33 @@ const OfficialDashboard = () => {
       }
     })
 
+  // Only the `claimed` transition is gated, and it is gated in a wrapper
+  // rather than inside handleUpdateDocRequestStatus -- that function is
+  // also how a decline is written, and a decline already has its own
+  // reason dialog. Confirming inside it would ask twice for one decision.
+  //
+  // Approve and Mark Ready are deliberately NOT gated. Both are
+  // intermediate steps the Secretary can move past in the same session,
+  // and a prompt on every step of a four-step queue is the fatigue that
+  // makes people stop reading prompts. `claimed` is where the request
+  // stops: there is no button that walks it back.
+  const handleMarkDocRequestClaimed = async (request) => {
+    if (!isSecretary) {
+      toast.error('Only the Secretary can update document requests.')
+      return
+    }
+    if (processingDocRequestIds.has(request.id)) return
+    const ok = await confirm({
+      title: 'Mark this request as claimed?',
+      message: `This records that ${request.full_name} has collected their `
+        + `${request.document_type}. It is the last step — there is no control here `
+        + 'that moves the request back afterwards.',
+      confirmLabel: 'Mark claimed',
+    })
+    if (!ok) return
+    return handleUpdateDocRequestStatus(request, 'claimed')
+  }
+
   const handleOpenDeclineRequest = (request) => {
     setDecliningRequest(request)
     setDeclineNotes('')
@@ -1063,6 +1335,15 @@ const OfficialDashboard = () => {
 
   // Only Punong Barangay can update kapitan status
   const isKapitan = officialInfo?.position === 'Punong Barangay'
+
+  // Who the Punong Barangay is, for the compact status element. Read
+  // from the directory the dashboard already fetched -- `officialsList`
+  // is already filtered to active officials, so an archived one cannot
+  // be named here. Falls back to the barangay's name rather than
+  // inventing a person when the directory has no active holder, which is
+  // the state the missing-Kagawad incident left behind for a month.
+  const punongBarangayName = officialsList
+    .find((o) => o.position === 'Punong Barangay')?.full_name || ''
   // Only the Treasurer approves/denies court reservations — they're the
   // one who actually receives the GCash payment and can verify it.
   const isTreasurer = officialInfo?.position === 'Barangay Treasurer'
@@ -1149,12 +1430,35 @@ const OfficialDashboard = () => {
     }
   }
 
-  const handleApproveReservation = (reservation) =>
-    withReservationGuard(reservation, async () => {
-      if (!isTreasurer) {
-        toast.error('Only the Treasurer can approve reservations.')
-        return
-      }
+  // ⚠️ Ordering matters here, in this order:
+  //
+  //   1. permission check -- a non-Treasurer must never be asked to
+  //      confirm something they will then be refused;
+  //   2. the in-flight check -- so one row cannot open two dialogs;
+  //   3. the confirmation;
+  //   4. only then withReservationGuard, which takes the per-row lock.
+  //
+  // Putting the dialog inside the guard would hold that lock for as long
+  // as the official took to answer, disabling the row's buttons and the
+  // other decision on it meanwhile. The guard still does its real job:
+  // the write itself cannot run twice.
+  const handleApproveReservation = async (reservation) => {
+    if (!isTreasurer) {
+      toast.error('Only the Treasurer can approve reservations.')
+      return
+    }
+    if (processingReservationIds.has(reservation.id)) return
+    const ok = await confirm({
+      title: 'Approve this reservation?',
+      message: `The court will be held for ${reservation.full_name} on `
+        + `${reservation.preferred_date} at ${reservation.preferred_time}`
+        + `${reservation.duration_hours ? ` for ${reservation.duration_hours} hour(s)` : ''}. `
+        + 'The resident is told the decision, and the slot stays held until somebody '
+        + 'changes it.',
+      confirmLabel: 'Approve booking',
+    })
+    if (!ok) return
+    return withReservationGuard(reservation, async () => {
       const { data: updated, error } = await supabase
         .from('reservations')
         .update({ status: 'approved', reviewed_by: user?.id ?? null, updated_at: new Date().toISOString() })
@@ -1182,13 +1486,23 @@ const OfficialDashboard = () => {
         fetchReservations()
       }
     })
+  }
 
-  const handleDeclineReservation = (reservation) =>
-    withReservationGuard(reservation, async () => {
-      if (!isTreasurer) {
-        toast.error('Only the Treasurer can decline reservations.')
-        return
-      }
+  const handleDeclineReservation = async (reservation) => {
+    if (!isTreasurer) {
+      toast.error('Only the Treasurer can decline reservations.')
+      return
+    }
+    if (processingReservationIds.has(reservation.id)) return
+    const ok = await confirm({
+      title: 'Decline this reservation?',
+      message: `${reservation.full_name}'s booking for ${reservation.preferred_date} at `
+        + `${reservation.preferred_time} will be declined and the slot released for `
+        + 'someone else. The resident is told the decision.',
+      confirmLabel: 'Decline booking',
+    })
+    if (!ok) return
+    return withReservationGuard(reservation, async () => {
       const { data: updated, error } = await supabase
         .from('reservations')
         .update({ status: 'declined', reviewed_by: user?.id ?? null, updated_at: new Date().toISOString() })
@@ -1211,6 +1525,7 @@ const OfficialDashboard = () => {
         fetchReservations()
       }
     })
+  }
 
   const handleUpdateKapitanStatus = async (status) => {
     if (!isKapitan) return
@@ -1225,7 +1540,7 @@ const OfficialDashboard = () => {
 
     if (fetchError || !current) {
       console.error('Kapitan status row missing:', fetchError)
-      toast.error('No Kapitan status record exists yet. Ask the admin to create one.')
+      toast.error(`No ${PUNONG_BARANGAY_LABEL} status record exists yet. Ask the admin to create one.`)
       return
     }
 
@@ -1529,6 +1844,79 @@ const OfficialDashboard = () => {
     }
   }
 
+  const handleOpenAddAnnouncement = () => {
+    setEditingAnnouncement(null)
+    setNewAnnouncement({ title: '', description: '', badge: '' })
+    setShowAnnouncementModal(true)
+  }
+
+  const handleOpenEditAnnouncement = (ann) => {
+    setEditingAnnouncement(ann)
+    // Every field is loaded, so saving cannot blank one the official did
+    // not touch. `badge` and `description` are nullable in the table, so
+    // they fall back to '' rather than rendering "null" in the input.
+    setNewAnnouncement({
+      title: ann.title || '',
+      description: ann.description || '',
+      badge: ann.badge || '',
+    })
+    setShowAnnouncementModal(true)
+  }
+
+  // ⚠️ UPDATES THE EXISTING ROW. Not delete-and-recreate: that would
+  // change the announcement's id (which the public detail page links
+  // to), lose `date_posted`, and file two audit entries for one
+  // correction. Same reasoning as Edit Event.
+  //
+  // Permission verified before this was written, by impersonating each
+  // role over the API in a rolled-back transaction: official 1 row,
+  // resident 0, nurse 0, anon 0. The existing
+  // "Admin and official can update announcements" policy already covers
+  // it, so NO MIGRATION was needed.
+  const handleUpdateAnnouncement = async () => {
+    if (submitting || !editingAnnouncement) return
+    if (!newAnnouncement.title || !newAnnouncement.description) {
+      toast.error('Please fill in all fields!')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      // .select() matters: RLS filters rows rather than raising, so a
+      // blocked update returns success with zero rows affected. Without
+      // this the toast would report a save that never happened.
+      const { data, error } = await supabase
+        .from('announcements')
+        .update({
+          title: newAnnouncement.title,
+          description: newAnnouncement.description,
+          badge: newAnnouncement.badge,
+        })
+        .eq('id', editingAnnouncement.id)
+        .select('id')
+
+      if (error) {
+        toast.error('Failed to update announcement!')
+      } else if (!data || data.length === 0) {
+        toast.error('No announcement was updated. You may not have permission to edit it.')
+      } else {
+        toast.success('Announcement updated.')
+        logActivity({
+          action: 'edited',
+          entityType: 'announcement',
+          entityId: editingAnnouncement.id,
+          subject: newAnnouncement.title,
+        })
+        setShowAnnouncementModal(false)
+        setEditingAnnouncement(null)
+        setNewAnnouncement({ title: '', description: '', badge: '' })
+        fetchAnnouncements()
+      }
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   const handleAddAnnouncement = async () => {
     if (submitting) return
     if (!newAnnouncement.title || !newAnnouncement.description) {
@@ -1606,6 +1994,94 @@ const OfficialDashboard = () => {
     }
   }
 
+  // ⚠️ `event_month` and `event_day` are denormalised display copies,
+  // and they are NOT the date. `event_date` is.
+  //
+  // They were written as `new Date(dateString)` then `.getDate()` /
+  // `.toLocaleString()`, which parses a UTC midnight and reads it back
+  // in the BROWSER's zone -- so west of UTC they describe the previous
+  // day. Every stored row happens to be correct because every row was
+  // written from the Philippines, but nothing enforced that.
+  //
+  // Derived from the characters of the date instead, so the two columns
+  // can no longer disagree with `event_date` whatever zone the official
+  // is in. They are kept because the public event cards still render
+  // them; the calendars read `event_date` and ignore them entirely.
+  const displayPartsFor = (dateString) => {
+    const parsed = parseDateKey(dateString)
+    if (!parsed) return { event_month: null, event_day: null }
+    return {
+      event_month: MONTH_SHORT[parsed.month].toUpperCase(),
+      event_day: String(parsed.day).padStart(2, '0'),
+    }
+  }
+
+  const handleOpenAddEvent = () => {
+    setEditingEvent(null)
+    setNewEvent({ title: '', location: '', event_date: '' })
+    setShowEventModal(true)
+  }
+
+  const handleOpenEditEvent = (event) => {
+    setEditingEvent(event)
+    setNewEvent({
+      title: event.title || '',
+      location: event.location || '',
+      // Normalised through the date-only helper, so the date input is
+      // populated from the stored value rather than from a Date.
+      event_date: toDateKey(event.event_date),
+    })
+    setShowEventModal(true)
+  }
+
+  // Updates the existing row. Deliberately NOT a delete-and-recreate:
+  // that would break the public /events/:id link, lose created_at, and
+  // file two audit entries for one correction.
+  const handleUpdateEvent = async () => {
+    if (submitting || !editingEvent) return
+    if (!newEvent.title || !newEvent.event_date) {
+      toast.error('Please fill in all fields!')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      // .select() matters: RLS filters rows rather than raising, so a
+      // blocked update returns success with zero rows affected. Without
+      // this the toast would report a save that never happened.
+      const { data, error } = await supabase
+        .from('events')
+        .update({
+          title: newEvent.title,
+          location: newEvent.location,
+          event_date: newEvent.event_date,
+          ...displayPartsFor(newEvent.event_date),
+        })
+        .eq('id', editingEvent.id)
+        .select('id')
+
+      if (error) {
+        toast.error('Failed to update event!')
+      } else if (!data || data.length === 0) {
+        toast.error('Nothing was updated — you may not have permission to change events.')
+      } else {
+        toast.success('Event updated.')
+        logActivity({
+          action: 'edited',
+          entityType: 'event',
+          entityId: editingEvent.id,
+          subject: newEvent.title,
+        })
+        setShowEventModal(false)
+        setEditingEvent(null)
+        setNewEvent({ title: '', location: '', event_date: '' })
+        fetchEvents()
+      }
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   const handleAddEvent = async () => {
     if (submitting) return
     if (!newEvent.title || !newEvent.event_date) {
@@ -1615,10 +2091,6 @@ const OfficialDashboard = () => {
 
     setSubmitting(true)
     try {
-      const date = new Date(newEvent.event_date)
-      const month = date.toLocaleString('en-US', { month: 'short' }).toUpperCase()
-      const day = String(date.getDate()).padStart(2, '0')
-
       // Readback returns the new id so the audit entry can point at the
       // row. Safe here: this table's SELECT policy covers whoever may
       // insert, so a successful insert is always readable by its author.
@@ -1628,8 +2100,7 @@ const OfficialDashboard = () => {
           title: newEvent.title,
           location: newEvent.location,
           event_date: newEvent.event_date,
-          event_month: month,
-          event_day: day,
+          ...displayPartsFor(newEvent.event_date),
         }])
         .select('id')
         .single()
@@ -1754,6 +2225,99 @@ const OfficialDashboard = () => {
     setResidentPurok('all')
   }
 
+  // Status and search compose: the status narrows the set, the query
+  // narrows what is left. Choosing Pending and typing a name shows that
+  // resident's pending bookings and nothing else.
+  //
+  // Status first, then the shared `filterRows` -- the same function the
+  // Residents, Voter Reference List and Reservations tabs use, so
+  // case-insensitivity and whitespace handling are identical across
+  // every search box in the portal.
+  const visibleDocumentRequests = useMemo(
+    () => filterDocumentRequests(documentRequests, {
+      query: documentQuery,
+      status: documentFilter,
+    }),
+    [documentRequests, documentFilter, documentQuery]
+  )
+
+  const documentFiltersActive =
+    documentFilter !== 'all' || documentQuery.trim() !== ''
+
+  const resetDocumentFilters = () => {
+    setDocumentQuery('')
+    setDocumentFilter('all')
+  }
+
+  // Same `filterRows` the other two tabs use, so case-insensitivity and
+  // whitespace trimming behave identically everywhere and are covered by
+  // the same tests.
+  const visibleReservations = useMemo(() => {
+    const byStatus = reservationFilter === 'all'
+      ? reservations
+      : reservations.filter((r) => r.status === reservationFilter)
+    // ⚠️ isExceptionRequest reads `exception_reason`, never the hour.
+    // Every booking filed before migration 020 starts before 5 PM and
+    // carries no reason, so filtering by hour here would hand the
+    // official the whole of the old queue labelled as exceptions.
+    const byException = reservationExceptionsOnly
+      ? byStatus.filter(isExceptionRequest)
+      : byStatus
+    // Compares the stored date as a string, which is correct for
+    // zero-padded ISO dates and needs no Date at all.
+    const byDate = reservationDateFilter
+      ? byException.filter((r) => toDateKey(r.preferred_date) === reservationDateFilter)
+      : byException
+    return filterRows(byDate, {
+      query: reservationQuery,
+      fields: RESERVATION_SEARCH_FIELDS,
+    })
+  }, [
+    reservations, reservationFilter, reservationExceptionsOnly,
+    reservationDateFilter, reservationQuery,
+  ])
+
+  const exceptionReservationCount = useMemo(
+    () => reservations.filter(isExceptionRequest).length,
+    [reservations]
+  )
+
+  // ⚠️ Built from the `reservations` state this dashboard already
+  // fetched -- the same rows the queue renders. NOT from
+  // get_reservation_slots_range: that RPC is the anonymous view, with
+  // five columns and deliberately no names and no exception_reason, so
+  // an official calling it would be reading a poorer copy of their own
+  // data through a second source.
+  const reservationCalendar = useMemo(
+    () => buildReservationCalendar(reservations),
+    [reservations]
+  )
+  const calendarDayReservations = useMemo(
+    () => reservationsOnDate(reservationCalendar, calendarDate),
+    [reservationCalendar, calendarDate]
+  )
+
+  const officialEventCalendar = useMemo(() => buildEventCalendar(events), [events])
+  const eventCalendarDayEvents = useMemo(
+    () => eventsOnDate(officialEventCalendar, eventCalendarDate),
+    [officialEventCalendar, eventCalendarDate]
+  )
+
+  // Today in Manila, for the grid's today marker and its past shading.
+  const calendarToday = useMemo(() => manilaToday(), [])
+
+  const reservationFiltersActive =
+    reservationQuery.trim() !== ''
+    || reservationFilter !== 'all'
+    || reservationExceptionsOnly
+    || reservationDateFilter !== ''
+  const resetReservationFilters = () => {
+    setReservationQuery('')
+    setReservationFilter('all')
+    setReservationExceptionsOnly(false)
+    setReservationDateFilter('')
+  }
+
   const visibleRegistryEntries = useMemo(
     () => filterRows(registryEntries, {
       query: registryQuery, purok: registryPurok, fields: REGISTRY_SEARCH_FIELDS,
@@ -1765,6 +2329,30 @@ const OfficialDashboard = () => {
     setRegistryQuery('')
     setRegistryPurok('all')
   }
+
+  // ── Sidebar badge counts ─────────────────────────────────────────
+  //
+  // Both come from data this dashboard already fetched, so a badge costs
+  // no extra request, no new column and no read-state to keep. They also
+  // update on their own: each successful action refetches its list, the
+  // filter below recomputes, and the badge drops.
+  //
+  // Only work that is waiting on an OFFICIAL is counted. `rejected` is an
+  // account the official has already dealt with and sent back, so it sits
+  // in the Requests group but not in the badge -- the line under that
+  // group's heading says so, because a tab reading 5 above a badge
+  // reading 3 is otherwise just confusing.
+  const pendingDocRequestCount = documentRequests
+    .filter((request) => request.status === 'pending').length
+  const awaitingVerificationCount = residentsList
+    .filter((resident) => resident.verification_status === 'pending').length
+  const returnedToResidentCount = residentsList
+    .filter((resident) => resident.verification_status === 'rejected').length
+  // Anything with an unrecognised status also lands in Requests. Counted
+  // here so the two figures above plus this one always add up to the
+  // group's own total rather than quietly falling short.
+  const unclassifiedRequestCount =
+    residentGroups.requests.length - awaitingVerificationCount - returnedToResidentCount
 
   // D6. Detection only -- see findReconciliationIssues for why this
   // cannot conclude anything about identity, and why it never writes.
@@ -1839,6 +2427,20 @@ const OfficialDashboard = () => {
   const maxMonthly = Math.max(1, ...monthlyCounts.map((b) => Math.max(b.documents, b.reservations)))
   const maxDay = Math.max(1, ...busiestDays.map((d) => d.count))
 
+  // One definition, rendered twice -- once in the desktop topbar and
+  // once in the mobile header -- so the two placements cannot be given
+  // different props.
+  const notificationBell = (
+    <NotificationBell
+      notifications={notifications}
+      readIds={notifReadIds}
+      loading={notifLoading}
+      onOpenTab={(tab) => setActiveTab(tab)}
+      onMarkRead={markNotificationRead}
+      onMarkAllRead={markAllNotificationsRead}
+    />
+  )
+
   return (
     <div className="dashboard-layout">
 
@@ -1847,18 +2449,46 @@ const OfficialDashboard = () => {
         role="official"
         activeTab={activeTab}
         setActiveTab={setActiveTab}
+        badges={{
+          documents: pendingDocRequestCount,
+          residents: awaitingVerificationCount,
+        }}
+        mobileHeaderAction={notificationBell}
       />
 
       {/* Main Content */}
-      <main className="dashboard-main" id="main-content">
+      <main className="dashboard-main" id="main-content" tabIndex={-1}>
+
+        {/* The DESKTOP bell. It sits here rather than inside each tab's
+            own header, because there are thirteen of those and no shared
+            dashboard header component exists. One place, every tab.
+
+            ⚠️ Hidden at and below 768px, where Sidebar renders the same
+            bell inside .dash-mobile-header. See NotificationBell.css. */}
+        <div className="dashboard-topbar">
+          {notificationBell}
+        </div>
 
         {/* ========================
             DASHBOARD TAB
         ======================== */}
         {activeTab === 'dashboard' && (
           <div>
+            {/* ── The overview's top block ────────────────────────────
+                Heading, the four stat cards and the Punong Barangay
+                status, in ONE container so their arrangement is a
+                responsive layout rather than two copies of an element.
+
+                ⚠️ DOM ORDER IS THE MOBILE ORDER, and it is deliberately
+                left alone: heading, stats, status -- exactly the
+                presentation already accepted at 375px, in plain document
+                flow with no `order` anywhere to go wrong. The wide
+                layout places the status in row 1 column 2 with grid,
+                beside the greeting, and lets the stats span both columns
+                underneath. See .dashboard-overview-top. */}
+            <div className="dashboard-overview-top">
             <div className="official-dashboard-header">
-              <h1>Administrative Hub</h1>
+              <h1>Official Dashboard</h1>
               <p>
                 Good day, <strong>{firstName}</strong>
                 {positionLabel ? ` · ${positionLabel}` : ''}.
@@ -1896,7 +2526,11 @@ const OfficialDashboard = () => {
                     <FaCalendarAlt />
                   </div>
                 </div>
-                <div className="stat-card-value">{events.length}</div>
+                {/* This said "Upcoming Events" while counting every event
+                    ever created, so a barangay with three events last year
+                    and nothing planned still read "3 upcoming". Compared
+                    against today in Manila, not the browser's timezone. */}
+                <div className="stat-card-value">{countUpcoming(events, 'event_date')}</div>
                 <div className="stat-card-label">Upcoming Events</div>
               </div>
 
@@ -1911,23 +2545,68 @@ const OfficialDashboard = () => {
               </div>
             </div>
 
-            {/* Kapitan Status — compact summary only. Full controls live on
-                the dedicated "Kapitan Status" tab to avoid duplicating the
-                same control in two places. */}
-            <div className="kapitan-status-section">
-              <h3>{isKapitan ? 'My Status' : "Kapitan's Status"}</h3>
-              <div className="kapitan-current-display">
-                {kapitanStatusDisplay(kapitanStatus)}
+            {/* ── Punong Barangay status, compact ──────────────────────
+                The dedicated sidebar tab is gone, so this is now the ONLY
+                place the status is read and set. It therefore carries the
+                Kapitan's own controls rather than linking to them.
+
+                A <select> replaces the four-button grid: one control
+                instead of four, which is what makes it fit on a dashboard
+                row. The options, their order and their wording are
+                unchanged -- KAPITAN_STATUS_OPTIONS is the same constant
+                the grid used, so nothing a user reads has moved.
+
+                ⚠️ The permission is unchanged. `isKapitan` is still the
+                only thing that renders a control, handleUpdateKapitanStatus
+                still returns early for anyone else, and the database
+                policy was not touched. An official who is not the Punong
+                Barangay sees the status and no control, exactly as
+                before. */}
+            <div className="kapitan-compact">
+              <div className="kapitan-compact-identity">
+                <FaUserTie className="kapitan-compact-icon" aria-hidden="true" />
+                <div>
+                  <span className="kapitan-compact-role">{PUNONG_BARANGAY_LABEL}</span>
+                  <span className="kapitan-compact-name">
+                    {punongBarangayName || 'Barangay Batinguel'}
+                  </span>
+                </div>
               </div>
-              {isKapitan && (
-                <button
-                  className="view-all-link"
-                  style={{ marginTop: 8 }}
-                  onClick={() => setActiveTab('kapitan')}
-                >
-                  Update Status →
-                </button>
+
+              {/* ⚠️ Shown only to an official who is NOT the Punong
+                  Barangay. For the Kapitan the <select> below already
+                  carries the current value, and rendering both put
+                  "✅ Available" on screen twice, side by side -- the
+                  same near-identical-strings-stacked fault
+                  HEALTH_NURSE_ROLE exists to prevent. A select reports
+                  its own state; a second copy of it is not information.
+                  Measured in the browser before removing it. */}
+              {!isKapitan && (
+                <div className="kapitan-compact-state">
+                  {kapitanStatusDisplay(kapitanStatus)}
+                </div>
               )}
+
+              {isKapitan && (
+                <div className="kapitan-compact-control">
+                  <label className="visually-hidden" htmlFor="kapitan-status-select">
+                    Set your availability status
+                  </label>
+                  <select
+                    id="kapitan-status-select"
+                    className="kapitan-compact-select"
+                    value={kapitanStatus}
+                    onChange={(event) => handleUpdateKapitanStatus(event.target.value)}
+                  >
+                    {KAPITAN_STATUS_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.emoji} {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
             </div>
 
             {/* Pending Reservations */}
@@ -1962,8 +2641,32 @@ const OfficialDashboard = () => {
                         <tr key={res.id}>
                           <td data-label="Name">{res.full_name}</td>
                           <td data-label="Date">{res.preferred_date}</td>
-                          <td data-label="Time">{res.preferred_time}</td>
-                          <td data-label="Purpose">{res.purpose}</td>
+                          {/* The badge sits with the time, because the
+                              time is what the exception is about. A
+                              booking from before migration 020 has no
+                              reason and gets no badge -- see
+                              isExceptionRequest, which reads the reason
+                              rather than the hour. */}
+                          <td data-label="Time">
+                            {res.preferred_time}
+                            {isExceptionRequest(res) && (
+                              <span
+                                className="badge badge-exception"
+                                title="Starts before 5:00 PM. The resident asked for an office-hours exception; an official decides it."
+                              >
+                                {EXCEPTION_BADGE_LABEL}
+                              </span>
+                            )}
+                          </td>
+                          <td data-label="Purpose">
+                            {res.purpose}
+                            {isExceptionRequest(res) && (
+                              <span className="exception-reason-note">
+                                <strong>Office-hours reason:</strong>{' '}
+                                {res.exception_reason}
+                              </span>
+                            )}
+                          </td>
                           <td data-label="Action">
                             {isTreasurer ? (
                               <>
@@ -2000,7 +2703,7 @@ const OfficialDashboard = () => {
         {activeTab === 'announcements' && (
           <div>
             <div className="announcements-header">
-              <h1>Community Voice</h1>
+              <h1>Announcements</h1>
               <p>Manage your broadcast communications and keep the community informed.</p>
             </div>
 
@@ -2021,8 +2724,8 @@ const OfficialDashboard = () => {
                       ))}
                     </select>
                   </div>
-                  <button className="btn-add" onClick={() => setShowAnnouncementModal(true)}>
-                    <FaPlus /> New Announcement
+                  <button className="btn-add" onClick={handleOpenAddAnnouncement}>
+                    <FaPlus /> Add Announcement
                   </button>
                 </div>
               </div>
@@ -2033,7 +2736,11 @@ const OfficialDashboard = () => {
                   : announcements.filter((a) => a.badge === announcementFilter)
 
                 return filteredAnnouncements.length === 0 ? (
-                  <p className="dashboard-empty">No announcements found.</p>
+                  <p className="dashboard-empty">
+                    {announcementFilter === 'all'
+                      ? 'No announcements yet.'
+                      : 'No announcements match this filter.'}
+                  </p>
                 ) : (
                 <div className="table-wrapper">
                   <table className="dashboard-table">
@@ -2053,12 +2760,29 @@ const OfficialDashboard = () => {
                           <td data-label="Date Posted">
                             {new Date(ann.date_posted).toLocaleDateString()}
                           </td>
-                          <td data-label="Action">
-                            <button
-                              className="btn-deny"
-                              onClick={() => handleDeleteAnnouncement(ann)}>
-                              Delete
-                            </button>
+                          <td data-label="Action" className="action-cell">
+                            <ActionMenu
+                              portal
+                              subject={ann.title}
+                              items={[
+                                {
+                                  key: 'edit',
+                                  label: 'Edit',
+                                  icon: <FaEdit />,
+                                  onSelect: () => handleOpenEditAnnouncement(ann),
+                                },
+                                {
+                                  key: 'delete',
+                                  label: 'Delete',
+                                  icon: <FaTrash />,
+                                  danger: true,
+                                  // Still goes through the shared
+                                  // confirmation dialog -- the menu only
+                                  // changes where the control lives.
+                                  onSelect: () => handleDeleteAnnouncement(ann),
+                                },
+                              ]}
+                            />
                           </td>
                         </tr>
                       ))}
@@ -2077,14 +2801,27 @@ const OfficialDashboard = () => {
         {activeTab === 'events' && (
           <div>
             <div className="events-header">
-              <h1>Community Events</h1>
+              <h1>Events</h1>
               <p>Manage upcoming neighborhood activities and events.</p>
             </div>
 
             <div className="dashboard-card">
               <div className="dashboard-card-header">
                 <h3>All Events</h3>
-                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                  {/* ⚠️ Table is the default and stays the management
+                      interface: Add, Edit and Delete live there. The
+                      calendar is an additional visual schedule over the
+                      same `events` rows. */}
+                  <ViewToggle
+                    label="How to view events"
+                    value={eventView}
+                    onChange={setEventView}
+                    options={[
+                      { value: 'table', label: 'Table', icon: <FaList aria-hidden="true" /> },
+                      { value: 'calendar', label: 'Calendar', icon: <FaCalendarAlt aria-hidden="true" /> },
+                    ]}
+                  />
                   <div className="filter-select-wrap">
                     <FaFilter style={{ fontSize: 12, color: '#6b7280' }} />
                     <select
@@ -2092,19 +2829,75 @@ const OfficialDashboard = () => {
                       value={eventFilter}
                       onChange={(e) => setEventFilter(e.target.value)}
                     >
-                      <option value="all">All Events</option>
+                      {/* Names the dimension, not the entity -- this sat
+                          inside a card already headed "All Events". */}
+                      <option value="all">All Dates</option>
                       <option value="upcoming">Upcoming</option>
                       <option value="past">Past</option>
                     </select>
                   </div>
-                  <button className="btn-add" onClick={() => setShowEventModal(true)}>
-                    <FaPlus /> Add New Event
+                  <button className="btn-add" onClick={handleOpenAddEvent}>
+                    <FaPlus /> Add Event
                   </button>
                 </div>
               </div>
 
-              {(() => {
-                const todayStr = new Date().toISOString().slice(0, 10)
+              {eventView === 'calendar' && (
+                <div className="dashboard-calendar-layout">
+                  <MonthCalendar
+                    year={eventMonth.year}
+                    month={eventMonth.month}
+                    onMonthChange={setEventMonth}
+                    selectedDate={eventCalendarDate}
+                    onSelectDate={setEventCalendarDate}
+                    today={calendarToday}
+                    idPrefix="official-events"
+                    renderDay={(cell) => describeEventDay(cell, officialEventCalendar)}
+                    caption={'Placed by event_date. Select a date to see what is '
+                      + 'scheduled; add, edit and delete stay in the table.'}
+                  />
+
+                  <div className="mcal-day-panel">
+                    {!eventCalendarDate ? (
+                      <p className="mcal-day-empty">Select a date to see its events.</p>
+                    ) : (
+                      <>
+                        <h4>{longDate(eventCalendarDate)}</h4>
+                        {eventCalendarDayEvents.length === 0 ? (
+                          <p className="mcal-day-empty">Nothing scheduled on this date.</p>
+                        ) : (
+                          <div className="mcal-day-list">
+                            {eventCalendarDayEvents.map((event) => (
+                              <div key={event.id} className="mcal-day-item">
+                                <span className="mcal-day-item-title">{event.title}</span>
+                                {event.location && (
+                                  <span className="mcal-day-item-meta">{event.location}</span>
+                                )}
+                                <button
+                                  type="button"
+                                  className="btn-add btn-sm"
+                                  onClick={() => handleOpenEditEvent(event)}
+                                >
+                                  <FaEdit aria-hidden="true" /> Edit
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {eventView === 'table' && (() => {
+                // ⚠️ Manila, not UTC. `new Date().toISOString()` is still
+                // on yesterday's date until 8 AM Philippine time, so an
+                // event dated today was filed under "past" for the first
+                // eight hours of every day -- while the Upcoming Events
+                // card on the same dashboard, which already uses this
+                // helper, counted it as upcoming. The two disagreed.
+                const todayStr = manilaToday()
                 const filteredEvents = eventFilter === 'all'
                   ? events
                   : eventFilter === 'upcoming'
@@ -2112,7 +2905,11 @@ const OfficialDashboard = () => {
                     : events.filter((ev) => ev.event_date < todayStr)
 
                 return filteredEvents.length === 0 ? (
-                  <p className="dashboard-empty">No events found.</p>
+                  <p className="dashboard-empty">
+                    {eventFilter === 'all'
+                      ? 'No events yet.'
+                      : 'No events match this filter.'}
+                  </p>
                 ) : (
                 <div className="table-wrapper">
                   <table className="dashboard-table">
@@ -2130,12 +2927,26 @@ const OfficialDashboard = () => {
                           <td data-label="Title">{event.title}</td>
                           <td data-label="Date">{event.event_date}</td>
                           <td data-label="Location">{event.location}</td>
-                          <td data-label="Action">
-                            <button
-                              className="btn-deny"
-                              onClick={() => handleDeleteEvent(event)}>
-                              Delete
-                            </button>
+                          <td data-label="Action" className="action-cell">
+                            <ActionMenu
+                              portal
+                              subject={event.title}
+                              items={[
+                                {
+                                  key: 'edit',
+                                  label: 'Edit',
+                                  icon: <FaEdit />,
+                                  onSelect: () => handleOpenEditEvent(event),
+                                },
+                                {
+                                  key: 'delete',
+                                  label: 'Delete',
+                                  icon: <FaTrash />,
+                                  danger: true,
+                                  onSelect: () => handleDeleteEvent(event),
+                                },
+                              ]}
+                            />
                           </td>
                         </tr>
                       ))}
@@ -2154,103 +2965,282 @@ const OfficialDashboard = () => {
         {activeTab === 'reservations' && (
           <div>
             <div className="reservations-header">
-              <h1>Facility Booking Queue</h1>
+              <h1>Reservations</h1>
               <p>Review pending court reservations and manage time slots.</p>
             </div>
 
             <div className="dashboard-card">
               <div className="dashboard-card-header">
                 <h3>All Reservations</h3>
-                <div className="filter-select-wrap">
-                  <FaFilter style={{ fontSize: 12, color: '#6b7280' }} />
-                  <select
-                    className="filter-select"
-                    value={reservationFilter}
-                    onChange={(e) => setReservationFilter(e.target.value)}
-                  >
-                    <option value="all">All Statuses</option>
-                    <option value="pending">Pending</option>
-                    <option value="approved">Approved</option>
-                    <option value="declined">Declined</option>
-                  </select>
-                </div>
+                {/* ⚠️ Queue is the default and stays the management
+                    interface: search, status, the exceptions filter,
+                    Approve and Decline, the resident's contact details
+                    and the exception reason all live there. The calendar
+                    is an additional way to look at the same rows. */}
+                <ViewToggle
+                  label="How to view reservations"
+                  value={reservationView}
+                  onChange={setReservationView}
+                  options={[
+                    { value: 'queue', label: 'Queue', icon: <FaClipboardList aria-hidden="true" /> },
+                    { value: 'calendar', label: 'Calendar', icon: <FaCalendarAlt aria-hidden="true" /> },
+                  ]}
+                />
               </div>
 
-              {(() => {
-                // fetchReservations already orders by created_at desc, so
-                // "All Statuses" shows most recent first by default.
-                const filteredReservations = reservationFilter === 'all'
-                  ? reservations
-                  : reservations.filter((r) => r.status === reservationFilter)
+              {reservationView === 'calendar' && (
+                <div className="dashboard-calendar-layout">
+                  <MonthCalendar
+                    year={reservationMonth.year}
+                    month={reservationMonth.month}
+                    onMonthChange={setReservationMonth}
+                    selectedDate={calendarDate}
+                    onSelectDate={setCalendarDate}
+                    today={calendarToday}
+                    idPrefix="official-reservations"
+                    renderDay={(cell) => describeReservationDay(cell, reservationCalendar)}
+                    caption={'Amber means a booking on that date is still waiting on an '
+                      + 'official. Green means every booking on it has been decided. '
+                      + 'Declined and cancelled bookings release their slots and do not '
+                      + 'make a date look occupied.'}
+                  />
 
-                return filteredReservations.length === 0 ? (
-                  <p className="dashboard-empty">No reservations found.</p>
-                ) : (
-                <div className="table-wrapper">
-                  <table className="dashboard-table">
-                    <thead>
-                      <tr>
-                        <th scope="col">Name</th>
-                        <th scope="col">Phone</th>
-                        <th scope="col">Email</th>
-                        <th scope="col">Purok</th>
-                        <th scope="col">Date</th>
-                        <th scope="col">Time</th>
-                        <th scope="col">Duration</th>
-                        <th scope="col">Purpose</th>
-                        <th scope="col">Submitted</th>
-                        <th scope="col">Status</th>
-                        <th scope="col">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredReservations.map((res) => (
-                        <tr key={res.id}>
-                          <td data-label="Name">{res.full_name}</td>
-                          <td data-label="Phone">{res.contact_number || '—'}</td>
-                          <td data-label="Email">{res.email || '—'}</td>
-                          <td data-label="Purok">{res.purok}</td>
-                          <td data-label="Date">{res.preferred_date}</td>
-                          <td data-label="Time">{res.preferred_time}</td>
-                          <td data-label="Duration">{res.duration_hours}h</td>
-                          <td data-label="Purpose">{res.purpose}</td>
-                          <td data-label="Submitted">
-                            {res.created_at ? new Date(res.created_at).toLocaleDateString() : '—'}
-                          </td>
-                          <td data-label="Status">
-                            <span className={`badge badge-${res.status}`}>
-                              {res.status}
-                            </span>
-                          </td>
-                          <td data-label="Action">
-                            {res.status === 'pending' && (
-                              isTreasurer ? (
-                                <>
-                                  <button
-                                    className="btn-approve"
-                                    disabled={processingReservationIds.has(res.id)}
-                                    onClick={() => handleApproveReservation(res)}>
-                                    Approve
-                                  </button>
-                                  <button
-                                    className="btn-deny"
-                                    disabled={processingReservationIds.has(res.id)}
-                                    onClick={() => handleDeclineReservation(res)}>
-                                    Deny
-                                  </button>
-                                </>
-                              ) : (
-                                <span className="role-restricted-note">Treasurer only</span>
-                              )
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  {/* Names, purposes and exception reasons go HERE, never
+                      inside a calendar cell. Same information the queue
+                      already shows this official -- nothing new is
+                      exposed, and nothing is exposed publicly. */}
+                  <div className="mcal-day-panel">
+                    {!calendarDate ? (
+                      <p className="mcal-day-empty">
+                        Select a date to see its bookings.
+                      </p>
+                    ) : (
+                      <>
+                        <h4>{longDate(calendarDate)}</h4>
+                        {calendarDayReservations.length === 0 ? (
+                          <p className="mcal-day-empty">No bookings on this date.</p>
+                        ) : (
+                          <>
+                            <div className="mcal-day-list">
+                              {calendarDayReservations.map((res) => (
+                                <div key={res.id} className="mcal-day-item">
+                                  <span className="mcal-day-item-time">
+                                    {res.preferred_time} · {res.duration_hours}h
+                                  </span>
+                                  <span className="mcal-day-item-title">{res.full_name}</span>
+                                  <span className={`badge ${reservationStatusClass(res.status)}`}>
+                                    {reservationStatusLabel(res.status)}
+                                  </span>
+                                  {isExceptionRequest(res) && (
+                                    <span className="badge badge-exception">
+                                      {EXCEPTION_BADGE_LABEL}
+                                    </span>
+                                  )}
+                                  <span className="mcal-day-item-meta">{res.purpose}</span>
+                                </div>
+                              ))}
+                            </div>
+                            {/* Decisions stay in the queue. This takes the
+                                official there with the date already in the
+                                search box, rather than duplicating Approve
+                                and Decline in a second place. */}
+                            <button
+                              type="button"
+                              className="btn-add btn-sm mcal-day-action"
+                              onClick={() => {
+                                setReservationDateFilter(calendarDate)
+                                setReservationView('queue')
+                              }}
+                            >
+                              Open these in the queue
+                            </button>
+                          </>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
-                )
-              })()}
+              )}
+
+              {/* ⚠️ The queue is the management interface and the
+                  default. Only its visibility is conditional here --
+                  nothing about the filtering, the ordering, the
+                  Treasurer-only gate or the decision handlers
+                  changed. */}
+              {reservationView === 'queue' && (
+                <>
+                {/* The status dropdown now sits in the shared filter bar
+                    beside the search box, so it reads as one set of controls
+                    narrowing one list. Same options as before plus
+                    Cancelled, and the two compose -- see
+                    visibleReservations. */}
+                <DashboardFilterBar
+                  idPrefix="reservations"
+                  searchLabel="Search reservations by name, contact number, email, purpose or purok"
+                  placeholder="Search reservations..."
+                  query={reservationQuery}
+                  onQueryChange={setReservationQuery}
+                  selectFilter={{
+                    label: 'Filter reservations by status',
+                    value: reservationFilter,
+                    onChange: setReservationFilter,
+                    options: RESERVATION_FILTER_OPTIONS,
+                  }}
+                  toggleFilter={{
+                    label: `Office-hours exceptions only (${exceptionReservationCount})`,
+                    checked: reservationExceptionsOnly,
+                    onChange: setReservationExceptionsOnly,
+                  }}
+                  resultText={
+                    reservationFiltersActive
+                      ? `Showing ${visibleReservations.length} of ${reservations.length}`
+                        + ` ${reservations.length === 1 ? 'reservation' : 'reservations'}`
+                        // Named, because the calendar can set this
+                        // filter and an official arriving in the queue
+                        // would otherwise see a short list with no
+                        // reason given.
+                        + (reservationDateFilter ? ` on ${longDate(reservationDateFilter)}` : '')
+                      : `${reservations.length}`
+                        + ` ${reservations.length === 1 ? 'reservation' : 'reservations'}`
+                  }
+                  onReset={resetReservationFilters}
+                  filtersActive={reservationFiltersActive}
+                />
+
+                {(() => {
+                  // Ordering is newest submission first, set by
+                  // fetchReservations and unchanged; filtering preserves it.
+                  const filteredReservations = visibleReservations
+
+                  return filteredReservations.length === 0 ? (
+                    <p className="dashboard-empty">
+                      {reservationFiltersActive
+                        ? 'No reservations match this search.'
+                        : 'No reservations yet.'}
+                    </p>
+                  ) : (
+                  <div className="table-wrapper">
+                    <table className="dashboard-table">
+                      <thead>
+                        <tr>
+                          <th scope="col">Name</th>
+                          <th scope="col">Phone</th>
+                          <th scope="col">Email</th>
+                          <th scope="col">Purok</th>
+                          <th scope="col">Date</th>
+                          <th scope="col">Time</th>
+                          {/* "Hours" and "Filed" rather than "Duration" and
+                              "Submitted": an uppercase letter-spaced header
+                              was setting the minimum width of a column whose
+                              values are "3h" and a short date, so the header
+                              was costing more room than the data it labels. */}
+                          <th scope="col">Hours</th>
+                          <th scope="col">Purpose</th>
+                          <th scope="col">Filed</th>
+                          <th scope="col">Status</th>
+                          <th scope="col">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredReservations.map((res) => (
+                          <tr key={res.id}>
+                            <td data-label="Name">{res.full_name}</td>
+                            <td data-label="Phone">{res.contact_number || '—'}</td>
+                            {/* Truncated with an ellipsis rather than
+                                wrapped: a 57-character address broken
+                                character-by-character was taking four lines
+                                and making every other row that tall. The
+                                whole address is in the tooltip, and the
+                                truncation is released in card mode where
+                                the value must be complete. */}
+                            <td data-label="Email">
+                              {res.email ? (
+                                <span className="cell-truncate" title={res.email}>
+                                  {res.email}
+                                </span>
+                              ) : '—'}
+                            </td>
+                            {/* The column is already headed Purok, so the
+                                cell says "4" rather than "Purok 4". Display
+                                only -- the stored value is untouched and is
+                                on the cell as a tooltip, which is also how
+                                a legacy free-text spelling stays visible. */}
+                            <td data-label="Purok" title={res.purok || undefined}>
+                              {purokShortLabel(res.purok) || '—'}
+                            </td>
+                            <td data-label="Date">{res.preferred_date}</td>
+                            {/* The badge sits with the time, because the
+                                time is what the exception is about. A
+                                booking from before migration 020 has no
+                                reason and gets no badge -- see
+                                isExceptionRequest, which reads the reason
+                                rather than the hour. */}
+                            <td data-label="Time">
+                              {res.preferred_time}
+                              {isExceptionRequest(res) && (
+                                <span
+                                  className="badge badge-exception"
+                                  title="Starts before 5:00 PM. The resident asked for an office-hours exception; an official decides it."
+                                >
+                                  {EXCEPTION_BADGE_LABEL}
+                                </span>
+                              )}
+                            </td>
+                            <td data-label="Hours">{res.duration_hours}h</td>
+                            <td data-label="Purpose">
+                              {res.purpose}
+                              {isExceptionRequest(res) && (
+                                <span className="exception-reason-note">
+                                  <strong>Office-hours reason:</strong>{' '}
+                                  {res.exception_reason}
+                                </span>
+                              )}
+                            </td>
+                            <td data-label="Filed">
+                              {res.created_at ? new Date(res.created_at).toLocaleDateString() : '—'}
+                            </td>
+                            <td data-label="Status">
+                              {/* Was `badge-${res.status}` with the raw value
+                                  as its text: a cancelled booking produced
+                                  `badge-cancelled`, which no stylesheet
+                                  defined, and an official read "pending"
+                                  where the resident read "Pending". Both now
+                                  come from the shared map. */}
+                              <span className={`badge ${reservationStatusClass(res.status)}`}>
+                                {reservationStatusLabel(res.status)}
+                              </span>
+                            </td>
+                            <td data-label="Action">
+                              {res.status === 'pending' && (
+                                isTreasurer ? (
+                                  <>
+                                    <button
+                                      className="btn-approve"
+                                      disabled={processingReservationIds.has(res.id)}
+                                      onClick={() => handleApproveReservation(res)}>
+                                      Approve
+                                    </button>
+                                    <button
+                                      className="btn-deny"
+                                      disabled={processingReservationIds.has(res.id)}
+                                      onClick={() => handleDeclineReservation(res)}>
+                                      Deny
+                                    </button>
+                                  </>
+                                ) : (
+                                  <span className="role-restricted-note">Treasurer only</span>
+                                )
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  )
+                })()}
+                </>
+              )}
             </div>
           </div>
         )}
@@ -2259,41 +3249,6 @@ const OfficialDashboard = () => {
             KAPITAN STATUS TAB
             (Only visible to Punong Barangay via Sidebar)
         ======================== */}
-        {activeTab === 'kapitan' && (
-          <div>
-            <div className="kapitan-page-header">
-              <h1>Kapitan Status Tracker</h1>
-              <p>Maintain transparency by providing real-time updates on your availability.</p>
-            </div>
-
-            {isKapitan ? (
-              <div className="kapitan-status-section">
-                <h3>Set Your Status</h3>
-                <div className="kapitan-current-display">
-                  {kapitanStatusDisplay(kapitanStatus)}
-                </div>
-                <div className="kapitan-status-grid">
-                  {KAPITAN_STATUS_OPTIONS.map((option) => (
-                    <button
-                      key={option.value}
-                      className={`kapitan-status-option ${kapitanStatus === option.value ? 'active' : ''}`}
-                      onClick={() => handleUpdateKapitanStatus(option.value)}>
-                      {option.emoji} {option.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="kapitan-status-section">
-                <h3>Kapitan's Current Status</h3>
-                <div className="kapitan-current-display">
-                  {kapitanStatusDisplay(kapitanStatus)}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
         {/* ========================
             DOCUMENT REQUESTS TAB
         ======================== */}
@@ -2305,8 +3260,39 @@ const OfficialDashboard = () => {
             </div>
 
             <div className="dashboard-card">
+              {documentRequests.length > 0 && (
+                <DashboardFilterBar
+                  idPrefix="documents"
+                  searchLabel="Search document requests by resident name, document type, purpose, contact number or purok"
+                  placeholder="Search requests..."
+                  query={documentQuery}
+                  onQueryChange={setDocumentQuery}
+                  selectFilter={{
+                    label: 'Filter document requests by status',
+                    value: documentFilter,
+                    onChange: setDocumentFilter,
+                    options: DOCUMENT_FILTER_OPTIONS,
+                  }}
+                  resultText={
+                    documentFiltersActive
+                      ? `Showing ${visibleDocumentRequests.length} of ${documentRequests.length}`
+                        + ` ${documentRequests.length === 1 ? 'request' : 'requests'}`
+                      : ''
+                  }
+                  onReset={resetDocumentFilters}
+                  filtersActive={documentFiltersActive}
+                />
+              )}
+
+              {/* ⚠️ Two different empty states. "No document requests
+                  yet" and "nothing matches your filters" are different
+                  facts, and showing the first while a filter is applied
+                  would tell an official the queue is empty when it is
+                  not. */}
               {documentRequests.length === 0 ? (
                 <p className="dashboard-empty">No document requests yet.</p>
+              ) : visibleDocumentRequests.length === 0 ? (
+                <p className="dashboard-empty">No document requests match this search.</p>
               ) : (
                 <div className="table-wrapper">
                   <table className="dashboard-table">
@@ -2322,25 +3308,25 @@ const OfficialDashboard = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {documentRequests.map((req) => (
+                      {visibleDocumentRequests.map((req) => (
                         <tr key={req.id}>
                           <td data-label="Resident">{req.full_name}</td>
                           <td data-label="Document">{req.document_type}</td>
                           <td data-label="Purpose">{req.purpose}</td>
                           <td data-label="Contact">{req.contact_number || '—'}</td>
                           <td data-label="Status">
-                            <span className={`badge badge-${
-                              req.status === 'ready_for_pickup' ? 'ready'
-                                : req.status === 'claimed' ? 'claimed'
-                                  : req.status
-                            }`}>
-                              {req.status.replace(/_/g, ' ')}
+                            {/* The resident portal read "Ready for Pickup"
+                                from its own label map while this table
+                                printed "ready for pickup" from a regex on
+                                the stored value. One map now serves both. */}
+                            <span className={`badge ${documentStatusClass(req.status)}`}>
+                              {documentStatusLabel(req.status)}
                             </span>
                           </td>
                           <td data-label="Submitted">
                             {req.created_at ? new Date(req.created_at).toLocaleDateString() : '—'}
                           </td>
-                          <td data-label="Action" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          <td data-label="Action" className="action-cell">
                             {isSecretary ? (
                               <>
                                 {req.status === 'pending' && (
@@ -2371,7 +3357,7 @@ const OfficialDashboard = () => {
                                   <button
                                     className="btn-approve"
                                     disabled={processingDocRequestIds.has(req.id)}
-                                    onClick={() => handleUpdateDocRequestStatus(req, 'claimed')}>
+                                    onClick={() => handleMarkDocRequestClaimed(req)}>
                                     Mark Claimed
                                   </button>
                                 )}
@@ -2401,7 +3387,7 @@ const OfficialDashboard = () => {
               <div className="dashboard-card-header">
                 <h3>Collection Schedule</h3>
                 <button className="btn-add" onClick={handleOpenAddWaste}>
-                  <FaPlus /> Add Entry
+                  <FaPlus /> Add Schedule Entry
                 </button>
               </div>
 
@@ -2423,23 +3409,31 @@ const OfficialDashboard = () => {
                     <tbody>
                       {wasteSchedule.map((entry) => (
                         <tr key={entry.id}>
-                          <td data-label="Purok">{entry.purok}</td>
+                          <td data-label="Purok">{entry.purok || '—'}</td>
                           <td data-label="Waste Type">{entry.waste_type}</td>
                           <td data-label="Day">{entry.day_of_week}</td>
                           <td data-label="Time">{entry.time_label || '—'}</td>
                           <td data-label="Notes">{entry.notes || '—'}</td>
-                          <td data-label="Action" style={{ display: 'flex', gap: 8 }}>
-                            <button
-                              className="btn-add"
-                              style={{ fontSize: 12, padding: '4px 10px' }}
-                              onClick={() => handleEditWaste(entry)}>
-                              <FaEdit /> Edit
-                            </button>
-                            <button
-                              className="btn-deny"
-                              onClick={() => handleDeleteWaste(entry)}>
-                              <FaTrash /> Delete
-                            </button>
+                          <td data-label="Action" className="action-cell">
+                            <ActionMenu
+                              portal
+                              subject={entry.purok || 'this schedule'}
+                              items={[
+                                {
+                                  key: 'edit',
+                                  label: 'Edit',
+                                  icon: <FaEdit />,
+                                  onSelect: () => handleEditWaste(entry),
+                                },
+                                {
+                                  key: 'delete',
+                                  label: 'Delete',
+                                  icon: <FaTrash />,
+                                  danger: true,
+                                  onSelect: () => handleDeleteWaste(entry),
+                                },
+                              ]}
+                            />
                           </td>
                         </tr>
                       ))}
@@ -2491,15 +3485,36 @@ const OfficialDashboard = () => {
 
                   <p className="dashboard-card-note">{activeResidentGroup.description}</p>
 
-                  <ResidentFilterBar
+                  {/* Why the sidebar badge can read lower than this tab's
+                      count: the badge counts only what is waiting on an
+                      official. Both numbers are right; without this line
+                      they look like one of them is wrong. */}
+                  {residentGroup === 'requests' && residentGroups.requests.length > 0 && (
+                    <p className="dashboard-card-note">
+                      {[
+                        `${awaitingVerificationCount} awaiting an official's review`
+                          + ' (what the sidebar badge counts)',
+                        `${returnedToResidentCount} returned to the resident to correct`,
+                        unclassifiedRequestCount > 0
+                          ? `${unclassifiedRequestCount} with an unrecognised status — see the`
+                            + ' cross-check below'
+                          : null,
+                      ].filter(Boolean).join(' · ')}
+                    </p>
+                  )}
+
+                  <DashboardFilterBar
                     idPrefix="residents"
                     searchLabel="Search resident accounts by name, contact number or purok"
                     placeholder="Search name, contact or purok…"
                     query={residentQuery}
                     onQueryChange={setResidentQuery}
-                    purokLabel="Filter resident accounts by purok"
-                    purok={residentPurok}
-                    onPurokChange={setResidentPurok}
+                    selectFilter={{
+                      label: 'Filter resident accounts by purok',
+                      value: residentPurok,
+                      onChange: setResidentPurok,
+                      options: PUROK_FILTER_OPTIONS,
+                    }}
                     resultText={
                       residentFiltersActive
                         ? `Showing ${visibleResidents.length} of `
@@ -2539,8 +3554,8 @@ const OfficialDashboard = () => {
                         <tr key={resident.id}>
                           <td data-label="Name">{resident.full_name}</td>
                           <td data-label="Contact">{resident.contact_number || '—'}</td>
-                          <td data-label="Purok">
-                            {resident.purok || '—'}
+                          <td data-label="Purok" title={resident.purok || undefined}>
+                            {purokShortLabel(resident.purok) || '—'}
                             {/* A value the purok list does not contain cannot be
                                 grouped or matched. Flagged in words, not left to
                                 be noticed -- and never rewritten here. */}
@@ -2608,8 +3623,7 @@ const OfficialDashboard = () => {
                           <td data-label="ID">
                             {resident.id_document_url ? (
                               <button
-                                className="btn-add"
-                                style={{ fontSize: 12, padding: '4px 10px' }}
+                                className="btn-add btn-sm"
                                 onClick={() => handleViewId(resident)}
                               >
                                 View ID
@@ -2626,7 +3640,7 @@ const OfficialDashboard = () => {
                               </span>
                             )}
                           </td>
-                          <td data-label="Action" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          <td data-label="Action" className="action-cell">
                             {resident.verification_status !== 'verified' && (
                               <button
                                 className="btn-approve"
@@ -2776,7 +3790,7 @@ const OfficialDashboard = () => {
               <div className="dashboard-card-header">
                 <h3>Voter Reference Entries</h3>
                 <button className="btn-add" onClick={handleOpenAddRegistryEntry}>
-                  <FaPlus /> Add Entry
+                  <FaPlus /> Add Voter Entry
                 </button>
               </div>
 
@@ -2784,15 +3798,18 @@ const OfficialDashboard = () => {
                 <p className="dashboard-empty">No voter reference entries yet.</p>
               ) : (
                 <>
-                  <ResidentFilterBar
+                  <DashboardFilterBar
                     idPrefix="registry"
                     searchLabel="Search the voter reference list by name, purok, household number or contact number"
                     placeholder="Search name, purok, household or contact…"
                     query={registryQuery}
                     onQueryChange={setRegistryQuery}
-                    purokLabel="Filter voter reference entries by purok"
-                    purok={registryPurok}
-                    onPurokChange={setRegistryPurok}
+                    selectFilter={{
+                      label: 'Filter voter reference entries by purok',
+                      value: registryPurok,
+                      onChange: setRegistryPurok,
+                      options: PUROK_FILTER_OPTIONS,
+                    }}
                     resultText={
                       registryFiltersActive
                         ? `Showing ${visibleRegistryEntries.length} of ${registryEntries.length} entries`
@@ -2822,8 +3839,8 @@ const OfficialDashboard = () => {
                       {visibleRegistryEntries.map((entry) => (
                         <tr key={entry.id}>
                           <td data-label="Name">{entry.full_name}</td>
-                          <td data-label="Purok">
-                            {entry.purok || '—'}
+                          <td data-label="Purok" title={entry.purok || undefined}>
+                            {purokShortLabel(entry.purok) || '—'}
                             {entry.purok && !isKnownPurok(entry.purok) && (
                               <span
                                 className="resident-purok-flag"
@@ -2835,18 +3852,26 @@ const OfficialDashboard = () => {
                           </td>
                           <td data-label="Household #">{entry.household_number || '—'}</td>
                           <td data-label="Contact">{entry.contact_number || '—'}</td>
-                          <td data-label="Action" style={{ display: 'flex', gap: 8 }}>
-                            <button
-                              className="btn-add"
-                              style={{ fontSize: 12, padding: '4px 10px' }}
-                              onClick={() => handleEditRegistryEntry(entry)}>
-                              <FaEdit /> Edit
-                            </button>
-                            <button
-                              className="btn-deny"
-                              onClick={() => handleDeleteRegistryEntry(entry)}>
-                              <FaTrash /> Delete
-                            </button>
+                          <td data-label="Action" className="action-cell">
+                            <ActionMenu
+                              portal
+                              subject={entry.full_name}
+                              items={[
+                                {
+                                  key: 'edit',
+                                  label: 'Edit',
+                                  icon: <FaEdit />,
+                                  onSelect: () => handleEditRegistryEntry(entry),
+                                },
+                                {
+                                  key: 'delete',
+                                  label: 'Delete',
+                                  icon: <FaTrash />,
+                                  danger: true,
+                                  onSelect: () => handleDeleteRegistryEntry(entry),
+                                },
+                              ]}
+                            />
                           </td>
                         </tr>
                       ))}
@@ -2863,7 +3888,7 @@ const OfficialDashboard = () => {
         {activeTab === 'officials' && (
           <div>
             <div className="officials-dir-header">
-              <h1>Leadership Directory</h1>
+              <h1>Officials Directory</h1>
               <p>Manage the digital face of your community leadership.</p>
             </div>
 
@@ -2907,31 +3932,45 @@ const OfficialDashboard = () => {
                           <td data-label="Position">{official.position}</td>
                           <td data-label="Committee">{official.committee || '—'}</td>
                           <td data-label="Contact">{official.contact_number || '—'}</td>
-                          <td data-label="Action" style={{ display: 'flex', gap: 8 }}>
-                            <button
-                              className="btn-add"
-                              style={{ fontSize: 12, padding: '4px 10px' }}
-                              onClick={() => handleEditOfficial(official)}>
-                              <FaEdit /> Edit
-                            </button>
-                            {/* Archive, not Delete. An official who leaves
-                                office is kept as barangay history. There is
-                                no permanent-delete control in this UI.
-
-                                An official may not archive their own record.
-                                The reason is stated in text rather than left
-                                to a disabled button, which explains nothing
-                                on its own. */}
-                            {isOwnOfficialRecord(official) ? (
+                          <td data-label="Action" className="action-cell">
+                            {/* ⚠️ The self-archive guard is preserved
+                                exactly: when this is the signed-in
+                                official's own record the Archive item is
+                                NOT in the menu, and the reason is still
+                                stated in text rather than left to a
+                                disabled control that explains nothing.
+                                Archive, not Delete -- an official who
+                                leaves office is kept as barangay
+                                history, and there is no permanent-delete
+                                control in this UI. */}
+                            <ActionMenu
+                              portal
+                              subject={official.full_name}
+                              items={[
+                                {
+                                  key: 'edit',
+                                  label: 'Edit',
+                                  icon: <FaEdit />,
+                                  onSelect: () => handleEditOfficial(official),
+                                },
+                                // ⚠️ "Archive", never "Delete". The two are
+                                // different outcomes here and the word is
+                                // the only thing that says so -- see
+                                // *Officials archive*. Only the redundant
+                                // entity noun was dropped.
+                                ...(isOwnOfficialRecord(official) ? [] : [{
+                                  key: 'archive',
+                                  label: 'Archive',
+                                  icon: <FaArchive />,
+                                  danger: true,
+                                  onSelect: () => setArchivingOfficial(official),
+                                }]),
+                              ]}
+                            />
+                            {isOwnOfficialRecord(official) && (
                               <span className="official-archive-blocked">
                                 Your own record — another official must archive it
                               </span>
-                            ) : (
-                              <button
-                                className="btn-deny"
-                                onClick={() => setArchivingOfficial(official)}>
-                                <FaArchive /> Archive
-                              </button>
                             )}
                           </td>
                         </tr>
@@ -3199,10 +4238,16 @@ const OfficialDashboard = () => {
                                 : ['declined', 'rejected', 'cancelled'].includes(entry.action) ? 'declined'
                                   : 'pending'
                             }`}>
-                              {entry.action.replace(/_/g, ' ')}
+                              {/* Was `entry.action.replace(/_/g, ' ')`, which
+                                  put "ready for pickup" and "marked
+                                  ineligible" on screen. An action the maps
+                                  do not know is still shown exactly as
+                                  stored -- the audit trail is the one place
+                                  an unexpected value must stay visible. */}
+                              {activityActionLabel(entry.action)}
                             </span>
                           </td>
-                          <td data-label="Type">{entry.entity_type.replace(/_/g, ' ')}</td>
+                          <td data-label="Type">{activityEntityLabel(entry.entity_type)}</td>
                           <td data-label="Subject">{entry.subject || '—'}</td>
                           <td data-label="Notes">{entry.details || '—'}</td>
                         </tr>
@@ -3276,9 +4321,9 @@ const OfficialDashboard = () => {
               </p>
 
               <div className="modal-form-group">
-                <label className="modal-form-label">New Password</label>
+                <label htmlFor="off-new-password" className="modal-form-label">New Password</label>
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <input
+                  <input id="off-new-password"
                     type={showNew ? 'text' : 'password'}
                     className="modal-form-input"
                     placeholder="Enter new password"
@@ -3287,6 +4332,9 @@ const OfficialDashboard = () => {
                     style={{ paddingRight: 40 }}
                   />
                   <button
+                    type="button"
+                    aria-pressed={showNew}
+                    aria-label={showNew ? 'Hide the new password' : 'Show the new password'}
                     onClick={() => setShowNew(!showNew)}
                     style={{
                       position: 'absolute', right: 12, background: 'none',
@@ -3299,9 +4347,9 @@ const OfficialDashboard = () => {
               </div>
 
               <div className="modal-form-group">
-                <label className="modal-form-label">Confirm New Password</label>
+                <label htmlFor="off-confirm-new-password" className="modal-form-label">Confirm New Password</label>
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <input
+                  <input id="off-confirm-new-password"
                     type={showConfirm ? 'text' : 'password'}
                     className="modal-form-input"
                     placeholder="Confirm new password"
@@ -3310,6 +4358,9 @@ const OfficialDashboard = () => {
                     style={{ paddingRight: 40 }}
                   />
                   <button
+                    type="button"
+                    aria-pressed={showConfirm}
+                    aria-label={showConfirm ? 'Hide the confirmed password' : 'Show the confirmed password'}
                     onClick={() => setShowConfirm(!showConfirm)}
                     style={{
                       position: 'absolute', right: 12, background: 'none',
@@ -3349,12 +4400,14 @@ const OfficialDashboard = () => {
       ======================== */}
       {showAnnouncementModal && (
         <div className="modal-overlay">
-          <div className="modal">
-            <h3>New Announcement</h3>
+          <div className="modal" role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="offdlg-1-title">
+            <h3 id="offdlg-1-title">
+              {editingAnnouncement ? 'Edit Announcement' : 'New Announcement'}
+            </h3>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Title</label>
-              <input
+              <label htmlFor="off-title" className="modal-form-label">Title</label>
+              <input id="off-title"
                 type="text"
                 className="modal-form-input"
                 placeholder="Announcement title"
@@ -3364,8 +4417,8 @@ const OfficialDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Badge / Category</label>
-              <input
+              <label htmlFor="off-badge-category" className="modal-form-label">Badge / Category</label>
+              <input id="off-badge-category"
                 type="text"
                 className="modal-form-input"
                 placeholder="e.g. PUBLIC WORKS, HEALTH"
@@ -3375,8 +4428,8 @@ const OfficialDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Description</label>
-              <textarea
+              <label htmlFor="off-description" className="modal-form-label">Description</label>
+              <textarea id="off-description"
                 className="modal-form-textarea"
                 placeholder="Announcement description"
                 value={newAnnouncement.description}
@@ -3385,11 +4438,20 @@ const OfficialDashboard = () => {
             </div>
 
             <div className="modal-buttons">
-              <button className="btn-cancel" onClick={() => setShowAnnouncementModal(false)}>
+              <button
+                className="btn-cancel"
+                onClick={() => { setShowAnnouncementModal(false); setEditingAnnouncement(null) }}
+              >
                 Cancel
               </button>
-              <button className="btn-save" onClick={handleAddAnnouncement} disabled={submitting}>
-                {submitting ? 'Saving...' : 'Save Announcement'}
+              <button
+                className="btn-save"
+                onClick={editingAnnouncement ? handleUpdateAnnouncement : handleAddAnnouncement}
+                disabled={submitting}
+              >
+                {submitting
+                  ? 'Saving...'
+                  : editingAnnouncement ? 'Save Changes' : 'Save Announcement'}
               </button>
             </div>
           </div>
@@ -3401,12 +4463,12 @@ const OfficialDashboard = () => {
       ======================== */}
       {showEventModal && (
         <div className="modal-overlay">
-          <div className="modal">
-            <h3>Add New Event</h3>
+          <div className="modal" role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="offdlg-2-title">
+            <h3 id="offdlg-2-title">{editingEvent ? 'Edit Event' : 'Add Event'}</h3>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Event Title</label>
-              <input
+              <label htmlFor="off-event-title" className="modal-form-label">Event Title</label>
+              <input id="off-event-title"
                 type="text"
                 className="modal-form-input"
                 placeholder="Event title"
@@ -3416,8 +4478,8 @@ const OfficialDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Location</label>
-              <input
+              <label htmlFor="off-location" className="modal-form-label">Location</label>
+              <input id="off-location"
                 type="text"
                 className="modal-form-input"
                 placeholder="Event location"
@@ -3427,8 +4489,8 @@ const OfficialDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Event Date</label>
-              <input
+              <label htmlFor="off-event-date" className="modal-form-label">Event Date</label>
+              <input id="off-event-date"
                 type="date"
                 className="modal-form-input"
                 value={newEvent.event_date}
@@ -3437,10 +4499,20 @@ const OfficialDashboard = () => {
             </div>
 
             <div className="modal-buttons">
-              <button className="btn-cancel" onClick={() => setShowEventModal(false)}>
+              <button
+                className="btn-cancel"
+                onClick={() => {
+                  setShowEventModal(false)
+                  setEditingEvent(null)
+                }}
+              >
                 Cancel
               </button>
-              <button className="btn-save" onClick={handleAddEvent} disabled={submitting}>
+              <button
+                className="btn-save"
+                onClick={editingEvent ? handleUpdateEvent : handleAddEvent}
+                disabled={submitting}
+              >
                 {submitting ? 'Saving...' : 'Save Event'}
               </button>
             </div>
@@ -3453,12 +4525,12 @@ const OfficialDashboard = () => {
       ======================== */}
       {showOfficialModal && (
         <div className="modal-overlay">
-          <div className="modal">
-            <h3>{editingOfficial ? 'Edit Official' : 'Add Official'}</h3>
+          <div className="modal" role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="offdlg-3-title">
+            <h3 id="offdlg-3-title">{editingOfficial ? 'Edit Official' : 'Add Official'}</h3>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Full Name</label>
-              <input
+              <label htmlFor="off-full-name" className="modal-form-label">Full Name</label>
+              <input id="off-full-name"
                 type="text"
                 className="modal-form-input"
                 placeholder="e.g. Hon. Frankie Credo"
@@ -3468,8 +4540,8 @@ const OfficialDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Position</label>
-              <select
+              <label htmlFor="off-position" className="modal-form-label">Position</label>
+              <select id="off-position"
                 className="modal-form-input"
                 value={newOfficial.position}
                 onChange={(e) => setNewOfficial({ ...newOfficial, position: e.target.value })}
@@ -3484,8 +4556,8 @@ const OfficialDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Committee (optional)</label>
-              <input
+              <label htmlFor="off-committee-optional" className="modal-form-label">Committee (optional)</label>
+              <input id="off-committee-optional"
                 type="text"
                 className="modal-form-input"
                 placeholder="e.g. Health and Sanitation"
@@ -3495,8 +4567,8 @@ const OfficialDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Contact Number (optional)</label>
-              <input
+              <label htmlFor="off-contact-number-optional" className="modal-form-label">Contact Number (optional)</label>
+              <input id="off-contact-number-optional"
                 type="text"
                 className="modal-form-input"
                 placeholder="09XXXXXXXXX"
@@ -3506,8 +4578,8 @@ const OfficialDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Display Order</label>
-              <input
+              <label htmlFor="off-display-order" className="modal-form-label">Display Order</label>
+              <input id="off-display-order"
                 type="number"
                 className="modal-form-input"
                 placeholder="Lower numbers appear first"
@@ -3530,12 +4602,12 @@ const OfficialDashboard = () => {
 
       {showWasteModal && (
         <div className="modal-overlay">
-          <div className="modal">
-            <h3>{editingWaste ? 'Edit Schedule Entry' : 'Add Schedule Entry'}</h3>
+          <div className="modal" role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="offdlg-4-title">
+            <h3 id="offdlg-4-title">{editingWaste ? 'Edit Schedule Entry' : 'Add Schedule Entry'}</h3>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Purok</label>
-              <input
+              <label htmlFor="off-purok" className="modal-form-label">Purok</label>
+              <input id="off-purok"
                 type="text"
                 className="modal-form-input"
                 placeholder="e.g. Purok 3"
@@ -3545,8 +4617,8 @@ const OfficialDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Waste Type</label>
-              <select
+              <label htmlFor="off-waste-type" className="modal-form-label">Waste Type</label>
+              <select id="off-waste-type"
                 className="modal-form-input"
                 value={newWasteEntry.waste_type}
                 onChange={(e) => setNewWasteEntry({ ...newWasteEntry, waste_type: e.target.value })}
@@ -3558,8 +4630,8 @@ const OfficialDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Day of Week</label>
-              <select
+              <label htmlFor="off-day-of-week" className="modal-form-label">Day of Week</label>
+              <select id="off-day-of-week"
                 className="modal-form-input"
                 value={newWasteEntry.day_of_week}
                 onChange={(e) => setNewWasteEntry({ ...newWasteEntry, day_of_week: e.target.value })}
@@ -3572,8 +4644,8 @@ const OfficialDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Time (optional)</label>
-              <input
+              <label htmlFor="off-time-optional" className="modal-form-label">Time (optional)</label>
+              <input id="off-time-optional"
                 type="text"
                 className="modal-form-input"
                 placeholder="e.g. 6:00 AM - 8:00 AM"
@@ -3583,8 +4655,8 @@ const OfficialDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Notes (optional)</label>
-              <input
+              <label htmlFor="off-notes-optional" className="modal-form-label">Notes (optional)</label>
+              <input id="off-notes-optional"
                 type="text"
                 className="modal-form-input"
                 placeholder="e.g. Segregate before collection"
@@ -3607,12 +4679,12 @@ const OfficialDashboard = () => {
 
       {showRegistryModal && (
         <div className="modal-overlay">
-          <div className="modal">
-            <h3>{editingRegistryEntry ? 'Edit Voter Reference Entry' : 'Add Voter Reference Entry'}</h3>
+          <div className="modal" role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="offdlg-5-title">
+            <h3 id="offdlg-5-title">{editingRegistryEntry ? 'Edit Voter Reference Entry' : 'Add Voter Reference Entry'}</h3>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Full Name</label>
-              <input
+              <label htmlFor="off-full-name-2" className="modal-form-label">Full Name</label>
+              <input id="off-full-name-2"
                 type="text"
                 className="modal-form-input"
                 placeholder="e.g. Juan Dela Cruz"
@@ -3652,8 +4724,8 @@ const OfficialDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Household Number (optional)</label>
-              <input
+              <label htmlFor="off-household-number-optional" className="modal-form-label">Household Number (optional)</label>
+              <input id="off-household-number-optional"
                 type="text"
                 className="modal-form-input"
                 placeholder="e.g. HH-0012"
@@ -3663,8 +4735,8 @@ const OfficialDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Contact Number (optional)</label>
-              <input
+              <label htmlFor="off-contact-number-optional-2" className="modal-form-label">Contact Number (optional)</label>
+              <input id="off-contact-number-optional-2"
                 type="text"
                 className="modal-form-input"
                 placeholder="09xx xxx xxxx"
@@ -3687,15 +4759,15 @@ const OfficialDashboard = () => {
 
       {decliningRequest && (
         <div className="modal-overlay">
-          <div className="modal">
-            <h3>Decline {decliningRequest.document_type} Request</h3>
+          <div className="modal" role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="offdlg-6-title">
+            <h3 id="offdlg-6-title">Decline {decliningRequest.document_type} Request</h3>
             <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>
               This resident will see this explanation on their Document Requests page.
             </p>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Reason</label>
-              <textarea
+              <label htmlFor="off-reason" className="modal-form-label">Reason</label>
+              <textarea id="off-reason"
                 className="modal-form-textarea"
                 placeholder="e.g. Missing required signature, incomplete purpose, please visit the office"
                 value={declineNotes}
@@ -3721,8 +4793,8 @@ const OfficialDashboard = () => {
 
       {viewingId && (
         <div className="modal-overlay" onClick={() => setViewingId(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640 }}>
-            <h3>ID — {viewingId.resident.full_name}</h3>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640 }} role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="offdlg-7-title">
+            <h3 id="offdlg-7-title">ID — {viewingId.resident.full_name}</h3>
             <p style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
               This link expires in 2 minutes. Check that the name and address match
               what the resident entered.
@@ -3757,8 +4829,8 @@ const OfficialDashboard = () => {
 
       {ineligibleResident && (
         <div className="modal-overlay">
-          <div className="modal">
-            <h3>Mark {ineligibleResident.full_name} as Not a Resident</h3>
+          <div className="modal" role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="offdlg-8-title">
+            <h3 id="offdlg-8-title">Mark {ineligibleResident.full_name} as Not a Resident</h3>
             <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 8 }}>
               Use this when the applicant is not a resident of Barangay Batinguel.
               Unlike Reject, they cannot put themselves back in the queue — only an
@@ -3784,8 +4856,8 @@ const OfficialDashboard = () => {
             )}
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Reason</label>
-              <textarea
+              <label htmlFor="off-reason-2" className="modal-form-label">Reason</label>
+              <textarea id="off-reason-2"
                 className="modal-form-textarea"
                 placeholder="e.g. confirmed to be living in another barangay"
                 value={ineligibleNotes}
@@ -3803,7 +4875,7 @@ const OfficialDashboard = () => {
                 onClick={handleConfirmIneligible}
                 disabled={submitting}
               >
-                {submitting ? 'Saving...' : 'Confirm'}
+                {submitting ? 'Saving...' : 'Confirm Not a Resident'}
               </button>
             </div>
           </div>
@@ -3812,15 +4884,15 @@ const OfficialDashboard = () => {
 
       {rejectingResident && (
         <div className="modal-overlay">
-          <div className="modal">
-            <h3>Reject {rejectingResident.full_name}'s Account</h3>
+          <div className="modal" role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="offdlg-9-title">
+            <h3 id="offdlg-9-title">Reject {rejectingResident.full_name}'s Account</h3>
             <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>
               This resident will see this explanation and can re-upload a new ID.
             </p>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Reason</label>
-              <textarea
+              <label htmlFor="off-reason-3" className="modal-form-label">Reason</label>
+              <textarea id="off-reason-3"
                 className="modal-form-textarea"
                 placeholder="e.g. ID photo is blurry, name doesn't match, please re-upload"
                 value={rejectNotes}

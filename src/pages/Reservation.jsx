@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../supabase/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import Navbar from '../components/Navbar'
@@ -6,42 +6,39 @@ import Footer from '../components/Footer'
 import toast from 'react-hot-toast'
 import { PUROKS } from '../constants/barangay'
 import { isKnownPurok } from '../utils/residentGroups'
+import {
+  COURT_CLOSES_HOUR,
+  COURT_OPENS_HOUR,
+  EVENING_SLOTS,
+  MAX_DURATION_HOURS,
+  MAX_EXCEPTION_DURATION_HOURS,
+  OFFICE_HOUR_SLOTS,
+  canFitDuration,
+  coveredHours,
+  durationOptionsForSlot,
+  getCoveredSlots,
+  hourLabel,
+  isOfficeHourSlot,
+  maxDurationForSlot,
+  slotHour,
+} from '../utils/reservationWindow'
 import './Reservation.css'
 
-const timeSlots = [
-  '8:00 AM',
-  '9:00 AM',
-  '10:00 AM',
-  '11:00 AM',
-  '1:00 PM',
-  '2:00 PM',
-  '3:00 PM',
-  '4:00 PM',
-  '5:00 PM',
-]
+// The slot list, the hour map, the 5-10 PM window and the
+// office-hours exception rules now live in utils/reservationWindow.js,
+// because the Official queue and the Resident portal need the same
+// answers and because they are unit-testable there. The lunch-gap
+// behaviour is unchanged and is asserted by those tests.
 
-const MAX_DURATION = 4
-
-// The court closes for lunch, so 11:00 AM and 1:00 PM sit next to each
-// other in the list but are NOT consecutive hours. Everything that
-// walks the slot list has to know that, otherwise a 2-hour booking
-// starting at 11 AM silently reserves 11-12 and 1-2 while telling the
-// resident they have the court from 11 to 1.
-const SLOT_HOURS = {
-  '8:00 AM': 8,
-  '9:00 AM': 9,
-  '10:00 AM': 10,
-  '11:00 AM': 11,
-  '1:00 PM': 13,
-  '2:00 PM': 14,
-  '3:00 PM': 15,
-  '4:00 PM': 16,
-  '5:00 PM': 17,
-}
 // The public-facing category for a booking. This appears on the
 // availability calendar for anyone to see, so it can only ever be one
 // of these fixed values -- never anything a resident typed freehand.
 // That's what `purpose` is for, and it stays visible to officials only.
+//
+// The last three are the kinds of activity the barangay mentioned when
+// it described office-hours exceptions. ⚠️ They are DESCRIPTIONS ONLY.
+// Choosing one grants nothing: an official decides every exception, and
+// no code anywhere reads activity_type to make that decision.
 const ACTIVITY_TYPES = [
   'Basketball',
   'Volleyball',
@@ -51,16 +48,11 @@ const ACTIVITY_TYPES = [
   'Meeting / Assembly',
   'Community Event',
   'Private Event',
+  'Ayuda / Distribution',
+  'Health Activity',
+  'City / Government Activity',
   'Other',
 ]
-
-// Renders the true end of a booking (start hour + duration), which is
-// not the same as the start of its last slot.
-const formatHour = (hour24) => {
-  const suffix = hour24 >= 12 ? 'PM' : 'AM'
-  const display = hour24 % 12 === 0 ? 12 : hour24 % 12
-  return `${display}:00 ${suffix}`
-}
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -84,7 +76,12 @@ const Reservation = () => {
     purpose: '',
     activity_type: '',
     additional_notes: '',
+    exception_reason: '',
   })
+  // 'evening' is the ordinary 5-10 PM booking. 'office-hours' is the
+  // exception, which a resident has to choose deliberately -- it is not
+  // reachable by scrolling the slot list.
+  const [bookingMode, setBookingMode] = useState('evening')
   const [reservations, setReservations] = useState([])
   const [loading, setLoading] = useState(false)
   const [fetchingSlots, setFetchingSlots] = useState(false)
@@ -98,13 +95,13 @@ const Reservation = () => {
   const [calendarYear, setCalendarYear] = useState(today.getFullYear())
   const [monthReservations, setMonthReservations] = useState([])
 
-  const slotIndexMap = useMemo(() => {
-    const map = {}
-    timeSlots.forEach((slot, index) => {
-      map[slot] = index
-    })
-    return map
-  }, [])
+  // Which start times the grid offers. Held slots are still computed
+  // over EVERY hour below, so an evening booking blocked by an approved
+  // office-hours event shows as taken, and the other way round.
+  const offeredSlots = useMemo(
+    () => (bookingMode === 'office-hours' ? OFFICE_HOUR_SLOTS : EVENING_SLOTS),
+    [bookingMode]
+  )
 
   useEffect(() => {
     if (formData.preferred_date) {
@@ -164,31 +161,6 @@ const Reservation = () => {
     }
   }
 
-  // Walks forward from the start slot, but stops as soon as the next
-  // slot isn't the very next clock hour — so a booking can never span
-  // the lunch closure. A short return means the duration doesn't fit,
-  // which hasConflict() and canFitDuration() both treat as a refusal.
-  const getCoveredSlots = useCallback((startSlot, duration) => {
-    const startIndex = slotIndexMap[startSlot]
-    const slots = []
-
-    if (startIndex === undefined) return slots
-
-    for (let i = 0; i < Number(duration); i++) {
-      const slot = timeSlots[startIndex + i]
-      if (!slot) break
-
-      if (i > 0) {
-        const previous = timeSlots[startIndex + i - 1]
-        if (SLOT_HOURS[slot] - SLOT_HOURS[previous] !== 1) break
-      }
-
-      slots.push(slot)
-    }
-
-    return slots
-  }, [slotIndexMap])
-
   const reservedSlots = useMemo(() => {
     const taken = new Set()
 
@@ -202,7 +174,7 @@ const Reservation = () => {
     })
 
     return taken
-  }, [reservations, getCoveredSlots])
+  }, [reservations])
 
   // Which activity is holding each taken slot, so the slot button can
   // say "Basketball" instead of just "Reserved". Bookings made before
@@ -216,18 +188,22 @@ const Reservation = () => {
         })
     })
     return map
-  }, [reservations, getCoveredSlots])
+  }, [reservations])
 
   const selectedSlots = useMemo(() => {
     return getCoveredSlots(
       formData.preferred_time,
       formData.duration_hours
     )
-  }, [formData.preferred_time, formData.duration_hours, getCoveredSlots])
+  }, [formData.preferred_time, formData.duration_hours])
 
+  // Scoped to the slots currently on offer, not to every hour. In
+  // evening mode a day whose daytime hours are taken is not "fully
+  // booked" to this resident, and saying so would send them away from a
+  // free evening.
   const availableSlots = useMemo(() => {
-    return timeSlots.filter((slot) => !reservedSlots.has(slot))
-  }, [reservedSlots])
+    return offeredSlots.filter((slot) => !reservedSlots.has(slot))
+  }, [reservedSlots, offeredSlots])
 
   // Fetch every held slot for the visible month in one request, so the
   // calendar can mark fully-booked days without one call per day.
@@ -263,7 +239,7 @@ const Reservation = () => {
         .forEach((slot) => map[dateKey].add(slot))
     })
     return map
-  }, [monthReservations, getCoveredSlots])
+  }, [monthReservations])
 
   // Distinct activities on each day of the visible month, for the
   // calendar tooltip. A Set because a day often holds several bookings
@@ -294,18 +270,26 @@ const Reservation = () => {
 
     for (let day = 1; day <= daysInMonth; day++) {
       const dateStr = toDateString(calendarYear, calendarMonth, day)
-      const taken = slotsTakenByDate[dateStr]?.size || 0
+      const taken = slotsTakenByDate[dateStr] || new Set()
+      // Counted over the slots this resident can actually choose, not
+      // over all thirteen hours. In evening mode a day whose daytime
+      // hours are held is not a full day, and a tooltip reading "8
+      // slots available" when every evening hour is gone would send
+      // somebody to a date they cannot book. `taken` itself is still
+      // built from every hour, so an office-hours event does hold the
+      // evening hours it runs into.
+      const remaining = offeredSlots.filter((slot) => !taken.has(slot)).length
       const isPast = new Date(calendarYear, calendarMonth, day) < todayMidnight
       cells.push({
         day,
         dateStr,
         isPast,
-        isFull: taken >= timeSlots.length,
-        remaining: timeSlots.length - taken,
+        isFull: remaining === 0,
+        remaining,
       })
     }
     return cells
-  }, [calendarYear, calendarMonth, slotsTakenByDate])
+  }, [calendarYear, calendarMonth, slotsTakenByDate, offeredSlots])
 
   const goToPreviousMonth = () => {
     if (calendarMonth === 0) {
@@ -334,23 +318,70 @@ const Reservation = () => {
     }))
   }
 
+  // Whether this booking needs a reason, read from the START hour --
+  // exactly the condition enforce_reservation_window() applies. Derived
+  // from the chosen time rather than from `bookingMode` so the two
+  // cannot disagree: a resident who opens the exception panel and then
+  // picks 7:00 PM is making an ordinary booking.
+  const needsExceptionReason = isOfficeHourSlot(formData.preferred_time)
+
+  // Which cap applies. Read from the mode the resident is in, not from
+  // the chosen hour, because the duration is usually picked BEFORE the
+  // start time -- so the control has to know which list it is offering
+  // for while `preferred_time` is still empty.
+  const isExceptionMode = bookingMode === 'office-hours'
+
+  // Only the durations that actually fit the chosen start time. Before a
+  // slot is picked the mode's full cap is offered, because changing the
+  // duration clears the slot (see handleChange) -- so this narrows the
+  // moment a start time exists and widens again when it is cleared.
+  const durationOptions = useMemo(() => {
+    const options = durationOptionsForSlot(
+      formData.preferred_time, { exception: isExceptionMode }
+    )
+    if (options.length) return options
+    const cap = isExceptionMode ? MAX_EXCEPTION_DURATION_HOURS : MAX_DURATION_HOURS
+    return Array.from({ length: cap }, (_, index) => index + 1)
+  }, [formData.preferred_time, isExceptionMode])
+
   const calculatedEndTime = useMemo(() => {
-    if (!selectedSlots.length) return ''
-    // The booking runs until the END of its last slot, an hour after
-    // that slot starts — not until the moment the last slot begins.
-    const lastSlot = selectedSlots[selectedSlots.length - 1]
-    return formatHour(SLOT_HOURS[lastSlot] + 1)
-  }, [selectedSlots])
+    // Start hour + duration, which is what `end_time` means and what
+    // the database's int4range upper bound is. Derived from the hours
+    // rather than from the last slot's label, because a booking running
+    // through noon occupies an hour that has no startable label.
+    const hours = coveredHours(formData.preferred_time, formData.duration_hours)
+    if (!hours.length) return ''
+    return hourLabel(hours[hours.length - 1] + 1)
+  }, [formData.preferred_time, formData.duration_hours])
 
-  const canFitDuration = (startSlot, duration) =>
-    getCoveredSlots(startSlot, duration).length === Number(duration)
+  const fits = (startSlot, duration) =>
+    canFitDuration(startSlot, duration, { exception: isExceptionMode })
 
+  // ⚠️ Checked over the covered HOURS, not the covered start labels, so
+  // an exception running through noon is tested against the noon hour
+  // too -- the same extent the database's exclusion constraint uses.
   const hasConflict = (startSlot, duration) => {
-    const slotsToCheck = getCoveredSlots(startSlot, duration)
+    if (!fits(startSlot, duration)) return true
+    return getCoveredSlots(startSlot, duration).some((slot) => reservedSlots.has(slot))
+  }
 
-    if (slotsToCheck.length !== Number(duration)) return true
-
-    return slotsToCheck.some((slot) => reservedSlots.has(slot))
+  // Why a duration does not fit, in the resident's own terms. Only two
+  // things can now cause it -- the cap for this kind of booking, and
+  // closing time -- so the message names whichever one bit. The lunch
+  // closure is no longer among them: an exception may run through noon.
+  const durationFitMessage = (startSlot, duration) => {
+    const longest = maxDurationForSlot(startSlot, { exception: isExceptionMode })
+    if (longest === 0) {
+      return 'That is not a time the covered court offers. Please pick a slot from the list.'
+    }
+    const plural = longest === 1 ? '' : 's'
+    const because = slotHour(startSlot) + longest >= COURT_CLOSES_HOUR
+      ? `the court closes at ${hourLabel(COURT_CLOSES_HOUR)}`
+      : isExceptionMode
+        ? `${MAX_EXCEPTION_DURATION_HOURS} hours is the longest single booking the court takes`
+        : `${MAX_DURATION_HOURS} hours is the most an ordinary booking may run`
+    return `A booking starting at ${startSlot} can run for at most ${longest} hour${plural}`
+      + ` — ${because}. You asked for ${duration}.`
   }
 
   const handleChange = (e) => {
@@ -380,10 +411,34 @@ const Reservation = () => {
     }))
   }
 
+  // Switching between the ordinary evening slots and the office-hours
+  // exception. The chosen start time is cleared either way -- it belongs
+  // to the list that is going away -- and leaving 'office-hours' also
+  // clears the reason, because the database rejects an evening booking
+  // that carries one (there is nothing for an official to decide).
+  const switchBookingMode = (mode) => {
+    if (showPaymentStep) return
+    setBookingMode(mode)
+    setFormData((prev) => ({
+      ...prev,
+      preferred_time: '',
+      // ⚠️ Clamped, not carried over. Leaving the exception panel with 8
+      // hours selected would otherwise submit an ordinary evening
+      // booking of 8 hours -- which the form's own rule forbids, and
+      // which the database would currently accept, since the 4-hour
+      // ordinary cap lives only here.
+      duration_hours: Math.min(
+        Number(prev.duration_hours) || 1,
+        mode === 'office-hours' ? MAX_EXCEPTION_DURATION_HOURS : MAX_DURATION_HOURS
+      ),
+      exception_reason: mode === 'office-hours' ? prev.exception_reason : '',
+    }))
+  }
+
   const handleTimeSelect = (slot) => {
     if (showPaymentStep) return
-    if (!canFitDuration(slot, formData.duration_hours)) {
-      toast.error('That duration does not fit — the court closes for lunch between 12 NN and 1 PM, and the last slot ends at 6 PM.')
+    if (!fits(slot, formData.duration_hours)) {
+      toast.error(durationFitMessage(slot, formData.duration_hours))
       return
     }
 
@@ -426,12 +481,20 @@ const Reservation = () => {
       toast.error('Please choose what the court will be used for.')
       return
     }
-    if (!canFitDuration(formData.preferred_time, formData.duration_hours)) {
-      toast.error('That duration does not fit — the court closes for lunch between 12 NN and 1 PM, and the last slot ends at 6 PM.')
+    if (!fits(formData.preferred_time, formData.duration_hours)) {
+      toast.error(durationFitMessage(formData.preferred_time, formData.duration_hours))
       return
     }
     if (hasConflict(formData.preferred_time, formData.duration_hours)) {
       toast.error('One or more selected time slots are already reserved.')
+      return
+    }
+    // The same condition the database trigger applies: decided by the
+    // START hour, not by which list the resident was looking at.
+    if (needsExceptionReason && !formData.exception_reason.trim()) {
+      toast.error(
+        'Please explain why you need the court during office hours — an official reads this and decides.'
+      )
       return
     }
     setShowPaymentStep(true)
@@ -446,8 +509,15 @@ const Reservation = () => {
       return
     }
 
-    if (!canFitDuration(formData.preferred_time, formData.duration_hours)) {
-      toast.error('That duration does not fit — the court closes for lunch between 12 NN and 1 PM, and the last slot ends at 6 PM.')
+    if (!fits(formData.preferred_time, formData.duration_hours)) {
+      toast.error(durationFitMessage(formData.preferred_time, formData.duration_hours))
+      return
+    }
+
+    if (needsExceptionReason && !formData.exception_reason.trim()) {
+      toast.error(
+        'Please go back and explain why you need the court during office hours.'
+      )
       return
     }
 
@@ -517,6 +587,13 @@ const Reservation = () => {
           purpose: formData.purpose,
           activity_type: formData.activity_type,
           additional_notes: formData.additional_notes,
+          // Null for an ordinary evening booking. The database refuses a
+          // reason on one, and refuses a daytime booking without one --
+          // so this is not a hint the trigger takes on trust, it is the
+          // same rule written on both sides.
+          exception_reason: needsExceptionReason
+            ? formData.exception_reason.trim()
+            : null,
           // No payment fields are sent, and none exist on the table any
           // more (migration 006). The court is free to use; donations are
           // voluntary, handed over in person, and recorded in the
@@ -559,6 +636,17 @@ const Reservation = () => {
           return
         }
 
+        // P0001 is enforce_reservation_window() in migration 020. Its
+        // RAISE messages are written for a resident to read -- the
+        // closing time, the missing reason, a time the court does not
+        // offer -- so they are shown as they are rather than replaced
+        // with a generic failure. Reaching one means the form and the
+        // database disagreed, which is worth seeing rather than hiding.
+        if (error.code === 'P0001') {
+          toast.error(error.message)
+          return
+        }
+
         toast.error(error.message || 'Failed to submit reservation.')
         return
       }
@@ -579,9 +667,11 @@ const Reservation = () => {
         purpose: '',
         activity_type: '',
         additional_notes: '',
+        exception_reason: '',
       })
 
       setReservations([])
+      setBookingMode('evening')
       setShowPaymentStep(false)
     } catch (error) {
       console.error('Submit reservation error:', error)
@@ -595,7 +685,7 @@ const Reservation = () => {
     <div className="reservation-page">
       <Navbar />
 
-      <main id="main-content">
+      <main id="main-content" tabIndex={-1}>
 
       <section className="reservation-hero">
         <div className="reservation-hero-content">
@@ -632,8 +722,8 @@ const Reservation = () => {
                   }}
                 >
                   <div className="form-group">
-                    <label>Full Name</label>
-                    <input
+                    <label htmlFor="res-full_name">Full Name</label>
+                    <input id="res-full_name"
                       type="text"
                       name="full_name"
                       value={formData.full_name}
@@ -668,15 +758,15 @@ const Reservation = () => {
                       ))}
                       {formData.purok && !isKnownPurok(formData.purok) && (
                         <option value={formData.purok}>
-                          {formData.purok} (as recorded)
+                          {formData.purok} (as recorded — not on the list)
                         </option>
                       )}
                     </select>
                   </div>
 
                   <div className="form-group">
-                    <label>Contact Number</label>
-                    <input
+                    <label htmlFor="res-contact_number">Contact Number</label>
+                    <input id="res-contact_number"
                       type="text"
                       name="contact_number"
                       value={formData.contact_number}
@@ -687,8 +777,8 @@ const Reservation = () => {
                   </div>
 
                   <div className="form-group">
-                    <label>Email Address</label>
-                    <input
+                    <label htmlFor="res-email">Email Address</label>
+                    <input id="res-email"
                       type="email"
                       name="email"
                       value={formData.email}
@@ -699,8 +789,8 @@ const Reservation = () => {
                   </div>
 
                   <div className="form-group">
-                    <label>Residency Status</label>
-                    <select
+                    <label htmlFor="res-residency_status">Residency Status</label>
+                    <select id="res-residency_status"
                       name="residency_status"
                       value={formData.residency_status}
                       onChange={handleChange}
@@ -712,8 +802,8 @@ const Reservation = () => {
                     </select>
                   </div>
                   <div className="form-group">
-                    <label>Type of Activity</label>
-                    <select
+                    <label htmlFor="res-activity_type">Type of Activity</label>
+                    <select id="res-activity_type"
                       name="activity_type"
                       value={formData.activity_type}
                       onChange={handleChange}
@@ -724,14 +814,14 @@ const Reservation = () => {
                         <option key={type} value={type}>{type}</option>
                       ))}
                     </select>
-                    <p style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>
+                    <p style={{ fontSize: 12, color: '#5f6775', marginTop: 6 }}>
                       Shown publicly on the availability calendar so others can see
                       what the court is booked for. Your name and purpose stay private.
                     </p>
                   </div>
                   <div className="form-group">
-                    <label>Purpose</label>
-                    <input
+                    <label htmlFor="res-purpose">Purpose</label>
+                    <input id="res-purpose"
                       type="text"
                       name="purpose"
                       value={formData.purpose}
@@ -741,9 +831,31 @@ const Reservation = () => {
                     />
                   </div>
 
+                  {bookingMode === 'office-hours' && (
+                    <div className="form-group">
+                      <label htmlFor="exception-reason">
+                        Reason for using the court during office hours
+                      </label>
+                      <textarea
+                        id="exception-reason"
+                        name="exception_reason"
+                        value={formData.exception_reason}
+                        onChange={handleChange}
+                        placeholder="Describe the activity and why it has to happen during the day."
+                        rows="3"
+                        required
+                      />
+                      <p className="field-note">
+                        Required for a booking that starts before 5:00 PM. An
+                        official reads this and decides — a reason is a request,
+                        not an approval.
+                      </p>
+                    </div>
+                  )}
+
                   <div className="form-group">
-                    <label>Preferred Date</label>
-                    <input
+                    <label htmlFor="res-preferred_date">Preferred Date</label>
+                    <input id="res-preferred_date"
                       type="date"
                       name="preferred_date"
                       value={formData.preferred_date}
@@ -754,14 +866,20 @@ const Reservation = () => {
                   </div>
 
                   <div className="form-group">
-                    <label>Duration (Hours)</label>
-                    <select
+                    <label htmlFor="res-duration_hours">Duration (Hours)</label>
+                    <select id="res-duration_hours"
                       name="duration_hours"
                       value={formData.duration_hours}
                       onChange={handleChange}
                       required
                     >
-                      {Array.from({ length: MAX_DURATION }, (_, i) => i + 1).map((hour) => (
+                      {/* Only the durations that actually fit: the cap for
+                          this kind of booking, then closing time. An
+                          ordinary evening booking is up to 4 hours and one
+                          hour at 9:00 PM; an office-hours request is up to
+                          8 -- the ceiling the reservations table's own
+                          CHECK has always had. */}
+                      {durationOptions.map((hour) => (
                         <option key={hour} value={hour}>
                           {hour} Hour{hour > 1 ? 's' : ''}
                         </option>
@@ -770,8 +888,8 @@ const Reservation = () => {
                   </div>
 
                   <div className="form-group">
-                    <label>Additional Notes</label>
-                    <textarea
+                    <label htmlFor="res-additional_notes">Additional Notes</label>
+                    <textarea id="res-additional_notes"
                       name="additional_notes"
                       value={formData.additional_notes}
                       onChange={handleChange}
@@ -785,7 +903,7 @@ const Reservation = () => {
                       "Ang tunay na yaman ay hindi sa kung ano ang natatanggap,
                       kundi sa kung ano ang naibabahagi."
                     </p>
-                    <p style={{ fontSize: 13, color: '#6b7280' }}>
+                    <p style={{ fontSize: 13, color: '#5f6775' }}>
                       This covered court is free to use. Any donation — big or small,
                       in cash or in kind, given in person at the Barangay Hall — helps
                       keep it clean and well-maintained for every family in the
@@ -807,11 +925,17 @@ const Reservation = () => {
                     <p><strong>Time:</strong> {formData.preferred_time} ({formData.duration_hours}h)</p>
                     <p><strong>Purpose:</strong> {formData.purpose}</p>
                     <p><strong>Activity:</strong> {formData.activity_type}</p>
+                    {needsExceptionReason && (
+                      <>
+                        <p><strong>Office-hours request:</strong> yes — awaiting a barangay decision</p>
+                        <p><strong>Reason given:</strong> {formData.exception_reason}</p>
+                      </>
+                    )}
                   </div>
 
                   <div className="payment-box">
                     <h3>Reserving the Court is Free</h3>
-                    <p style={{ fontSize: 13, color: '#6b7280' }}>
+                    <p style={{ fontSize: 13, color: '#5f6775' }}>
                       There is nothing to pay and nothing to upload — just submit
                       your reservation. If you'd like to support the court's
                       upkeep, donations are welcome in person at the Barangay
@@ -824,7 +948,7 @@ const Reservation = () => {
                     <button
                       type="button"
                       className="reservation-submit-btn"
-                      style={{ background: '#6b7280' }}
+                      style={{ background: '#5f6775' }}
                       onClick={() => setShowPaymentStep(false)}
                     >
                       ← Back to Details
@@ -843,8 +967,13 @@ const Reservation = () => {
 
             <div className="reservation-slots-card">
               <h3>Check Availability</h3>
+              {/* A cell is greyed when `cell.isPast || cell.isFull`, so
+                  most greyed dates in the current month are simply past.
+                  The note used to say only "fully booked", which the
+                  cell's own tooltip ("Past date") contradicted. */}
               <p className="slots-note">
-                Grayed-out dates are fully booked. Pick an open date to see its time slots.
+                Past dates and fully-booked dates are greyed out. Pick an open
+                date to see its time slots.
               </p>
 
               <div className="availability-calendar">
@@ -874,7 +1003,7 @@ const Reservation = () => {
                         className={`calendar-cell
                           ${unavailable ? 'unavailable' : ''}
                           ${isSelected ? 'selected' : ''}
-                          ${!unavailable && cell.remaining < timeSlots.length ? 'partial' : ''}`}
+                          ${!unavailable && cell.remaining < offeredSlots.length ? 'partial' : ''}`}
                         onClick={() => handleCalendarDayClick(cell)}
                         disabled={unavailable}
                         title={
@@ -901,6 +1030,60 @@ const Reservation = () => {
                 Pending and approved reservations hold their covered slots.
               </p>
 
+              {/* The window, and the way into the exception. The daytime
+                  slots are deliberately not just further down the same
+                  list: an office-hours booking is something the barangay
+                  decides one at a time, so asking for one has to be a
+                  deliberate act rather than a scroll. */}
+              <div className="booking-window-note">
+                <p>
+                  The covered court is reservable{' '}
+                  <strong>
+                    {hourLabel(COURT_OPENS_HOUR)} – {hourLabel(COURT_CLOSES_HOUR)}
+                  </strong>
+                  . It is made available for booking after office hours, so a
+                  booking has to <em>finish</em> by {hourLabel(COURT_CLOSES_HOUR)}.
+                </p>
+
+                {bookingMode === 'evening' ? (
+                  <button
+                    type="button"
+                    className="exception-toggle"
+                    onClick={() => switchBookingMode('office-hours')}
+                    disabled={showPaymentStep}
+                  >
+                    Need the court during office hours? Request an exception
+                  </button>
+                ) : (
+                  <>
+                    <p className="exception-explainer">
+                      You are asking for an <strong>office-hours exception</strong>.
+                      The barangay may allow a daytime booking depending on the
+                      activity and on which officials are available that day —
+                      an ayuda or distribution activity, a health activity, or a
+                      city or government activity are the kinds of thing it gave
+                      as examples. Picking one of those categories approves
+                      nothing: an official reads your reason and decides.
+                    </p>
+                    <p className="exception-explainer">
+                      A daytime request may run for up to{' '}
+                      <strong>{MAX_EXCEPTION_DURATION_HOURS} hours</strong> and may
+                      run straight through {hourLabel(12)} — an activity that takes
+                      most of the day does not have to stop for lunch. It still has
+                      to finish by {hourLabel(COURT_CLOSES_HOUR)}.
+                    </p>
+                    <button
+                      type="button"
+                      className="exception-toggle"
+                      onClick={() => switchBookingMode('evening')}
+                      disabled={showPaymentStep}
+                    >
+                      ← Back to the {hourLabel(COURT_OPENS_HOUR)} – {hourLabel(COURT_CLOSES_HOUR)} slots
+                    </button>
+                  </>
+                )}
+              </div>
+
               {!formData.preferred_date ? (
                 <div className="slots-empty">
                   Select a date above to see its time slots.
@@ -912,7 +1095,7 @@ const Reservation = () => {
               ) : (
                 <>
                   <div className="slots-grid">
-                    {timeSlots.map((slot) => {
+                    {offeredSlots.map((slot) => {
                       const isReserved = reservedSlots.has(slot)
                       const isSelected = selectedSlots.includes(slot)
 

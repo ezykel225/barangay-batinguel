@@ -19,69 +19,7 @@
 
 .official-dashboard-header p {
   font-size: var(--fs-14);
-  color: #6b7280;
-}
-
-/* ================================
-    KAPITAN STATUS CARD
-  ================================ */
-.kapitan-status-section {
-  background: linear-gradient(135deg,
-      #1e3a8a,
-      #1e40af);
-  border-radius: var(--radius-md);
-  padding: 24px;
-  color: white;
-  margin-bottom: 24px;
-}
-
-.kapitan-status-section h3 {
-  font-size: var(--fs-14);
-  font-weight: 600;
-  color: #bfdbfe;
-  margin-bottom: 16px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.kapitan-status-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin-bottom: 16px;
-}
-
-.kapitan-status-option {
-  padding: 10px;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
-  font-size: var(--fs-13);
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-family: 'Poppins', sans-serif;
-  text-align: center;
-}
-
-.kapitan-status-option.active {
-  border-color: white;
-  background: rgba(255, 255, 255, 0.2);
-}
-
-.kapitan-status-option:hover {
-  background: rgba(255, 255, 255, 0.15);
-}
-
-.kapitan-current-status {
-  font-size: var(--fs-14);
-  color: #bfdbfe;
-}
-
-.kapitan-current-status strong {
-  color: white;
-  margin-left: 8px;
+  color: #5f6775;
 }
 
 /* ================================
@@ -100,7 +38,7 @@
 
 .announcements-header p {
   font-size: var(--fs-14);
-  color: #6b7280;
+  color: #5f6775;
 }
 
 /* ================================
@@ -119,7 +57,7 @@
 
 .events-header p {
   font-size: var(--fs-14);
-  color: #6b7280;
+  color: #5f6775;
 }
 
 /* ================================
@@ -138,33 +76,7 @@
 
 .reservations-header p {
   font-size: var(--fs-14);
-  color: #6b7280;
-}
-
-/* ================================
-    KAPITAN STATUS PAGE
-  ================================ */
-.kapitan-page-header {
-  margin-bottom: 32px;
-}
-
-.kapitan-page-header h1 {
-  font-size: var(--fs-28);
-  font-weight: 700;
-  color: #1f2937;
-  margin-bottom: 4px;
-}
-
-.kapitan-page-header p {
-  font-size: var(--fs-14);
-  color: #6b7280;
-}
-
-.kapitan-current-display {
-  font-size: var(--fs-24);
-  font-weight: 700;
-  margin-bottom: 16px;
-  color: white;
+  color: #5f6775;
 }
 
 /* ================================
@@ -183,7 +95,7 @@
 
 .officials-dir-header p {
   font-size: var(--fs-14);
-  color: #6b7280;
+  color: #5f6775;
 }
 
 /* ================================
@@ -241,14 +153,14 @@
 .dashboard-empty {
   text-align: center;
   padding: 40px;
-  color: #6b7280;
+  color: #5f6775;
   font-size: var(--fs-14);
 }
 
 .dashboard-loading {
   text-align: center;
   padding: 20px;
-  color: #6b7280;
+  color: #5f6775;
   font-size: var(--fs-14);
 }
 
@@ -273,12 +185,6 @@
 /* ================================
     RESPONSIVE
   ================================ */
-@media (max-width: 1024px) {
-  .kapitan-status-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
 @media (max-width: 768px) {
   .official-dashboard-header h1 {
     font-size: var(--fs-22);
@@ -312,7 +218,7 @@
 
 .report-stat-label {
   font-size: var(--fs-12);
-  color: #6b7280;
+  color: #5f6775;
   margin-top: 4px;
 }
 
@@ -327,7 +233,7 @@
   display: flex;
   gap: 16px;
   font-size: var(--fs-12);
-  color: #6b7280;
+  color: #5f6775;
   margin-bottom: 12px;
 }
 
@@ -345,7 +251,7 @@
 }
 
 .chart-dot-doc { background-color: #1e3a8a; }
-.chart-dot-res { background-color: #16a34a; }
+.chart-dot-res { background-color: #15803d; }
 
 .bar-chart {
   display: flex;
@@ -380,11 +286,11 @@
 }
 
 .bar-doc { background-color: #1e3a8a; }
-.bar-res { background-color: #16a34a; }
+.bar-res { background-color: #15803d; }
 
 .bar-chart-label {
   font-size: var(--fs-12);
-  color: #6b7280;
+  color: #5f6775;
   margin-top: 8px;
 }
 
@@ -422,7 +328,7 @@
 }
 
 .rank-bar-alt {
-  background-color: #16a34a;
+  background-color: #15803d;
 }
 
 .rank-count {
@@ -500,7 +406,7 @@
 }
 
 .resident-group-tab:hover {
-  border-color: #16a34a;
+  border-color: #15803d;
   color: #15803d;
 }
 
@@ -556,7 +462,7 @@
 .resident-search-icon {
   flex-shrink: 0;
   font-size: 12px;
-  color: #6b7280;
+  color: #5f6775;
 }
 
 .resident-search-input {
@@ -567,6 +473,12 @@
   font-family: 'Poppins', sans-serif;
   font-size: var(--fs-13);
   color: #374151;
+  /* Same reason as `.filter-select` in Sidebar.css: the 8px of wrapper
+     padding above and below is not part of the target, so the field a
+     user sees as 52px tall could only be hit over 20px of it. Stretch
+     makes the input fill the wrapper's content box. */
+  align-self: stretch;
+  min-height: 24px;
 }
 
 .resident-search-input::placeholder {
@@ -606,7 +518,7 @@
 .resident-filter-count {
   margin: 0;
   font-size: var(--fs-12);
-  color: #6b7280;
+  color: #5f6775;
 }
 
 .resident-filter-reset {
@@ -624,7 +536,7 @@
 }
 
 .resident-filter-reset:hover:not(:disabled) {
-  border-color: #16a34a;
+  border-color: #15803d;
   color: #15803d;
 }
 
@@ -660,7 +572,7 @@
 .resident-status-note {
   margin-top: 4px;
   font-size: var(--fs-12);
-  color: #6b7280;
+  color: #5f6775;
   line-height: 1.4;
 }
 
@@ -696,7 +608,7 @@
 }
 
 .reconcile-notice {
-  border-left-color: #6b7280;
+  border-left-color: #5f6775;
 }
 
 .reconcile-item-head {
@@ -762,13 +674,13 @@
 
 .reconcile-row-detail {
   font-size: var(--fs-12);
-  color: #6b7280;
+  color: #5f6775;
 }
 
 .reconcile-footnote {
   margin: 16px 0 0;
   font-size: var(--fs-12);
-  color: #6b7280;
+  color: #5f6775;
   line-height: 1.5;
 }
 
@@ -786,4 +698,206 @@
     ordinary residents must not read as a list of defects. */
 .reconcile-expected {
   border-left-color: #1d4ed8;
+}
+
+/* ── Calendar views in the dashboards ──
+ * `.mcal-*` and `.view-toggle` come from MonthCalendar.css, which the
+ * component imports. This only places the grid and its selected-day
+ * panel side by side, and stacks them when there is no room.
+ */
+.dashboard-calendar-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+  margin-bottom: 4px;
+}
+
+.dashboard-calendar-layout .mcal-day-panel {
+  margin-top: 0;
+}
+
+.mcal-day-action {
+  margin-top: 10px;
+}
+
+/* Below 1100px the sidebar still takes its width, so two columns stop
+   fitting well before the usual tablet breakpoint. */
+@media (max-width: 1100px) {
+  .dashboard-calendar-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ── The overview's top block ─────────────────────────────────────────
+ *
+ * Heading, the four stat cards and the Punong Barangay status, arranged
+ * from ONE set of DOM nodes.
+ *
+ * ⚠️ The DEFAULT here is the mobile layout, and it is nothing at all --
+ * plain document flow, so the three children stack in DOM order
+ * (heading, stats, status), which is the presentation already accepted
+ * at 375px. There is no `order` anywhere: if this rule and the one
+ * below both vanished, the phone layout would be unchanged. That is the
+ * point -- the accepted layout is the fallback, not the override.
+ *
+ * The wide layout is additive, below.
+ */
+.dashboard-overview-top {
+  display: block;
+}
+
+/* ⚠️ 769px, matching every other dashboard breakpoint in this project
+ * (Sidebar.css switches the drawer and the table-to-card block at 768).
+ * Below it the content area is the whole viewport, and the greeting
+ * paragraph plus a ~300px status side by side leaves the greeting too
+ * narrow to read -- measured at 768 before choosing this number, not
+ * assumed.
+ */
+@media (min-width: 769px) {
+  .dashboard-overview-top {
+    display: grid;
+    /* minmax(0, 1fr), never a bare 1fr: a bare track cannot shrink below
+       its content's min-content width, which is the single biggest
+       finding X2 recorded. The greeting holds a name somebody typed. */
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    column-gap: 24px;
+  }
+
+  /* Row 1: the greeting on the left, the status on its right. Both are
+     placed explicitly, so neither depends on DOM order -- which is why
+     the status can sit third in the markup and still render here. */
+  .dashboard-overview-top > .official-dashboard-header {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .dashboard-overview-top > .kapitan-compact {
+    grid-column: 2;
+    grid-row: 1;
+    /* Content width, pinned to the right edge. A stretched status would
+       be a second full-width band, which is what this move undoes. */
+    justify-self: end;
+    /* The heading's own 32px bottom margin already separates row 1 from
+       the stats; a second margin here would make the two rows disagree
+       about the gap. */
+    margin-bottom: 0;
+    /* Never wider than the greeting it sits beside. */
+    max-width: 420px;
+  }
+
+  /* Row 2: the stat cards keep the full width they had. */
+  .dashboard-overview-top > .dashboard-stats {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+/* ── The compact Punong Barangay status (post-X3) ─────────────────────
+ *
+ * Replaces the full-width gradient panel that used to sit on the
+ * dashboard and the dedicated sidebar tab behind it. One row: who,
+ * what state, and -- for the Punong Barangay only -- one control to
+ * change it.
+ *
+ * It keeps the navy treatment the old panel had, because that is what
+ * marks it as the barangay's own status rather than another data card,
+ * but at a fraction of the height.
+ */
+.kapitan-compact {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  padding: 14px 18px;
+  margin-bottom: 24px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, #1e3a8a, #1e40af);
+  color: #ffffff;
+  box-shadow: var(--shadow-md);
+}
+
+.kapitan-compact-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  /* Takes the leftover room so the state and the control sit together
+     at the right on a wide screen, and min-width: 0 lets a long name
+     wrap instead of widening the row. */
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.kapitan-compact-icon {
+  flex-shrink: 0;
+  font-size: var(--fs-20);
+  opacity: 0.9;
+}
+
+.kapitan-compact-role {
+  display: block;
+  font-size: var(--fs-12);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #bfdbfe;
+}
+
+.kapitan-compact-name {
+  display: block;
+  font-size: var(--fs-14);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.kapitan-compact-state {
+  flex-shrink: 0;
+}
+
+.kapitan-compact-control {
+  flex-shrink: 0;
+}
+
+/* A real control on a dark surface: the default select is nearly
+   invisible against navy. */
+.kapitan-compact-select {
+  padding: 8px 10px;
+  /* 38px tall with the padding and font size, comfortably over the
+     24px target minimum X3 settled on. */
+  min-height: 38px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: var(--radius-sm);
+  background-color: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  font-family: inherit;
+  font-size: var(--fs-13);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* The option list is drawn by the OS, which does not inherit the dark
+   surface -- without this the text is white on white. */
+.kapitan-compact-select option {
+  color: #1f2937;
+  background-color: #ffffff;
+}
+
+/* index.css turns the focus ring white on the project's dark surfaces;
+   this is a new one, so it is named here too. */
+.kapitan-compact :focus-visible {
+  outline-color: #ffffff;
+}
+
+@media (max-width: 600px) {
+  /* Stacked on a phone: the three parts each take the full width rather
+     than squeezing a select beside a badge. */
+  .kapitan-compact {
+    align-items: stretch;
+  }
+
+  .kapitan-compact-control,
+  .kapitan-compact-select {
+    width: 100%;
+  }
 }

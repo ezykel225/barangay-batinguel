@@ -74,6 +74,26 @@ export const normalizePurok = (value) =>
 export const isKnownPurok = (value) =>
   PUROKS.some((purok) => normalizePurok(purok) === normalizePurok(value))
 
+// ── Purok, shown short ────────────────────────────────────────
+//
+// "Purok 4" -> "4", for a column already headed Purok where repeating the
+// word in every cell says nothing. Display only: the stored value is
+// never touched, and it stays available in the cell's `title`.
+//
+// A value the pattern does not recognise is returned exactly as stored.
+// The alternative -- blanking it, or guessing a number out of it -- would
+// hide the legacy free-text spellings the purok flag exists to surface.
+export const purokShortLabel = (value) => {
+  const raw = (value ?? '').trim().replace(/\s+/g, ' ')
+  if (!raw) return ''
+  const named = /^purok\s*0*(\d{1,2})$/i.exec(raw)
+  if (named) return named[1]
+  // A bare number, with any leading zeros dropped: '04' and '4' are the
+  // same purok written two ways.
+  if (/^0*\d{1,2}$/.test(raw)) return String(Number(raw))
+  return raw
+}
+
 // Sentinel for the purok filter's last option. Covers both a blank
 // purok and an off-list one, because from an official's side they are
 // the same job: a value that cannot be grouped or matched and needs
@@ -134,10 +154,10 @@ export const VERIFICATION_STATES = {
 // and findReconciliationIssues reports it as well.
 export const UNKNOWN_STATE = {
   group: 'requests',
-  label: 'Unrecognised status',
+  label: 'Unrecognized status',
   residentLabel: 'Awaiting review',
   tone: 'pending',
-  meaning: 'This account holds a verification status the app does not recognise.',
+  meaning: 'This account holds a verification status the app does not recognize.',
 }
 
 export const describeVerification = (status) =>
@@ -203,10 +223,48 @@ export const REGISTRY_SEARCH_FIELDS = [
   'full_name', 'purok', 'household_number', 'contact_number',
 ]
 
+// Court reservations. `purpose` is the resident's own words and
+// `activity_type` the fixed category, so both are searched -- an official
+// looking for "basketball" should find it whichever field it landed in.
+//
+// A purok search works in both directions without special handling: the
+// column displays "4" while the row stores "Purok 4", and a substring
+// test matches "4" and "purok 4" alike.
+export const RESERVATION_SEARCH_FIELDS = [
+  'full_name', 'contact_number', 'email', 'purpose', 'activity_type', 'purok',
+]
+
+// The Document Requests queue, which had no search or filter at all --
+// an official scrolled the whole table looking for one resident.
+//
+// `purpose` is included because a request's purpose is often the only
+// thing that distinguishes two Certificates of Indigency from the same
+// person. `contact_number` and `purok` match the reservation fields, so
+// an official can search either queue the same way.
+export const DOCUMENT_SEARCH_FIELDS = [
+  'full_name', 'document_type', 'purpose', 'contact_number', 'purok',
+]
+
 export const filterRows = (list = [], { query = '', purok = 'all', fields }) =>
   list.filter(
     (row) => matchesSearch(row, query, fields) && purokMatchesFilter(row?.purok, purok)
   )
+
+// Status first, then search. Pure, so the Official Portal's Document
+// Requests queue can be filtered the same way in a test as on screen --
+// the reservation queue composes its two filters inline in the
+// dashboard, which is why that combination has no unit test.
+//
+// `status: 'all'` means no status narrowing, matching the dropdown's
+// first option. An unrecognised status simply matches nothing, rather
+// than falling back to everything: a filter that silently stops
+// filtering is worse than one that shows an empty list.
+export const filterDocumentRequests = (list = [], { query = '', status = 'all' } = {}) => {
+  const byStatus = status === 'all'
+    ? (list || [])
+    : (list || []).filter((row) => row?.status === status)
+  return filterRows(byStatus, { query, fields: DOCUMENT_SEARCH_FIELDS })
+}
 
 // ── D6: account ↔ voter reference list cross-check ────────────
 //
@@ -303,7 +361,7 @@ export const findReconciliationIssues = ({
     {
       id: 'not-resident-in-registry',
       severity: 'warning',
-      title: 'Accounts marked “Not a resident” whose name is on the voter reference list',
+      title: 'Accounts marked "Not a resident" whose name is on the voter reference list',
       explanation:
         'Two barangay records disagree: the account says this person is not a '
         + 'resident of Batinguel, the voter reference list carries the name. One '
@@ -351,7 +409,7 @@ export const findReconciliationIssues = ({
     {
       id: 'unrecognised-status',
       severity: 'warning',
-      title: 'Accounts holding an unrecognised verification status',
+      title: 'Accounts holding an unrecognized verification status',
       explanation:
         'The stored value is not one of the four this app knows. Such an account '
         + 'is shown under Requests so that it cannot disappear from every group '
@@ -361,13 +419,13 @@ export const findReconciliationIssues = ({
         .map((r) => ({
           key: r.id,
           label: r.full_name,
-          detail: `stored as “${r.verification_status ?? 'null'}”`,
+          detail: `stored as "${r.verification_status ?? 'null'}"`,
         })),
     },
     {
       id: 'account-purok-unlisted',
       severity: 'notice',
-      title: 'Accounts whose purok is blank or not on the barangay’s list',
+      title: "Accounts whose purok is blank or not on the barangay's list",
       explanation:
         'Free-text entry predates the purok dropdown, so some accounts hold a '
         + 'spelling the system cannot group or match. Existing values are left '
@@ -379,13 +437,13 @@ export const findReconciliationIssues = ({
         .map((r) => ({
           key: r.id,
           label: r.full_name,
-          detail: r.purok ? `recorded as “${r.purok}”` : 'no purok recorded',
+          detail: r.purok ? `recorded as "${r.purok}"` : 'no purok recorded',
         })),
     },
     {
       id: 'registry-purok-unlisted',
       severity: 'notice',
-      title: 'Voter reference entries whose purok is blank or not on the barangay’s list',
+      title: "Voter reference entries whose purok is blank or not on the barangay's list",
       explanation:
         'Same cause as above, on the voter reference data. Editing the entry now '
         + 'offers the purok list.',
@@ -394,7 +452,7 @@ export const findReconciliationIssues = ({
         .map((e) => ({
           key: e.id,
           label: e.full_name,
-          detail: e.purok ? `recorded as “${e.purok}”` : 'no purok recorded',
+          detail: e.purok ? `recorded as "${e.purok}"` : 'no purok recorded',
         })),
     },
     {

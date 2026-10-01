@@ -77,3 +77,30 @@ export const BARANGAY_OFFICE_HOURS = {
 // confirms it, and add her photo to officialPhotos.jsx at the same
 // time -- name and face should arrive together or not at all.
 export const HEALTH_NURSE_NAME = 'Barangay Health Nurse'
+
+// Her role, as one string, because the app had four descriptions of the
+// same person: "Barangay Health Nurse" (the label above, used as her
+// name), "Public Health Nurse" on the sidebar and both public pages,
+// "Head Barangay Nurse" in her own Settings, and "Nurse Administrator"
+// in her dashboard heading. Her Settings page therefore introduced her
+// as "Barangay Health Nurse / Head Barangay Nurse" -- a name and a title
+// that are nearly the same words and disagree with the sidebar.
+//
+// "Public Health Nurse" wins because it was already the wording on the
+// two pages residents actually read. It is a role, like the name above,
+// and no database value depends on either.
+export const HEALTH_NURSE_ROLE = 'Public Health Nurse'
+
+// ── The Punong Barangay ──────────────────────────────────────────
+// What users read. "Kapitan" is the everyday word for the post, but the
+// app used it in headings and navigation while the officials directory,
+// the public cards and `barangay_officials.position` all say "Punong
+// Barangay" -- two names for one person in one product. The formal
+// title wins because it is the one already tied to the position that
+// drives permissions.
+//
+// ⚠️ Presentation only. `kapitan_status` and `kapitan_availability`,
+// the `kapitan` tab id, `isKapitan` and every `.kapitan-*` class keep
+// their names: renaming those buys nothing a reader would ever see and
+// costs a migration.
+export const PUNONG_BARANGAY_LABEL = 'Punong Barangay'

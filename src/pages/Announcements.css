@@ -32,9 +32,11 @@
   font-size: var(--fs-14);
 }
 
+/* minmax(0, …) for the reason given in Home.css: a bare 1fr track
+   cannot shrink below its content's min-content width. */
 .announcements-page-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 24px;
 }
 
@@ -44,6 +46,6 @@
 
 @media (max-width: 900px) {
   .announcements-page-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }

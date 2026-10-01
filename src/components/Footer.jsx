@@ -1,10 +1,15 @@
 import { useState } from 'react'
 import { FaFacebook } from 'react-icons/fa'
 import './Footer.css'
-import { BARANGAY_CONTACT, telHref } from '../constants/barangay'
+import { useModalA11y } from './useModalA11y'
+import { BARANGAY_CONTACT, BARANGAY_OFFICE_HOURS, telHref } from '../constants/barangay'
 
 const Footer = () => {
   const [activeModal, setActiveModal] = useState(null)
+
+  // Escape, focus entry and focus restoration for the Privacy and Terms
+  // boxes. See useModalA11y -- these had none of it.
+  useModalA11y(!!activeModal, () => setActiveModal(null))
   const currentYear = new Date().getFullYear()
 
   const modalContent = {
@@ -13,7 +18,16 @@ const Footer = () => {
       content: (
         <>
           <p><strong>Address:</strong> Barangay Batinguel, Dumaguete City, Negros Oriental, Philippines</p>
-          <p><strong>Office Hours:</strong> Monday - Friday, 8:00 AM - 5:00 PM</p>
+          {/* Rendered from BARANGAY_OFFICE_HOURS rather than repeated.
+              This line used to read "8:00 AM - 5:00 PM" straight through
+              and omitted the lunch closure the Home page states, so the
+              two pages told a resident different things about when the
+              hall is open. */}
+          <p>
+            <strong>Office Hours:</strong> {BARANGAY_OFFICE_HOURS.days},{' '}
+            {BARANGAY_OFFICE_HOURS.morning} and {BARANGAY_OFFICE_HOURS.afternoon}
+          </p>
+          <p>{BARANGAY_OFFICE_HOURS.breakNote} · {BARANGAY_OFFICE_HOURS.closedNote}</p>
           <p>
             <strong>Landline:</strong>{' '}
             <a href={telHref(BARANGAY_CONTACT.landline)}>{BARANGAY_CONTACT.landline}</a>
@@ -124,9 +138,13 @@ const Footer = () => {
         >
           <div
             className="footer-modal"
+            role="dialog"
+            aria-modal="true"
+            tabIndex={-1}
+            aria-labelledby="footer-modal-title"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2>{modalContent[activeModal].title}</h2>
+            <h2 id="footer-modal-title">{modalContent[activeModal].title}</h2>
             <div className="footer-modal-content">
               {modalContent[activeModal].content}
             </div>

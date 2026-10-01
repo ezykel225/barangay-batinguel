@@ -229,7 +229,7 @@
   text-align: center;
   font-size: var(--fs-12);
   font-weight: 600;
-  color: #6b7280;
+  color: #5f6775;
   padding: 4px 0;
 }
 
@@ -267,7 +267,7 @@
 
 .calendar-cell.unavailable {
   background-color: #e5e7eb;
-  color: #6b7280;
+  color: #5f6775;
   border-color: #d1d5db;
   cursor: not-allowed;
   filter: grayscale(100%);
@@ -285,7 +285,7 @@
   flex-wrap: wrap;
   margin-top: 12px;
   font-size: var(--fs-12);
-  color: #6b7280;
+  color: #5f6775;
 }
 
 .calendar-legend span {
@@ -443,15 +443,60 @@
   margin-bottom: 8px;
 }
 
-.payment-note {
-  font-size: var(--fs-12) !important;
-  color: #475569 !important;
-  margin-top: 8px;
+/* The booking window, and the way into the office-hours exception.
+   Migration 020 and src/utils/reservationWindow.js hold the rule; this
+   only has to make the exception read as a request rather than as
+   another row of slots. */
+.booking-window-note {
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
 }
 
-.residency-box {
-  background-color: #f0fdf4;
-  border: 1px solid #bbf7d0;
+.booking-window-note p {
+  font-size: var(--fs-13);
+  color: #334155;
+  margin: 0 0 8px;
+  line-height: 1.5;
+}
+
+.exception-explainer {
+  border-left: 3px solid #f59e0b;
+  padding-left: 10px;
+}
+
+.exception-toggle {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: #1d4ed8;
+  text-align: left;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.exception-toggle:hover:not(:disabled) {
+  color: #1e3a8a;
+}
+
+.exception-toggle:disabled {
+  color: #94a3b8;
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
+/* A note under a field, explaining what it is for. The activity-type
+   note above it is still inline; this is the shared class new fields
+   use. */
+.field-note {
+  font-size: var(--fs-12);
+  color: #5f6775;
+  margin-top: 6px;
+  line-height: 1.5;
 }
 
 

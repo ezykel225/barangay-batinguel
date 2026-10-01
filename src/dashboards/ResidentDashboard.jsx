@@ -11,10 +11,20 @@ import { supabase } from '../supabase/supabaseClient'
 import { pathFromPublicUrl } from '../utils/storagePath'
 import { BARANGAY_NAME, PUROKS } from '../constants/barangay'
 import { describeVerification } from '../utils/residentGroups'
+import { useConfirm } from '../components/ConfirmDialog'
+import { MONTH_NAMES, parseDateKey } from '../utils/monthGrid'
+import {
+  DOCUMENT_STATUS_LABELS as STATUS_LABELS,
+  RESERVATION_STATUS_LABELS,
+} from '../utils/displayLabels'
+import { residentStatusLabel } from '../utils/reservationWindow'
 import { logActivity } from '../utils/activityLog'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 import Sidebar from '../components/Sidebar'
+import { useModalA11y } from '../components/useModalA11y'
+import NotificationBell from '../components/NotificationBell'
+import { useNotifications } from '../components/useNotifications'
 import '../components/Sidebar.css'
 import './ResidentDashboard.css'
 
@@ -27,20 +37,12 @@ const DOCUMENT_TYPES = [
   'Other',
 ]
 
-const STATUS_LABELS = {
-  pending: { label: 'Pending Review', className: 'badge-pending' },
-  approved: { label: 'Approved', className: 'badge-approved' },
-  declined: { label: 'Declined', className: 'badge-declined' },
-  ready_for_pickup: { label: 'Ready for Pickup', className: 'badge-ready' },
-  claimed: { label: 'Claimed', className: 'badge-claimed' },
-}
-
-const RESERVATION_STATUS_LABELS = {
-  pending: { label: 'Pending', className: 'badge-pending' },
-  approved: { label: 'Approved', className: 'badge-approved' },
-  declined: { label: 'Declined', className: 'badge-declined' },
-  cancelled: { label: 'Cancelled', className: 'badge-claimed' },
-}
+// These two maps used to be defined here, and the Official Dashboard
+// rendered the same columns from raw database values instead -- so a
+// resident read "Ready for Pickup" while the official looking at the same
+// request read "ready for pickup". They now come from
+// utils/displayLabels.js, which both dashboards read, with the wording
+// this portal already shipped kept exactly as it was.
 
 // Today's date in Manila as YYYY-MM-DD. 'en-CA' formats that way, and
 // ISO date strings compare correctly with <, so no Date maths needed.
@@ -59,8 +61,44 @@ const canCancel = (r) =>
   (r.status === 'pending' || r.status === 'approved') &&
   r.preferred_date >= todayInManila()
 
+// ⚠️ `preferred_date` is a date-only column, and it used to be rendered
+// as `new Date(r.preferred_date).toLocaleDateString()`. That parses the
+// string as UTC midnight and reads it back in the BROWSER's zone, so a
+// booking on the 1st displays as the 30th of the previous month
+// anywhere west of UTC -- the resident's own record of their own
+// booking, off by a day. Correct from the Philippines, which is why it
+// had never been seen.
+//
+// Found during the calendar work's self-review. Rendered from the
+// characters of the stored date instead. `created_at` elsewhere in this
+// file is a timestamptz, where `new Date()` is the right tool.
+const bookingDate = (value) => {
+  const parsed = parseDateKey(value)
+  if (!parsed) return '—'
+  return `${parsed.day} ${MONTH_NAMES[parsed.month]} ${parsed.year}`
+}
+
 const ResidentDashboard = () => {
   const { user } = useAuth()
+  // Destructive and consequential actions go through the shared dialog,
+  // the same one the Official and Nurse portals use. Replaced the two
+  // remaining window.confirm calls in this file.
+  const [confirm, confirmDialog] = useConfirm()
+
+  // ── Notifications ──────────────────────────────────────────────────
+  //
+  // `badges` is keyed by each notification's own `link_tab`, so the
+  // sidebar counts and the bell count are the same number from the same
+  // rows. They cannot disagree.
+  const {
+    notifications,
+    readIds: notifReadIds,
+    loading: notifLoading,
+    badges: notifBadges,
+    refresh: refreshNotifications,
+    markRead: markNotificationRead,
+    markAllRead: markAllNotificationsRead,
+  } = useNotifications(user?.id)
   const [activeTab, setActiveTab] = useState('dashboard')
   const [userProfile, setUserProfile] = useState(null)
   const [requests, setRequests] = useState([])
@@ -69,6 +107,10 @@ const ResidentDashboard = () => {
   const [submitting, setSubmitting] = useState(false)
   const [cancellingId, setCancellingId] = useState(null)
   const [showRequestModal, setShowRequestModal] = useState(false)
+
+  // Escape, focus entry and focus restoration for the document-request
+  // modal. The confirmation dialog above already has its own.
+  useModalA11y(showRequestModal, () => setShowRequestModal(false))
 
   const [newRequest, setNewRequest] = useState({
     document_type: DOCUMENT_TYPES[0],
@@ -142,6 +184,16 @@ const ResidentDashboard = () => {
     }
   }, [user, fetchUserProfile, fetchMyRequests, fetchMyReservations])
 
+  // ⚠️ THIS NO LONGER FEEDS A BADGE. The sidebar badges now come from
+  // the notification read-state (migration 022), so there is ONE
+  // definition of unread in the app instead of two that answer different
+  // questions. `resident_viewed_at` stays in the schema and is still
+  // written below, because it marks a ROW as seen -- which is a useful
+  // record, and is what `protect_reservation_status` allows a resident
+  // to write -- but it cannot count EVENTS: a request that goes
+  // approved -> ready_for_pickup -> claimed is three things the resident
+  // needs telling, and one timestamp only remembers the last.
+  //
   // An item counts as "unseen" once an official has acted on it
   // (moved it past pending) and the resident hasn't opened that tab
   // since. A null updated_at means no tracked change (old data from
@@ -157,8 +209,6 @@ const ResidentDashboard = () => {
     return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)))
   }
 
-  const unseenRequestCount = requests.filter(isUnseen).length
-  const unseenReservationCount = myReservations.filter(isUnseen).length
 
   const markRequestsViewed = async () => {
     const unseenIds = requests.filter(isUnseen).map((r) => r.id)
@@ -195,6 +245,25 @@ const ResidentDashboard = () => {
     if (activeTab === 'reservations') markReservationsViewed()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
+
+  // Opening the tab a notification points at counts as having seen it,
+  // which is what previously cleared the unseen badge. Same behaviour,
+  // now reading the one authoritative record.
+  // Realtime is deferred, so a tab change is the refresh point: it is
+  // the moment the reader is asking to see that part of the dashboard
+  // anyway. Keyed on activeTab ALONE -- adding `notifications` here
+  // would make the refresh its own trigger.
+  useEffect(() => {
+    refreshNotifications()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
+
+  useEffect(() => {
+    notifications
+      .filter((n) => n.link_tab === activeTab && !notifReadIds.has(n.id))
+      .forEach((n) => { markNotificationRead(n) })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, notifications])
 
   // Every upload path here builds a fresh timestamped name, so without
   // this the file being replaced stays in the bucket forever, referenced
@@ -268,10 +337,24 @@ const ResidentDashboard = () => {
 
     // Releasing an approved booking loses a slot the resident waited
     // for, so a misclick shouldn't do it silently.
-    const ok = window.confirm(
-      `Cancel your booking for ${reservation.preferred_date} at ${reservation.preferred_time}?\n\n` +
-      'The slot will be released for someone else. Booking again means waiting for approval again.'
-    )
+    //
+    // The shared dialog rather than window.confirm, which is what the
+    // Official and Nurse portals already use -- so a resident gets the
+    // same focus trap, Escape handling, Enter-defaults-to-Cancel and
+    // aria-modal that a native dialog cannot be given.
+    //
+    // ⚠️ cancelLabel is set deliberately. The default pair would read
+    // "Cancel" next to "Cancel booking", which is unreadable when the
+    // action itself is called cancelling.
+    const ok = await confirm({
+      title: 'Cancel this booking?',
+      message: `The court is held for you on ${reservation.preferred_date} at `
+        + `${reservation.preferred_time}. Cancelling releases the slot for someone `
+        + 'else straight away, and booking again means waiting for an official to '
+        + 'approve it again.',
+      confirmLabel: 'Cancel booking',
+      cancelLabel: 'Keep booking',
+    })
     if (!ok) return
 
     setCancellingId(reservation.id)
@@ -413,12 +496,23 @@ const ResidentDashboard = () => {
       suffix !== (userProfile?.suffix || '')
 
     if (nameChanged && status === 'verified') {
-      const confirmed = window.confirm(
-        'Changing your name means an official has to check it against your ID again.\n\n' +
-        'Your account will go back to "pending", and you will not be able to request ' +
-        'documents until it has been re-verified.\n\n' +
-        'Continue?'
-      )
+      // `destructive: false` -- the dialog defaults to the red confirm,
+      // and this is a consequence to accept rather than something being
+      // deleted. Nothing about the name-change or the verification reset
+      // itself is altered here; only how the resident is asked.
+      //
+      // "Awaiting review" is the approved resident-facing wording for
+      // `pending` (residentGroups.VERIFICATION_STATES). The native
+      // dialog this replaces printed the raw stored value.
+      const confirmed = await confirm({
+        title: 'Change your name?',
+        message: 'An official will have to check your new name against your ID '
+          + 'again. Your account goes back to "Awaiting review", and you will not '
+          + 'be able to request documents until it has been verified again.',
+        confirmLabel: 'Change name',
+        cancelLabel: 'Keep current name',
+        destructive: false,
+      })
       if (!confirmed) return
     }
 
@@ -567,7 +661,7 @@ const ResidentDashboard = () => {
           </>
         ) : isRejected ? (
           <>
-            <strong>Your ID verification was declined.</strong>{' '}
+            <strong>Your ID verification was rejected.</strong>{' '}
             {userProfile.verification_notes || 'Please visit the Barangay Hall for assistance.'}{' '}
             You can correct your details under Settings and upload a clearer ID.
           </>
@@ -583,16 +677,41 @@ const ResidentDashboard = () => {
     )
   }
 
+  // One definition, rendered twice -- once in the desktop topbar and
+  // once in the mobile header -- so the two placements cannot be given
+  // different props.
+  const notificationBell = (
+    <NotificationBell
+      notifications={notifications}
+      readIds={notifReadIds}
+      loading={notifLoading}
+      onOpenTab={(tab) => setActiveTab(tab)}
+      onMarkRead={markNotificationRead}
+      onMarkAllRead={markAllNotificationsRead}
+    />
+  )
+
   return (
     <div className="dashboard-layout">
       <Sidebar
         role="resident"
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        badges={{ documents: unseenRequestCount, reservations: unseenReservationCount }}
+        badges={notifBadges}
+        mobileHeaderAction={notificationBell}
       />
 
-      <main className="dashboard-main" id="main-content">
+      <main className="dashboard-main" id="main-content" tabIndex={-1}>
+
+        {/* The DESKTOP bell. One place for all four tabs -- there is no
+            shared dashboard header component, and four copies would be
+            four things to keep in step.
+
+            ⚠️ Hidden at and below 768px, where Sidebar renders the same
+            bell inside .dash-mobile-header. See NotificationBell.css. */}
+        <div className="dashboard-topbar">
+          {notificationBell}
+        </div>
         {activeTab === 'dashboard' && (
           <div>
             <div className="resident-dashboard-header">
@@ -683,7 +802,7 @@ const ResidentDashboard = () => {
                             </span>
                             {r.status === 'ready_for_pickup' && (
                               <div className={`pickup-reminder ${daysSince(r.updated_at) >= 7 ? 'pickup-reminder-urgent' : ''}`}>
-                                Ready for {daysSince(r.updated_at)} day{daysSince(r.updated_at) === 1 ? '' : 's'}
+                                Ready for {daysSince(r.updated_at)} day{daysSince(r.updated_at) === 1 ? '' : 's'} — please claim soon
                               </div>
                             )}
                           </td>
@@ -796,7 +915,7 @@ const ResidentDashboard = () => {
                       {myReservations.map((r) => (
                         <tr key={r.id}>
                           <td data-label="Date">
-                            {r.preferred_date ? new Date(r.preferred_date).toLocaleDateString() : '—'}
+                            {bookingDate(r.preferred_date)}
                           </td>
                           <td data-label="Time">
                             {r.preferred_time}{r.end_time ? ` – ${r.end_time}` : ''}
@@ -806,6 +925,24 @@ const ResidentDashboard = () => {
                             <span className={`badge ${RESERVATION_STATUS_LABELS[r.status]?.className || ''}`}>
                               {RESERVATION_STATUS_LABELS[r.status]?.label || r.status}
                             </span>
+                            {/* A pending office-hours request is not the
+                                same prospect as a pending evening
+                                booking: the court is normally reservable
+                                from 5:00 PM, so this one needs a decision
+                                that the other does not. Saying only
+                                "Pending" for both would imply otherwise.
+                                Returns null for every other case --
+                                including a booking filed before migration
+                                020, which carries no reason and is not
+                                relabelled. */}
+                            {residentStatusLabel(r) && (
+                              <span
+                                className="reservation-exception-note"
+                                title={r.exception_reason || undefined}
+                              >
+                                {residentStatusLabel(r)}
+                              </span>
+                            )}
                           </td>
                           <td data-label="Action">
                             {canCancel(r) ? (
@@ -860,8 +997,8 @@ const ResidentDashboard = () => {
                   )}
 
                   <div className="modal-form-group">
-                    <label className="modal-form-label">First Name</label>
-                    <input
+                    <label htmlFor="rd-first-name" className="modal-form-label">First Name</label>
+                    <input id="rd-first-name"
                       type="text"
                       className="modal-form-input"
                       value={details?.first_name ?? ''}
@@ -872,8 +1009,8 @@ const ResidentDashboard = () => {
                   </div>
 
                   <div className="modal-form-group">
-                    <label className="modal-form-label">Middle Name (optional)</label>
-                    <input
+                    <label htmlFor="rd-middle-name-optional" className="modal-form-label">Middle Name (optional)</label>
+                    <input id="rd-middle-name-optional"
                       type="text"
                       className="modal-form-input"
                       value={details?.middle_name ?? ''}
@@ -884,8 +1021,8 @@ const ResidentDashboard = () => {
                   </div>
 
                   <div className="modal-form-group">
-                    <label className="modal-form-label">Last Name</label>
-                    <input
+                    <label htmlFor="rd-last-name" className="modal-form-label">Last Name</label>
+                    <input id="rd-last-name"
                       type="text"
                       className="modal-form-input"
                       value={details?.last_name ?? ''}
@@ -896,8 +1033,8 @@ const ResidentDashboard = () => {
                   </div>
 
                   <div className="modal-form-group">
-                    <label className="modal-form-label">Suffix (optional)</label>
-                    <input
+                    <label htmlFor="rd-suffix-optional" className="modal-form-label">Suffix (optional)</label>
+                    <input id="rd-suffix-optional"
                       type="text"
                       className="modal-form-input"
                       value={details?.suffix ?? ''}
@@ -908,8 +1045,8 @@ const ResidentDashboard = () => {
                   </div>
 
                   <div className="modal-form-group">
-                    <label className="modal-form-label">Contact Number</label>
-                    <input
+                    <label htmlFor="rd-contact-number" className="modal-form-label">Contact Number</label>
+                    <input id="rd-contact-number"
                       type="tel"
                       className="modal-form-input"
                       value={details?.contact_number ?? ''}
@@ -920,8 +1057,8 @@ const ResidentDashboard = () => {
                   </div>
 
                   <div className="modal-form-group">
-                    <label className="modal-form-label">Purok</label>
-                    <select
+                    <label htmlFor="rd-purok" className="modal-form-label">Purok</label>
+                    <select id="rd-purok"
                       className="modal-form-input"
                       value={details?.purok ?? ''}
                       onChange={(e) => setDetails((d) => ({ ...d, purok: e.target.value }))}
@@ -1044,9 +1181,9 @@ const ResidentDashboard = () => {
               </p>
 
               <div className="modal-form-group">
-                <label className="modal-form-label">New Password</label>
+                <label htmlFor="rd-new-password" className="modal-form-label">New Password</label>
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <input
+                  <input id="rd-new-password"
                     type={showNew ? 'text' : 'password'}
                     className="modal-form-input"
                     placeholder="Enter new password"
@@ -1055,6 +1192,9 @@ const ResidentDashboard = () => {
                     style={{ paddingRight: 40 }}
                   />
                   <button
+                    type="button"
+                    aria-pressed={showNew}
+                    aria-label={showNew ? 'Hide the new password' : 'Show the new password'}
                     onClick={() => setShowNew(!showNew)}
                     style={{
                       position: 'absolute', right: 12, background: 'none',
@@ -1067,9 +1207,9 @@ const ResidentDashboard = () => {
               </div>
 
               <div className="modal-form-group">
-                <label className="modal-form-label">Confirm New Password</label>
+                <label htmlFor="rd-confirm-new-password" className="modal-form-label">Confirm New Password</label>
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <input
+                  <input id="rd-confirm-new-password"
                     type={showConfirm ? 'text' : 'password'}
                     className="modal-form-input"
                     placeholder="Confirm new password"
@@ -1078,6 +1218,9 @@ const ResidentDashboard = () => {
                     style={{ paddingRight: 40 }}
                   />
                   <button
+                    type="button"
+                    aria-pressed={showConfirm}
+                    aria-label={showConfirm ? 'Hide the confirmed password' : 'Show the confirmed password'}
                     onClick={() => setShowConfirm(!showConfirm)}
                     style={{
                       position: 'absolute', right: 12, background: 'none',
@@ -1104,12 +1247,12 @@ const ResidentDashboard = () => {
       {/* New Document Request Modal */}
       {showRequestModal && (
         <div className="modal-overlay">
-          <div className="modal">
-            <h3>Request a Document</h3>
+          <div className="modal" role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="rddlg-1-title">
+            <h3 id="rddlg-1-title">Request a Document</h3>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Document Type</label>
-              <select
+              <label htmlFor="rd-document-type" className="modal-form-label">Document Type</label>
+              <select id="rd-document-type"
                 className="modal-form-input"
                 value={newRequest.document_type}
                 onChange={(e) => setNewRequest({ ...newRequest, document_type: e.target.value })}
@@ -1121,8 +1264,8 @@ const ResidentDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Purpose</label>
-              <input
+              <label htmlFor="rd-purpose" className="modal-form-label">Purpose</label>
+              <input id="rd-purpose"
                 type="text"
                 className="modal-form-input"
                 placeholder="e.g. Employment requirement"
@@ -1132,8 +1275,8 @@ const ResidentDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Additional Notes (optional)</label>
-              <textarea
+              <label htmlFor="rd-additional-notes-optional" className="modal-form-label">Additional Notes (optional)</label>
+              <textarea id="rd-additional-notes-optional"
                 className="modal-form-textarea"
                 placeholder="Anything else the official should know"
                 value={newRequest.additional_notes}
@@ -1152,6 +1295,8 @@ const ResidentDashboard = () => {
           </div>
         </div>
       )}
+
+      {confirmDialog}
     </div>
   )
 }

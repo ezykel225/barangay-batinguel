@@ -6,19 +6,28 @@ import {
 } from 'react-icons/fa'
 import { MdVerified } from 'react-icons/md'
 import { supabase } from '../supabase/supabaseClient'
-import { HEALTH_NURSE_NAME } from '../constants/barangay'
+import {
+  HEALTH_NURSE_ROLE, PUNONG_BARANGAY_LABEL,
+} from '../constants/barangay'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { PersonAvatar } from '../utils/officialPhotos'
 import './Officials.css'
 
-// Health Department — the barangay has one nurse. Named by role, not
-// by person: see HEALTH_NURSE_NAME.
+// Health Department — the barangay has one nurse, identified by role
+// rather than by person until the barangay confirms a name and a photo
+// together. See HEALTH_NURSE_ROLE in constants/barangay.js.
 const healthDept = [
   {
     id: 1,
-    name: HEALTH_NURSE_NAME,
-    role: 'Public Health Nurse',
+    // One role string, not two. This card used to render
+    // HEALTH_NURSE_NAME ("Barangay Health Nurse") directly above
+    // HEALTH_NURSE_ROLE ("Public Health Nurse") -- the same defect
+    // HEALTH_NURSE_ROLE's own comment describes, moved from her
+    // Settings card to the public pages. The role is the honest label
+    // until the barangay confirms a name and photo together.
+    name: HEALTH_NURSE_ROLE,
+    role: 'Barangay Health Center',
     desc: 'Oversees local community immunization drives, maternal care programs, and clinical health tracking.',
     liveAvailability: true,
   },
@@ -197,22 +206,29 @@ const Officials = () => {
     <div className="officials-page">
       <Navbar />
 
-      <main id="main-content">
+      <main id="main-content" tabIndex={-1}>
 
       {/* Hero */}
       <section className="officials-hero">
         <div className="officials-hero-container">
           <div>
-            <h1>Kapitan's Office</h1>
+            {/* The paragraph under this heading already said "Punong
+                Barangay"; the heading said "Kapitan". One page, two names
+                for the same person. */}
+            <h1>Office of the {PUNONG_BARANGAY_LABEL}</h1>
             <p>
               Direct access to Punong Barangay's schedule and
               administrative availability. We promise transparency
               and resident-focused governance.
             </p>
           </div>
+          {/* Not "Official Portal": that is what the sidebar calls the
+              staff dashboard, and this is the public directory. A visitor
+              reading it here would think they were inside the staff
+              area. */}
           <div className="officials-hero-badge available">
             <MdVerified />
-            Official Portal
+            Official Directory
           </div>
         </div>
       </section>
@@ -247,11 +263,11 @@ const Officials = () => {
                 Consultation Schedule
               </h4>
               {loadingSchedule ? (
-                <p style={{ fontSize: '13px', color: '#6b7280' }}>
+                <p style={{ fontSize: '13px', color: '#5f6775' }}>
                   Loading schedule...
                 </p>
               ) : schedule.length === 0 ? (
-                <p style={{ fontSize: '13px', color: '#6b7280' }}>
+                <p style={{ fontSize: '13px', color: '#5f6775' }}>
                   No schedule available.
                 </p>
               ) : (
@@ -285,7 +301,7 @@ const Officials = () => {
           </p>
 
           {loadingOfficials ? (
-            <p style={{ fontSize: '14px', color: '#6b7280' }}>
+            <p style={{ fontSize: '14px', color: '#5f6775' }}>
               Loading officials...
             </p>
           ) : (

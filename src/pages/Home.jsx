@@ -7,6 +7,7 @@ import { BARANGAY_CONTACT, BARANGAY_OFFICE_HOURS, telHref } from '../constants/b
 import {
   BARANGAY_HISTORY, BARANGAY_PROFILE, BATINGUEL_ELEMENTARY,
 } from '../constants/about'
+import { upcomingEvents } from '../utils/eventCalendar'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import './Home.css'
@@ -52,18 +53,33 @@ const Home = () => {
     }
   }
 
+  const HOME_EVENT_LIMIT = 4
+
   const fetchEvents = async () => {
     try {
+      // ⚠️ No .limit() here, and that is deliberate.
+      //
+      // This section is headed "Upcoming Events" and used to run
+      // `.order('event_date').limit(4)` with no date filter at all. On
+      // live data that showed three events from 2024 FIRST and the one
+      // genuinely upcoming event last -- the heading promising the
+      // opposite of what was under it. The same defect as the
+      // "Upcoming Events" count fixed in PR #22, in the list beside it.
+      //
+      // Filter, THEN limit. Limiting in SQL first would hand four rows
+      // to a filter that then has nothing upcoming left to show.
       const { data, error } = await supabase
         .from('events')
         .select('*')
         .order('event_date', { ascending: true })
-        .limit(4)
 
       if (error) {
         console.error('Events error:', error)
       } else {
-        setEvents(data || [])
+        // Filtered to what is still to come, then limited. Today in
+        // Manila counts as upcoming -- an event this afternoon has not
+        // happened yet.
+        setEvents(upcomingEvents(data || [], { limit: HOME_EVENT_LIMIT }))
       }
     } catch (err) {
       console.error('Fetch events error:', err)
@@ -95,7 +111,7 @@ const Home = () => {
     <div className="home">
       <Navbar />
 
-      <main id="main-content">
+      <main id="main-content" tabIndex={-1}>
 
       <section className="hero">
         <div className="hero-container">

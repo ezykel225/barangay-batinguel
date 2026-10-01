@@ -16,6 +16,7 @@ import toast from 'react-hot-toast'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import './Login.css'
+import { useModalA11y } from '../components/useModalA11y'
 
 // Supabase's browser auth lock is shared across ALL tabs of this
 // origin, not per-tab. With multiple tabs open, one tab's auth call
@@ -47,6 +48,13 @@ const Login = () => {
   const [forgotEmail, setForgotEmail] = useState('')
   const [forgotLoading, setForgotLoading] = useState(false)
 
+  // Escape, focus entry and focus restoration for the reset-password and
+  // support boxes. One call for both -- they are mutually exclusive.
+  useModalA11y(showForgotModal || showSupportModal, () => {
+    setShowForgotModal(false)
+    setShowSupportModal(false)
+  })
+
   const handleLogin = async (e) => {
     e.preventDefault()
     setLoading(true)
@@ -76,7 +84,7 @@ const Login = () => {
           )
         } else {
           setError(
-            'Invalid System ID or Security Key. Please try again.'
+            'Incorrect email or password. Please try again.'
           )
         }
         setLoading(false)
@@ -141,7 +149,7 @@ const Login = () => {
     e.preventDefault()
     if (forgotLoading) return
     if (!forgotEmail) {
-      toast.error('Please enter your System ID (email).')
+      toast.error('Please enter your email address.')
       return
     }
 
@@ -171,7 +179,7 @@ const Login = () => {
       <Navbar />
 
       {/* Login Container */}
-      <main className="login-container" id="main-content">
+      <main className="login-container" id="main-content" tabIndex={-1}>
         <div className="login-box">
 
           {/* Left Panel */}
@@ -194,10 +202,10 @@ const Login = () => {
                 <FaLock />
                 Secure Gateway Access
               </div>
-              <h1>Portal Authentication</h1>
+              <h1>Log in</h1>
               <p>
-                Please verify your identity to
-                proceed to your workstation.
+                Sign in to continue to your
+                barangay dashboard.
               </p>
             </div>
 
@@ -211,11 +219,11 @@ const Login = () => {
 
           {/* Right Panel */}
           <div className="login-right">
-            <h2>Portal Authentication</h2>
-            <p>
-              Please verify your identity to proceed
-              to your workstation.
-            </p>
+            {/* The form's own heading, as on the signup and reset pages.
+                This used to repeat the left panel's h1 and its sentence
+                word for word, which is why only the wording changed
+                here rather than the structure. */}
+            <h2>Sign in</h2>
 
             {/* Error Message */}
             {error && (
@@ -289,14 +297,14 @@ const Login = () => {
               className="login-form"
               onSubmit={handleLogin}>
 
-              {/* System ID */}
+              {/* Email */}
               <div className="login-form-group">
-                <label>System ID</label>
+                <label htmlFor="login-email">Email</label>
                 <div className="login-input-wrapper">
                   <div className="login-input-icon">
                     <FaIdCard />
                   </div>
-                  <input
+                  <input id="login-email"
                     type="text"
                     placeholder="Enter your email"
                     value={systemId}
@@ -308,14 +316,14 @@ const Login = () => {
                 </div>
               </div>
 
-              {/* Security Key */}
+              {/* Password */}
               <div className="login-form-group">
-                <label>Security Key</label>
+                <label htmlFor="login-password">Password</label>
                 <div className="login-input-wrapper">
                   <div className="login-input-icon">
                     <FaKey />
                   </div>
-                  <input
+                  <input id="login-password"
                     type={showPassword
                       ? 'text' : 'password'}
                     placeholder="••••••••••••"
@@ -328,6 +336,8 @@ const Login = () => {
                   <button
                     type="button"
                     className="login-toggle-password"
+                    aria-pressed={showPassword}
+                    aria-label={showPassword ? 'Hide the password' : 'Show the password'}
                     onClick={() =>
                       setShowPassword(!showPassword)
                     }>
@@ -351,8 +361,8 @@ const Login = () => {
                 disabled={loading}>
                 <FaShieldAlt />
                 {loading
-                  ? 'Authenticating...'
-                  : 'Authorize Access'}
+                  ? 'Logging in...'
+                  : 'Log in'}
               </button>
 
             </form>
@@ -371,7 +381,7 @@ const Login = () => {
                 className="login-link-btn"
                 onClick={() => setShowForgotModal(true)}
               >
-                Forgot Access?
+                Forgot your password?
               </button>
               <span className="login-divider">|</span>
               <button
@@ -390,10 +400,10 @@ const Login = () => {
       {/* Forgot Access Modal */}
       {showForgotModal && (
         <div className="login-modal-overlay" onClick={() => setShowForgotModal(false)}>
-          <div className="login-modal" onClick={(e) => e.stopPropagation()}>
-            <h2>Reset Your Access</h2>
+          <div className="login-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="logindlg-1-title">
+            <h2 id="logindlg-1-title">Reset your password</h2>
             <p>
-              Enter the System ID (email) tied to your official or nurse
+              Enter the email address tied to your official or nurse
               account. We'll send a password reset link to it.
             </p>
             <form onSubmit={handleForgotAccess}>
@@ -428,8 +438,8 @@ const Login = () => {
       {/* Support Portal Modal */}
       {showSupportModal && (
         <div className="login-modal-overlay" onClick={() => setShowSupportModal(false)}>
-          <div className="login-modal" onClick={(e) => e.stopPropagation()}>
-            <h2>Support Portal</h2>
+          <div className="login-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="logindlg-2-title">
+            <h2 id="logindlg-2-title">Support Portal</h2>
             <p>
               For account access issues that a reset link can't fix,
               contact the Barangay Batinguel administrator directly:

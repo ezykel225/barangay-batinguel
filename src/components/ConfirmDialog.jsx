@@ -151,7 +151,7 @@ export const ConfirmDialog = ({
             onClick={onConfirm}
             disabled={busy}
           >
-            {busy ? 'Working…' : confirmLabel}
+            {busy ? 'Working...' : confirmLabel}
           </button>
         </div>
       </div>
@@ -166,6 +166,24 @@ export const useConfirm = () => {
   const resolverRef = useRef(null)
 
   const confirm = useCallback((options) => new Promise((resolve) => {
+    // ⚠️ A second confirm() while one is still open used to overwrite the
+    // resolver, so the FIRST promise never settled and its handler hung
+    // for the rest of the session -- silently, with no write and no
+    // error.
+    //
+    // It was latent while every caller was an official or nurse clicking
+    // one row at a time, and only two rows apart from each other: the
+    // action buttons disable per row, not across rows. Converting the
+    // resident portal's two window.confirm calls made it reachable --
+    // window.confirm blocks the page, so this race could not happen
+    // there before.
+    //
+    // A question the user never saw is answered `false`: declining the
+    // abandoned action can never cause a write, whereas resolving it
+    // `true` or leaving it pending both can cause harm.
+    const pending = resolverRef.current
+    if (pending) pending(false)
+
     resolverRef.current = resolve
     setState(options)
   }), [])

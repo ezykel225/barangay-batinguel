@@ -161,19 +161,6 @@ body {
   background-color: #fca5a5;
 }
 
-@keyframes pulse {
-  0% {
-    opacity: 1;
-  }
-
-  50% {
-    opacity: 0.4;
-  }
-
-  100% {
-    opacity: 1;
-  }
-}
 
 .kapitan-left h2 {
   font-size: var(--fs-13);
@@ -257,7 +244,7 @@ body {
 .schedule-day-name {
   font-size: var(--fs-12);
   font-weight: 600;
-  color: #6b7280;
+  color: #5f6775;
   text-transform: uppercase;
   margin-bottom: 4px;
 }
@@ -270,12 +257,6 @@ body {
 
 .schedule-day.on-field .schedule-day-status {
   color: #b45309;
-}
-
-.schedule-time {
-  font-size: var(--fs-12);
-  color: #6b7280;
-  margin-top: 4px;
 }
 
 /* ================================
@@ -300,7 +281,7 @@ body {
 
 .section-subtitle {
   font-size: var(--fs-14);
-  color: #6b7280;
+  color: #5f6775;
   margin-bottom: 32px;
 }
 
@@ -365,27 +346,9 @@ body {
 
 .council-card-desc {
   font-size: var(--fs-13);
-  color: #6b7280;
+  color: #5f6775;
   line-height: 1.6;
   margin-bottom: 16px;
-}
-
-.council-card-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background-color: #eff6ff;
-  color: #1e3a8a;
-  padding: 8px 16px;
-  border-radius: var(--radius-sm);
-  font-size: var(--fs-13);
-  font-weight: 500;
-  text-decoration: none;
-  transition: background-color 0.2s;
-}
-
-.council-card-btn:hover {
-  background-color: #dbeafe;
 }
 
 .council-grid {
@@ -467,7 +430,7 @@ body {
 
 .council-small-committee {
   font-size: var(--fs-12);
-  color: #6b7280;
+  color: #5f6775;
   line-height: 1.45;
 }
 
@@ -543,25 +506,9 @@ body {
 
 .health-dept-desc {
   font-size: var(--fs-12);
-  color: #6b7280;
+  color: #5f6775;
   line-height: 1.6;
   margin-bottom: 16px;
-}
-
-.health-dept-btn {
-  display: inline-block;
-  background-color: #f0fdf4;
-  color: #16a34a;
-  padding: 6px 14px;
-  border-radius: var(--radius-sm);
-  font-size: var(--fs-12);
-  font-weight: 500;
-  text-decoration: none;
-  transition: background-color 0.2s;
-}
-
-.health-dept-btn:hover {
-  background-color: #dcfce7;
 }
 
 /* ================================
@@ -659,25 +606,22 @@ body {
 
 .health-badge-available {
   background-color: rgba(22, 163, 74, 0.12);
-  color: #15803d;
+  /* ⚠️ (X3) Darkened from #15803d, which measured 4.39:1 on this pale
+     green chip at 12px -- just under AA. The chip colour is unchanged;
+     only the text moved. */
+  color: #126c33;
   border: 1px solid rgba(22, 163, 74, 0.3);
 }
 
 .health-badge-unavailable {
   background-color: rgba(239, 68, 68, 0.1);
-  color: #dc2626;
+  color: #b91c1c;
   border: 1px solid rgba(239, 68, 68, 0.25);
-}
-
-.health-badge-onduty {
-  background-color: rgba(30, 58, 138, 0.08);
-  color: #1e3a8a;
-  border: 1px solid rgba(30, 58, 138, 0.2);
 }
 
 .health-badge-loading {
   background-color: #f3f4f6;
-  color: #6b7280;
+  color: #5f6775;
   border: 1px solid #e5e7eb;
 }
 
@@ -689,14 +633,10 @@ body {
 }
 
 .dot-available {
-  background-color: #16a34a;
+  background-color: #15803d;
   animation: pulse 2s infinite;
 }
 
 .dot-unavailable {
-  background-color: #dc2626;
-}
-
-.dot-onduty {
-  background-color: #1e3a8a;
+  background-color: #b91c1c;
 }

@@ -96,7 +96,11 @@
   max-width: 1200px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 1fr 2fr;
+  /* minmax(0, …) for the reason given in Home.css: a bare `1fr` track is
+     `minmax(auto, 1fr)` and cannot shrink below its content's
+     min-content width, so one long medicine name set the width of the
+     whole page. Measured at 375px before this: +193px. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
   gap: 32px;
 }
 
@@ -107,6 +111,14 @@
   display: flex;
   flex-direction: column;
   gap: 24px;
+  /* A flex item's default `min-width: auto` is its min-content width,
+     so without this a long medicine or programme name widens the whole
+     sidebar column. */
+  min-width: 0;
+}
+
+.health-sidebar > * {
+  min-width: 0;
 }
 
 /* On Duty Status Card */
@@ -121,7 +133,7 @@
 .health-status-card h3 {
   font-size: var(--fs-13);
   font-weight: 600;
-  color: #6b7280;
+  color: #5f6775;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 16px;
@@ -134,23 +146,10 @@
   width: 8px;
   height: 8px;
   border-radius: var(--radius-circle);
-  background-color: #16a34a;
+  background-color: #15803d;
   animation: pulse 2s infinite;
 }
 
-@keyframes pulse {
-  0% {
-    opacity: 1;
-  }
-
-  50% {
-    opacity: 0.4;
-  }
-
-  100% {
-    opacity: 1;
-  }
-}
 
 .health-nurse-item {
   display: flex;
@@ -194,7 +193,7 @@
 
 .health-nurse-info p {
   font-size: var(--fs-12);
-  color: #6b7280;
+  color: #5f6775;
 }
 
 .health-nurse-status {
@@ -226,32 +225,25 @@
 
 .status-badge.available {
   background-color: rgba(22, 163, 74, 0.12);
-  color: #15803d;
+  /* ⚠️ (X3) Darkened from #15803d, which measured 4.39:1 on this pale
+     green chip at 12px -- just under AA. The chip colour is unchanged;
+     only the text moved. */
+  color: #126c33;
   border: 1px solid rgba(22, 163, 74, 0.3);
 }
 
 .status-badge.available::before {
-  background-color: #16a34a;
+  background-color: #15803d;
 }
 
 .status-badge.unavailable {
   background-color: rgba(239, 68, 68, 0.1);
-  color: #dc2626;
+  color: #b91c1c;
   border: 1px solid rgba(239, 68, 68, 0.25);
 }
 
 .status-badge.unavailable::before {
-  background-color: #dc2626;
-}
-
-.status-badge.on-duty {
-  background-color: rgba(30, 58, 138, 0.08);
-  color: #1e3a8a;
-  border: 1px solid rgba(30, 58, 138, 0.2);
-}
-
-.status-badge.on-duty::before {
-  background-color: #1e3a8a;
+  background-color: #b91c1c;
 }
 
 /* Clinic Hours Card */
@@ -294,7 +286,7 @@
 }
 
 .clinic-hours-closed {
-  color: #dc2626;
+  color: #b91c1c;
   font-weight: 600;
 }
 
@@ -344,7 +336,7 @@
 
 .visit-appointment {
   background-color: #f0fdf4;
-  color: #16a34a;
+  color: #15803d;
 }
 
 .visit-option-info h4 {
@@ -356,14 +348,14 @@
 
 .visit-option-info p {
   font-size: var(--fs-12);
-  color: #6b7280;
+  color: #5f6775;
   line-height: 1.5;
 }
 
 .visit-divider {
   text-align: center;
   font-size: var(--fs-12);
-  color: #6b7280;
+  color: #5f6775;
   font-weight: 600;
   margin: 4px 0;
 }
@@ -379,7 +371,7 @@
 
 .visit-contact span {
   font-size: var(--fs-12);
-  color: #6b7280;
+  color: #5f6775;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -434,7 +426,7 @@
 
 .bakuna-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
 }
 
@@ -481,7 +473,7 @@
 
 .bakuna-card-body p {
   font-size: var(--fs-12);
-  color: #6b7280;
+  color: #5f6775;
   line-height: 1.5;
   margin-bottom: 10px;
 }
@@ -489,7 +481,7 @@
 .bakuna-target {
   display: inline-block;
   background-color: #f0fdf4;
-  color: #16a34a;
+  color: #15803d;
   padding: 3px 10px;
   border-radius: var(--radius-pill);
   font-size: var(--fs-12);
@@ -509,7 +501,7 @@
 
 .health-tips-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 16px;
 }
 
@@ -545,7 +537,7 @@
 
 .health-tip-info p {
   font-size: var(--fs-12);
-  color: #6b7280;
+  color: #5f6775;
   line-height: 1.5;
 }
 
@@ -608,7 +600,7 @@
 
 .quicklink-green {
   background-color: #f0fdf4;
-  color: #16a34a;
+  color: #15803d;
 }
 
 .quicklink-navy {
@@ -625,12 +617,12 @@
 
 .quicklink-info p {
   font-size: var(--fs-12);
-  color: #6b7280;
+  color: #5f6775;
 }
 
 .quicklink-arrow {
   margin-left: auto;
-  color: #6b7280;
+  color: #5f6775;
   font-size: var(--fs-13);
   flex-shrink: 0;
 }
@@ -658,16 +650,17 @@
     min-width: 0;
   }
 
+  /* A single column is still minmax(auto, 1fr) without this. */
   .health-main-container {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .bakuna-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .health-tips-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .health-main {
@@ -768,13 +761,13 @@
 
 .medicine-updated {
   font-size: var(--fs-12);
-  color: #6b7280;
+  color: #5f6775;
   font-weight: 500;
 }
 
 .medicine-disclaimer {
   font-size: var(--fs-13);
-  color: #6b7280;
+  color: #5f6775;
   line-height: 1.6;
   margin: 0 0 18px;
 }
@@ -804,7 +797,7 @@
   display: grid;
   /* Name column flexes, badge column stays its natural width so the
      statuses line up down the page instead of drifting. */
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 4px 12px;
   padding: 10px 12px;
@@ -819,16 +812,25 @@
   align-items: baseline;
   flex-wrap: wrap;
   gap: 8px;
+  min-width: 0;
 }
 
-.medicine-name { font-size: var(--fs-14); font-weight: 600; color: #111827; }
-.medicine-form { font-size: var(--fs-12); color: #6b7280; }
+/* A medicine name is data a nurse typed, and some of them are one long
+   chemical token. It wraps rather than widening the card. */
+.medicine-name {
+  font-size: var(--fs-14);
+  font-weight: 600;
+  color: #111827;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.medicine-form { font-size: var(--fs-12); color: #5f6775; }
 
 .medicine-generic,
 .medicine-note {
   grid-column: 1;
   font-size: var(--fs-12);
-  color: #6b7280;
+  color: #5f6775;
   line-height: 1.5;
 }
 

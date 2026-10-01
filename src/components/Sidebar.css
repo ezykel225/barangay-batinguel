@@ -169,12 +169,6 @@
   color: #bfdbfe;
 }
 
-.sidebar-role {
-  font-size: var(--fs-12);
-  color: #bfdbfe;
-  margin-top: 8px;
-}
-
 /* Sidebar Navigation */
 .sidebar-nav {
   flex: 1;
@@ -218,7 +212,7 @@
 
 .sidebar-nav-badge {
   margin-left: auto;
-  background-color: #dc2626;
+  background-color: #b91c1c;
   color: white;
   font-size: var(--fs-12);
   font-weight: 700;
@@ -241,12 +235,6 @@
 .sidebar-nav-home:hover {
   background-color: rgba(255, 255, 255, 0.1);
   color: white;
-}
-
-.sidebar-nav-divider {
-  height: 1px;
-  background-color: rgba(255, 255, 255, 0.1);
-  margin: 8px 20px;
 }
 
 .sidebar-nav-label {
@@ -331,22 +319,6 @@
   min-height: 100vh;
 }
 
-.dashboard-header {
-  margin-bottom: 32px;
-}
-
-.dashboard-header h1 {
-  font-size: var(--fs-28);
-  font-weight: 700;
-  color: #1f2937;
-  margin-bottom: 4px;
-}
-
-.dashboard-header p {
-  font-size: var(--fs-14);
-  color: #6b7280;
-}
-
 /* Stats Cards */
 .dashboard-stats {
   display: grid;
@@ -387,7 +359,7 @@
 
 .stat-card-icon.green {
   background-color: #dcfce7;
-  color: #16a34a;
+  color: #15803d;
 }
 
 .stat-card-icon.yellow {
@@ -397,7 +369,7 @@
 
 .stat-card-icon.red {
   background-color: #fee2e2;
-  color: #dc2626;
+  color: #b91c1c;
 }
 
 .stat-card-value {
@@ -409,22 +381,7 @@
 
 .stat-card-label {
   font-size: var(--fs-13);
-  color: #6b7280;
-}
-
-/* Dashboard Grid */
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-  margin-bottom: 24px;
-}
-
-.dashboard-grid-3 {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 24px;
-  margin-bottom: 24px;
+  color: #5f6775;
 }
 
 /* Dashboard Cards */
@@ -485,6 +442,17 @@
   font-size: var(--fs-13);
   color: #374151;
   cursor: pointer;
+  /* The wrapper is padded and the select is not, and a pointer landing
+     on that padding activates NOTHING -- measured with
+     elementFromPoint across the wrapper box: only the middle ~17px
+     returned the <select>. That is under WCAG 2.2 SC 2.5.8's 24px
+     minimum even though the control LOOKS 37px tall.
+     `align-self: stretch` overrides the wrapper's `align-items: center`
+     so the select fills the wrapper's content box instead of sitting
+     in the middle of it, and the min-height guarantees the 24px when
+     the font metrics would otherwise fall short. */
+  align-self: stretch;
+  min-height: 24px;
 }
 
 /* Table Styles */
@@ -497,7 +465,7 @@
   text-align: left;
   font-size: var(--fs-12);
   font-weight: 600;
-  color: #6b7280;
+  color: #5f6775;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 8px 12px;
@@ -533,33 +501,23 @@
 
 .badge-approved {
   background-color: #dcfce7;
-  color: #16a34a;
+  color: #15803d;
 }
 
 .badge-declined {
   background-color: #fee2e2;
-  color: #dc2626;
+  color: #b91c1c;
 }
 
 .role-restricted-note {
   font-size: var(--fs-12);
-  color: #6b7280;
+  color: #5f6775;
   font-style: italic;
-}
-
-.badge-in-office {
-  background-color: #dcfce7;
-  color: #16a34a;
-}
-
-.badge-on-field {
-  background-color: #fef9c3;
-  color: #b45309;
 }
 
 .badge-unavailable {
   background-color: #fee2e2;
-  color: #dc2626;
+  color: #b91c1c;
 }
 
 .badge-ready {
@@ -572,10 +530,38 @@
   color: #4b5563;
 }
 
+/* `badge badge-${res.status}` on the official Reservations table produced
+    `badge-cancelled`, which no stylesheet defined -- so a booking the
+    resident had cancelled rendered as an unstyled pill among styled ones
+    and looked like a rendering fault. Grey rather than red: a resident
+    releasing their own slot is not a refusal, and it is the one status no
+    official caused. */
+.badge-cancelled {
+  background-color: #e5e7eb;
+  color: #4b5563;
+}
+
 /* Action Buttons */
+/* `inline-flex` with a gap, because both of these buttons are used with
+    an icon beside their label (Edit, Archive, Delete). Without it the
+    icon sits on the text baseline rather than centred on it, which is the
+    misalignment visible in every action column.
+
+    `margin-right` is gone: every action cell now spaces its buttons with
+    `gap` via `.action-cell`, and the two together produced 10px between
+    some buttons and 6px between others in the same table.
+
+    ⚠️ The protected mobile block sets `width: 100%` on both of these at
+    768px and below. `inline-flex` honours that -- the button still fills
+    its card row -- and `justify-content: center` is what keeps the label
+    centred once it does. */
 .btn-approve {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   padding: 6px 12px;
-  background-color: #16a34a;
+  background-color: #15803d;
   color: white;
   border: none;
   border-radius: var(--radius-sm);
@@ -584,7 +570,6 @@
   cursor: pointer;
   font-family: 'Poppins', sans-serif;
   transition: background-color 0.2s;
-  margin-right: 4px;
 }
 
 .btn-approve:hover {
@@ -592,8 +577,12 @@
 }
 
 .btn-deny {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   padding: 6px 12px;
-  background-color: #dc2626;
+  background-color: #b91c1c;
   color: white;
   border: none;
   border-radius: var(--radius-sm);
@@ -608,9 +597,13 @@
   background-color: #b91c1c;
 }
 
+/* `inline-flex`, not `flex`: as a block-level flex container this
+    stretched inside table cells and card rows, which is why nearly every
+    in-table instance carried an inline style to shrink it. */
 .btn-add {
-  display: flex;
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   padding: 8px 16px;
   background-color: #1e3a8a;
@@ -629,59 +622,12 @@
 }
 
 .btn-add:disabled {
-  background-color: #6b7280;
+  background-color: #5f6775;
   cursor: not-allowed;
 }
 
 .btn-add:disabled:hover {
-  background-color: #6b7280;
-}
-
-/* Kapitan Status */
-.kapitan-status-card {
-  background: linear-gradient(135deg,
-      #1e3a8a,
-      #1e40af);
-  border-radius: var(--radius-md);
-  padding: 24px;
-  color: white;
-  margin-bottom: 24px;
-}
-
-.kapitan-status-card h3 {
-  font-size: var(--fs-14);
-  font-weight: 600;
-  color: #bfdbfe;
-  margin-bottom: 16px;
-}
-
-.kapitan-status-buttons {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin-bottom: 16px;
-}
-
-.kapitan-status-btn {
-  padding: 10px;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
-  font-size: var(--fs-13);
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-family: 'Poppins', sans-serif;
-}
-
-.kapitan-status-btn.active {
-  border-color: white;
-  background: rgba(255, 255, 255, 0.2);
-}
-
-.kapitan-status-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background-color: #5f6775;
 }
 
 /* Modal */
@@ -696,6 +642,27 @@
   padding: 20px;
 }
 
+/* ⚠️ (X2) A TALL MODAL MUST NOT PUT ITS SUBMIT BUTTON OFF-SCREEN.
+ *
+ * `.modal-overlay` is `position: fixed; inset: 0` and centres its child,
+ * so a form taller than the viewport overflowed BOTH edges with nothing
+ * able to scroll: the page behind is covered by a fixed overlay, and the
+ * modal itself had no max-height and no overflow.
+ *
+ * Measured with the Add Registry Entry form (9 fields), before this:
+ *
+ *   375x667   modal 979px, title at -156px, Save button 124px below the
+ *             fold and unreachable
+ *   375x812   Save button 52px below the fold
+ *   1280x800  Save button 58px below the fold  <- NOT a mobile-only bug
+ *
+ * Capping the height and letting the modal scroll itself fixes all
+ * three. `max-height` only binds when the modal is too tall, so short
+ * modals are pixel-identical to before.
+ *
+ * The `dvh` line is for mobile browsers whose toolbars make `100vh`
+ * taller than the visible area; a browser that does not know the unit
+ * ignores the declaration and keeps the `vh` line above it. */
 .modal {
   background-color: white;
   border-radius: var(--radius-lg);
@@ -703,6 +670,9 @@
   width: 100%;
   max-width: 500px;
   box-shadow: var(--shadow-lg);
+  max-height: calc(100vh - 40px);
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
 }
 
 .modal h3 {
@@ -745,29 +715,6 @@
 
 /* Responsive */
 @media (max-width: 1024px) {
-  .dashboard-stats {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .dashboard-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .dashboard-grid-3 {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 768px) {
-  .sidebar {
-    display: none;
-  }
-
-  .dashboard-main {
-    margin-left: 0;
-    padding: 20px;
-  }
-
   .dashboard-stats {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -919,12 +866,90 @@
    Keep mobile navigation reachable while leaving page content
    unobstructed. Same position for every portal; hidden on desktop, where
    the sidebar is the navigation. */
-.mobile-menu-button {
+/* ── The mobile dashboard header (X2) ─────────────────────────────────
+ *
+ * One fixed strip across the top of all three portals, holding the
+ * system brand, the notification bell and the menu button. Hidden above
+ * 768px, where the sidebar is the navigation and the bell lives in
+ * .dashboard-topbar.
+ *
+ * Before this, the same 76px strip was reserved and held the menu button
+ * alone -- an otherwise empty band -- while the bell floated separately
+ * above the page content, giving a phone two pieces of chrome stacked
+ * where one row would do.
+ *
+ * White with a shadow, matching the public .navbar, because the brand it
+ * carries is the same brand.
+ *
+ * ⚠️ z-index 1050 sits ABOVE the drawer overlay (1000) and BELOW the
+ * drawer itself (1100), so an open drawer covers the header rather than
+ * leaving a strip of it floating over the top. The notification panel is
+ * a child of this element, so it paints inside this stacking context --
+ * above .dashboard-main, which is what it needs.
+ */
+.dash-mobile-header {
   display: none;
   position: fixed;
-  top: 20px;
-  right: 20px;
+  top: 0;
+  left: 0;
+  right: 0;
   z-index: 1050;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  background-color: #ffffff;
+  box-shadow: var(--shadow-sm);
+}
+
+.dash-mobile-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /* The brand is the one thing here that may take the leftover room, and
+     min-width: 0 lets it shrink so the two controls on the right are
+     never pushed off the edge. */
+  flex: 1 1 auto;
+  min-width: 0;
+  text-decoration: none;
+  color: inherit;
+}
+
+.dash-mobile-brand-logo {
+  /* flex-shrink: 0 so the logo never squashes to an ellipse when the
+     name wraps. */
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-circle);
+  object-fit: cover;
+}
+
+/* ⚠️ Wraps to two lines rather than shrinking. At 375px the full name
+   does not fit on one line beside two 44px controls, and the brief's
+   choice -- and the right one -- is to wrap: a brand shrunk to fit would
+   be smaller than the body text around it. 1.15 line-height keeps two
+   lines inside the strip. */
+.dash-mobile-brand-name {
+  font-size: var(--fs-13);
+  font-weight: 700;
+  line-height: 1.15;
+  color: #1e3a8a;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.dash-mobile-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* Never shrinks: the bell and the menu keep their full touch targets
+     and the brand gives up space instead. */
+  flex: 0 0 auto;
+}
+
+.mobile-menu-button {
+  display: none;
   align-items: center;
   justify-content: center;
   /* 44px square: the usual minimum for a comfortable touch target. */
@@ -958,28 +983,34 @@
   .dashboard-main {
     margin-left: 0;
     padding: 20px;
-    /* Reserves the strip the menu button occupies, so a page heading
-       never starts underneath it. 20px (top inset) + 44px (button) +
-       12px (breathing room) = 76px. The bottom clearance that used to be
-       here existed only for the fixed bottom bar, which is gone; the
-       20px from the shorthand is the page's own spacing. */
+    /* Reserves the fixed .dash-mobile-header, so a page heading never
+       starts underneath it. 8px + 44px (the taller of the two controls)
+       + 8px = 60px of header, plus 12px of breathing room. The brand may
+       wrap to two lines, which grows the header past 60px -- hence
+       min-height below rather than a fixed height, and hence the
+       generous 76px kept here. The bottom clearance that used to be in
+       this rule existed only for the fixed bottom bar, which is gone. */
     padding-top: 76px;
+  }
+
+  .dash-mobile-header {
+    display: flex;
+    min-height: 60px;
   }
 
   .mobile-menu-button {
     display: flex;
   }
 
+  /* ⚠️ `.dashboard-topbar` is hidden at this width, but the rule lives in
+     NotificationBell.css, NOT here. Both rules are `.dashboard-topbar`
+     (0,1,0) and a media query adds no specificity, so whichever file the
+     bundler emits LAST wins at every width. It emitted this file first,
+     so the hide silently never applied -- measured: two bells visible at
+     375px. The rule belongs beside the declaration it overrides. */
+
   .dashboard-stats {
     grid-template-columns: repeat(2, 1fr);
-  }
-
-  .dashboard-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .kapitan-status-grid {
-    grid-template-columns: 1fr;
   }
 }
 
@@ -1133,4 +1164,385 @@
   font-size: var(--fs-13);
   color: var(--grey-600);
   line-height: 1.5;
+}
+
+/* ================================
+   ACTION CELLS AND SMALL BUTTONS
+   ================================
+   Two classes replacing style attributes that were repeated across the
+   dashboards. Appended after the protected mobile table-to-card block,
+   which is unchanged: both rules are deliberately weaker than the
+   protected ones, so mobile still wins.
+
+   `.action-cell` is what `style={{ display: 'flex', gap: 6, flexWrap:
+   'wrap' }}` was doing on six action cells -- with 6px on some and 8px on
+   others -- while four more had no wrapper at all and their buttons ran
+   together.
+
+   ⚠️ `.dashboard-table td:last-child` in the protected block (0,2,1)
+   outranks `.action-cell` (0,1,0) and comes later in the file, so at
+   768px and below the action cell still stacks into a column with the
+   protected gap. Verified in the browser at 375px, not assumed. */
+.action-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* The small variant of .btn-add / .btn-deny, replacing the
+   `style={{ fontSize: 12, padding: '4px 10px' }}` that was repeated on
+   seven in-table buttons -- in two spellings, `12` and `'12px'`. One
+   definition, so they cannot drift a pixel apart again. */
+.btn-sm {
+  padding: 5px 10px;
+  font-size: var(--fs-12);
+}
+
+/* ================================
+   SIGNED-IN IDENTITY
+   ================================
+   The sidebar footer showed a generic icon for everybody, and the mobile
+   drawer showed nothing at all -- so on a phone the account you were
+   about to log out of was never named. Both now render the same block.
+
+   Appended after the protected mobile table-to-card rules, which are
+   untouched: none of this concerns tables. */
+
+/* The avatar box was already a 36px circle that centres its child; an
+    <img> needs telling to fill it. PersonAvatar returns the old role icon
+    when there is no photo, so an account without one is unchanged. */
+.sidebar-user-photo {
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-circle);
+  object-fit: cover;
+  display: block;
+}
+
+/* Identity in the mobile drawer, above the destinations. Same two lines
+    as the desktop footer, on the drawer's dark background. */
+.nav-drawer-user {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* (X2) The avatar is a fixed 36px circle, and without this it is a flex
+   item free to shrink -- a long name squeezed it into an ellipse and
+   left the row looking mis-set. The name block takes the remaining
+   width instead, so the row has no slack on either side. */
+.nav-drawer-user .sidebar-user-avatar {
+  flex: 0 0 auto;
+}
+
+.nav-drawer-user .sidebar-user-info {
+  flex: 1 1 auto;
+}
+
+/* Long names wrap rather than pushing the drawer sideways. */
+.nav-drawer-user .sidebar-user-info {
+  min-width: 0;
+}
+
+.nav-drawer-user .sidebar-user-info span {
+  overflow-wrap: anywhere;
+}
+
+/* ================================
+   TABLE FIT — CARDS THAT FIT, COLUMNS THAT STAY VISIBLE
+   ================================
+   Appended after the protected mobile table-to-card block, which is
+   unchanged. Everything here is a later rule at equal or lower
+   specificity, so the protected declarations still decide anything they
+   set and these only fill the gaps they leave.
+
+   ── The mobile root cause ──
+   The protected block turns each ROW into a card (`tr { display: block }`)
+   and each CELL into a label/value line (`td { display: flex }`), but the
+   `<table>` and `<tbody>` are left as table boxes. A table box is sized by
+   its contents' MINIMUM width, and an unbreakable value -- a long email --
+   sets that floor. So the cards kept a ~485px floor at every viewport
+   width, and `.table-wrapper`'s `overflow-x: auto` scrolled them sideways
+   inside it.
+
+   Measured on the Reservations table with a 57-character email:
+
+     | viewport | card floor | visible | hidden off-screen |
+     |----------|-----------|---------|-------------------|
+     | 320px    | 485px     | 246px   | 239px             |
+     | 375px    | 485px     | 301px   | 184px             |
+     | 414px    | 485px     | 340px   | 145px             |
+     | 600px    | 526px     | 526px   | none              |
+
+   The hidden part is the right-hand side of every line -- which, in a
+   label-left/value-right layout, is the VALUE. The reading was "cards
+   clip their values", and the cause was the table box, not the cells.
+
+   Making the table and tbody blocks removes the floor entirely. */
+@media (max-width: 768px) {
+  .dashboard-table,
+  .dashboard-table tbody {
+    display: block;
+    width: 100%;
+  }
+
+  /* A flex item will not shrink below its content unless told it may.
+     Without these, one long word still pushes a card wider than the
+     screen even once the table box is gone. */
+  .dashboard-table td {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  /* The label is `flex-shrink: 0` in the protected block, so a long one
+     ("Household #", "Voter List Match") would otherwise take whatever it
+     wanted and leave the value a sliver. */
+  .dashboard-table td::before {
+    max-width: 42%;
+  }
+}
+
+/* ── Narrow phones: stack the value under its label ──
+   Below this width a side-by-side line leaves too little room for the
+   value even after the fixes above -- a 320px card minus padding, minus
+   the label, minus the gap is around 120px for a name or an email. The
+   label goes on its own line and the value gets the full width.
+
+   480px rather than a guess: 414px (the widest common phone) sits well
+   inside it, and 481-768px measures comfortably at two columns.
+
+   `.dashboard-table td:last-child` in the protected block is more
+   specific than this, so the action cell keeps the column layout and the
+   8px gap it already had. */
+@media (max-width: 480px) {
+  .dashboard-table td {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+
+  .dashboard-table td::before {
+    max-width: none;
+  }
+}
+
+/* ── Desktop: two free-text columns get a ceiling ──
+   With the sidebar expanded the Reservations table wanted 1252px against
+   906px of room at 1280px, so its last four columns -- including the
+   Approve/Deny buttons -- were off the end of the scroller. Collapsing
+   the sidebar fixed it, but needing to collapse a sidebar to see whether
+   a booking is approvable is not a fix.
+
+   Email and Purpose were 425px and 276px of that: one is an address that
+   cannot break without help, the other is free text with no natural
+   length. Capping those two and letting them wrap buys back the room
+   without touching the other nine columns or the collapsed-sidebar
+   layout, which is already good. */
+@media (min-width: 769px) {
+  /* Compact cells. 12px each side across eleven columns was 264px of
+     padding -- more than the Purpose column was getting to hold a
+     sentence in. Trimming it is the cheapest width there is: it takes
+     nothing away from the data, and the desktop table is meant to be
+     compact. */
+  .dashboard-table th {
+    padding: 8px 8px;
+  }
+
+  .dashboard-table td {
+    padding: 10px 8px;
+  }
+
+  /* Short, fixed-shape values that must never be split. A phone number
+     across two lines, a date wrapped after the year or a status pill with
+     its word on the next line all read as broken rather than as narrow. */
+  .dashboard-table td[data-label="Phone"],
+  .dashboard-table td[data-label="Contact"],
+  .dashboard-table td[data-label="Date"],
+  .dashboard-table td[data-label="Time"],
+  .dashboard-table td[data-label="Hours"],
+  .dashboard-table td[data-label="Duration"],
+  .dashboard-table td[data-label="Filed"],
+  .dashboard-table td[data-label="Submitted"],
+  .dashboard-table td[data-label="Purok"],
+  .dashboard-table td[data-label="Status"] {
+    white-space: nowrap;
+  }
+
+  /* Free text, and the only column that should be spending vertical
+     space. Wraps at spaces like prose -- `overflow-wrap: anywhere` here
+     would break mid-word, which is what made every value look mangled. */
+  .dashboard-table td[data-label="Purpose"] {
+    max-width: 220px;
+    /* A floor as well as a ceiling. Without it the auto table layout
+       hands this column its minimum -- the width of its longest single
+       word -- whenever the table is squeezed, and a 95-character purpose
+       then stacks into eleven lines and sets the height of every other
+       cell in the row. */
+    min-width: 150px;
+  }
+
+  /* A name may wrap between its parts, but not inside one of them. */
+  .dashboard-table td[data-label="Name"],
+  .dashboard-table td[data-label="Resident"] {
+    max-width: 150px;
+  }
+
+  /* One line with an ellipsis, not four lines of broken address. The
+     element is inside the cell rather than the cell itself, because
+     `text-overflow` needs a block box with a width and an auto-layout
+     table does not reliably give a `td` one. */
+  .cell-truncate {
+    display: inline-block;
+    max-width: 130px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
+  }
+}
+
+/* A status pill is two or three words that belong together at every
+   width, card mode included. */
+.badge {
+  white-space: nowrap;
+}
+
+/* A button's label is one word and should stay one word. "Approve"
+   broken after "App" in a squeezed action column reads as a rendering
+   fault; the column wraps BETWEEN the buttons instead, which is what it
+   already does on a phone. */
+.btn-approve,
+.btn-deny,
+.btn-add {
+  white-space: nowrap;
+}
+
+/* In card mode the value must be complete -- that is the whole point of
+   the card conversion -- so the truncation is released and the address
+   wraps instead. `anywhere` is right here and wrong on desktop: a 320px
+   card has no space to break an address politely. */
+@media (max-width: 768px) {
+  .cell-truncate {
+    display: inline;
+    max-width: none;
+    overflow: visible;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
+/* ── A scrollbar you can see ──
+   A narrow desktop window can still need the scroller, and the default
+   overlay scrollbar on macOS and on touch devices is invisible until
+   something is already being dragged -- so a clipped column reads as a
+   missing column. `.table-wrapper` keeps the `overflow-x: auto` the
+   protected block gives it; this only makes the affordance visible. */
+.table-wrapper {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.table-wrapper::-webkit-scrollbar {
+  height: 10px;
+}
+
+.table-wrapper::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: var(--radius-pill);
+}
+
+.table-wrapper::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: var(--radius-pill);
+}
+
+.table-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Cards do not scroll sideways any more, so a track under them would be
+   decoration pointing at nothing. */
+@media (max-width: 768px) {
+  .table-wrapper::-webkit-scrollbar {
+    height: 0;
+  }
+}
+
+/* ── The office-hours exception ──
+   A booking that starts before 5:00 PM is something an official decides
+   rather than something the system accepted, so the queue has to say so
+   on the row itself. Appended here, after the protected responsive
+   block, and at a specificity (0,1,0) that does not outrank anything in
+   it.
+
+   The badge WRAPS, unlike every other one. `.badge { white-space:
+   nowrap }` above is right for "Ready for Pickup"; "Office-hours
+   exception" held on one line would set a ~140px floor on a column
+   whose values are "5:00 PM", and the reservations table has no width
+   to spare. Same specificity, declared later, so this wins for this one
+   badge and leaves the rest alone. */
+.badge-exception {
+  display: block;
+  margin-top: 4px;
+  max-width: 120px;
+  white-space: normal;
+  background-color: #ffedd5;
+  color: #c2410c;
+}
+
+/* The reason the resident gave, under the purpose. The official
+   deciding the row needs it in front of them, not behind a tooltip:
+   this is the whole substance of the request. */
+.exception-reason-note {
+  display: block;
+  margin-top: 4px;
+  font-size: var(--fs-12);
+  line-height: 1.4;
+  color: #7c2d12;
+  overflow-wrap: anywhere;
+}
+
+.exception-reason-note strong {
+  color: #9a3412;
+}
+
+/* The filter bar's optional checkbox. Matches the height and colour of
+   the select beside it so the two read as one control strip. */
+.filter-toggle-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-13);
+  color: #374151;
+}
+
+.filter-toggle-wrap input,
+.filter-toggle-wrap label {
+  cursor: pointer;
+}
+
+/* ── (X3) The mobile card label colour ────────────────────────────────
+ *
+ * ⚠️ `.dashboard-table td::before` inside the protected block sets
+ * `color: #6b7280`, which measures 4.41:1 on the card background --
+ * under the 4.5:1 AA minimum for text this size. That grey was darkened
+ * to #5f6775 everywhere else in X3.
+ *
+ * The protected block is NOT edited for it. This rule sits after the
+ * block at the SAME specificity, so it wins on source order alone --
+ * the ordering rule X2 learned the hard way, applied deliberately this
+ * time rather than by accident.
+ *
+ * It overrides one declaration and nothing else: the content, weight,
+ * size, letter-spacing and flex behaviour all still come from the
+ * protected rule.
+ */
+@media (max-width: 768px) {
+  .dashboard-table td::before {
+    color: #5f6775;
+  }
 }

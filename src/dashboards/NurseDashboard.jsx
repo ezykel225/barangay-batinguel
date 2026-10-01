@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
   FaUserNurse,
   FaPlus,
@@ -6,12 +6,26 @@ import {
   FaEyeSlash,
   FaLock,
   FaFilter,
+  FaEdit,
+  FaTrash,
+  FaList,
+  FaCalendarAlt,
 } from 'react-icons/fa'
 import { supabase } from '../supabase/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 import Sidebar from '../components/Sidebar'
-import { HEALTH_NURSE_NAME } from '../constants/barangay'
+import { useModalA11y } from '../components/useModalA11y'
+import { HEALTH_NURSE_NAME, HEALTH_NURSE_ROLE } from '../constants/barangay'
+import {
+  availabilityStatusClass,
+  availabilityStatusLabel,
+  manilaToday,
+} from '../utils/displayLabels'
+import ActionMenu from '../components/ActionMenu'
+import MonthCalendar from '../components/MonthCalendar'
+import { buildEventCalendar, describeEventDay, eventsOnDate, upcomingEvents } from '../utils/eventCalendar'
+import { MONTH_NAMES, monthOf, parseDateKey, toDateKey } from '../utils/monthGrid'
 import {
   MEDICINE_CATEGORIES, MEDICINE_FORMS, MEDICINE_STATUS, statusOf,
 } from '../constants/medicines'
@@ -21,12 +35,42 @@ import { useConfirm } from '../components/ConfirmDialog'
 import '../components/Sidebar.css'
 import './NurseDashboard.css'
 
+// A date key as a heading, through parseDateKey so a 'YYYY-MM-DD' is
+// never handed to `new Date()` and cannot shift a day.
+const longDate = (key) => {
+  const parsed = parseDateKey(key)
+  return parsed ? `${parsed.day} ${MONTH_NAMES[parsed.month]} ${parsed.year}` : ''
+}
+
+const ViewToggle = ({ label, value, options, onChange }) => (
+  <div className="view-toggle" role="group" aria-label={label}>
+    {options.map((option) => (
+      <button
+        key={option.value}
+        type="button"
+        onClick={() => onChange(option.value)}
+        aria-pressed={value === option.value}
+      >
+        {option.icon}
+        {option.label}
+      </button>
+    ))}
+  </div>
+)
+
 const NurseDashboard = () => {
   const { user } = useAuth()
   // Destructive actions go through this rather than acting on the first
   // click. confirm() resolves true/false, so each handler needs one
   // early return and nothing else changes.
   const [confirm, confirmDialog] = useConfirm()
+  // Table stays the default and the management interface; the calendar
+  // is an additional visual schedule over the same health_events rows.
+  const [healthEventView, setHealthEventView] = useState('table')
+  const [healthCalendarDate, setHealthCalendarDate] = useState('')
+  const [healthMonth, setHealthMonth] = useState(() => monthOf(manilaToday()))
+  // Null when adding, the row when editing. One modal serves both.
+  const [editingHealthEvent, setEditingHealthEvent] = useState(null)
   const [activeTab, setActiveTab] = useState('dashboard')
   const [healthEvents, setHealthEvents] = useState([])
   const [nurseAvailability, setNurseAvailability] = useState([])
@@ -142,6 +186,113 @@ const NurseDashboard = () => {
     setSavingStatus(false)
   }
 
+  const BLANK_EVENT = {
+    title: '', description: '', event_date: '', location: '', target_audience: '',
+  }
+
+  // ⚠️ `event_month`/`event_day` are denormalised display copies, not
+  // the date. They were written as `new Date(dateString)` then
+  // `.getDate()` / `.toLocaleString()`, which parses a UTC midnight and
+  // reads it back in the BROWSER's zone -- so west of UTC they describe
+  // the previous day. Derived from the characters of the date instead.
+  // The calendars read `event_date` and ignore these entirely; they are
+  // kept because the public Health Center cards still render them.
+  const displayPartsFor = (dateString) => {
+    const parsed = parseDateKey(dateString)
+    if (!parsed) return { event_month: null, event_day: null }
+    return {
+      event_month: MONTH_NAMES[parsed.month].slice(0, 3).toUpperCase(),
+      event_day: String(parsed.day).padStart(2, '0'),
+    }
+  }
+
+  const handleOpenAddHealthEvent = () => {
+    setEditingHealthEvent(null)
+    setNewEvent(BLANK_EVENT)
+    setShowEventModal(true)
+  }
+
+  const handleOpenEditHealthEvent = (event) => {
+    setEditingHealthEvent(event)
+    setNewEvent({
+      title: event.title || '',
+      description: event.description || '',
+      // Through the date-only helper, so the date input is populated
+      // from the stored characters rather than from a parsed Date.
+      event_date: toDateKey(event.event_date),
+      location: event.location || '',
+      target_audience: event.target_audience || '',
+    })
+    setShowEventModal(true)
+  }
+
+  // Updates the existing row rather than deleting and recreating it:
+  // that would lose created_at and file two audit entries for one
+  // correction.
+  const handleUpdateHealthEvent = async () => {
+    if (submitting || !editingHealthEvent) return
+    if (!newEvent.title || !newEvent.event_date) {
+      toast.error('Please fill in all required fields!')
+      return
+    }
+    setSubmitting(true)
+    try {
+      // .select() matters: RLS filters rows rather than raising, so a
+      // blocked update comes back as success with zero rows affected.
+      const { data, error } = await supabase
+        .from('health_events')
+        .update({
+          title: newEvent.title,
+          description: newEvent.description,
+          event_date: newEvent.event_date,
+          ...displayPartsFor(newEvent.event_date),
+          location: newEvent.location,
+          target_audience: newEvent.target_audience,
+        })
+        .eq('id', editingHealthEvent.id)
+        .select('id')
+
+      if (error) {
+        console.error('Update health event error:', error)
+        toast.error(error.message || 'Failed to update health event!')
+      } else if (!data || data.length === 0) {
+        toast.error('Nothing was updated — you may not have permission to change health events.')
+      } else {
+        toast.success('Health event updated.')
+        logActivity({
+          action: 'edited',
+          entityType: 'health_event',
+          entityId: editingHealthEvent.id,
+          subject: newEvent.title,
+        })
+        setShowEventModal(false)
+        setEditingHealthEvent(null)
+        setNewEvent(BLANK_EVENT)
+        await fetchHealthEvents()
+      }
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // Built from the `healthEvents` state this dashboard already fetched
+  // -- the same rows the table renders, not a second source.
+  const healthEventCalendar = useMemo(
+    () => buildEventCalendar(healthEvents),
+    [healthEvents]
+  )
+  const healthCalendarDayEvents = useMemo(
+    () => eventsOnDate(healthEventCalendar, healthCalendarDate),
+    [healthEventCalendar, healthCalendarDate]
+  )
+
+  // The dashboard card's three-item preview: the next sessions, not the
+  // first three rows whatever their date.
+  const upcomingHealthEvents = useMemo(
+    () => upcomingEvents(healthEvents, { limit: 3 }),
+    [healthEvents]
+  )
+
   const handleAddEvent = async () => {
     if (submitting) return
     if (!newEvent.title || !newEvent.event_date) {
@@ -150,10 +301,6 @@ const NurseDashboard = () => {
     }
     setSubmitting(true)
     try {
-      const date = new Date(newEvent.event_date)
-      const month = date.toLocaleString('en-US', { month: 'short' }).toUpperCase()
-      const day = String(date.getDate()).padStart(2, '0')
-
       // Readback returns the new id so the audit entry can point at the
       // row. Safe here: this table's SELECT policy covers whoever may
       // insert, so a successful insert is always readable by its author.
@@ -163,8 +310,7 @@ const NurseDashboard = () => {
           title: newEvent.title,
           description: newEvent.description,
           event_date: newEvent.event_date,
-          event_month: month,
-          event_day: day,
+          ...displayPartsFor(newEvent.event_date),
           location: newEvent.location,
           target_audience: newEvent.target_audience,
         }])
@@ -338,6 +484,17 @@ const NurseDashboard = () => {
   // ── Medicine availability ──────────────────────────────
   const [medicines, setMedicines] = useState([])
   const [showMedicineModal, setShowMedicineModal] = useState(false)
+
+  // Escape, focus entry and focus restoration for all four modals.
+  useModalA11y(
+    showEventModal || showAvailabilityModal || showMedicineModal || showProgramModal,
+    () => {
+      setShowEventModal(false)
+      setShowAvailabilityModal(false)
+      setShowMedicineModal(false)
+      setShowProgramModal(false)
+    }
+  )
   const [editingMedicine, setEditingMedicine] = useState(null)
   const [medicineForm, setMedicineForm] = useState({
     name: '', generic_name: '', form: 'Tablet',
@@ -467,11 +624,16 @@ const NurseDashboard = () => {
   }
 
   const handleDeleteMedicine = async (medicine) => {
-    const ok = window.confirm(
-      `Remove ${medicine.name} from the list?\n\n` +
-      'If it is only out of stock, set it to "Out of stock" instead — ' +
-      'residents can then see it exists and ask when it is expected.'
-    )
+    // Was the last window.confirm in this portal; the resident portal's
+    // two were converted in the X1 pass, so there are none left in the
+    // app. An unstyled browser prompt reads as a security warning
+    // rather than a question about a medicine.
+    const ok = await confirm({
+      title: `Remove ${medicine.name} from the list?`,
+      message: 'If it is only out of stock, set it to "Out of stock" instead — '
+        + 'residents can then see it exists and ask when it is expected.',
+      confirmLabel: 'Remove medicine',
+    })
     if (!ok) return
 
     // .select() matters here: RLS filters rows rather than raising, so a
@@ -578,7 +740,7 @@ const NurseDashboard = () => {
         if (error) {
           toast.error('Failed to add program!')
         } else if (!inserted?.id) {
-          toast.error('Saved, but the programme could not be read back. Refresh to confirm it is there.')
+          toast.error('Saved, but the program could not be read back. Refresh to confirm it is there.')
         } else {
           toast.success('Program added!')
           logActivity({
@@ -599,10 +761,10 @@ const NurseDashboard = () => {
 
   const handleDeleteProgram = async (program) => {
     const ok = await confirm({
-      title: 'Remove this medical programme?',
+      title: 'Remove this medical program?',
       message: `"${program.title}" will no longer be listed on the public Health `
         + 'Center page, and cannot be recovered.',
-      confirmLabel: 'Remove programme',
+      confirmLabel: 'Remove program',
     })
     if (!ok) return
 
@@ -618,7 +780,7 @@ const NurseDashboard = () => {
     if (error) {
       toast.error('Failed to delete program!')
     } else if (!data || data.length === 0) {
-      toast.error('Nothing was removed — you may not have permission to change programmes.')
+      toast.error('Nothing was removed — you may not have permission to change programs.')
     } else {
       toast.success('Program removed!')
       logActivity({
@@ -676,14 +838,16 @@ const NurseDashboard = () => {
     <div className="dashboard-layout">
       <Sidebar role="nurse" activeTab={activeTab} setActiveTab={setActiveTab} />
 
-      <main className="dashboard-main" id="main-content">
+      <main className="dashboard-main" id="main-content" tabIndex={-1}>
 
         {/* DASHBOARD TAB */}
         {activeTab === 'dashboard' && (
           <div>
             <div className="nurse-dashboard-header">
               <div>
-                <h1>Nurse Administrator Dashboard</h1>
+                {/* "Nurse Administrator" was a fourth description of the
+                    same person. This is a page name, not a job title. */}
+                <h1>Health Center Dashboard</h1>
                 <p>Managing community health and medical services for Barangay Batinguel.</p>
               </div>
               <div className="nurse-status-badge" style={getStatusStyle()}>
@@ -694,18 +858,22 @@ const NurseDashboard = () => {
 
             <div className="nurse-dashboard-grid">
 
-              {/* Bakuna Calendar */}
+              {/* ⚠️ Called "Bakuna Calendar" until the X1 follow-up, and
+                  it is not a calendar -- it is the next three sessions.
+                  The real month grid is one tab away under Health Events
+                  (Table | Calendar), so this is named for what it shows
+                  rather than being turned into a second copy of it. */}
               <div className="bakuna-calendar-card">
                 <div className="bakuna-calendar-header">
-                  <h3>💉 Bakuna Calendar</h3>
+                  <h3>💉 Upcoming Health Events</h3>
                   <button className="btn-add" onClick={() => setShowEventModal(true)}>Manage</button>
                 </div>
                 {loading ? (
                   <p className="loading-text">Loading...</p>
-                ) : healthEvents.length === 0 ? (
-                  <p className="empty-text">No health events yet.</p>
+                ) : upcomingHealthEvents.length === 0 ? (
+                  <p className="empty-text">No upcoming health events.</p>
                 ) : (
-                  healthEvents.slice(0, 3).map((event) => (
+                  upcomingHealthEvents.map((event) => (
                     <div key={event.id} className="bakuna-event-item">
                       <div className="bakuna-event-date">
                         <div className="month">{event.event_month}</div>
@@ -718,8 +886,11 @@ const NurseDashboard = () => {
                     </div>
                   ))
                 )}
-                <button className="bakuna-add-btn" onClick={() => setShowEventModal(true)}>
-                  <FaPlus /> Schedule New Event
+                {/* Same action as the Health Events tab's button, so the
+                    same words. This said "Schedule New Event" while that
+                    one says "Add New Event". */}
+                <button className="bakuna-add-btn" onClick={handleOpenAddHealthEvent}>
+                  <FaPlus /> Add Health Event
                 </button>
               </div>
 
@@ -728,7 +899,7 @@ const NurseDashboard = () => {
                 <div className="programs-card-header">
                   <h3>Active Medical Programs</h3>
                   <button className="btn-add" onClick={handleOpenAddProgram}>
-                    <FaPlus /> Add
+                    <FaPlus /> Add Program
                   </button>
                 </div>
                 <p className="programs-subtitle">Update schedules and program availability</p>
@@ -799,7 +970,7 @@ const NurseDashboard = () => {
         {activeTab === 'medicines' && (
           <div>
             <div className="nurse-dashboard-header">
-              <h1>Medicine Availability</h1>
+              <h1>Medicines</h1>
               <p>
                 What the health center has today. This list is public — residents
                 see it on the Health Center page, so they know whether a trip is
@@ -855,15 +1026,35 @@ const NurseDashboard = () => {
                         ))}
                       </div>
 
+                      {/* Five controls per row became three plus a menu.
+                          The three availability buttons stay exactly where
+                          they were -- setting stock is the whole purpose of
+                          this screen and must not cost an extra click --
+                          while Edit and Remove, which are occasional, move
+                          behind the ⋮.
+
+                          This list is cards, not a `.dashboard-table`, so
+                          the menu is not clipped by `.table-wrapper`'s
+                          `overflow-x: auto`. See ActionMenu.jsx. */}
                       <div className="medicine-admin-actions">
-                        <button className="btn-add" style={{ fontSize: 12, padding: '4px 10px' }}
-                                onClick={() => handleEditMedicine(medicine)}>
-                          Edit
-                        </button>
-                        <button className="btn-deny" style={{ fontSize: 12, padding: '4px 10px' }}
-                                onClick={() => handleDeleteMedicine(medicine)}>
-                          Remove
-                        </button>
+                        <ActionMenu
+                          label={`More actions for ${medicine.name}`}
+                          items={[
+                            {
+                              key: 'edit',
+                              label: 'Edit details',
+                              icon: <FaEdit />,
+                              onSelect: () => handleEditMedicine(medicine),
+                            },
+                            {
+                              key: 'remove',
+                              label: 'Remove',
+                              icon: <FaTrash />,
+                              danger: true,
+                              onSelect: () => handleDeleteMedicine(medicine),
+                            },
+                          ]}
+                        />
                       </div>
                     </div>
                   ))}
@@ -876,8 +1067,12 @@ const NurseDashboard = () => {
         {activeTab === 'availability' && (
           <div>
             <div className="availability-header">
-              <h1>Nurse Availability</h1>
-              <p>Configure your recurring schedule. Click a row to edit its status.</p>
+              <h1>Availability</h1>
+              {/* The old copy said "Click a row to edit its status". No row
+                  has ever had a click handler -- editing is the Edit button
+                  in each row -- so the instruction described something that
+                  did not exist. */}
+              <p>Configure your recurring clinic schedule. Use Edit on a row to change it.</p>
             </div>
 
             <div className="dashboard-card">
@@ -894,11 +1089,16 @@ const NurseDashboard = () => {
                 <div className="table-wrapper">
                   <table className="dashboard-table">
                     <thead>
+                      {/* Four columns, not six. Time Start, Time End and
+                          Lunch Break were three columns holding one idea --
+                          when the clinic is open -- and on a phone, where
+                          each row becomes a card, that was six labelled
+                          lines for five days. Hours now carries the opening
+                          span with the break beneath it, which reads the
+                          same way on both. */}
                       <tr>
                         <th scope="col">Day</th>
-                        <th scope="col">Time Start</th>
-                        <th scope="col">Time End</th>
-                        <th scope="col">Lunch Break</th>
+                        <th scope="col">Hours</th>
                         <th scope="col">Status</th>
                         <th scope="col">Action</th>
                       </tr>
@@ -907,31 +1107,39 @@ const NurseDashboard = () => {
                       {nurseAvailability.map((avail) => (
                         <tr key={avail.id}>
                           <td data-label="Day">{avail.day_of_week}</td>
-                          <td data-label="Time Start">{avail.time_start}</td>
-                          <td data-label="Time End">{avail.time_end}</td>
-                          <td data-label="Lunch Break">
-                            {avail.break_start && avail.break_end
-                              ? `${avail.break_start} – ${avail.break_end}`
-                              : '—'}
+                          <td data-label="Hours">
+                            <span className="availability-hours">
+                              {avail.time_start && avail.time_end
+                                ? `${avail.time_start} – ${avail.time_end}`
+                                : '—'}
+                            </span>
+                            {avail.break_start && avail.break_end && (
+                              <span className="availability-break">
+                                Lunch {avail.break_start} – {avail.break_end}
+                              </span>
+                            )}
                           </td>
                           <td data-label="Status">
-                            <span className={`badge ${avail.status === 'available' ? 'badge-approved' : 'badge-declined'}`}>
-                              {avail.status}
+                            {/* The old rule was `available ? green : red`,
+                                which coloured a scheduled day off as a
+                                fault, and printed the raw stored value.
+                                Both now come from one shared map. */}
+                            <span className={`badge ${availabilityStatusClass(avail.status)}`}>
+                              {availabilityStatusLabel(avail.status)}
                             </span>
                           </td>
-                          <td data-label="Action" style={{ display: 'flex', gap: '8px' }}>
+                          <td data-label="Action" className="action-cell">
                             <button
-                              className="btn-add"
-                              style={{ fontSize: '12px', padding: '4px 10px' }}
+                              className="btn-add btn-sm"
                               onClick={() => handleEditAvailability(avail)}
                             >
-                              Edit
+                              <FaEdit /> Edit
                             </button>
                             <button
-                              className="btn-deny"
+                              className="btn-deny btn-sm"
                               onClick={() => handleDeleteAvailability(avail)}
                             >
-                              Delete
+                              <FaTrash /> Delete
                             </button>
                           </td>
                         </tr>
@@ -955,7 +1163,18 @@ const NurseDashboard = () => {
             <div className="dashboard-card">
               <div className="dashboard-card-header">
                 <h3>All Health Events</h3>
-                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                  {/* ⚠️ Table is the default and stays the management
+                      interface: Add, Edit and Delete live there. */}
+                  <ViewToggle
+                    label="How to view health events"
+                    value={healthEventView}
+                    onChange={setHealthEventView}
+                    options={[
+                      { value: 'table', label: 'Table', icon: <FaList aria-hidden="true" /> },
+                      { value: 'calendar', label: 'Calendar', icon: <FaCalendarAlt aria-hidden="true" /> },
+                    ]}
+                  />
                   <div className="filter-select-wrap">
                     <FaFilter style={{ fontSize: 12, color: '#6b7280' }} />
                     <select
@@ -963,19 +1182,80 @@ const NurseDashboard = () => {
                       value={healthEventFilter}
                       onChange={(e) => setHealthEventFilter(e.target.value)}
                     >
-                      <option value="all">All Events</option>
+                      {/* Names the dimension being filtered, not the
+                          entity -- and this sat inside a card already
+                          headed with the entity. */}
+                      <option value="all">All Dates</option>
                       <option value="upcoming">Upcoming</option>
                       <option value="past">Past</option>
                     </select>
                   </div>
-                  <button className="btn-add" onClick={() => setShowEventModal(true)}>
-                    <FaPlus /> Add New Event
+                  <button className="btn-add" onClick={handleOpenAddHealthEvent}>
+                    <FaPlus /> Add Health Event
                   </button>
                 </div>
               </div>
 
-              {(() => {
-                const todayStr = new Date().toISOString().slice(0, 10)
+              {healthEventView === 'calendar' && (
+                <div className="dashboard-calendar-layout">
+                  <MonthCalendar
+                    year={healthMonth.year}
+                    month={healthMonth.month}
+                    onMonthChange={setHealthMonth}
+                    selectedDate={healthCalendarDate}
+                    onSelectDate={setHealthCalendarDate}
+                    today={manilaToday()}
+                    idPrefix="nurse-health-events"
+                    renderDay={(cell) => describeEventDay(cell, healthEventCalendar)}
+                    caption={'Placed by event_date. Select a date to see what is '
+                      + 'scheduled; add, edit and delete stay in the table.'}
+                  />
+
+                  <div className="mcal-day-panel">
+                    {!healthCalendarDate ? (
+                      <p className="mcal-day-empty">Select a date to see its sessions.</p>
+                    ) : (
+                      <>
+                        <h4>{longDate(healthCalendarDate)}</h4>
+                        {healthCalendarDayEvents.length === 0 ? (
+                          <p className="mcal-day-empty">Nothing scheduled on this date.</p>
+                        ) : (
+                          <div className="mcal-day-list">
+                            {healthCalendarDayEvents.map((event) => (
+                              <div key={event.id} className="mcal-day-item">
+                                <span className="mcal-day-item-title">{event.title}</span>
+                                {event.location && (
+                                  <span className="mcal-day-item-meta">{event.location}</span>
+                                )}
+                                {event.target_audience && (
+                                  <span className="mcal-day-item-meta">
+                                    {event.target_audience}
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  className="btn-add btn-sm"
+                                  onClick={() => handleOpenEditHealthEvent(event)}
+                                >
+                                  <FaEdit aria-hidden="true" /> Edit
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {healthEventView === 'table' && (() => {
+                // ⚠️ Manila, not UTC. `new Date().toISOString()` is still
+                // on yesterday's date until 8 AM Philippine time, so a
+                // bakuna session dated today was filed under "past" for
+                // the first eight hours of every day. Same helper the
+                // upcoming-event count already uses.
+                const todayStr = manilaToday()
                 const filteredHealthEvents = healthEventFilter === 'all'
                   ? healthEvents
                   : healthEventFilter === 'upcoming'
@@ -983,7 +1263,11 @@ const NurseDashboard = () => {
                     : healthEvents.filter((ev) => ev.event_date < todayStr)
 
                 return filteredHealthEvents.length === 0 ? (
-                <p className="empty-text">No health events found.</p>
+                <p className="empty-text">
+                  {healthEventFilter === 'all'
+                    ? 'No health events yet.'
+                    : 'No health events match this filter.'}
+                </p>
               ) : (
                 <div className="table-wrapper">
                   <table className="dashboard-table">
@@ -1003,9 +1287,14 @@ const NurseDashboard = () => {
                           <td data-label="Date">{event.event_date}</td>
                           <td data-label="Location">{event.location}</td>
                           <td data-label="Target">{event.target_audience}</td>
-                          <td data-label="Action">
-                            <button className="btn-deny" onClick={() => handleDeleteEvent(event)}>
-                              Delete
+                          <td data-label="Action" className="action-cell">
+                            <button
+                              className="btn-add btn-sm"
+                              onClick={() => handleOpenEditHealthEvent(event)}>
+                              <FaEdit /> Edit
+                            </button>
+                            <button className="btn-deny btn-sm" onClick={() => handleDeleteEvent(event)}>
+                              <FaTrash /> Delete
                             </button>
                           </td>
                         </tr>
@@ -1040,13 +1329,25 @@ const NurseDashboard = () => {
                       className="profile-avatar-photo"
                     />
                   </div>
-                  <div className="profile-name">{nurseName}</div>
-                  <div className="profile-role">Head Barangay Nurse</div>
+                  {/* ⚠️ One role label, not two. This card has now been
+                      through two passes of the same defect: it used to read
+                      "Barangay Health Nurse / Head Barangay Nurse", then
+                      "Barangay Health Nurse / Public Health Nurse" -- still
+                      two near-identical strings stacked. Found during the
+                      X1 pass while fixing the same thing on the two public
+                      pages, which this one had been missed by because it
+                      renders `nurseName` rather than the constant.
+
+                      ⚠️ `nurseName` itself is unchanged: it is written to
+                      nurse_availability.nurse_name and is what PersonAvatar
+                      derives initials from. Display only. */}
+                  <div className="profile-name">{HEALTH_NURSE_ROLE}</div>
+                  <div className="profile-role">Barangay Health Center</div>
                 </div>
                 <div className="profile-form">
                   <div className="profile-form-group">
-                    <label className="profile-form-label">Email Address</label>
-                    <input
+                    <label htmlFor="nur-email-address" className="profile-form-label">Email Address</label>
+                    <input id="nur-email-address"
                       type="email"
                       className="profile-form-input"
                       value={user?.email || ''}
@@ -1065,11 +1366,19 @@ const NurseDashboard = () => {
                 </div>
                 <div className="security-form">
                   <div>
-                    <label className="security-label">Change Password</label>
+                    {/* ⚠️ NOT a <label>. "Change Password" names the
+                        section, not the first box -- associating the two
+                        made a screen reader announce the New Password
+                        field as "Change Password" and left Confirm
+                        nameless. The boxes carry their own names below.
+                        `.security-label` is a class selector, so the
+                        styling is unchanged. */}
+                    <p className="security-label">Change Password</p>
                     <p className="security-desc">Update your password regularly for better security.</p>
 
                     <div style={{ position: 'relative', marginBottom: 10 }}>
                       <input
+                        aria-label="New password"
                         type={showNew ? 'text' : 'password'}
                         className="security-input"
                         placeholder="New password (min. 6 characters)"
@@ -1087,6 +1396,7 @@ const NurseDashboard = () => {
 
                     <div style={{ position: 'relative', marginBottom: 10 }}>
                       <input
+                        aria-label="Confirm new password"
                         type={showConfirm ? 'text' : 'password'}
                         className="security-input"
                         placeholder="Confirm new password"
@@ -1120,8 +1430,8 @@ const NurseDashboard = () => {
       {/* HEALTH EVENT MODAL */}
       {showEventModal && (
         <div className="modal-overlay">
-          <div className="modal">
-            <h3>Add New Health Event</h3>
+          <div className="modal" role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="nurdlg-1-title">
+            <h3 id="nurdlg-1-title">{editingHealthEvent ? 'Edit Health Event' : 'Add Health Event'}</h3>
             {[
               { label: 'Event Title *', key: 'title', type: 'text', placeholder: 'e.g. Vaccination Drive' },
               { label: 'Description', key: 'description', type: 'text', placeholder: 'Event description' },
@@ -1143,8 +1453,20 @@ const NurseDashboard = () => {
               </div>
             ))}
             <div className="modal-buttons">
-              <button className="btn-cancel" onClick={() => setShowEventModal(false)}>Cancel</button>
-              <button className="btn-save" onClick={handleAddEvent} disabled={submitting}>
+              <button
+                className="btn-cancel"
+                onClick={() => {
+                  setShowEventModal(false)
+                  setEditingHealthEvent(null)
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn-save"
+                onClick={editingHealthEvent ? handleUpdateHealthEvent : handleAddEvent}
+                disabled={submitting}
+              >
                 {submitting ? 'Saving...' : 'Save Event'}
               </button>
             </div>
@@ -1155,15 +1477,15 @@ const NurseDashboard = () => {
       {/* AVAILABILITY MODAL */}
       {showAvailabilityModal && (
         <div className="modal-overlay">
-          <div className="modal">
-            <h3>{editingAvail ? `Edit ${editingAvail.day_of_week}` : 'Add Availability'}</h3>
+          <div className="modal" role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="nurdlg-2-title">
+            <h3 id="nurdlg-2-title">{editingAvail ? `Edit ${editingAvail.day_of_week}` : 'Add Availability'}</h3>
 
             {!editingAvail && (
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ fontSize: '12px', fontWeight: '600', color: '#374151', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+                <label htmlFor="nur-day-of-week" style={{ fontSize: '12px', fontWeight: '600', color: '#374151', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
                   Day of Week *
                 </label>
-                <select
+                <select id="nur-day-of-week"
                   value={newAvailability.day_of_week}
                   onChange={(e) => setNewAvailability({ ...newAvailability, day_of_week: e.target.value })}
                   style={{ width: '100%', padding: '10px 14px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', fontFamily: 'Poppins, sans-serif', outline: 'none', backgroundColor: 'white' }}
@@ -1196,10 +1518,10 @@ const NurseDashboard = () => {
             ))}
 
             <div style={{ marginBottom: '16px' }}>
-              <label style={{ fontSize: '12px', fontWeight: '600', color: '#374151', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+              <label htmlFor="nur-status" style={{ fontSize: '12px', fontWeight: '600', color: '#374151', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
                 Status
               </label>
-              <select
+              <select id="nur-status"
                 value={newAvailability.status}
                 onChange={(e) => setNewAvailability({ ...newAvailability, status: e.target.value })}
                 style={{ width: '100%', padding: '10px 14px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', fontFamily: 'Poppins, sans-serif', outline: 'none', backgroundColor: 'white' }}
@@ -1223,12 +1545,12 @@ const NurseDashboard = () => {
       {/* MEDICAL PROGRAM MODAL */}
       {showMedicineModal && (
         <div className="modal-overlay">
-          <div className="modal">
-            <h3>{editingMedicine ? 'Edit Medicine' : 'Add Medicine'}</h3>
+          <div className="modal" role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="nurdlg-3-title">
+            <h3 id="nurdlg-3-title">{editingMedicine ? 'Edit Medicine' : 'Add Medicine'}</h3>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Medicine Name</label>
-              <input
+              <label htmlFor="nur-medicine-name" className="modal-form-label">Medicine Name</label>
+              <input id="nur-medicine-name"
                 className="modal-form-input"
                 placeholder="e.g. Paracetamol 500mg"
                 value={medicineForm.name}
@@ -1237,8 +1559,8 @@ const NurseDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Generic Name (optional)</label>
-              <input
+              <label htmlFor="nur-generic-name-optional" className="modal-form-label">Generic Name (optional)</label>
+              <input id="nur-generic-name-optional"
                 className="modal-form-input"
                 placeholder="e.g. Paracetamol"
                 value={medicineForm.generic_name}
@@ -1250,8 +1572,8 @@ const NurseDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Form</label>
-              <select
+              <label htmlFor="nur-form" className="modal-form-label">Form</label>
+              <select id="nur-form"
                 className="modal-form-input"
                 value={medicineForm.form}
                 onChange={(e) => setMedicineForm((f) => ({ ...f, form: e.target.value }))}
@@ -1263,8 +1585,8 @@ const NurseDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Category</label>
-              <select
+              <label htmlFor="nur-category" className="modal-form-label">Category</label>
+              <select id="nur-category"
                 className="modal-form-input"
                 value={medicineForm.category}
                 onChange={(e) => setMedicineForm((f) => ({ ...f, category: e.target.value }))}
@@ -1276,8 +1598,8 @@ const NurseDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Availability</label>
-              <select
+              <label htmlFor="nur-availability" className="modal-form-label">Availability</label>
+              <select id="nur-availability"
                 className="modal-form-input"
                 value={medicineForm.status}
                 onChange={(e) => setMedicineForm((f) => ({ ...f, status: e.target.value }))}
@@ -1289,8 +1611,8 @@ const NurseDashboard = () => {
             </div>
 
             <div className="modal-form-group">
-              <label className="modal-form-label">Note for residents (optional)</label>
-              <textarea
+              <label htmlFor="nur-note-for-residents-optional" className="modal-form-label">Note for residents (optional)</label>
+              <textarea id="nur-note-for-residents-optional"
                 className="modal-form-textarea"
                 placeholder="e.g. Bring your prescription. / Children's dose only."
                 value={medicineForm.notes}
@@ -1315,8 +1637,8 @@ const NurseDashboard = () => {
 
       {showProgramModal && (
         <div className="modal-overlay">
-          <div className="modal">
-            <h3>{editingProgram ? 'Edit Program' : 'Add Program'}</h3>
+          <div className="modal" role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="nurdlg-4-title">
+            <h3 id="nurdlg-4-title">{editingProgram ? 'Edit Program' : 'Add Program'}</h3>
             {[
               { label: 'Program Title *', key: 'title', placeholder: 'e.g. Child Immunization' },
               { label: 'Schedule *', key: 'schedule_label', placeholder: 'e.g. Every Tuesday' },

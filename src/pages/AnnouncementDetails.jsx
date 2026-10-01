@@ -39,7 +39,7 @@ const AnnouncementDetails = () => {
     <div className="announcement-details-page">
       <Navbar />
 
-      <main id="main-content">
+      <main id="main-content" tabIndex={-1}>
 
       <section className="announcement-details-section">
         <div className="announcement-details-container">

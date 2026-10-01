@@ -138,46 +138,6 @@
   margin-bottom: 24px;
 }
 
-.login-left-roles {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  position: relative;
-  z-index: 1;
-}
-
-.login-left-role-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  border-radius: var(--radius-sm);
-  background-color: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  transition: all 0.2s;
-  font-size: var(--fs-20);
-  color: #bfdbfe;
-}
-
-.login-left-role-item.active {
-  background-color: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.4);
-  color: white;
-}
-
-.login-left-role-item div span {
-  display: block;
-  font-size: var(--fs-13);
-  font-weight: 600;
-  color: white;
-}
-
-.login-left-role-item div p {
-  font-size: var(--fs-12);
-  color: #bfdbfe;
-  margin: 0;
-}
-
 .login-left-footer {
   position: relative;
   z-index: 1;
@@ -209,14 +169,14 @@
 
 .login-right>p {
   font-size: var(--fs-13);
-  color: #6b7280;
+  color: #5f6775;
   margin-bottom: 24px;
 }
 
 .login-role-label {
   font-size: var(--fs-12);
   font-weight: 600;
-  color: #6b7280;
+  color: #5f6775;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 10px;
@@ -238,7 +198,7 @@
   border: 2px solid #e5e7eb;
   border-radius: var(--radius-sm);
   background-color: #f9fafb;
-  color: #6b7280;
+  color: #5f6775;
   font-size: var(--fs-13);
   font-weight: 500;
   cursor: pointer;
@@ -341,7 +301,7 @@
 
 .login-input-icon {
   padding: 12px 14px;
-  color: #6b7280;
+  color: #5f6775;
   font-size: var(--fs-16);
   background-color: #f9fafb;
   border-right: 1px solid #e5e7eb;
@@ -358,12 +318,12 @@
 }
 
 .login-input-wrapper input::placeholder {
-  color: #6b7280;
+  color: #5f6775;
 }
 
 .login-toggle-password {
   padding: 12px 14px;
-  color: #6b7280;
+  color: #5f6775;
   font-size: var(--fs-16);
   cursor: pointer;
   background: none;
@@ -480,7 +440,7 @@
 
 .login-modal p {
   font-size: var(--fs-13);
-  color: #6b7280;
+  color: #5f6775;
   line-height: 1.6;
   margin-bottom: 16px;
 }
@@ -516,7 +476,7 @@
   padding: 10px 18px;
   border: 1px solid #e5e7eb;
   background: white;
-  color: #6b7280;
+  color: #5f6775;
   border-radius: var(--radius-sm);
   font-size: var(--fs-13);
   font-weight: 600;
@@ -544,7 +504,7 @@
 .login-error {
   background-color: #fef2f2;
   border: 1px solid #fecaca;
-  color: #dc2626;
+  color: #b91c1c;
   padding: 12px 16px;
   border-radius: var(--radius-sm);
   font-size: var(--fs-13);
@@ -580,14 +540,14 @@
    reset-password pages all share this stylesheet. ── */
 .field-optional {
   font-weight: 400;
-  color: #6b7280;
+  color: #5f6775;
   text-transform: none;
   letter-spacing: 0;
 }
 
 .field-hint {
   font-size: var(--fs-12);
-  color: #6b7280;
+  color: #5f6775;
   margin: 6px 0 0;
   line-height: 1.5;
 }
