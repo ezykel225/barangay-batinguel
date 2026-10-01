@@ -2504,8 +2504,9 @@ only** — no renaming, no consolidation for its own sake, no change to
 the colour system, the type scale or the spacing tokens.
 
 **461 net lines of CSS removed** across nine stylesheets; the shipped
-bundle went 19.14 kB → **18.38 kB**. The JS bundle is byte-identical,
-because nothing in any component changed.
+bundle went 19.14 kB → **18.38 kB**. The JS bundle is byte-identical to
+the pre-X4 build because X4 made no JS/JSX/component changes. Earlier
+X3 accessibility component changes remain present and unchanged.
 
 ### How "dead" was established, since grep is not enough
 
