@@ -324,6 +324,55 @@ describe('resident-facing wording', () => {
   })
 })
 
+describe('the caps the database now enforces too', () => {
+  // ⚠️ Mirrors migration 021's SQL cases one for one. Before 021 the
+  // 4-hour ordinary limit lived ONLY here, and a direct API call with
+  // the publishable key could file a 5:00 PM / 5-hour booking --
+  // verified accepted at the time. These assertions and that
+  // migration's header have to move together.
+  it('accepts the ordinary cases the server accepts', () => {
+    expect(canFitDuration('5:00 PM', 4)).toBe(true)
+    expect(canFitDuration('6:00 PM', 4)).toBe(true)
+    expect(canFitDuration('9:00 PM', 1)).toBe(true)
+  })
+
+  it('refuses an ordinary 5 PM / 5h, exactly as the guard does', () => {
+    // Ends at 10:00 PM precisely, so the window cannot be what refuses
+    // it -- only the 4-hour cap can. That is why this is the case worth
+    // asserting rather than 5 PM / 8h, which the closing time catches
+    // first on both sides.
+    expect(endsWithinWindow('5:00 PM', 5)).toBe(true)
+    expect(canFitDuration('5:00 PM', 5)).toBe(false)
+  })
+
+  it('refuses an ordinary booking that runs past closing', () => {
+    expect(canFitDuration('7:00 PM', 4)).toBe(false)
+  })
+
+  it('lets an exception have the 8 hours the CHECK allows', () => {
+    expect(canFitDuration('8:00 AM', 8, { exception: true })).toBe(true)
+    expect(canFitDuration('1:00 PM', 8, { exception: true })).toBe(true)
+  })
+
+  it('never offers a 9th hour, which the CHECK refuses as 23514', () => {
+    // reservations_duration_hours_check is BETWEEN 1 AND 8, and 021
+    // deliberately does not restate that number in the guard. The form
+    // must therefore never produce a 9, or the resident meets a raw
+    // constraint error instead of a sentence.
+    expect(durationOptionsForSlot('8:00 AM', { exception: true }))
+      .not.toContain(9)
+    expect(Math.max(
+      ...ALL_SLOTS.map((slot) => maxDurationForSlot(slot, { exception: true }))
+    )).toBe(MAX_EXCEPTION_DURATION_HOURS)
+  })
+
+  it('offers no ordinary duration above the ordinary cap, at any slot', () => {
+    ALL_SLOTS.forEach((slot) => {
+      expect(maxDurationForSlot(slot)).toBeLessThanOrEqual(MAX_DURATION_HOURS)
+    })
+  })
+})
+
 describe('the window constants', () => {
   it('are 5 PM and 10 PM', () => {
     expect(COURT_OPENS_HOUR).toBe(17)

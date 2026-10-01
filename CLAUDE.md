@@ -65,7 +65,7 @@ banned below: it silences the one check this project has.
 
 ### Tests
 
-Five suites, 124 tests:
+Five suites, 130 tests:
 
 | File | What it covers |
 |---|---|
@@ -73,7 +73,7 @@ Five suites, 124 tests:
 | `src/utils/residentGroups.test.js` | 38 tests over the resident grouping, status vocabulary, search/filter, and the account ↔ voter-list cross-check — including the ones that hold "not on the voter list" at severity `expected` so a later edit cannot quietly promote ordinary residents into a list of problems |
 | `src/utils/displayLabels.test.js` | 20 tests over the shared status labels, the upcoming-event count, and a guard that this module never re-acquires a second verification vocabulary |
 | `src/components/ActionMenu.test.js` | 13 tests over the ⋮ menu's keyboard, Escape and focus-restore behaviour — the parts nobody catches by clicking |
-| `src/utils/reservationWindow.test.js` | 40 tests over the 5–10 PM window, the per-slot and per-kind durations, the noon-spanning exception and the office-hours exception — deliberately mirroring the SQL cases in migration 020's header, so client and database are asserted to agree rather than each checked alone. The load-bearing one is that an exception is read from `exception_reason` and never from the hour |
+| `src/utils/reservationWindow.test.js` | 46 tests over the 5–10 PM window, the per-slot and per-kind durations, the noon-spanning exception and the office-hours exception — deliberately mirroring the SQL cases in migration 020's header, so client and database are asserted to agree rather than each checked alone. The load-bearing one is that an exception is read from `exception_reason` and never from the hour |
 
 Schema and policy changes are still verified by impersonating each role
 in SQL, with the results recorded in the migration headers — not by
@@ -194,7 +194,7 @@ src/
 
   assets/images/      11 official portraits, page backgrounds, logo.
 
-supabase-migrations/  20 numbered SQL files. A record, not a runner.
+supabase-migrations/  21 numbered SQL files. A record, not a runner.
 supabase/functions/   Edge Function source (notify-reservation-sms).
 docs/                 SETUP.md, TESTING-WALKTHROUGH.pdf + its generator.
 ```
@@ -569,7 +569,7 @@ such row.
 
 ## Database notes
 
-**20 migrations**, `001` through `020`, all applied.
+**21 migrations**, `001` through `021`, all applied.
 
 **17 tables, RLS enabled on every one.**
 
@@ -1036,12 +1036,13 @@ was built without one.
 
 ## Court reservations
 
-- **Reservable 5:00 PM – 10:00 PM** (migration 020). The court is made
-  available for booking after office hours, so the window describes when
-  the **facility** is open: a booking must **finish** by 10:00 PM, not
-  merely start before it. With the 4-hour cap unchanged, the latest
+- **Reservable 5:00 PM – 10:00 PM, up to 4 hours** (migrations 020 and
+  021). The court is made available for booking after office hours, so
+  the window describes when the **facility** is open: a booking must
+  **finish** by 10:00 PM, not merely start before it. The latest
   ordinary start for a full four hours is 6:00 PM, and 9:00 PM offers one
-  hour only. `src/utils/reservationWindow.js` holds this for the client;
+  hour only. Both the window and the 4-hour maximum are enforced in the
+  database, not only in the form. `src/utils/reservationWindow.js` holds this for the client;
   `reservation_slot_hour()` and `enforce_reservation_window()` hold it in
   the database. See *The office-hours exception* below.
 - **Free.** The database has **no money columns at all** — ten fee-model
@@ -1101,7 +1102,7 @@ claiming a span.
 | | |
 |---|---|
 | Client | `reservationWindow.js`; the form refuses a daytime slot with no reason and a duration that does not fit. Ordinary bookings up to 4 hours, exceptions up to 8, both still ending by 10:00 PM |
-| Database | `enforce_reservation_window()`, BEFORE INSERT. Rejects an unknown time, an end past 10:00 PM, a daytime start with no reason, **and an evening start that carries one** |
+| Database | `enforce_reservation_window()`, BEFORE INSERT. Rejects an unknown time, an end past 10:00 PM, a daytime start with no reason, an evening start that **carries** one, and — since migration 021 — an ordinary booking longer than 4 hours |
 | Official Portal | an `Office-hours exception` badge on the row, the reason under the purpose, and an *exceptions only* checkbox beside the status filter |
 | Resident Portal | a pending exception reads *"Office-hours request — awaiting barangay decision"* rather than plain "Pending" |
 
@@ -1164,29 +1165,56 @@ rule but was **already misreporting a real row**: an approved 10:00 AM /
 form printed *"Ends At: 12:00 PM"* and the grid showed two of its three
 hours held.
 
-**Duration: 4 hours ordinary, 8 for an exception.** The 8 is not a number
-chosen in the client — it is the ceiling of
-`reservations_duration_hours_check`, which has read `duration_hours
-BETWEEN 1 AND 8` since the table was created. Client and database
-therefore agree with **no schema change**, and 8 AM + 8 hours covers the
-daytime through 4:00 PM. Going past 8 (a full 8 AM – 10 PM day is 14)
-means altering that CHECK.
+### Duration: 4 hours ordinary, 8 for an exception
 
-⚠️ **Two things the insert guard still does not do, both pre-existing:**
+**Both limits are enforced in the database, and each number lives in
+exactly one place.**
 
-- **It does not cap duration at all.** The 4-hour cap on an *ordinary*
-  booking lives only in the client. Verified: a 5:00 PM / 5-hour booking
-  with no reason is **accepted** over the API. Nothing in the app
-  produces one, but the publishable key ships in the bundle, so "the
-  form does not offer it" is not a control.
-- **A 12:00 NN start is refused, not stored.** `reservation_slot_hour()`
-  has no `'12:00 PM'` case, so the guard rejects it (`P0001`, unknown
-  time) rather than writing a row whose NULL `slot_hour` would escape the
-  overlap constraint's partial `WHERE`. **Noon is a coverable hour, not a
-  startable one** — which is correct for blocking (any span reaching
-  noon also holds 11 AM, and that is the cell a resident sees) but means
-  a resident cannot pick noon as a start time. Making it startable means
-  adding the mapping in a migration.
+| Limit | Where it lives | What refuses it |
+|---|---|---|
+| Ordinary ≤ 4 hours | `enforce_reservation_window()`, **migration 021** | `P0001` with a sentence a resident can read |
+| Exception ≤ 8 hours | `reservations_duration_hours_check`, which has read `duration_hours BETWEEN 1 AND 8` since the table was created | `23514`, the raw constraint |
+| Everything ends by 10:00 PM | `enforce_reservation_window()`, migration 020 | `P0001` |
+
+**Migration 021 exists because the 4-hour limit used to be client-only.**
+Verified before it: a 5:00 PM / 5-hour booking with no reason was
+**accepted** over the API. The publishable key ships inside the bundle,
+so "the form does not offer it" was never a control — the same argument
+migration 018 made about hiding archived officials with a React filter.
+Verified after it, as `authenticated` **and** as `anon`: refused.
+
+⚠️ **021 deliberately does not restate the 8.** Repeating that ceiling
+inside the guard would give one rule two homes that can drift, so the
+exception branch says nothing about duration and the CHECK is the only
+place the number appears. The consequence to know: a 9-hour exception
+fails as a bare `23514` rather than a sentence, so **the form must never
+offer a 9th hour** — `reservationWindow.test.js` asserts it does not.
+
+⚠️ **A refusal proves nothing until you know which step produced it.**
+5:00 PM / 8h is refused by the **10:00 PM rule**, not by the cap — 5 PM
+plus 8 is 1 AM. The case that isolates the cap is 5:00 PM / **5h**: it
+ends at 10:00 PM exactly, so only the cap can refuse it. Both the
+migration header and the tests use that case for exactly this reason.
+
+Going past 8 (a full 8 AM – 10 PM day is 14) means altering the CHECK.
+**Not done, and not wanted at this time** — decided 2026-10-01.
+
+⚠️ **A 12:00 NN start is refused, not stored.**
+`reservation_slot_hour()` has no `'12:00 PM'` case, so the guard rejects
+it (`P0001`, unknown time) rather than writing a row whose NULL
+`slot_hour` would escape the overlap constraint's partial `WHERE`.
+**Noon is a coverable hour, not a startable one** — which is correct for
+blocking (any span reaching noon also holds 11 AM, and that is the cell a
+resident sees) but means a resident cannot pick noon as a start time.
+Making it startable means adding the mapping in a migration. **Decided
+against at this time**, 2026-10-01.
+
+**Why 021 is a trigger branch and not a CHECK**, for the same reason as
+020: `duration_hours <= 4 OR exception_reason IS NOT NULL` as a
+constraint would be revalidated on every UPDATE, so any pre-existing
+evening row longer than 4 hours would become un-approvable and
+un-cancellable. There is no such row (all 21 stored rows are daytime,
+durations 1–4), but the trigger does not depend on that staying true.
 
 ---
 
@@ -1337,11 +1365,12 @@ the real name and photo together when the barangay confirms them.
   controlled exception workflow, as recorded: a request outside 5–10 PM
   is something an official decides on with the reason recorded, and no
   activity category approves anything. An exception may run through noon
-  and for up to 8 hours, per the barangay's 2026-09-30 decision. What is
-  deliberately **not** built: there is no re-send or re-decide path, the
-  insert guard does not cap duration (the ordinary 4-hour limit is
-  client-only), and noon is a coverable hour but not a startable one —
-  all three noted where they belong.
+  and for up to 8 hours, per the barangay's 2026-09-30 decision, and
+  migration 021 made the ordinary 4-hour maximum authoritative in the
+  database. What is deliberately **not** built, decided 2026-10-01:
+  there is no re-send or re-decide path, exceptions are not supported
+  beyond 8 hours (the CHECK stays `1..8`), and noon is a coverable hour
+  but not a startable one — all noted where they belong.
 - **`profile_id` foreign key** replacing the `full_name` matching above.
 - **019B — the Previous Term Officials roster and its UI.** Migration 019A
   created the tables; both are **empty**, and there is **no frontend**. 019B
@@ -1357,9 +1386,9 @@ the real name and photo together when the barangay confirms them.
 - **Source maps ship to production** (~7 MB), so the original JSX is
   publicly reconstructable. `GENERATE_SOURCEMAP=false` in Vercel fixes it.
 - **`public/logo.png` is 984 KB and referenced by nothing.**
-- **Thin automated test coverage.** 124 tests in five suites: one smoke
+- **Thin automated test coverage.** 130 tests in five suites: one smoke
   test over `<App />`, which fails without `.env` because
-  `supabaseClient.js` throws at import time, and 123 pure unit tests over
+  `supabaseClient.js` throws at import time, and 129 pure unit tests over
   the resident workflow rules, the display labels, the booking window and
   the ⋮ menu's keyboard behaviour. No integration or end-to-end tests,
   and **no test touches the database** — the reservation-window tests
