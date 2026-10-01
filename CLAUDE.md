@@ -1065,8 +1065,15 @@ was built without one.
   the label list to work out what a booking occupies; use
   `coveredHours()`.
 - `end_time` is the **end** of the booking (start + duration), not the
-  start of its last slot. Rows created before 2026-09-04 have the old,
-  wrong value.
+  start of its last slot — and it is a **display string the client
+  computes and sends**, never derived or validated server-side. The
+  authoritative extent is always `slot_hour + duration_hours`, which is
+  what the exclusion constraint uses; `end_time` is what the Resident
+  portal prints. Measured 2026-10-01: of 21 stored rows, **6 hold NULL
+  and 9 hold the old off-by-one value** (the start of the last slot), all
+  of them created on or before 2026-08-19. Every row created from
+  2026-09-04 onward is correct, so the form is not still producing them
+  — but nothing stops a crafted API call from storing any string here.
 - **`activity_type`** is a fixed category shown publicly on the
   availability calendar. The free-text `purpose` stays visible to
   officials only — residents write personal things in it ("birthday
@@ -1160,10 +1167,14 @@ protection covers every hour of a long span, noon included.
 slot-label list.** `coveredHours()` in `reservationWindow.js` is the
 single source of it and mirrors that range exactly. The old walk stopped
 dead at the 11 AM / 1 PM label gap, which was not only the superseded
-rule but was **already misreporting a real row**: an approved 10:00 AM /
-3-hour booking occupies hours 10, 11 and 12 in the database, while the
-form printed *"Ends At: 12:00 PM"* and the grid showed two of its three
-hours held.
+rule but **already misreported a shape of booking that exists in the
+data**: an approved 10:00 AM / 3-hour row occupies hours 10, 11 and 12
+in the exclusion constraint, while the walk returned two labels — so the
+booking form's live *"Ends At"* preview for that shape read 12:00 PM
+instead of 1:00 PM, and the public slot grid marked only two of the three
+occupied hours as held. (That row's **stored** `end_time` is correct, at
+`1:00 PM`; the defect was in what the client computed, not in what the
+database holds.)
 
 ### Duration: 4 hours ordinary, 8 for an exception
 

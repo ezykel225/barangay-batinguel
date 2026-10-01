@@ -92,10 +92,15 @@
 --
 -- What was actually wrong was the CLIENT. Its slot walk stopped at the
 -- 11 AM / 1 PM label gap, so it under-reported a booking's extent --
--- including an approved 10:00 AM / 3-hour row already in this table,
--- whose exclusion range is [10,13) while the form printed "Ends At:
--- 12:00 PM". Fixed in src/utils/reservationWindow.js by computing the
--- extent in hours (coveredHours) to match that range exactly. The
+-- including the shape of an approved 10:00 AM / 3-hour row already in
+-- this table, whose exclusion range is [10,13): the walk returned two
+-- labels, so the form's live "Ends At" preview for that shape read
+-- 12:00 PM instead of 1:00 PM and the public grid showed two of the
+-- three occupied hours. (That row's STORED end_time is correct at
+-- '1:00 PM' -- the defect was in what the client computed, not in what
+-- this table holds.) Fixed in src/utils/reservationWindow.js by
+-- computing the extent in hours (coveredHours) to match that range
+-- exactly. The
 -- database needed no change: verified that the constraint refuses both
 -- an 11:00 AM and a 1:00 PM booking against a 10 AM / 4-hour
 -- exception, so overlap protection already covers every hour of a long
