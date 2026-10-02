@@ -1,9 +1,8 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import {
   FaShieldAlt,
   FaUserTie,
-  FaUserNurse,
   FaUser,
   FaIdCard,
   FaKey,
@@ -17,6 +16,12 @@ import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import './Login.css'
 import { useModalA11y } from '../components/useModalA11y'
+import { safeReturnTo } from '../utils/returnTo'
+import {
+  BARANGAY_CONTACT,
+  BARANGAY_OFFICE_HOURS,
+  telHref,
+} from '../constants/barangay'
 
 // Supabase's browser auth lock is shared across ALL tabs of this
 // origin, not per-tab. With multiple tabs open, one tab's auth call
@@ -31,13 +36,55 @@ const withTimeout = (promise, ms, message) =>
     new Promise((_, reject) => setTimeout(() => reject(new Error(message)), ms)),
   ])
 
+// ⚠️ PRESENTATION ONLY. This picks which heading, help text and sign-up
+// prompt the form shows -- nothing else. It is NOT a role, it does not
+// reach the database, and it grants nothing: where somebody lands is
+// decided entirely by `profiles.role`, read back after Supabase has
+// authenticated them, and what they may then see is decided by
+// ProtectedRoute and RLS.
+//
+// It REPLACED a three-button Official / Nurse / Resident picker that
+// looked like a privilege switch and behaved worse than one: the form
+// compared the chosen button against `profiles.role` and, on a
+// mismatch, signed the person back out with "Invalid role selected.
+// Please select the correct role." So a resident who had correctly
+// typed their own email and password was told their credentials were a
+// role error. The check never protected anything -- it ran AFTER
+// `signInWithPassword` had already succeeded, and the real control was
+// always RLS -- so removing it takes nothing away.
+//
+// Resident is first and is the default, because this is a public
+// barangay website: almost everyone signing in is a resident, and
+// staff know they are staff.
+const AUDIENCES = [
+  {
+    id: 'resident',
+    label: 'Resident',
+    heading: 'Sign in',
+    help: 'Use the email and password you signed up with.',
+  },
+  {
+    id: 'staff',
+    label: 'Barangay Staff',
+    heading: 'Staff sign in',
+    help: 'For barangay officials and health centre staff. '
+      + 'Staff accounts are created by the barangay, not by signing up.',
+  },
+]
+
 const LOCK_TIMEOUT_MESSAGE =
   'This is taking too long — if you have this app open in another browser tab, please close it and try again.'
 
 const Login = () => {
   const navigate = useNavigate()
   const currentYear = new Date().getFullYear()
-  const [role, setRole] = useState('official')
+  const [params] = useSearchParams()
+  // Where to go after a resident signs in, if the link that brought
+  // them here asked for somewhere. ⚠️ Resolved through the allowlist in
+  // utils/returnTo.js, never used raw -- see that file's header for why
+  // a `next` parameter is the classic open-redirect shape.
+  const nextPath = safeReturnTo(params.get('next'), '/')
+  const [audience, setAudience] = useState('resident')
   const [systemId, setSystemId] = useState('')
   const [securityKey, setSecurityKey] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -54,6 +101,9 @@ const Login = () => {
     setShowForgotModal(false)
     setShowSupportModal(false)
   })
+
+  const currentAudience =
+    AUDIENCES.find((entry) => entry.id === audience) || AUDIENCES[0]
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -110,32 +160,43 @@ const Login = () => {
         return
       }
 
-      // Step 3 - Check if role matches
-      if (profile.role !== role) {
-        setError(
-          'Invalid role selected. Please select the correct role.'
-        )
-        await supabase.auth.signOut()
-        setLoading(false)
-        return
+      // ⚠️ Step 3 - Where to go is decided by `profiles.role`, the
+      // value the database holds, and by NOTHING the person chose on
+      // this page. The tab above picks the wording, not the
+      // destination: somebody who clicks Barangay Staff and signs in
+      // with a resident account is a resident, and is treated as one
+      // rather than told their password was wrong.
+      //
+      // The role check that used to live here compared the chosen
+      // button against `profile.role` and signed the person back out on
+      // a mismatch. It ran after `signInWithPassword` had already
+      // succeeded, so it never kept anybody out of anything -- RLS did
+      // and still does -- and what it produced was a correct password
+      // reported as "Invalid role selected."
+      toast.success('Signed in.')
+
+      // ⚠️ `next` is honoured for a RESIDENT only. A staff member
+      // arriving from an E-Services link would otherwise be sent to a
+      // resident-portal path that ProtectedRoute immediately bounces,
+      // which reads as a broken login rather than as a wrong link.
+      // Staff always go to their own portal.
+      const destination = profile.role === 'official'
+        ? '/official'
+        : profile.role === 'nurse'
+          ? '/nurse'
+          // Residents are citizens browsing a public site who happen to
+          // have an account -- not staff logging in to use an internal
+          // tool. Home unless a link asked for somewhere else, and the
+          // navbar shows their profile button in place of "Login" so
+          // they can reach their dashboard whenever they want it.
+          : nextPath
+
+      if (audience === 'staff' && profile.role === 'resident') {
+        toast('This is a resident account, so you are signed in as a resident.')
       }
 
-      // Step 4 - Redirect based on role
-      toast.success('Login successful! Welcome back!')
-
       setTimeout(() => {
-        if (profile.role === 'official') {
-          navigate('/official', { replace: true })
-        } else if (profile.role === 'nurse') {
-          navigate('/nurse', { replace: true })
-        } else if (profile.role === 'resident') {
-          // Residents are citizens browsing a public site who happen to
-          // have an account — not staff logging in to use an internal
-          // tool. Send them back to Home like anyone else; the navbar
-          // now shows their profile button in place of "Login" so they
-          // can reach their dashboard whenever they actually want it.
-          navigate('/', { replace: true })
-        }
+        navigate(destination, { replace: true })
       }, 500)
 
     } catch (err) {
@@ -204,8 +265,8 @@ const Login = () => {
               </div>
               <h1>Log in</h1>
               <p>
-                Sign in to continue to your
-                barangay dashboard.
+                Sign in to request barangay documents and to follow your
+                own requests. Barangay staff sign in here too.
               </p>
             </div>
 
@@ -223,7 +284,7 @@ const Login = () => {
                 This used to repeat the left panel's h1 and its sentence
                 word for word, which is why only the wording changed
                 here rather than the structure. */}
-            <h2>Sign in</h2>
+            <h2>{currentAudience.heading}</h2>
 
             {/* Error Message */}
             {error && (
@@ -232,69 +293,40 @@ const Login = () => {
               </div>
             )}
 
-            {/* Role Selection */}
-            <div className="login-role-label">
-              Authorized Role
-            </div>
-            <div className="login-role-buttons">
-
-              {/* Official Role */}
-              <button
-                className={`login-role-btn
-                  ${role === 'official'
-                    ? 'active-official' : ''}`}
-                onClick={() => setRole('official')}
-                type="button">
-                <FaUserTie />
-                Official
-              </button>
-
-              {/* Nurse Role */}
-              <button
-                className={`login-role-btn
-                  ${role === 'nurse'
-                    ? 'active-nurse' : ''}`}
-                onClick={() => setRole('nurse')}
-                type="button">
-                <FaUserNurse />
-                Nurse
-              </button>
-
-              {/* Resident Role */}
-              <button
-                className={`login-role-btn
-                  ${role === 'resident'
-                    ? 'active-resident' : ''}`}
-                onClick={() => setRole('resident')}
-                type="button">
-                <FaUser />
-                Resident
-              </button>
-
+            {/* ⚠️ A TAB LIST, not a role picker. `aria-selected` and
+                `role="tab"` say what these are: two versions of the
+                same form. The three-button Official / Nurse / Resident
+                grid that was here looked like a privilege switch, and
+                a resident who picked the wrong one was told "Invalid
+                role selected" after typing a correct password. See the
+                AUDIENCES comment at the top of this file. */}
+            <div className="login-audience-tabs" role="tablist" aria-label="Who is signing in">
+              {AUDIENCES.map((entry) => (
+                <button
+                  key={entry.id}
+                  type="button"
+                  role="tab"
+                  id={`login-tab-${entry.id}`}
+                  aria-selected={audience === entry.id}
+                  aria-controls="login-panel"
+                  className={`login-audience-tab ${audience === entry.id ? 'is-selected' : ''}`}
+                  onClick={() => setAudience(entry.id)}
+                >
+                  {entry.id === 'resident' ? <FaUser /> : <FaUserTie />}
+                  {entry.label}
+                </button>
+              ))}
             </div>
 
-            {/* Selected Role Badge */}
-            <div className="login-selected-role">
-              {role === 'official' && (
-                <span className="role-badge official-badge">
-                  👮 Logging in as Barangay Official
-                </span>
-              )}
-              {role === 'nurse' && (
-                <span className="role-badge nurse-badge">
-                  💉 Logging in as Nurse
-                </span>
-              )}
-              {role === 'resident' && (
-                <span className="role-badge resident-badge">
-                  🏠 Logging in as Resident
-                </span>
-              )}
-            </div>
+            <p className="login-audience-help">{currentAudience.help}</p>
 
+            {/* Login Form */}
             {/* Login Form */}
             <form
               className="login-form"
+              id="login-panel"
+              role="tabpanel"
+              aria-labelledby={`login-tab-${audience}`}
               onSubmit={handleLogin}>
 
               {/* Email */}
@@ -352,12 +384,7 @@ const Login = () => {
               <button
                 type="submit"
                 className={`login-submit-btn
-                  ${role === 'official'
-                    ? 'submit-official' : ''}
-                  ${role === 'nurse'
-                    ? 'submit-nurse' : ''}
-                  ${role === 'resident'
-                    ? 'submit-resident' : ''}`}
+                  ${audience === 'resident' ? 'submit-resident' : 'submit-official'}`}
                 disabled={loading}>
                 <FaShieldAlt />
                 {loading
@@ -367,11 +394,23 @@ const Login = () => {
 
             </form>
 
-            {role === 'resident' && (
-              <div className="login-form-footer" style={{ justifyContent: 'center', gap: 6 }}>
-                <span>Don't have an account?</span>
-                <Link to="/signup">Sign up</Link>
+            {audience === 'resident' ? (
+              <div className="login-signup-prompt">
+                <span>Don't have an account?</span>{' '}
+                <Link to="/signup">Create a resident account</Link>
+                <p className="login-note">
+                  Signing up needs an email you can open: the barangay sends a
+                  confirmation link, and the account cannot be used until it is
+                  clicked. A new account then waits for an official to verify
+                  it before documents can be requested.
+                </p>
               </div>
+            ) : (
+              <p className="login-note login-note-standalone">
+                Official and health centre accounts are created by the barangay.
+                There is no staff sign-up — ask at the Barangay Hall if you need
+                one.
+              </p>
             )}
 
             {/* Footer Links */}
@@ -389,7 +428,7 @@ const Login = () => {
                 className="login-link-btn"
                 onClick={() => setShowSupportModal(true)}
               >
-                Support Portal
+                Help with your account
               </button>
             </div>
 
@@ -403,8 +442,12 @@ const Login = () => {
           <div className="login-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="logindlg-1-title">
             <h2 id="logindlg-1-title">Reset your password</h2>
             <p>
-              Enter the email address tied to your official or nurse
-              account. We'll send a password reset link to it.
+              Enter the email address your account uses — resident, official
+              or health centre staff. We'll send a password reset link to it.
+            </p>
+            <p className="login-modal-note">
+              The reply is the same whether or not an account exists, so this
+              box cannot be used to find out who has one.
             </p>
             <form onSubmit={handleForgotAccess}>
               <input
@@ -439,15 +482,41 @@ const Login = () => {
       {showSupportModal && (
         <div className="login-modal-overlay" onClick={() => setShowSupportModal(false)}>
           <div className="login-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="logindlg-2-title">
-            <h2 id="logindlg-2-title">Support Portal</h2>
+            <h2 id="logindlg-2-title">Getting help with your account</h2>
             <p>
-              For account access issues that a reset link can't fix,
-              contact the Barangay Batinguel administrator directly:
+              For an account problem a reset link cannot fix, contact the
+              barangay directly:
             </p>
+            {/* ⚠️ From `constants/barangay.js`, not typed again here.
+                This box used to promise "contact the Barangay Batinguel
+                administrator directly:" and then give no way to contact
+                anybody -- two bullet points telling the reader to go to
+                the Barangay Hall, with none of the numbers the footer
+                and the Home page were already showing. */}
             <ul className="login-support-list">
-              <li>Visit the Barangay Hall during office hours</li>
-              <li>Ask the assigned administrator to verify or reset your account</li>
+              <li>
+                Landline:{' '}
+                <a href={telHref(BARANGAY_CONTACT.landline)}>
+                  {BARANGAY_CONTACT.landline}
+                </a>
+              </li>
+              <li>
+                Mobile:{' '}
+                <a href={telHref(BARANGAY_CONTACT.mobile)}>
+                  {BARANGAY_CONTACT.mobile}
+                </a>
+              </li>
+              <li>{BARANGAY_CONTACT.address}</li>
+              <li>
+                {BARANGAY_OFFICE_HOURS.days}, {BARANGAY_OFFICE_HOURS.morning}{' '}
+                and {BARANGAY_OFFICE_HOURS.afternoon}.{' '}
+                {BARANGAY_OFFICE_HOURS.closedNote}.
+              </li>
             </ul>
+            <p className="login-modal-note">
+              Bring a valid ID if you are asking for an account to be verified
+              or reset in person.
+            </p>
             <div className="login-modal-actions">
               <button
                 type="button"

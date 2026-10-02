@@ -173,96 +173,96 @@
   margin-bottom: 24px;
 }
 
-.login-role-label {
-  font-size: var(--fs-12);
-  font-weight: 600;
-  color: #5f6775;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 10px;
-}
+/* ================================
+   WHO IS SIGNING IN
+   ================================
 
-.login-role-buttons {
+   ⚠️ A TAB LIST, not a role picker. What was here was a three-column
+   grid of Official / Nurse / Resident buttons in three different
+   accent colours, each with a matching "Logging in as ..." pill
+   beneath it -- eight rules and three colour families for a control
+   that granted nothing and, on a mismatch, reported a correct password
+   as "Invalid role selected."
+
+   Two tabs now, in one colour: the selected one is carried by the
+   border, the weight AND `aria-selected`, never by colour alone. */
+.login-audience-tabs {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 10px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
-.login-role-btn {
+.login-audience-tab {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 10px 8px;
+  gap: 8px;
+  min-width: 0;
+  padding: 11px 10px;
   border: 2px solid #e5e7eb;
   border-radius: var(--radius-sm);
   background-color: #f9fafb;
   color: #5f6775;
-  font-size: var(--fs-13);
+  font-size: var(--fs-14);
   font-weight: 500;
+  font-family: 'Poppins', sans-serif;
   cursor: pointer;
   transition: all 0.2s;
-  font-family: 'Poppins', sans-serif;
 }
 
-.login-role-btn:hover {
+.login-audience-tab:hover {
   border-color: #1e3a8a;
   color: #1e3a8a;
   background-color: #eff6ff;
 }
 
-.login-role-btn.active-official {
+.login-audience-tab.is-selected {
   border-color: #1e3a8a;
   color: #1e3a8a;
   background-color: #eff6ff;
+  font-weight: 700;
+}
+
+.login-audience-help {
+  font-size: var(--fs-13);
+  color: #5f6775;
+  line-height: 1.6;
+  margin: 0 0 20px;
+}
+
+.login-signup-prompt {
+  margin-top: 18px;
+  text-align: center;
+  font-size: var(--fs-14);
+  color: #5f6775;
+}
+
+.login-signup-prompt a {
+  color: #1e40af;
   font-weight: 600;
 }
 
-.login-role-btn.active-nurse {
-  border-color: #0891b2;
-  color: #0891b2;
-  background-color: #ecfeff;
-  font-weight: 600;
+.login-note {
+  font-size: var(--fs-13);
+  color: #5f6775;
+  line-height: 1.7;
+  margin: 10px 0 0;
+  text-align: left;
 }
 
-.login-role-btn.active-resident {
-  border-color: #15803d;
-  color: #15803d;
-  background-color: #f0fdf4;
-  font-weight: 600;
+.login-note-standalone {
+  margin-top: 18px;
+  padding: 12px 14px;
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-sm);
 }
 
-.login-selected-role {
-  margin-bottom: 20px;
-}
-
-.role-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  border-radius: var(--radius-pill);
-  font-size: var(--fs-12);
-  font-weight: 600;
-}
-
-.official-badge {
-  background-color: #eff6ff;
-  color: #1e3a8a;
-  border: 1px solid #bfdbfe;
-}
-
-.nurse-badge {
-  background-color: #ecfeff;
-  color: #0891b2;
-  border: 1px solid #a5f3fc;
-}
-
-.resident-badge {
-  background-color: #f0fdf4;
-  color: #15803d;
-  border: 1px solid #bbf7d0;
+.login-modal-note {
+  font-size: var(--fs-13);
+  color: #5f6775;
+  line-height: 1.6;
 }
 
 .login-form {
@@ -389,8 +389,21 @@
   margin-top: 16px;
 }
 
+/* ⚠️ The padding is a TARGET SIZE fix, not spacing. Measured in
+   Chromium at all six widths: "Forgot your password?" was 149x20 and
+   "Support Portal" 94x20 -- both under WCAG 2.2 SC 2.5.8's 24px
+   minimum, on the two controls somebody who cannot get in has to
+   reach. Pre-existing; X3 did not catch it because axe does not check
+   target size and the keyboard pass does not measure boxes.
+   `inline-flex` so the min-height binds on a <button> and an <a>
+   alike, and vertical padding only, so nothing moves sideways. */
 .login-form-footer a,
+.login-signup-prompt a,
 .login-link-btn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 4px 0;
   font-size: var(--fs-13);
   color: #1e3a8a;
   text-decoration: none;
@@ -399,7 +412,10 @@
   border: none;
   cursor: pointer;
   font-family: 'Poppins', sans-serif;
-  padding: 0;
+}
+
+.login-signup-prompt a {
+  font-size: var(--fs-14);
 }
 
 .login-form-footer a:hover,
@@ -531,8 +547,8 @@
     font-size: var(--fs-22);
   }
 
-  .login-role-buttons {
-    grid-template-columns: 1fr;
+  .login-audience-tabs {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 /* ── Resident signup: split name fields, purok list, residency

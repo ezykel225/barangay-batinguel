@@ -5,6 +5,7 @@ import Footer from '../components/Footer'
 import { useAuth } from '../context/AuthContext'
 import { SERVICE_GROUPS } from '../constants/eServices'
 import './EServices.css'
+import { loginHrefFor } from '../utils/returnTo'
 
 // The E-Services landing page.
 //
@@ -76,9 +77,20 @@ const EServices = () => {
                           Login sanitises it. */}
                       {needsAccount && !isResident ? (
                         <>
+                          {/* ⚠️ Built by `loginHrefFor`, never by hand.
+                              This line used to assemble
+                              `?next=${encodeURIComponent(service.to)}`
+                              itself, which is a `next` that skips the
+                              allowlist: it would happily put a
+                              destination in the URL that Login then
+                              refuses, producing a link that promises to
+                              bring somebody back and silently does not.
+                              The helper returns a plain `/login` for
+                              anything not on the list, so the link
+                              cannot lie. */}
                           <Link
                             className="eservices-card-btn"
-                            to={`/login?next=${encodeURIComponent(service.to)}`}
+                            to={loginHrefFor(service.to)}
                           >
                             Sign in to continue
                           </Link>
