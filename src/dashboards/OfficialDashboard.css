@@ -364,20 +364,13 @@
     flex-wrap, so nothing needs a breakpoint of its own and nothing can
     push the document sideways at 375px. */
 
-/* Accessible name for a control whose purpose is already clear visually.
-    Clipped rather than `display: none`, which would hide it from screen
-    readers as well and defeat the point. */
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
+/* ⚠️ `.visually-hidden` now lives in `src/index.css`. It was declared
+    here and used from here only, until the public Covered Court
+    reservation flow needed it too -- at which point a public page would
+    have been depending on the Official Dashboard's stylesheet to be in
+    the bundle. That is the same dishonesty X4 recorded for
+    `@keyframes pulse`: a global owned by one page. The rule's bytes are
+    unchanged; only the file moved. */
 
 /* ── The three group buttons ── */
 .resident-group-tabs {

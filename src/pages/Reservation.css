@@ -79,10 +79,16 @@
   font-size: var(--fs-14);
 }
 
+/* ⚠️ minmax(0, ...), never a bare fr. X2's biggest finding: a bare
+   track is `minmax(auto, 1fr)` and cannot shrink below its content's
+   min-content width, so one unbreakable token -- here a long activity
+   name on a slot button -- sets a floor and the document scrolls
+   sideways. These two tracks were `1.1fr 0.9fr`. */
 .reservation-grid {
   display: grid;
-  grid-template-columns: 1.1fr 0.9fr;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
   gap: 24px;
+  align-items: start;
 }
 
 .reservation-form-card,
@@ -423,25 +429,13 @@
   font-size: var(--fs-14);
 }
 
-.payment-box {
-  margin-top: 10px;
-  padding: 18px;
-  border-radius: var(--radius-md);
-  background-color: #eff6ff;
-  border: 1px solid #bfdbfe;
-}
-
-.payment-box h3 {
-  font-size: var(--fs-18);
-  color: #1e3a8a;
-  margin-bottom: 10px;
-}
-
-.payment-box p {
-  font-size: var(--fs-14);
-  color: #334155;
-  margin-bottom: 8px;
-}
+/* ⚠️ `.payment-box` is gone. It held the donation message, which sat
+   between the Additional Notes field and the submit button -- inside the
+   form, where it read as a step in paying for something. The court is
+   free and `reservations` has no money columns at all (migration 006
+   dropped all ten), so a box in the middle of the form is the one thing
+   that message must not look like. The text now lives in the secondary
+   Court Information section below the flow, as `.res-info-card`. */
 
 /* The booking window, and the way into the office-hours exception.
    Migration 020 and src/utils/reservationWindow.js hold the rule; this
@@ -467,10 +461,23 @@
   padding-left: 10px;
 }
 
+/* ⚠️ The padding is a TARGET SIZE fix, not spacing. Measured in
+   Chromium while driving the new step flow: with `padding: 0` this
+   button was 378x20 -- under WCAG 2.2 SC 2.5.8's 24px minimum, on the
+   only way into the office-hours exception workflow. It showed at 768,
+   1280 and 1440 and NOT at 320, 375 or 1024, because at those widths
+   the label wraps to two lines and clears 24px on its own: a defect
+   that disappears when you narrow the window is exactly the kind a
+   person checking by eye does not find.
+
+   Pre-existing, not introduced by the rework -- the same class of
+   finding as the filter bar's padded-wrapper controls in the post-X3
+   round. Vertical padding only, so nothing moves horizontally. */
 .exception-toggle {
   background: none;
   border: none;
-  padding: 0;
+  padding: 6px 0;
+  min-height: 24px;
   font-size: var(--fs-13);
   font-weight: 600;
   color: #1d4ed8;
@@ -502,6 +509,432 @@
 
 
 
+/* ================================
+   THE FOUR-STEP FLOW
+   ================================
+
+   One stateful flow, four steps: date & time, your details, review,
+   done. Every step renders from one `formData`, so Back never clears
+   anything -- the fields are hidden, not unmounted.
+
+   Nothing here introduces a colour, a radius or a shadow: every value
+   is a token or a hex literal already used elsewhere on this page. */
+
+/* ── The stepper ──────────────────────────────────────────────────── */
+.res-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  list-style: none;
+  margin: 0 0 24px;
+  padding: 0;
+}
+
+.res-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 14px 8px 10px;
+  border-radius: 999px;
+  background-color: #f3f4f6;
+  border: 1px solid #e5e7eb;
+}
+
+.res-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background-color: #ffffff;
+  border: 1px solid #d1d5db;
+  color: #5f6775;
+  font-size: var(--fs-13);
+  font-weight: 700;
+}
+
+.res-step-label {
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: #5f6775;
+  overflow-wrap: anywhere;
+}
+
+/* ⚠️ Three cues, not one. The current step is carried by the border,
+   the weight AND `aria-current="step"`; a completed one by the tick as
+   well as the fill. None of the three states is told apart by colour
+   alone, which is the rule the notification bell's unread state
+   follows. */
+.res-step.is-current {
+  background-color: #eff6ff;
+  border-color: #1e40af;
+}
+
+.res-step.is-current .res-step-num {
+  background-color: #1e40af;
+  border-color: #1e40af;
+  color: #ffffff;
+}
+
+.res-step.is-current .res-step-label {
+  color: #1e3a8a;
+  font-weight: 700;
+}
+
+.res-step.is-done .res-step-num {
+  background-color: #126c33;
+  border-color: #126c33;
+  color: #ffffff;
+}
+
+.res-step.is-done .res-step-label {
+  color: #126c33;
+}
+
+/* ── Single-column steps ──────────────────────────────────────────── */
+/* Steps 2, 3 and 4 have no calendar beside them, so they are one
+   column -- capped rather than full width, because a line of form
+   fields 1200px wide is harder to read than one 720px wide. */
+.res-single {
+  max-width: 720px;
+}
+
+/* ── Action rows ──────────────────────────────────────────────────── */
+.res-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.res-actions .reservation-submit-btn {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+/* A secondary action, not a disabled one. Grey rather than tinted blue,
+   so Back and Continue are not two shades of the same button. */
+.res-btn-secondary {
+  background: #5f6775;
+}
+
+.res-btn-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  background: #ffffff;
+  color: #1e40af;
+  border: 1px solid #1e40af;
+}
+
+.res-btn-link:hover {
+  background-color: #eff6ff;
+}
+
+/* ── The chosen slot, carried into step 2 ─────────────────────────── */
+/* So somebody filling in their name can still see what they are booking
+   without going back for it. */
+.res-chosen-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  background-color: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  margin-bottom: 20px;
+}
+
+.res-chosen-label {
+  font-size: var(--fs-12);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #1e40af;
+  margin: 0;
+  flex-basis: 100%;
+}
+
+.res-chosen-value {
+  font-size: var(--fs-15);
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.res-chosen-change {
+  background: none;
+  border: none;
+  padding: 4px 0;
+  min-height: 24px;
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: #1e40af;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* ── The review list, shared by step 3 and step 4 ─────────────────── */
+/* A <dl>: these are labelled values, which is exactly what a definition
+   list is for, and it gives a screen reader the pairing without any
+   ARIA. */
+.res-review-list {
+  margin: 0 0 20px;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.res-review-row {
+  display: grid;
+  grid-template-columns: minmax(0, 180px) minmax(0, 1fr);
+  gap: 4px 16px;
+  padding: 12px 16px;
+}
+
+.res-review-row + .res-review-row {
+  border-top: 1px solid #e5e7eb;
+}
+
+.res-review-row dt {
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: #5f6775;
+  margin: 0;
+}
+
+.res-review-row dd {
+  font-size: var(--fs-14);
+  color: #1f2937;
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.res-review-note {
+  font-size: var(--fs-13);
+  color: #5f6775;
+  line-height: 1.6;
+  margin: 0 0 4px;
+}
+
+/* ── Step 4, the success panel ────────────────────────────────────── */
+.res-success-card {
+  background-color: #ffffff;
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  box-shadow: var(--shadow-md);
+}
+
+.res-success-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-13);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #126c33;
+  margin: 0 0 10px;
+}
+
+.res-success-card h2 {
+  font-size: var(--fs-24);
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 10px;
+}
+
+.res-success-text {
+  font-size: var(--fs-15);
+  color: #5f6775;
+  line-height: 1.7;
+  margin: 0 0 24px;
+}
+
+/* ⚠️ The loudest thing on the page, on purpose. This is the only time
+   the reference is ever shown: there is no email, no SMS, and a guest
+   has no account to look it up in. */
+.res-reference {
+  background-color: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: var(--radius-md);
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+/* Amber rather than blue: this is the one branch of step 4 that needs
+   somebody to do something. It reuses the palette the project already
+   has for a warning state. */
+.res-reference-missing {
+  background-color: #fffbeb;
+  border-color: #fde68a;
+}
+
+.res-reference-missing .res-reference-label {
+  color: #92400e;
+}
+
+.res-reference-label {
+  font-size: var(--fs-12);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #1e40af;
+  margin: 0 0 6px;
+}
+
+/* Monospace so a 0 and an O are told apart on screen. Generation never
+   emits O, I, L or U for the same reason -- see migration 024 -- but the
+   year digits and the body still deserve a font that does not make them
+   guess. */
+.res-reference-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--fs-24);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #1e3a8a;
+  margin: 0 0 14px;
+  overflow-wrap: anywhere;
+}
+
+.res-reference-copy {
+  background-color: #ffffff;
+  border: 1px solid #1e40af;
+  border-radius: var(--radius-sm);
+  color: #1e40af;
+  cursor: pointer;
+  font-size: var(--fs-13);
+  font-weight: 600;
+  min-height: 36px;
+  padding: 8px 16px;
+  transition: var(--transition-fast);
+}
+
+.res-reference-copy:hover {
+  background-color: #dbeafe;
+}
+
+.res-reference-warning {
+  font-size: var(--fs-13);
+  color: #5f6775;
+  line-height: 1.6;
+  margin: 14px 0 0;
+}
+
+.res-next-heading {
+  font-size: var(--fs-16);
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 10px;
+}
+
+/* ⚠️ `list-style` is set EXPLICITLY, and the list is not a flex
+   container. Two separate facts, and the first is the one that actually
+   bit -- found by screenshotting step 4, where "What happens next"
+   rendered as three unnumbered paragraphs under a heading promising a
+   sequence.
+
+   MEASURED in the shipped bundle: `@tailwind base` emits Preflight,
+   which carries `ol,ul{list-style:none;margin:0;padding:0}`. So although
+   CLAUDE.md records that "there is not a single Tailwind utility class
+   in the JSX", Preflight's RESET is live across the whole application
+   and silently strips every list marker. Any list that wants markers has
+   to ask for them.
+
+   My first reading of the screenshot blamed the flex container, which
+   is a real rule -- a flex parent turns a child's `display: list-item`
+   into `block` -- but it was not the cause here, and the fix would not
+   have worked on its own. The bundle grep is what settled it. Both are
+   corrected, because once the marker is restored the flex container
+   would remove it again. */
+.res-next-steps {
+  margin: 0 0 24px;
+  padding-left: 22px;
+  list-style: decimal;
+}
+
+.res-next-steps li + li {
+  margin-top: 8px;
+}
+
+.res-next-steps li {
+  font-size: var(--fs-14);
+  color: #5f6775;
+  line-height: 1.6;
+}
+
+/* ── Court information, below the flow ────────────────────────────── */
+.res-info {
+  margin-top: 40px;
+  padding-top: 32px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.res-info h2 {
+  font-size: var(--fs-20);
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 18px;
+}
+
+.res-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: 20px;
+}
+
+.res-info-card {
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-md);
+  padding: 20px;
+  min-width: 0;
+}
+
+.res-info-card h3 {
+  font-size: var(--fs-15);
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 10px;
+}
+
+.res-info-card p,
+.res-info-card li {
+  font-size: var(--fs-13);
+  color: #5f6775;
+  line-height: 1.7;
+}
+
+.res-info-card p {
+  margin: 0 0 10px;
+}
+
+/* Same two reasons as `.res-next-steps`: Preflight's reset, and no
+   flex container over list items. */
+.res-info-card ul {
+  margin: 0;
+  padding-left: 20px;
+  list-style: disc;
+}
+
+.res-info-card li + li {
+  margin-top: 6px;
+}
+
+.res-info-quote {
+  font-style: italic;
+  color: #374151;
+  margin: 0;
+}
+
 @media (max-width: 900px) {
   .reservation-grid {
     grid-template-columns: 1fr;
@@ -527,5 +960,63 @@
   .reservation-form-card,
   .reservation-slots-card {
     padding: 18px;
+  }
+}
+/* ================================
+   THE COMPACT HERO
+   ================================
+
+   ⚠️ A modifier, not an edit to `.reservation-hero`. The photograph, the
+   dark-blue overlay gradient, the badge and the type scale are the
+   public pages' shared design language and are untouched; this changes
+   the height only.
+
+   `min-height: 500px` put the first step of the booking flow below the
+   fold on a laptop. The informational pages earn a tall hero because
+   the picture IS the content there; a transactional page does not. */
+.reservation-hero.reservation-hero-compact {
+  min-height: 0;
+  padding: 44px 40px;
+}
+
+.reservation-hero-compact h1 {
+  font-size: var(--fs-36);
+  margin-bottom: 10px;
+}
+
+.reservation-hero-compact p {
+  max-width: 56ch;
+}
+
+@media (max-width: 768px) {
+  .reservation-hero.reservation-hero-compact {
+    min-height: 0;
+    padding: 32px 20px;
+  }
+
+  .reservation-hero-compact h1 {
+    font-size: var(--fs-28);
+  }
+
+  /* The label column collapses: at this width 180px of label beside a
+     short value leaves the value in a ribbon. */
+  .res-review-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .res-actions .reservation-submit-btn {
+    flex: 1 1 100%;
+  }
+
+  .res-success-card {
+    padding: 20px;
+  }
+
+  .res-reference {
+    padding: 16px;
+  }
+
+  .res-reference-code {
+    font-size: var(--fs-20);
   }
 }

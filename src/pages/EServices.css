@@ -144,7 +144,7 @@
   font-size: var(--fs-14);
   font-weight: 600;
   text-decoration: none;
-  transition: var(--transition-base);
+  transition: var(--transition-fast);
   align-self: flex-start;
 }
 

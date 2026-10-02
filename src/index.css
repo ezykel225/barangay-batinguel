@@ -176,3 +176,32 @@ body {
     animation-iteration-count: infinite !important;
   }
 }
+
+/* ================================
+   VISUALLY HIDDEN
+   ================================
+
+   Text that exists for assistive technology and not for the screen: an
+   accessible name for a control whose purpose is already obvious
+   visually, or a word like "Completed" that a sighted reader takes from
+   a tick.
+
+   Clipped rather than `display: none`, which would remove it from the
+   accessibility tree as well and defeat the whole point.
+
+   ⚠️ It lives HERE, not in a page's own stylesheet. It was declared in
+   `OfficialDashboard.css` while the dashboard was its only user; the
+   public reservation flow is now a second one, and a public page
+   depending on a dashboard stylesheet is the `@keyframes pulse` trap X4
+   recorded -- a global owned by one page. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
