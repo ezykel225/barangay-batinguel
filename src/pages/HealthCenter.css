@@ -907,3 +907,158 @@
   color: #92400e;
   white-space: nowrap;
 }
+
+/* ================================
+   MEDICINE LIST: SUMMARY, FILTERS, GROUPS
+   ================================
+
+   ⚠️ Counts of LIST ENTRIES, never of stock. Medicine availability is
+   a status and not a quantity, because a published count is a promise
+   the barangay cannot keep without logging every tablet dispensed --
+   the wording on screen says "listed" for the same reason. */
+
+.medicine-summary {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-md);
+}
+
+.medicine-summary li {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--fs-13);
+  color: #5f6775;
+}
+
+.medicine-summary strong {
+  color: #1f2937;
+  font-weight: 700;
+}
+
+/* The dot repeats the badge colour, and never carries the meaning on
+   its own -- the count and the word beside it do that. */
+.medicine-summary-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: var(--radius-circle);
+  flex-shrink: 0;
+}
+
+.medicine-summary-dot.medicine-available { background-color: #126c33; }
+.medicine-summary-dot.medicine-low { background-color: #b45309; }
+.medicine-summary-dot.medicine-unavailable { background-color: #b91c1c; }
+
+/* ── Filters ─────────────────────────────────────────────────────── */
+/* ⚠️ minmax(0, 1fr), never a bare fr -- the search box holds a
+   medicine name somebody typed. */
+.medicine-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 14px;
+}
+
+.medicine-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.medicine-field label {
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: #5f6775;
+}
+
+/* ⚠️ The control is the target, so the padding is ON the control and
+   not on a wrapper around it. A borderless input inside a padded
+   wrapper looks 52px tall and can only be hit over 20px of itself --
+   the post-X3 finding on the dashboard filter bar, which is this same
+   shape of control. */
+.medicine-field input,
+.medicine-field select {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding: 9px 11px;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-sm);
+  background-color: #ffffff;
+  font-size: var(--fs-13);
+  color: #1f2937;
+  font-family: 'Poppins', sans-serif;
+}
+
+.medicine-clear-btn {
+  align-self: end;
+  min-height: 40px;
+  padding: 9px 16px;
+  border: 1px solid #1e40af;
+  border-radius: var(--radius-sm);
+  background-color: #ffffff;
+  color: #1e40af;
+  font-size: var(--fs-13);
+  font-weight: 600;
+  font-family: 'Poppins', sans-serif;
+  cursor: pointer;
+}
+
+.medicine-clear-btn:hover {
+  background-color: #eff6ff;
+}
+
+.medicine-filtered-note,
+.medicine-empty {
+  font-size: var(--fs-13);
+  color: #5f6775;
+  line-height: 1.6;
+  margin: 0 0 14px;
+}
+
+.medicine-empty {
+  padding: 14px;
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-md);
+}
+
+/* ── Collapsible groups ──────────────────────────────────────────── */
+/* A disclosure button that fills its heading, so the whole row is the
+   target rather than the few words in it. */
+.medicine-group-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+
+.medicine-group-chevron {
+  flex-shrink: 0;
+  font-size: var(--fs-12);
+  color: #5f6775;
+}
+
+.medicine-group-count {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: var(--fs-12);
+  font-weight: 500;
+  color: #5f6775;
+}

@@ -15,7 +15,9 @@ import {
 } from 'react-icons/fa'
 import { MdOutlineEventAvailable, MdPersonSearch } from 'react-icons/md'
 import { supabase } from '../supabase/supabaseClient'
-import { MEDICINE_CATEGORIES, statusOf } from '../constants/medicines'
+import { MEDICINE_CATEGORIES, MEDICINE_STATUS, statusOf } from '../constants/medicines'
+import { buildWeekSchedule } from '../utils/clinicSchedule'
+import { countByStatus, filterMedicines, groupByCategory } from '../utils/medicineFilter'
 import {
   BARANGAY_CONTACT, HEALTH_NURSE_ROLE, telHref,
 } from '../constants/barangay'
@@ -53,7 +55,9 @@ const healthTips = [
   },
 ]
 
-const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+// ⚠️ DAY_ORDER moved to utils/clinicSchedule.js, which is the module
+// that now decides what a week looks like. Two copies of a weekday
+// order is two places for Sunday to end up in the wrong half.
 
 const HealthCenter = () => {
   const [healthEvents, setHealthEvents] = useState([])
@@ -62,8 +66,19 @@ const HealthCenter = () => {
   const [nurseStatus, setNurseStatus] = useState('unavailable')
   const [weekSchedule, setWeekSchedule] = useState([])
   const [loadingSchedule, setLoadingSchedule] = useState(true)
+  const [scheduleRows, setScheduleRows] = useState([])
   const [medicines, setMedicines] = useState([])
   const [medicinesLoading, setMedicinesLoading] = useState(true)
+  // Narrowing the medicine list. All client-side, over rows already
+  // fetched -- no second query, so the counts and the list cannot
+  // disagree about what is published.
+  const [medicineQuery, setMedicineQuery] = useState('')
+  const [medicineCategory, setMedicineCategory] = useState('all')
+  const [medicineStatus, setMedicineStatus] = useState('all')
+  // Which category groups are folded away. Collapsed by key, so a
+  // group that appears later starts open rather than inheriting a
+  // collapse nobody asked for.
+  const [collapsedCategories, setCollapsedCategories] = useState({})
 
   const fetchNurseAvailability = useCallback(async () => {
     try {
@@ -94,15 +109,29 @@ const HealthCenter = () => {
   // Availability tab, so "Clinic Hours" here is never out of sync.
   const fetchWeekSchedule = useCallback(async () => {
     try {
+      // ⚠️ `break_start` and `break_end` were NOT in this select, and
+      // the page's whole "work the lunch break out from the Manila
+      // clock so nobody has to press anything at noon" behaviour reads
+      // them. `isOnScheduledBreak` got `undefined` for both, returned
+      // null, and the `=== true` test below was therefore ALWAYS
+      // false: the automatic half of the two-ways-of-being-on-break
+      // design has never once fired on this page.
+      //
+      // The weekly list rendered the break correctly only because it
+      // read `day.break_start` from these same rows -- which is to say
+      // it printed nothing, and "no break recorded" looks exactly like
+      // a day that has none.
       const { data, error } = await supabase
         .from('nurse_availability')
-        .select('day_of_week, time_start, time_end, status')
+        .select('day_of_week, time_start, time_end, break_start, break_end, status')
 
       if (!error) {
-        const sorted = (data || []).sort(
-          (a, b) => DAY_ORDER.indexOf(a.day_of_week) - DAY_ORDER.indexOf(b.day_of_week)
-        )
-        setWeekSchedule(sorted)
+        // ⚠️ Sorting is no longer enough, because a day can have more
+        // than one ROW -- Friday has two in the live table, and the
+        // list showed Friday twice. `buildWeekSchedule` gives one
+        // entry per weekday carrying every session recorded for it.
+        setWeekSchedule(buildWeekSchedule(data || []))
+        setScheduleRows(data || [])
       }
     } catch (err) {
       console.error('Schedule fetch error:', err)
@@ -149,21 +178,49 @@ const HealthCenter = () => {
     fetchMedicines()
   }, [fetchNurseAvailability, fetchWeekSchedule, fetchHealthEvents, fetchMedicines])
 
+  const filteredMedicines = useMemo(
+    () => filterMedicines(medicines, {
+      query: medicineQuery,
+      category: medicineCategory,
+      status: medicineStatus,
+    }),
+    [medicines, medicineQuery, medicineCategory, medicineStatus],
+  )
+
   // Grouped in the order the categories are declared, so the list reads
   // the same way every visit rather than reshuffling as stock changes.
-  const medicinesByCategory = useMemo(() => {
-    const groups = new Map()
-    medicines.forEach((medicine) => {
-      const key = MEDICINE_CATEGORIES.includes(medicine.category)
-        ? medicine.category
-        : 'Other'
-      if (!groups.has(key)) groups.set(key, [])
-      groups.get(key).push(medicine)
-    })
-    return MEDICINE_CATEGORIES
-      .filter((category) => groups.has(category))
-      .map((category) => [category, groups.get(category)])
-  }, [medicines])
+  const medicinesByCategory = useMemo(
+    () => groupByCategory(filteredMedicines),
+    [filteredMedicines],
+  )
+
+  // ⚠️ Counted over EVERYTHING published, not over what is on screen.
+  // A summary that shrinks as you type is answering a different
+  // question from the one it appears to answer, and "2 available"
+  // under a search for "para" would be read as the health centre
+  // having two medicines.
+  const statusCounts = useMemo(() => countByStatus(medicines), [medicines])
+  const isFiltered = medicineQuery.trim() !== ''
+    || medicineCategory !== 'all'
+    || medicineStatus !== 'all'
+
+  const clearMedicineFilters = () => {
+    setMedicineQuery('')
+    setMedicineCategory('all')
+    setMedicineStatus('all')
+  }
+
+  // Only the categories that actually have something in them, so the
+  // dropdown cannot offer a filter that yields nothing.
+  const availableCategories = useMemo(
+    () => MEDICINE_CATEGORIES.filter(
+      (category) => groupByCategory(medicines).some(([key]) => key === category),
+    ),
+    [medicines],
+  )
+
+  const toggleCategory = (category) =>
+    setCollapsedCategories((prev) => ({ ...prev, [category]: !prev[category] }))
 
   // Stale stock information is worse than none -- a resident who
   // trusts it and walks for nothing stops trusting the whole site. So
@@ -182,7 +239,14 @@ const HealthCenter = () => {
   }, [medicines])
 
   const today = manilaWeekday()
-  const todaySchedule = weekSchedule.find((d) => d.day_of_week === today) || null
+  // ⚠️ The RAW row for today, because `isOnScheduledBreak` reads
+  // `break_start`/`break_end` as stored. A day with two rows uses the
+  // one covering the moment being asked about; failing that, the first.
+  const todaySchedule = useMemo(() => {
+    const rows = scheduleRows.filter((row) => row.day_of_week === today)
+    if (rows.length === 0) return null
+    return rows.find((row) => isOnScheduledBreak(row) !== null) || rows[0]
+  }, [scheduleRows, today])
 
   // Two ways of being on break. The scheduled one is worked out from
   // the clock, so nobody has to remember to press anything at noon;
@@ -322,47 +386,52 @@ const HealthCenter = () => {
                   Clinic hours have not been set yet.
                 </p>
               ) : (
-                weekSchedule.map((day) => {
-                  const isToday = day.day_of_week === today
-                  const open = day.status === 'available' && day.time_start && day.time_end
-                  const hasBreak = Boolean(day.break_start && day.break_end)
+                weekSchedule.map((entry) => {
+                  const isToday = entry.day === today
+                  const open = entry.status === 'available' && entry.hasHours
 
                   return (
                     <div
                       className={`clinic-hours-item ${isToday ? 'is-today' : ''}`}
-                      key={day.day_of_week}
+                      key={entry.day}
                     >
                       <span className="clinic-hours-day">
-                        {day.day_of_week}
+                        {entry.day}
                         {isToday && <span className="clinic-today-tag">Today</span>}
                       </span>
 
                       {open ? (
                         <span className="clinic-hours-time">
-                          {/* Split into two blocks rather than one range,
-                              so the closed hour is visible instead of
-                              implied. */}
-                          {hasBreak ? (
-                            <>
-                              <span className="clinic-hours-block">
-                                {formatTime(day.time_start)} – {formatTime(day.break_start)}
+                          {/* ⚠️ One block per SESSION. Friday is recorded
+                              as two rows in the live table -- 8-12 and
+                              1-5 -- and the list used to render the day
+                              twice, which reads as a rendering fault
+                              rather than as two sessions. A lunch break
+                              is printed only when it actually falls
+                              inside the session it was stored against;
+                              Friday's second row carries one that ends
+                              as that session begins. */}
+                          {entry.sessions.map((session) => (
+                            <span className="clinic-hours-block" key={session.label}>
+                              {session.label}
+                            </span>
+                          ))}
+                          {entry.sessions
+                            .filter((session) => session.breakLabel)
+                            .map((session) => (
+                              <span className="clinic-hours-break" key={`b-${session.label}`}>
+                                Lunch {session.breakLabel}
                               </span>
-                              <span className="clinic-hours-block">
-                                {formatTime(day.break_end)} – {formatTime(day.time_end)}
-                              </span>
-                              <span className="clinic-hours-break">
-                                Lunch {formatTime(day.break_start)} – {formatTime(day.break_end)}
-                              </span>
-                            </>
-                          ) : (
-                            <span className="clinic-hours-block">
-                              {formatTime(day.time_start)} – {formatTime(day.time_end)}
+                            ))}
+                          {entry.isSplit && !entry.sessions.some((s) => s.breakLabel) && (
+                            <span className="clinic-hours-break">
+                              Two sessions — closed in between
                             </span>
                           )}
                         </span>
                       ) : (
                         <span className="clinic-hours-closed">
-                          {day.status === 'on-leave' ? 'On Leave' : 'Closed'}
+                          {entry.status === 'on-leave' ? 'On Leave' : 'Closed'}
                         </span>
                       )}
                     </div>
@@ -433,10 +502,134 @@ const HealthCenter = () => {
                     the counter before relying on it.
                   </p>
 
-                  {medicinesByCategory.map(([category, items]) => (
+                  {/* ⚠️ Counted over everything PUBLISHED, not over what
+                      is on screen. A summary that shrinks as you type
+                      answers a different question from the one it looks
+                      like it answers -- "2 available" under a search for
+                      "para" reads as the health centre having two
+                      medicines.
+
+                      And these are counts of LIST ENTRIES, never of
+                      boxes on a shelf. Medicine availability is a status
+                      and not a quantity, because a published count is a
+                      promise the barangay cannot keep without logging
+                      every tablet dispensed. The wording says "listed". */}
+                  <ul className="medicine-summary" aria-label="What is on the list today">
+                    <li>
+                      <strong>{statusCounts.total}</strong> medicines listed
+                    </li>
+                    {Object.entries(MEDICINE_STATUS).map(([key, meta]) => (
+                      <li key={key}>
+                        <span className={`medicine-summary-dot ${meta.className}`} aria-hidden="true" />
+                        <strong>{statusCounts[key]}</strong> {meta.label.toLowerCase()}
+                      </li>
+                    ))}
+                  </ul>
+
+                  <div className="medicine-filters">
+                    <div className="medicine-field">
+                      <label htmlFor="medicine-search">Search medicines</label>
+                      <input
+                        id="medicine-search"
+                        type="search"
+                        value={medicineQuery}
+                        onChange={(e) => setMedicineQuery(e.target.value)}
+                        placeholder="Name, generic name, or what it is for"
+                      />
+                    </div>
+
+                    <div className="medicine-field">
+                      <label htmlFor="medicine-category">Category</label>
+                      <select
+                        id="medicine-category"
+                        value={medicineCategory}
+                        onChange={(e) => setMedicineCategory(e.target.value)}
+                      >
+                        <option value="all">All categories</option>
+                        {availableCategories.map((category) => (
+                          <option key={category} value={category}>{category}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="medicine-field">
+                      <label htmlFor="medicine-status">Availability</label>
+                      {/* ⚠️ The words come from MEDICINE_STATUS, the map
+                          the badges below already read, so the filter and
+                          the badge beside it cannot say different things.
+                          The VALUES are the stored ones, which is what
+                          the filter compares against. */}
+                      <select
+                        id="medicine-status"
+                        value={medicineStatus}
+                        onChange={(e) => setMedicineStatus(e.target.value)}
+                      >
+                        <option value="all">Any availability</option>
+                        {Object.entries(MEDICINE_STATUS).map(([key, meta]) => (
+                          <option key={key} value={key}>{meta.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {/* Only offered when there is something to clear.
+                        A control that does nothing is worse than no
+                        control: it makes somebody doubt the one they
+                        just used. */}
+                    {isFiltered && (
+                      <button
+                        type="button"
+                        className="medicine-clear-btn"
+                        onClick={clearMedicineFilters}
+                      >
+                        Clear filters
+                      </button>
+                    )}
+                  </div>
+
+                  {isFiltered && (
+                    <p className="medicine-filtered-note" role="status">
+                      Showing {filteredMedicines.length} of {statusCounts.total} medicines.
+                    </p>
+                  )}
+
+                  {/* ⚠️ Two different empty states, because they are two
+                      different facts. Telling somebody the list is empty
+                      while a filter is applied is the one wrong thing
+                      this card can say -- they would stop looking for a
+                      medicine the health centre has. */}
+                  {filteredMedicines.length === 0 ? (
+                    <p className="medicine-empty">
+                      No medicines match this search. Try a different name, or
+                      clear the filters to see the whole list.
+                    </p>
+                  ) : medicinesByCategory.map(([category, items]) => (
                     <div key={category} className="medicine-group">
-                      <h4 className="medicine-group-title">{category}</h4>
-                      <ul className="medicine-list">
+                      {/* A disclosure, not a heading with a click
+                          handler: `aria-expanded` is what tells somebody
+                          not looking at the arrow whether the group is
+                          open, and `aria-controls` points at the list it
+                          opens. */}
+                      <h4 className="medicine-group-title">
+                        <button
+                          type="button"
+                          className="medicine-group-toggle"
+                          aria-expanded={!collapsedCategories[category]}
+                          aria-controls={`medicine-group-${category.replace(/\W+/g, '-')}`}
+                          onClick={() => toggleCategory(category)}
+                        >
+                          <span className="medicine-group-chevron" aria-hidden="true">
+                            {collapsedCategories[category] ? '▸' : '▾'}
+                          </span>
+                          {category}
+                          <span className="medicine-group-count">
+                            {items.length} {items.length === 1 ? 'medicine' : 'medicines'}
+                          </span>
+                        </button>
+                      </h4>
+                      <ul
+                        className="medicine-list"
+                        id={`medicine-group-${category.replace(/\W+/g, '-')}`}
+                        hidden={Boolean(collapsedCategories[category])}
+                      >
                         {items.map((medicine) => {
                           const meta = statusOf(medicine.status)
                           return (

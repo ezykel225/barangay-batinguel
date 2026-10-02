@@ -228,3 +228,29 @@ body {
   align-items: center;
   justify-content: center;
 }
+
+/* ================================
+   TELEPHONE LINKS
+   ================================
+
+   ⚠️ A TARGET SIZE fix, not spacing, and global because the pattern is
+   global: `tel:` links are written inline inside sentences on the Home
+   page, the Health Center page and the Officials page, with no class
+   of their own to hang a rule on.
+
+   MEASURED in Chromium at 1280: 108x21, 90x18, 85x18 on the Health
+   Center page and 97x19, 92x19 on Home -- every one under WCAG 2.2
+   SC 2.5.8's 24px minimum, on the links a person holding a phone is
+   most likely to tap. Pre-existing: X3 raised the footer legal buttons
+   and the "View All" links and did not reach these, because axe does
+   not check target size.
+
+   `inline-flex` so the min-height binds on an inline element, and
+   vertical padding only, so nothing moves sideways in the sentence
+   around it. */
+a[href^="tel:"] {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 0;
+}

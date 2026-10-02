@@ -158,7 +158,14 @@
   margin: 12px 0 0;
 }
 
+/* ⚠️ Target size again, measured at 173x19 -- under SC 2.5.8's 24px,
+   and introduced earlier on this same branch. `inline-flex` with
+   vertical padding only, so the sentence around it does not move. */
 .eservices-card-alt a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 0;
   color: #1e40af;
   font-weight: 600;
 }
