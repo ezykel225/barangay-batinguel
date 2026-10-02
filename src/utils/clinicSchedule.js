@@ -20,17 +20,34 @@
 // as a display string -- `clinicHours.toMinutes` accepts both, which is
 // why nothing broke outright and why nobody noticed.
 //
-// ⚠️ THE TWO ROWS ARE NOT MERGED INTO ONE. 08:00-12:00 plus 13:00-17:00
-// looks exactly like the standard day with a lunch break, and writing
-// that down as a single 8:00 AM - 5:00 PM row would be INFERRING what
-// the barangay meant and then storing the inference. They are shown as
-// what they are: two sessions on one day, in one Friday row. If Friday
-// really is an ordinary day, the barangay can say so and the two rows
-// become one -- a data correction, made deliberately, not a guess made
-// by a display function.
+// ─── ⚠️ TWO SESSIONS READ AS ONE DAY ONLY WHEN THE DATA SAYS SO ───
 //
-// ⚠️ And nothing here deletes or rewrites a row. This module only
-// decides what a reader sees.
+// The first cut of this module refused to join the two Friday rows,
+// on the grounds that 08:00-12:00 plus 13:00-17:00 only LOOKS like an
+// ordinary day with a lunch break, and that turning the resemblance
+// into a single 8:00 AM - 5:00 PM row would be inferring what the
+// barangay meant. The page therefore printed two blocks and the line
+// "Two sessions — closed in between", which readers took to mean the
+// clinic keeps unusual Friday hours.
+//
+// It is not an inference, and the rows themselves are what settle it:
+// BOTH Friday rows record a break of 12:00-13:00, which is exactly the
+// gap between the two sessions. The barangay has already written down
+// that the closure between them is the lunch break. So `bridgingBreak`
+// joins two sessions into one span if and ONLY if a break recorded on
+// one of that day's own rows starts precisely where the first session
+// ends and ends precisely where the second begins.
+//
+// ⚠️ The rule is derived, not hard-coded to a weekday. Nothing here
+// names Friday, and a day whose gap is NOT covered by a recorded break
+// still renders as separate sessions -- so a genuine morning-only /
+// late-afternoon clinic day could never be flattened into one span.
+// Friday is the only day in the live table with two rows, which is why
+// it is the only day this changes.
+//
+// ⚠️ And nothing here deletes or rewrites a row. The database still
+// holds two Friday rows; `sessions` still reports both of them. This
+// module only decides what a reader sees.
 
 import { formatTime, toMinutes } from './clinicHours'
 
@@ -51,6 +68,37 @@ export const breakFallsWithin = (session, breakStart, breakEnd) => {
   if ([start, end, bStart, bEnd].some((v) => v === null)) return false
   if (bEnd <= bStart) return false
   return bStart >= start && bEnd <= end
+}
+
+// ⚠️ The one thing that lets two rows become one day, and it reads
+// the answer out of the rows rather than guessing it.
+//
+// Returns the break that exactly FILLS the gap between two sessions --
+// starting where the first ends, ending where the second begins -- or
+// null. Friday's two rows both carry 12:00-13:00 against a gap of
+// 12:00-13:00, so the barangay has already recorded that the closure
+// between the sessions is the lunch break.
+//
+// Deliberately strict on both edges. A break of 12:00-12:30 against a
+// gap to 1:00 PM would leave half an hour unaccounted for, and a span
+// claiming to run 8 to 5 would then be a half-hour wrong; a day whose
+// gap no recorded break covers is left as two sessions, which is the
+// honest reading of a clinic that really does close in between.
+export const bridgingBreak = (dayRows = [], sessions = []) => {
+  if (sessions.length !== 2) return null
+
+  const gapStart = toMinutes(sessions[0]?.end)
+  const gapEnd = toMinutes(sessions[1]?.start)
+  if (gapStart === null || gapEnd === null || gapEnd <= gapStart) return null
+
+  const match = (dayRows || []).find((row) => {
+    const bStart = toMinutes(row?.break_start)
+    const bEnd = toMinutes(row?.break_end)
+    return bStart === gapStart && bEnd === gapEnd
+  })
+  if (!match) return null
+
+  return { start: match.break_start, end: match.break_end }
 }
 
 // One entry per weekday, in weekday order, each carrying every session
@@ -91,6 +139,22 @@ export const buildWeekSchedule = (rows = []) => {
       // An unparseable time sorts last rather than throwing the order.
       .sort((a, b) => (a.startMinutes ?? Infinity) - (b.startMinutes ?? Infinity))
 
+    // ⚠️ What the page RENDERS, which is not always one block per
+    // stored row. See the header: two sessions whose gap is exactly a
+    // break recorded on one of the day's own rows are one span with
+    // that break printed under it. `sessions` above is left alone, so
+    // nothing loses sight of what the table actually holds.
+    const bridge = bridgingBreak(dayRows, sessions)
+    const displaySessions = bridge
+      ? [{
+        start: sessions[0].start,
+        end: sessions[sessions.length - 1].end,
+        startMinutes: sessions[0].startMinutes,
+        label: `${formatTime(sessions[0].start)} – ${formatTime(sessions[sessions.length - 1].end)}`,
+        breakLabel: `${formatTime(bridge.start)} – ${formatTime(bridge.end)}`,
+      }]
+      : sessions
+
     // ⚠️ The status is taken from the FIRST row of the day, and when
     // the day's rows disagree that is recorded rather than hidden.
     // Silently picking one of two contradictory values is how a
@@ -101,9 +165,14 @@ export const buildWeekSchedule = (rows = []) => {
       day,
       hasHours: sessions.length > 0,
       sessions,
-      // True when the day genuinely runs in more than one block, which
-      // is a fact about the clinic -- not a duplicate to be collapsed.
-      isSplit: sessions.length > 1,
+      displaySessions,
+      // True when a recorded break bridged the gap, so the two stored
+      // rows are presented as one day. Kept so a caller can tell this
+      // apart from a day that only ever had one row.
+      isBridged: Boolean(bridge),
+      // True when the day READS as more than one block -- a genuinely
+      // split day the data does not explain as a lunch closure.
+      isSplit: displaySessions.length > 1,
       status: statuses[0] || null,
       statusConflict: statuses.length > 1,
       rowCount: dayRows.length,

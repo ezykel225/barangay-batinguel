@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { FaBullhorn, FaCalendarAlt, FaLeaf, FaRecycle, FaTrashAlt } from 'react-icons/fa'
 import { MdAnnouncement } from 'react-icons/md'
 import { supabase } from '../supabase/supabaseClient'
+import { announcementExcerpt, nextCollection } from '../utils/homeSections'
 import {
   BARANGAY_CONTACT, BARANGAY_NAME, BARANGAY_OFFICE_HOURS, telHref,
 } from '../constants/barangay'
@@ -26,6 +27,10 @@ const Home = () => {
   const [announcements, setAnnouncements] = useState([])
   const [events, setEvents] = useState([])
   const [wasteSchedule, setWasteSchedule] = useState([])
+  // The full weekly grid, folded away behind the summary. Closed by
+  // default: the question somebody scrolls to this section to answer is
+  // "when is my rubbish collected", and the summary answers it.
+  const [wasteOpen, setWasteOpen] = useState(false)
   const [loadingAnnouncements, setLoadingAnnouncements] = useState(true)
   const [loadingEvents, setLoadingEvents] = useState(true)
   const [loadingWaste, setLoadingWaste] = useState(true)
@@ -110,6 +115,11 @@ const Home = () => {
     }
   }
 
+  // Null when no row carries a weekday this application recognises, and
+  // the section then renders the grid alone rather than a fabricated
+  // summary. See `utils/homeSections.js`.
+  const next = nextCollection(wasteSchedule)
+
   return (
     <div className="home">
       <Navbar />
@@ -118,17 +128,31 @@ const Home = () => {
 
       <section className="hero">
         <div className="hero-container">
+          {/* ⚠️ The system's own name, not a description of the kind
+              of thing it is. "Official Barangay Portal" could sit on
+              any barangay's homepage; the heading below already says
+              which barangay this is, so the badge was spending the
+              most prominent line on the site saying nothing. */}
           <span className="hero-badge">
-            🏛️ Official Barangay Portal
+            🏛️ Barangay Batinguel E-Services
           </span>
           <h1>Welcome to Barangay Batinguel</h1>
           <p>
             Your digital gateway for community updates and neighborhood
             health wellness.
           </p>
+          {/* ⚠️ THE PRIMARY ACTION IS THE CATALOGUE, NOT ONE SERVICE.
+              It was "Book a Reservation", which made the covered court
+              the headline errand of the whole barangay -- above
+              requesting a document, which is the reason most residents
+              open this site, and above tracking a request they have
+              already filed. `/e-services` is the one doorway that
+              reaches all of them, and X5 removed Court Reservation
+              from the top-level navigation for the same reason.
+              Health Center stays secondary, unchanged. */}
           <div className="hero-buttons">
-            <Link to="/reservation" className="hero-btn-primary">
-              Book a Reservation
+            <Link to="/e-services" className="hero-btn-primary">
+              Explore E-Services
             </Link>
             <Link to="/health-center" className="hero-btn-secondary">
               Health Center
@@ -201,7 +225,7 @@ const Home = () => {
           <div className="contact-card">
             <div className="contact-icon">📍</div>
             <div className="contact-content">
-              <h4>Address</h4>
+              <h3>Address</h3>
               <p>Barangay Batinguel,</p>
               <p>Dumaguete City,</p>
               <p>Negros Oriental, Philippines</p>
@@ -211,7 +235,7 @@ const Home = () => {
           <div className="contact-card">
             <div className="contact-icon">🕐</div>
             <div className="contact-content">
-              <h4>Office Hours</h4>
+              <h3>Office Hours</h3>
               <p>{BARANGAY_OFFICE_HOURS.days}</p>
               {/* Two lines rather than one range, so the closed hour is
                   stated instead of left to be discovered on arrival. */}
@@ -225,7 +249,7 @@ const Home = () => {
           <div className="contact-card">
             <div className="contact-icon">📞</div>
             <div className="contact-content">
-              <h4>Contact Number</h4>
+              <h3>Contact Number</h3>
               <p>
                 Landline:{' '}
                 <a href={telHref(BARANGAY_CONTACT.landline)}>
@@ -244,7 +268,7 @@ const Home = () => {
           <div className="contact-card">
             <div className="contact-icon">📧</div>
             <div className="contact-content">
-              <h4>Email Address</h4>
+              <h3>Email Address</h3>
               <p>batinguel@dumaguete.gov.ph</p>
             </div>
           </div>
@@ -281,7 +305,17 @@ const Home = () => {
                         {item.badge}
                       </span>
                       <h3>{item.title}</h3>
-                      <p>{item.description}</p>
+                      {/* ⚠️ AN EXCERPT, AND THE ROW IS NOT TOUCHED.
+                          `/announcements/:id` reads the same
+                          `description` column, so the full notice is
+                          one click away and unchanged. The card printed
+                          the whole body, so one long announcement made
+                          its card several times the height of the two
+                          beside it and pushed the events and waste
+                          sections off the screen. */}
+                      <p className="announcement-card-excerpt">
+                        {announcementExcerpt(item.description)}
+                      </p>
                       <div className="announcement-card-footer">
                         {new Date(item.date_posted).toLocaleDateString(
                           'en-US',
@@ -356,7 +390,71 @@ const Home = () => {
           ) : wasteSchedule.length === 0 ? (
             <div className="empty-text">No waste collection schedule has been posted yet.</div>
           ) : (
-            <div className="waste-schedule-home-grid">
+            <>
+            {/* ⚠️ THE SUMMARY IS DERIVED FROM THE ROWS, AND IS ABSENT
+                WHEN IT CANNOT BE. `waste_schedule.day_of_week` holds a
+                weekday name and the schedule recurs weekly, so the next
+                collection IS answerable from what is stored --
+                `nextCollection` returns null rather than a guess if no
+                row carries a weekday this application recognises, and
+                this renders nothing at all in that case. Nothing here
+                is hard-coded: no day, no purok, no time. */}
+            {next && (
+              <div className="waste-next">
+                <span className="waste-next-label">Next collection</span>
+                <strong className="waste-next-day">
+                  {next.label}
+                  {next.label !== next.weekday && ` · ${next.weekday}`}
+                </strong>
+                <ul className="waste-next-list">
+                  {next.rows.map((row) => (
+                    <li key={row.id} className="waste-next-row">
+                      <span className="waste-next-icon" aria-hidden="true">
+                        {wasteTypeIcon(row.waste_type)}
+                      </span>
+                      <span className="waste-next-purok">{row.purok || 'Other'}</span>
+                      <span className="waste-next-type">{row.waste_type}</span>
+                      {row.time_label && (
+                        <span className="waste-next-time">{row.time_label}</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+                {/* A row whose day is not a weekday name is counted,
+                    not hidden -- a summary that quietly drops rows
+                    looks complete while being short. */}
+                {next.skipped > 0 && (
+                  <p className="waste-next-note">
+                    {next.skipped} other {next.skipped === 1 ? 'entry' : 'entries'} in
+                    the schedule {next.skipped === 1 ? 'does' : 'do'} not record a
+                    weekday. See the full schedule below.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* ⚠️ A real disclosure -- a <button> with `aria-expanded`
+                and `aria-controls` -- and NOT a link. There is no public
+                waste-schedule route in `App.js`, and `path="*"` renders
+                Home, so a "View Full Waste Schedule" link would land a
+                resident back on this page looking like the page was
+                broken. The full grid is already here; it is now folded
+                behind the summary instead of being the whole section. */}
+            <button
+              type="button"
+              className="waste-toggle"
+              aria-expanded={wasteOpen}
+              aria-controls="waste-full-schedule"
+              onClick={() => setWasteOpen((open) => !open)}
+            >
+              {wasteOpen ? 'Hide the full weekly schedule' : 'View the full weekly schedule'}
+            </button>
+
+            <div
+              className="waste-schedule-home-grid"
+              id="waste-full-schedule"
+              hidden={!wasteOpen}
+            >
               {Object.entries(
                 wasteSchedule.reduce((acc, row) => {
                   const key = row.purok || 'Other'
@@ -383,6 +481,7 @@ const Home = () => {
                 </div>
               ))}
             </div>
+            </>
           )}
 
           <div className="waste-schedule-home-notice">

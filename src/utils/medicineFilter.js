@@ -74,3 +74,38 @@ export const countByStatus = (list = []) => {
   })
   return counts
 }
+
+// ─── Which category groups are open ──────────────────────────────────
+//
+// The collapsible groups exist to shorten a page that was unreadably
+// long, so leaving every one of them open by default defeats the thing
+// they were added for. The first group is open and the rest are folded.
+export const DEFAULT_OPEN_CATEGORY_COUNT = 1
+
+// ⚠️ WHILE A FILTER IS APPLIED, EVERY RENDERED GROUP IS OPEN, AND THAT
+// IS NOT A CONVENIENCE.
+//
+// `filterMedicines` has already removed everything that does not match,
+// so every row still in `medicinesByCategory` IS a match. A collapsed
+// group would therefore hide a medicine that the page has just counted
+// as a result -- "Showing 1 of 6 medicines" above a screen with no
+// medicine on it. A resident searching for Paracetamol would read that
+// as the health centre not having it.
+//
+// `overrides` carries only the groups the reader has actually clicked.
+// An absent key means "never touched", which is what lets the default
+// differ per group; `hasOwnProperty` rather than a bare lookup, for the
+// reason `officialPhotos.hasBundledPhoto` uses it -- a bare lookup
+// answers for `toString`.
+export const isCategoryOpen = ({
+  index = 0,
+  category,
+  overrides = {},
+  isFiltered = false,
+} = {}) => {
+  if (isFiltered) return true
+  if (overrides && Object.prototype.hasOwnProperty.call(overrides, category)) {
+    return Boolean(overrides[category])
+  }
+  return index < DEFAULT_OPEN_CATEGORY_COUNT
+}

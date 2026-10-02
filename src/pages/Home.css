@@ -154,6 +154,13 @@
   justify-content: center;
 }
 
+/* ⚠️ Both tags. These four were <h4> directly under the section's
+   <h2>, which axe flags as heading-order: the old Home had the history
+   block and its own sub-headings above them, and X5 moved that to
+   /about and left the skip behind. They are <h3> now; the h4 selector
+   stays so the rule is correct either way and so nothing depends on
+   which tag a card happens to use. */
+.contact-content h3,
 .contact-content h4 {
   font-size: var(--fs-13);
   font-weight: 700;
@@ -675,4 +682,153 @@
     flex: 1 1 100%;
     justify-content: center;
   }
+}
+
+/* ── Announcement cards: equal heights, three-line excerpt ────────── */
+/* ⚠️ The cards used to be as tall as their text. One long announcement
+   beside two short ones made a row of three wildly different cards and
+   pushed the events and waste sections down the page. Two separate
+   things fix it and both are needed:
+
+   - the card STRETCHES to its row, so three cards are one height
+     whatever is in them;
+   - the excerpt CLAMPS to three lines, so the tallest card cannot be
+     set by whoever wrote the longest notice.
+
+   `announcementExcerpt` also bounds the text in the DOM. The clamp is
+   what makes the boundary exact at any width; the excerpt is what keeps
+   a 4,000-character notice out of a page already fetching five
+   sections. Neither touches the stored `description`, which the detail
+   page still renders in full. */
+.announcement-card-link {
+  display: block;
+  height: 100%;
+}
+
+.announcement-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.announcement-card-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  /* A flex item's default min-width is its min-content width (X2). */
+  min-width: 0;
+}
+
+.announcement-card-excerpt {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+/* The date sits on the card's bottom edge rather than directly under a
+   short excerpt, so three cards' footers line up. */
+.announcement-card-footer {
+  margin-top: auto;
+}
+
+/* ── Next waste collection ───────────────────────────────────────── */
+.waste-next {
+  background-color: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  margin-bottom: 16px;
+}
+
+.waste-next-label {
+  display: block;
+  font-size: var(--fs-12);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #126c33;
+}
+
+.waste-next-day {
+  display: block;
+  font-size: var(--fs-20);
+  color: var(--text);
+  margin-top: 2px;
+}
+
+.waste-next-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.waste-next-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  font-size: var(--fs-13);
+  min-width: 0;
+}
+
+.waste-next-icon {
+  flex-shrink: 0;
+  color: #126c33;
+}
+
+/* A purok is a stored value that may hold an off-list spelling, and a
+   waste type is free text -- both are text somebody typed, so both are
+   allowed to wrap rather than set a min-content floor (X2). */
+.waste-next-purok {
+  font-weight: 600;
+  color: var(--text);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.waste-next-type,
+.waste-next-time {
+  color: var(--text-light);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.waste-next-note {
+  margin: 10px 0 0;
+  font-size: var(--fs-12);
+  color: var(--text-light);
+}
+
+.waste-toggle {
+  background: none;
+  border: none;
+  padding: 6px 0;
+  /* WCAG 2.2 SC 2.5.8. */
+  min-height: 24px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.waste-toggle:hover {
+  color: #126c33;
+}
+
+/* ⚠️ `[hidden]` is a UA rule on the ELEMENT selector, so the grid's own
+   `display: grid` beats it and the schedule would stay on screen with
+   `aria-expanded="false"` announcing it closed. The defect measured on
+   `.medicine-list` -- see HealthCenter.css. */
+.waste-schedule-home-grid[hidden] {
+  display: none;
+}
+
+.waste-schedule-home-grid {
+  margin-top: 12px;
 }

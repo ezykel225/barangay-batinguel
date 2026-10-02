@@ -105,6 +105,30 @@
   padding: 0;
 }
 
+/* ⚠️ THE ALIGNMENT FIX, and it is not a padding problem.
+   MEASURED in Chromium: the four service labels sat at 82px, 54px,
+   41px and 62px from the panel's left edge -- a different offset each,
+   varying with the length of the text. That is CENTRING, not
+   indentation.
+
+   The panel renders inside the public navbar, so its own `<li>`
+   elements also match `.navbar-menu li { display: flex; align-items:
+   center; justify-content: center }`. Each `<a>` became a block-level
+   FLEX ITEM, shrink-wrapped to its text, and was then centred in its
+   row. Every row therefore started somewhere different.
+
+   This resets the panel's list items to ordinary blocks at (0,3,1),
+   which outranks `.navbar-menu li` at (0,1,1) without touching the
+   navbar rule that every other nav item depends on. One left edge for
+   the lot; the hierarchy comes from weight, size and spacing. */
+.eservices-panel .eservices-list li {
+  display: block;
+}
+
+.eservices-panel .eservices-item {
+  width: 100%;
+}
+
 .eservices-item {
   display: block;
   padding: 8px 12px;
@@ -158,9 +182,13 @@
   margin-top: 1px;
 }
 
-/* The service list inside the mobile drawer. `.navbar-mobile li`
-   already supplies the row padding and separator, so this only has to
-   indent the children and stop the <ul> looking like a bullet list. */
+/* The service list inside the mobile drawer.
+   ⚠️ An earlier version of this comment said `.navbar-mobile li`
+   already supplied the row padding and separator. It does not -- there
+   is NO `.navbar-mobile li` rule anywhere, and the drawer spaces its
+   rows with `gap: 16px` on the flex column instead. That is why these
+   anchors carry their own padding, and why the drawer's four top-level
+   links needed a target-size fix of their own (see Navbar.css). */
 .navbar-mobile-sublist {
   list-style: none;
   margin: 0;

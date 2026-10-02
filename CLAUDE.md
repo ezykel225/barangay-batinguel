@@ -65,7 +65,7 @@ banned below: it silences the one check this project has.
 
 ### Tests
 
-Twenty-five suites, 554 tests:
+Twenty-six suites, 592 tests:
 
 | File | What it covers |
 |---|---|
@@ -90,8 +90,9 @@ Twenty-five suites, 554 tests:
 | `src/utils/returnTo.test.js` | 39 tests over the `?next=` allowlist, **26 of them attack strings** that have each defeated a redirect sanitiser written by inspection — `//evil.example`, `/\evil.example`, `https:/evil.example`, `javascript:`, `data:`, a `user:pass@` trick, a double-encoded payload. All fall back to `/` |
 | `src/utils/signupSteps.test.js` | 23 tests over the sign-up rules. The load-bearing ones: step 1 reports nothing about the password, the two advisory password checks **stay advisory** (a long passphrase with no digit is accepted), and `MIN_PASSWORD_LENGTH` can never drop below Supabase's own minimum |
 | `src/utils/officialPhotos.test.js` | 26 tests over the portrait map, `portraitWillBeLost` and `PersonAvatar`. `hasBundledPhoto` uses `hasOwnProperty`, asserted — a bare lookup reports a portrait for an official named `toString`. Six are the **2026-10-01 regression guard**: the eleven canonical keys written out in full, that the erroneous rename is not a key, and that no middle name the barangay spells out is abbreviated to an initial. Run **both directions** — re-keying the portrait to `Lastimoso` fails 4, and "tidying" it to `Jeffrey F. Duran` fails 4 |
-| `src/utils/clinicSchedule.test.js` | 21 tests over the clinic week, built from the **live rows including Friday's two**. The load-bearing one: Friday is ONE entry carrying both sessions, and the two are **not merged** |
-| `src/utils/medicineFilter.test.js` | 20 tests over the public medicine list — the three narrowings, an unrecognised category or status matching **nothing rather than everything**, and that the counts always sum to the total |
+| `src/utils/clinicSchedule.test.js` | 29 tests over the clinic week, built from the **live rows including Friday's two**. Friday is ONE entry carrying both stored sessions in `sessions`, and `displaySessions` presents them as one 8-to-5 span because **both rows record the 12-1 break that exactly fills the gap**. The load-bearing pair runs the other direction: a two-session day whose gap no recorded break covers is **not** joined, and neither is one whose break only partly fills it |
+| `src/utils/medicineFilter.test.js` | 28 tests over the public medicine list — the three narrowings, an unrecognised category or status matching **nothing rather than everything**, that the counts always sum to the total, and 8 over `isCategoryOpen`. The load-bearing one there: **while a filter is applied every rendered group is open**, including one the reader had collapsed — `filterMedicines` has already dropped the non-matches, so a collapsed group would hide a medicine the page has just counted as a result |
+| `src/utils/homeSections.test.js` | 19 tests over the Home page's two summaries: the announcement excerpt (a very-long-body regression guard, the word boundary, the unbreakable token) and `nextCollection`, whose load-bearing one is that it returns **null rather than a guess** when no row carries a weekday name, and counts the rows it left out |
 | `src/utils/officialAvailability.test.js` | 24 tests over per-official consultation hours. The load-bearing one **reads `026_official_availability.sql`** and asserts the four statuses the form offers are exactly the four the CHECK accepts — the same thing `reservationWindow.test.js` does for migration 020 |
 | `src/components/EServicesMenu.test.js` | 15 tests over the E-Services dropdown and the catalogue: the disclosure pattern, Escape and focus restore, that it does **not** use `role="menu"`, and that every service states its access requirement in words |
 | `src/utils/residentTabs.test.js` | 7 tests over `?tab=` resolution — a hint, never authorization |
@@ -212,6 +213,23 @@ src/
   utils/
     officialPhotos    Maps barangay_officials.full_name -> portrait file.
     clinicHours.js    Parses the "8:00 AM" display strings.
+    clinicSchedule    The clinic week as it is READ. One entry per
+                      weekday; `displaySessions` joins two sessions into
+                      one span ONLY when a break recorded on that day's
+                      own rows exactly fills the gap -- which is why
+                      Friday's two live rows read as one 8-to-5 day. The
+                      database still holds both; `sessions` still reports
+                      both. Pure.
+    medicineFilter    Narrows and counts the public medicine list, and
+                      owns `isCategoryOpen` -- the collapse default
+                      (first group open) and the rule that a FILTER
+                      opens every rendered group, because every row left
+                      is a match. Pure.
+    homeSections      The two Home summaries: `announcementExcerpt` (the
+                      card's text only -- the stored description is
+                      untouched) and `nextCollection`, which returns
+                      NULL rather than a guess when no waste row carries
+                      a weekday name. Pure.
     storagePath.js    Public URL -> storage object path.
     displayLabels     Stored status -> the words users read: document
                       requests, reservations, availability. Also the
@@ -2881,10 +2899,38 @@ stored 24-hour while every other row is a display string). The Clinic
 Hours list printed Friday, then printed Friday again underneath it.
 
 `src/utils/clinicSchedule.js` builds **one entry per weekday** carrying
-every session recorded for it. ⚠️ **The two rows are NOT merged.**
-08:00–12:00 plus 13:00–17:00 looks exactly like the standard day with a
-lunch break, and writing that down as one 8-to-5 row would be inferring
-what the barangay meant and then showing the inference as fact.
+every session recorded for it.
+
+⚠️ **It first refused to merge them, and that was wrong — corrected in
+the post-X5 polish pass.** The original reasoning was that 08:00–12:00
+plus 13:00–17:00 only *looks* like the standard day with a lunch break,
+so joining them would be inferring what the barangay meant. The page
+therefore printed two blocks and the line *"Two sessions — closed in
+between"*, which readers took to mean the clinic keeps unusual Friday
+hours.
+
+It is not an inference, and **the rows themselves settle it**: both
+Friday rows record a break of 12:00–13:00, which is exactly the gap
+between the two sessions. The barangay has already written down that the
+closure between them is the lunch break. So `bridgingBreak` joins two
+sessions into one span **if and only if** a break recorded on one of
+that day's own rows starts precisely where the first session ends and
+ends precisely where the second begins. Friday now reads
+`8:00 AM – 5:00 PM` with `Lunch 12:00 NN – 1:00 PM`, like every other
+day.
+
+⚠️ **The rule is derived, not keyed to a weekday.** Nothing in the
+module names Friday, and a day whose gap no recorded break accounts for
+— a genuine morning-only / late-afternoon clinic day — is still shown as
+two blocks, because flattening it would promise hours the clinic does
+not keep. A break that only *partly* fills the gap does not join either.
+Friday is the only day in the live table with two rows, which is why it
+is the only day this changes; a test asserts every other day renders
+exactly as stored.
+
+⚠️ **Nothing was written to the database.** There are still two Friday
+rows, and `sessions` still reports both; `displaySessions` is what the
+page renders. A data correction remains the barangay's to make.
 
 ⚠️ **A break is shown only when it falls inside the session it was
 stored against.** Friday's second row carries a 12:00 PM–1:00 PM break
@@ -2988,6 +3034,229 @@ page. Step 4 of the booking flow and the tracking page's result were
 reached with the **real** components and the **real** CSS bundle and
 only the **network** stubbed, because Supabase is not reachable from
 this container's browser.
+
+---
+
+## Manual review polish pass (post-X5)
+
+Eight corrections, 2026-10-02, from the repo owner's own review of the
+deployed PR branch. **No migration, no schema change, no permission
+change, no new table and no change to authentication, RLS or the
+reservation security model** — the pass is presentation, plus two real
+defects where a control reported one state and the page showed another.
+
+### ⚠️ Two controls that reported a state the page did not have
+
+Both are the **same Postgres-of-CSS fact**, and it is worth stating once
+because it will come back: **`[hidden]` is a UA rule on the ELEMENT
+selector, so any author `display` declaration beats it.**
+
+- **The medicine category disclosures did nothing.** `hidden` was set,
+  `aria-expanded` flipped, the chevron turned — and `.medicine-list`
+  sets `display: flex`, so the list never moved. Measured in Chromium
+  after one click: `aria-expanded="false"`, `ul.hidden === true`,
+  computed `display: flex`, the list still **126px tall with both
+  medicines on screen**. A screen reader was told the group was closed
+  while everybody could see it.
+- Fixed with `.medicine-list[hidden] { display: none }`. The two new
+  disclosures added in this pass — the officials' week and the waste
+  grid — each carry the same guard next to their own `display`, by
+  construction rather than after the fact.
+
+Same family as `@keyframes pulse` and `animation-name` in X4: the
+attribute reads right and the CSS silently defeats it. **Checking the
+attribute alone passes a broken page** — measure the computed `display`
+and the box.
+
+### ⚠️ The E-Services dropdown was centring, not indenting
+
+Reported as uneven padding. Measured inside the panel, the four service
+labels sat at **82px, 54px, 41px and 62px** from its left edge — a
+different offset each, varying with the length of the text. That is not
+padding; that is centring.
+
+The panel renders **inside the public navbar**, so its own `<li>`
+elements also match `.navbar-menu li { display: flex; align-items:
+center; justify-content: center }`. Each `<a>` became a block-level flex
+item, shrink-wrapped to its text, and was then centred in its row.
+
+`.eservices-panel .eservices-list li { display: block }` at **(0,3,1)**
+outranks `.navbar-menu li` at **(0,1,1)**, so the fix never touches the
+rule every other nav item depends on. Re-measured at 1024/1280/1440:
+all five entries, the *All E-Services* link included, at **21px**.
+
+⚠️ **The general lesson is not about this panel.** A component rendered
+inside another component's DOM inherits that component's descendant
+selectors. The X2 cascade note says a media query is not a tiebreaker;
+this one says **proximity in the file tree is not isolation**.
+
+### Medicine categories: a default, and a filter that overrides it
+
+The groups exist to shorten a page that was unreadably long, so leaving
+them all open defeated the thing they were added for. `isCategoryOpen`
+in `medicineFilter.js` is the one rule: **first group open, the rest
+folded**, overridden by what the reader has clicked.
+
+⚠️ **While a filter is applied EVERY rendered group is open**, and that
+is not a convenience. `filterMedicines` has already dropped the
+non-matches, so every group still on screen *is* a match — a collapsed
+one would hide a medicine the page has just counted as a result
+("Showing 1 of 6" over an empty screen). Verified in the browser:
+searching `Ascorbic`, whose only match lives in a group that is
+collapsed by default, renders it open with the medicine visible; and
+searching `Paracetamol` with that group **explicitly** collapsed still
+shows both matches.
+
+⚠️ **While filtered the group title is a plain heading, not a button.**
+There is nothing left to disclose, and a disclosure whose control cannot
+change anything is worse than no control — `aria-expanded` would
+announce a state the click does not alter.
+
+⚠️ **The override map stores only what the reader clicked.** An absent
+key means "never touched", which is what lets the default differ per
+group. A plain `collapsed[key] = true/false` map could not tell the two
+apart, so the first click on a group folded *by default* would have
+written `true` and left it folded. `toggleCategory` flips the
+**effective** state, not the stored one.
+
+### The Home page
+
+- **The hero badge is the system's name**, `Barangay Batinguel
+  E-Services`, not `Official Barangay Portal` — which could sit on any
+  barangay's homepage, above a heading that already says which one this
+  is.
+- **The primary action is the catalogue**, `Explore E-Services` →
+  `/e-services`. It was `Book a Reservation`, which made the covered
+  court the headline errand of the whole barangay — above requesting a
+  document, which is why most residents open this site. Health Center
+  stays secondary, unchanged; the image, the overlay and the typography
+  are untouched.
+- **Announcement cards carry an excerpt**, and ⚠️ **the stored
+  `description` is not touched** — `/announcements/:id` still renders it
+  in full, verified: 179 characters on the card, **2,159 on the detail
+  page**, from one row. Two things bound the card and both are needed:
+  `announcementExcerpt` keeps a long notice out of the DOM, and a
+  three-line CSS clamp makes the boundary exact at any width. Measured
+  at 320/375/768/1024/1280/1440: **every row of cards is one height**,
+  three at 365px across at 1280 and 1440.
+- ⚠️ **The clamp's own ellipsis can follow the excerpt's three dots** on
+  a narrow screen, where 179 characters do not fit three lines. Cosmetic,
+  and the alternative — dropping the clamp — gives the phone a card as
+  tall as whoever wrote the longest notice.
+
+### ⚠️ The next waste collection is DERIVED, and absent when it cannot be
+
+`waste_schedule.day_of_week` holds a weekday **name** and the schedule
+recurs weekly, so "the next collection" is a question the stored data
+can answer: the fewest days from the Manila weekday to that weekday.
+`nextCollection` in `src/utils/homeSections.js` does exactly that and
+**returns null rather than a guess** when no row carries a weekday name,
+in which case the page renders no summary at all. Nothing is hard-coded
+— no day, no purok, no time.
+
+What the table does **not** hold is a date, a fortnightly or monthly
+pattern, or a holiday exception. So a row whose `day_of_week` is not a
+weekday name is left out of the computation and **counted in a note**,
+rather than quietly dropped: a summary that loses rows looks complete
+while being short.
+
+⚠️ **Today counts as the next collection, not as missed.** `time_label`
+is free text — one live row reads `7:00 AM - 10:00` — so deciding
+whether today's window has passed would mean parsing a range the column
+does not guarantee, and telling somebody their collection is six days
+away on the morning it happens is the worse error. Same rule as
+`upcomingEvents`: an event this afternoon has not happened yet.
+
+⚠️ **There is no public waste-schedule route, so nothing links to one.**
+`path="*"` renders `Home`, so a *"View Full Waste Schedule"* link would
+land a resident back on the page they started from and look broken. The
+full grid was already on this page; it now sits behind a real disclosure
+(`<button>`, `aria-expanded`, `aria-controls`) under the summary. A
+dedicated public page is **not built** — see *Known gaps*.
+
+### The officials' consultation hours have two shapes
+
+`official_availability` holds **zero rows** (026 seeded nothing, by
+decision), so the common case is "nothing published" — and eleven cards
+each carrying the sentence *"No consultation hours published yet."* was a
+screen of apology where a reader wanted a name and a committee. That
+case is now one short line: **Consultation Schedule / Not published
+yet**.
+
+⚠️ **It still says NOT PUBLISHED, never "unavailable".** An absent
+schedule is not a closed door, and `todayLine` already draws that
+distinction; this only chose how to show it. Nothing fabricates a status.
+
+When an official *has* published, the card reads **Consultation Today**,
+the status and the hours, with a **View schedule** disclosure revealing
+all seven days. Days with no row read *Not published* rather than being
+omitted.
+
+⚠️ **The disclosure's accessible name carries the official's name** —
+eleven cards would otherwise offer eleven controls all announced "View
+schedule" — and it is a **prefix** of the visible label, never a
+replacement: WCAG 2.5.3 means somebody saying "click View schedule" must
+still match. The same rule, and the same reasoning, as `ActionMenu`'s
+`subject`.
+
+⚠️ **The Punong Barangay's card hides the empty shape, and only the
+empty shape.** His card already carries the full weekly Consultation
+Schedule from `kapitan_availability` in `.kapitan-section`, so
+"Not published yet" beside a schedule the reader can see would
+contradict it. Verified both directions: with the table empty his card
+has no block and `.kapitan-section` still shows its days; give him
+`official_availability` rows — a **different** table — and the block
+appears like anybody else's.
+
+### Two findings from passing, both target size
+
+- ⚠️ **The public mobile drawer's four nav links were 21px tall**, under
+  WCAG 2.2 SC 2.5.8's 24px. `.navbar-mobile` spaces its rows with
+  `gap: 16px` on the flex column, so the space around each link belongs
+  to the **list**, not the link — the same "a padded wrapper is not a
+  target" defect as the dashboard filter bar's borderless input. X3 and
+  X5 both missed it because **neither sweep opened the drawer**: a
+  `display: none` control has a zero box and every target check skips
+  it. Three of the four are pre-existing; E-Services is the one X5
+  added. Fixed with `.navbar-mobile > li > a`, which keeps off the
+  service sub-list (already padded) and off the login button (its
+  padding is `!important`).
+- ⚠️ **A comment in `EServicesMenu.css` asserted a rule that does not
+  exist** — that `.navbar-mobile li` supplies the row padding. There is
+  no such rule anywhere. The comment is corrected; it was the reason the
+  21px links read as already handled.
+- **Home's four contact cards jumped `<h2>` to `<h4>`** (axe
+  `heading-order`). The old Home had the history block and its own
+  sub-headings above them; X5 moved that to `/about` and left the skip
+  behind. They are `<h3>` now, and the stylesheet matches **both** tags
+  so nothing depends on which one a card uses — verified pixel-identical
+  (13px / 700 / `#bfdbfe` / 5px margin).
+
+### What was measured, and what was not
+
+Driven in Chromium against the **shipped production bundle**, with only
+the network stubbed:
+
+| Check | Result |
+|---|---|
+| Document overflow + clipping + 24px targets, every public route, 6 widths | **0 failures across 66** |
+| The same with each new control OPEN (dropdown, every medicine group, a filter applied, the waste grid, every officials week), 8 widths | **0 failures across 40** |
+| axe-core 4.13 (WCAG 2.0/2.1 A + AA + best practice), 9 page states x 2 widths | **0 violations** |
+| Announcement card heights per row, 6 widths | one height in every row |
+| Dropdown label offsets, 3 widths | 21px for all five entries |
+| Jest | 26 suites, **592 tests**, all passing |
+| Production build | clean, no ESLint warnings, **220 kB** gzipped |
+
+Every control was **clicked**, not inspected: the dropdown (open,
+Escape, focus restored to the trigger), each medicine group (collapse,
+expand, and the two filter cases), the waste disclosure (open, grid
+`display: grid`, both purok cards present), each officials week (open by
+mouse, closed by Enter), and the hero CTA and an announcement card
+followed to their destinations.
+
+⚠️ **The dashboards are still behind `ProtectedRoute` and this
+environment still has no test account, so no authenticated page was
+loaded in a browser.** Nothing in this pass touches a dashboard.
 
 ---
 
@@ -3187,9 +3456,9 @@ derives her initials from. It is no longer displayed as a label.
 - **Source maps ship to production** (~7 MB), so the original JSX is
   publicly reconstructable. `GENERATE_SOURCEMAP=false` in Vercel fixes it.
 - **`public/logo.png` is 984 KB and referenced by nothing.**
-- **Thin automated test coverage.** 554 tests in twenty-five suites: one
+- **Thin automated test coverage.** 592 tests in twenty-six suites: one
   smoke test over `<App />`, which fails without `.env` because
-  `supabaseClient.js` throws at import time, and 553 tests over the
+  `supabaseClient.js` throws at import time, and 591 tests over the
   resident workflow rules, the display labels, the booking window, the
   month grid and its three feature layers, the document-request filter,
   the ⋮ menu's keyboard and authorization behaviour, the modal
@@ -3220,8 +3489,11 @@ derives her initials from. It is no longer displayed as a label.
   on the homepage and looks like the service is broken.
 - **`nurse_availability` has no uniqueness on `day_of_week`**, which is
   how the live table ended up with two Friday rows. `clinicSchedule.js`
-  now renders them as one day with two sessions, but nothing stops a
-  third. A unique index cannot simply be added — it would fail on the
+  renders them as ONE 8-to-5 day with a lunch break, because both rows
+  record the 12–1 break that exactly fills the gap between them — but
+  nothing stops a third row, and a third would not be joined (the rule
+  takes exactly two sessions), so it would reappear as a second block.
+  A unique index cannot simply be added — it would fail on the
   existing data, and a clinic day may legitimately be split, which is
   exactly why `official_availability` has that constraint and this
   table does not.
@@ -3231,6 +3503,18 @@ derives her initials from. It is no longer displayed as a label.
 - **One dead database function**, `tmp_cleanup_probe_row`, left by
   migration 026's verification because this connector gates
   `DROP FUNCTION`. Neutralised; needs one line in the SQL Editor.
+- **No public waste-schedule route.** The collection schedule is a
+  section of the Home page and nothing else. Home now carries a derived
+  *Next collection* summary with the full weekly grid behind a
+  disclosure, which is why there is no *"View Full Waste Schedule"*
+  link: `path="*"` renders `Home`, so one would land a resident back
+  where they started. A dedicated page is an unbuilt feature, not a
+  defect.
+- **`waste_schedule` records a weekday name and nothing else** — no
+  date, no fortnightly or monthly pattern, no holiday exception. So
+  `nextCollection` can only answer "which weekday is soonest", and a row
+  whose `day_of_week` is not a weekday name is excluded from the summary
+  and counted in a note rather than placed on some day anyway.
 - **No lint script and no typecheck script** — see *Commands* and
   *Tests* above.
 

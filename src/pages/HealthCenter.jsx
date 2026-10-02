@@ -17,7 +17,9 @@ import { MdOutlineEventAvailable, MdPersonSearch } from 'react-icons/md'
 import { supabase } from '../supabase/supabaseClient'
 import { MEDICINE_CATEGORIES, MEDICINE_STATUS, statusOf } from '../constants/medicines'
 import { buildWeekSchedule } from '../utils/clinicSchedule'
-import { countByStatus, filterMedicines, groupByCategory } from '../utils/medicineFilter'
+import {
+  countByStatus, filterMedicines, groupByCategory, isCategoryOpen,
+} from '../utils/medicineFilter'
 import {
   BARANGAY_CONTACT, HEALTH_NURSE_ROLE, telHref,
 } from '../constants/barangay'
@@ -75,10 +77,14 @@ const HealthCenter = () => {
   const [medicineQuery, setMedicineQuery] = useState('')
   const [medicineCategory, setMedicineCategory] = useState('all')
   const [medicineStatus, setMedicineStatus] = useState('all')
-  // Which category groups are folded away. Collapsed by key, so a
-  // group that appears later starts open rather than inheriting a
-  // collapse nobody asked for.
-  const [collapsedCategories, setCollapsedCategories] = useState({})
+  // ⚠️ Only the groups the READER has clicked. An absent key means
+  // "never touched", which is what lets `isCategoryOpen` apply the
+  // default -- first group open, the rest folded -- without a collapse
+  // nobody asked for sticking to a group that appears later. A plain
+  // `collapsed[key] = true/false` map could not tell the two apart, so
+  // toggling a group that was folded BY DEFAULT would have written
+  // `true` and left it folded.
+  const [categoryOverrides, setCategoryOverrides] = useState({})
 
   const fetchNurseAvailability = useCallback(async () => {
     try {
@@ -219,8 +225,15 @@ const HealthCenter = () => {
     [medicines],
   )
 
-  const toggleCategory = (category) =>
-    setCollapsedCategories((prev) => ({ ...prev, [category]: !prev[category] }))
+  // Flips the EFFECTIVE state rather than the stored one, so the first
+  // click always does what the chevron promises.
+  const toggleCategory = (category, index) =>
+    setCategoryOverrides((prev) => ({
+      ...prev,
+      [category]: !isCategoryOpen({
+        index, category, overrides: prev, isFiltered,
+      }),
+    }))
 
   // Stale stock information is worse than none -- a resident who
   // trusts it and walks for nothing stops trusting the whole site. So
@@ -402,32 +415,32 @@ const HealthCenter = () => {
 
                       {open ? (
                         <span className="clinic-hours-time">
-                          {/* ⚠️ One block per SESSION. Friday is recorded
-                              as two rows in the live table -- 8-12 and
-                              1-5 -- and the list used to render the day
-                              twice, which reads as a rendering fault
-                              rather than as two sessions. A lunch break
-                              is printed only when it actually falls
-                              inside the session it was stored against;
-                              Friday's second row carries one that ends
-                              as that session begins. */}
-                          {entry.sessions.map((session) => (
+                          {/* ⚠️ `displaySessions`, not `sessions`. Friday is
+                              recorded as two rows in the live table --
+                              8-12 and 1-5, both carrying a 12-1 break --
+                              and the list used to print it as two blocks
+                              under "Two sessions — closed in between",
+                              which reads as unusual Friday hours rather
+                              than as the lunch closure every other day
+                              shows. `clinicSchedule` joins two sessions
+                              only when a break recorded on the day's own
+                              rows exactly fills the gap between them, so
+                              Friday now reads 8:00 AM – 5:00 PM with
+                              Lunch 12:00 NN – 1:00 PM like the rest of
+                              the week. A day whose gap nothing explains
+                              is still shown as two blocks. */}
+                          {entry.displaySessions.map((session) => (
                             <span className="clinic-hours-block" key={session.label}>
                               {session.label}
                             </span>
                           ))}
-                          {entry.sessions
+                          {entry.displaySessions
                             .filter((session) => session.breakLabel)
                             .map((session) => (
                               <span className="clinic-hours-break" key={`b-${session.label}`}>
                                 Lunch {session.breakLabel}
                               </span>
                             ))}
-                          {entry.isSplit && !entry.sessions.some((s) => s.breakLabel) && (
-                            <span className="clinic-hours-break">
-                              Two sessions — closed in between
-                            </span>
-                          )}
                         </span>
                       ) : (
                         <span className="clinic-hours-closed">
@@ -601,34 +614,56 @@ const HealthCenter = () => {
                       No medicines match this search. Try a different name, or
                       clear the filters to see the whole list.
                     </p>
-                  ) : medicinesByCategory.map(([category, items]) => (
+                  ) : medicinesByCategory.map(([category, items], index) => {
+                    const groupId = `medicine-group-${category.replace(/\W+/g, '-')}`
+                    const open = isCategoryOpen({
+                      index, category, overrides: categoryOverrides, isFiltered,
+                    })
+                    return (
                     <div key={category} className="medicine-group">
                       {/* A disclosure, not a heading with a click
                           handler: `aria-expanded` is what tells somebody
                           not looking at the arrow whether the group is
                           open, and `aria-controls` points at the list it
-                          opens. */}
+                          opens.
+
+                          ⚠️ While a filter is applied there is nothing
+                          left to disclose -- every rendered row is a
+                          match and every group is open -- so the title
+                          is a plain heading instead. A disclosure whose
+                          button cannot change anything is worse than no
+                          button: `aria-expanded` would announce a state
+                          the click does not alter. */}
                       <h4 className="medicine-group-title">
+                        {isFiltered ? (
+                          <span className="medicine-group-static">
+                            {category}
+                            <span className="medicine-group-count">
+                              {items.length} {items.length === 1 ? 'medicine' : 'medicines'}
+                            </span>
+                          </span>
+                        ) : (
                         <button
                           type="button"
                           className="medicine-group-toggle"
-                          aria-expanded={!collapsedCategories[category]}
-                          aria-controls={`medicine-group-${category.replace(/\W+/g, '-')}`}
-                          onClick={() => toggleCategory(category)}
+                          aria-expanded={open}
+                          aria-controls={groupId}
+                          onClick={() => toggleCategory(category, index)}
                         >
                           <span className="medicine-group-chevron" aria-hidden="true">
-                            {collapsedCategories[category] ? '▸' : '▾'}
+                            {open ? '▾' : '▸'}
                           </span>
                           {category}
                           <span className="medicine-group-count">
                             {items.length} {items.length === 1 ? 'medicine' : 'medicines'}
                           </span>
                         </button>
+                        )}
                       </h4>
                       <ul
                         className="medicine-list"
-                        id={`medicine-group-${category.replace(/\W+/g, '-')}`}
-                        hidden={Boolean(collapsedCategories[category])}
+                        id={groupId}
+                        hidden={!open}
                       >
                         {items.map((medicine) => {
                           const meta = statusOf(medicine.status)
@@ -658,7 +693,8 @@ const HealthCenter = () => {
                         })}
                       </ul>
                     </div>
-                  ))}
+                    )
+                  })}
                 </>
               )}
             </div>

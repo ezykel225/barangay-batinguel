@@ -728,3 +728,88 @@ body {
   min-width: 0;
   overflow-wrap: anywhere;
 }
+
+/* ── The consultation disclosure on a council card ────────────────── */
+/* The unpublished shape is one short line, not a labelled block with a
+   sentence in it. `official_availability` holds zero rows today, so
+   this is what every card shows -- eleven copies of a full-sentence
+   apology was a screen of nothing where a reader wanted a name and a
+   committee. */
+.council-availability.is-unpublished {
+  gap: 4px 8px;
+}
+
+.council-availability.is-unpublished .council-availability-label {
+  flex-basis: auto;
+}
+
+.council-schedule-toggle {
+  margin-left: auto;
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: 4px 0;
+  /* WCAG 2.2 SC 2.5.8. A padded wrapper is not a target -- the lesson
+     the filter bar's borderless input taught. */
+  min-height: 24px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: #1e3a8a;
+  text-decoration: underline;
+}
+
+.council-schedule-toggle:hover {
+  color: #15803d;
+}
+
+.council-schedule-week {
+  flex-basis: 100%;
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* ⚠️ `[hidden]` is a UA rule on the ELEMENT selector, so the
+   `display: flex` above beats it and the panel would stay on screen
+   with `aria-expanded="false"` announcing otherwise. Exactly the
+   defect measured on `.medicine-list` -- see HealthCenter.css. */
+.council-schedule-week[hidden] {
+  display: none;
+}
+
+.council-schedule-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  font-size: var(--fs-12);
+  min-width: 0;
+}
+
+.council-schedule-day {
+  flex-shrink: 0;
+  min-width: 76px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.council-schedule-value {
+  color: #5f6775;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* A note is text an official typed, so it must be allowed to wrap. */
+.council-schedule-note {
+  flex-basis: 100%;
+  color: #5f6775;
+  font-style: italic;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

@@ -793,6 +793,25 @@
   gap: 6px;
 }
 
+/* ⚠️ THE COLLAPSE FIX, and the whole defect in one declaration.
+   The browser's own `[hidden] { display: none }` is a rule on the
+   element selector, so ANY author `display` beats it -- and
+   `.medicine-list` above sets `display: flex`. So `hidden` was being
+   set correctly, `aria-expanded` was flipping correctly, the chevron
+   was turning, and the list stayed exactly where it was.
+
+   MEASURED in Chromium before the fix: after one click,
+   `aria-expanded="false"`, `ul.hidden === true`, computed
+   `display: flex`, and the list still 126px tall with both medicines
+   on screen. A screen reader was told the group was closed while
+   everybody could still see it.
+
+   Same family as `@keyframes pulse` and `animation-name` in X4: the
+   attribute reads right and the CSS silently defeats it. */
+.medicine-list[hidden] {
+  display: none;
+}
+
 .medicine-item {
   display: grid;
   /* Name column flexes, badge column stays its natural width so the
@@ -1061,4 +1080,16 @@
   font-size: var(--fs-12);
   font-weight: 500;
   color: #5f6775;
+}
+
+/* The same row layout as the disclosure button, for the filtered case
+   where the title is a plain heading. `.medicine-group-count` is
+   pushed right with `margin-left: auto`, which needs a flex parent --
+   without this the count would sit against the category name. */
+.medicine-group-static {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 6px 0;
 }

@@ -1,6 +1,7 @@
 import {
   DAY_ORDER,
   breakFallsWithin,
+  bridgingBreak,
   buildWeekSchedule,
   scheduleForDay,
 } from './clinicSchedule'
@@ -33,14 +34,13 @@ describe('buildWeekSchedule', () => {
     const week = buildWeekSchedule(LIVE_ROWS)
     expect(week.filter((d) => d.day === 'Friday')).toHaveLength(1)
     expect(friday().sessions).toHaveLength(2)
-    expect(friday().isSplit).toBe(true)
     expect(friday().rowCount).toBe(2)
   })
 
-  // ⚠️ And it does NOT merge them into one 8-to-5 session. That would
-  // be inferring what the barangay meant and then showing the
-  // inference as fact.
-  it('keeps the two Friday sessions separate rather than merging them', () => {
+  // ⚠️ `sessions` still reports BOTH stored rows. Nothing about the
+  // presentation below is allowed to lose sight of what the table
+  // actually holds -- there are still two Friday rows in the database.
+  it('keeps both stored Friday sessions available, unmerged', () => {
     expect(friday().sessions.map((s) => s.label))
       .toEqual(['8:00 AM – 12:00 NN', '1:00 PM – 5:00 PM'])
   })
@@ -49,6 +49,64 @@ describe('buildWeekSchedule', () => {
     const reversed = [...LIVE_ROWS].reverse()
     expect(friday(reversed).sessions.map((s) => s.label))
       .toEqual(['8:00 AM – 12:00 NN', '1:00 PM – 5:00 PM'])
+  })
+
+  // ⚠️ THE PRESENTATION ONE. Both Friday rows record a 12:00-13:00
+  // break, which is exactly the gap between the two sessions, so the
+  // barangay has already written down that the closure between them is
+  // the lunch break. Friday therefore READS like every other day.
+  it('presents Friday as one 8-to-5 span with the lunch break', () => {
+    const f = friday()
+    expect(f.isBridged).toBe(true)
+    expect(f.isSplit).toBe(false)
+    expect(f.displaySessions).toHaveLength(1)
+    expect(f.displaySessions[0].label).toBe('8:00 AM – 5:00 PM')
+    expect(f.displaySessions[0].breakLabel).toBe('12:00 NN – 1:00 PM')
+  })
+
+  it('presents it the same way whatever order the rows arrive in', () => {
+    const reversed = [...LIVE_ROWS].reverse()
+    expect(friday(reversed).displaySessions[0].label).toBe('8:00 AM – 5:00 PM')
+  })
+
+  // ⚠️ THIS IS FRIDAY ONLY, and only because of what Friday's rows
+  // record. Every other day is a single row and is untouched -- a
+  // regression guard, because the rule is applied generally rather than
+  // keyed to a weekday name.
+  it('leaves every other day exactly as stored', () => {
+    const week = buildWeekSchedule(LIVE_ROWS)
+    week.filter((d) => d.day !== 'Friday' && d.hasHours).forEach((d) => {
+      expect(d.isBridged).toBe(false)
+      expect(d.displaySessions).toEqual(d.sessions)
+    })
+    expect(scheduleForDay(week, 'Thursday').displaySessions[0].label)
+      .toBe('8:00 AM – 5:00 PM')
+    expect(scheduleForDay(week, 'Thursday').status).toBe('on-break')
+  })
+
+  // ⚠️ The direction that matters. A day that really does close in
+  // between -- a gap no recorded break accounts for -- must NOT be
+  // flattened into one span, or the page would promise hours the
+  // clinic does not keep.
+  it('does NOT join two sessions whose gap no recorded break covers', () => {
+    const rows = [
+      { day_of_week: 'Friday', time_start: '8:00 AM', time_end: '11:00 AM', status: 'available' },
+      { day_of_week: 'Friday', time_start: '2:00 PM', time_end: '5:00 PM', status: 'available' },
+    ]
+    const f = friday(rows)
+    expect(f.isBridged).toBe(false)
+    expect(f.isSplit).toBe(true)
+    expect(f.displaySessions.map((x) => x.label))
+      .toEqual(['8:00 AM – 11:00 AM', '2:00 PM – 5:00 PM'])
+  })
+
+  it('does NOT join when the recorded break only partly fills the gap', () => {
+    const rows = [
+      { day_of_week: 'Friday', time_start: '08:00', time_end: '12:00', break_start: '12:00', break_end: '12:30', status: 'available' },
+      { day_of_week: 'Friday', time_start: '13:00', time_end: '17:00', status: 'available' },
+    ]
+    expect(friday(rows).isBridged).toBe(false)
+    expect(friday(rows).displaySessions).toHaveLength(2)
   })
 
   // Friday is stored 24-hour, every other day as a display string.
@@ -64,6 +122,7 @@ describe('buildWeekSchedule', () => {
   it('marks an ordinary single-session day as not split', () => {
     const monday = scheduleForDay(buildWeekSchedule(LIVE_ROWS), 'Monday')
     expect(monday.isSplit).toBe(false)
+    expect(monday.isBridged).toBe(false)
     expect(monday.sessions).toHaveLength(1)
   })
 
@@ -76,6 +135,7 @@ describe('buildWeekSchedule', () => {
     expect(saturday).not.toBeNull()
     expect(saturday.hasHours).toBe(false)
     expect(saturday.sessions).toEqual([])
+    expect(saturday.displaySessions).toEqual([])
     expect(saturday.status).toBeNull()
   })
 
@@ -128,6 +188,45 @@ describe('the lunch break', () => {
   // at 12:00 -- it is the end of the session, not a closure within it.
   it('is dropped when it merely abuts the end of the session', () => {
     expect(friday().sessions[0].breakLabel).toBeNull()
+  })
+
+  describe('bridgingBreak', () => {
+    const rows = [
+      { break_start: '12:00', break_end: '13:00' },
+      { break_start: '12:00 PM', break_end: '1:00 PM' },
+    ]
+    const sessions = [{ end: '12:00' }, { start: '13:00' }]
+
+    it('returns the break that exactly fills the gap', () => {
+      expect(bridgingBreak(rows, sessions)).toEqual({ start: '12:00', end: '13:00' })
+    })
+
+    it('needs BOTH edges to line up, not just one', () => {
+      expect(bridgingBreak(rows, [{ end: '12:00' }, { start: '14:00' }])).toBeNull()
+      expect(bridgingBreak(rows, [{ end: '11:00' }, { start: '13:00' }])).toBeNull()
+    })
+
+    it('is null when no row records a break at all', () => {
+      expect(bridgingBreak([{}, {}], sessions)).toBeNull()
+    })
+
+    it('is null for anything but exactly two sessions', () => {
+      expect(bridgingBreak(rows, [{ end: '12:00' }])).toBeNull()
+      expect(bridgingBreak(rows, [])).toBeNull()
+      expect(bridgingBreak(rows, [{ end: '12:00' }, { start: '13:00' }, { start: '18:00' }]))
+        .toBeNull()
+    })
+
+    it('is null when the sessions overlap or abut with no gap', () => {
+      expect(bridgingBreak(rows, [{ end: '13:00' }, { start: '13:00' }])).toBeNull()
+      expect(bridgingBreak(rows, [{ end: '14:00' }, { start: '13:00' }])).toBeNull()
+    })
+
+    it('survives no arguments and unparseable times', () => {
+      expect(bridgingBreak()).toBeNull()
+      expect(bridgingBreak(rows, [{ end: 'noon' }, { start: 'one' }])).toBeNull()
+      expect(bridgingBreak(null, sessions)).toBeNull()
+    })
   })
 
   describe('breakFallsWithin', () => {

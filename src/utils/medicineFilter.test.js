@@ -1,10 +1,12 @@
 import { MEDICINE_CATEGORIES } from '../constants/medicines'
 import {
+  DEFAULT_OPEN_CATEGORY_COUNT,
   MEDICINE_SEARCH_FIELDS,
   categoryOf,
   countByStatus,
   filterMedicines,
   groupByCategory,
+  isCategoryOpen,
 } from './medicineFilter'
 
 const LIST = [
@@ -141,5 +143,68 @@ describe('countByStatus', () => {
 
   it('is all zeroes for no list', () => {
     expect(countByStatus()).toEqual({ total: 0, available: 0, low: 0, unavailable: 0 })
+  })
+})
+
+describe('isCategoryOpen', () => {
+  // The groups exist to shorten the page. Leaving them all open
+  // defeats the thing they were added for.
+  it('opens the first group and folds the rest by default', () => {
+    expect(isCategoryOpen({ index: 0, category: 'Pain & Fever' })).toBe(true)
+    expect(isCategoryOpen({ index: 1, category: 'Antibiotics' })).toBe(false)
+    expect(isCategoryOpen({ index: 5, category: 'Vitamins' })).toBe(false)
+  })
+
+  it('opens exactly as many groups as the default says', () => {
+    expect(DEFAULT_OPEN_CATEGORY_COUNT).toBe(1)
+  })
+
+  // ⚠️ THE LOAD-BEARING ONE. `filterMedicines` has already dropped
+  // everything that does not match, so every group still rendered IS a
+  // match. A collapsed group would hide a medicine the page has just
+  // counted as a result -- "Showing 1 of 6" over an empty screen, which
+  // a resident reads as the health centre not having it.
+  it('opens EVERY group while a filter is applied, whatever its index', () => {
+    expect(isCategoryOpen({ index: 3, category: 'Vitamins', isFiltered: true })).toBe(true)
+    expect(isCategoryOpen({ index: 9, category: 'Other', isFiltered: true })).toBe(true)
+  })
+
+  // ⚠️ And a filter overrides a collapse the reader asked for, in
+  // that direction only. The alternative is a match that exists in the
+  // results and cannot be seen.
+  it('opens a group the reader collapsed, once a filter is applied', () => {
+    const overrides = { Vitamins: false }
+    expect(isCategoryOpen({ index: 2, category: 'Vitamins', overrides })).toBe(false)
+    expect(isCategoryOpen({
+      index: 2, category: 'Vitamins', overrides, isFiltered: true,
+    })).toBe(true)
+  })
+
+  it('honours an override in both directions when nothing is filtered', () => {
+    expect(isCategoryOpen({ index: 0, category: 'Pain & Fever', overrides: { 'Pain & Fever': false } }))
+      .toBe(false)
+    expect(isCategoryOpen({ index: 4, category: 'Vitamins', overrides: { Vitamins: true } }))
+      .toBe(true)
+  })
+
+  // An absent key means "never touched", which is what lets the
+  // default differ per group. A plain collapsed-by-key map could not
+  // tell that apart from "deliberately open".
+  it('tells an untouched group apart from one explicitly opened', () => {
+    expect(isCategoryOpen({ index: 2, category: 'Vitamins', overrides: {} })).toBe(false)
+    expect(isCategoryOpen({ index: 2, category: 'Vitamins', overrides: { Vitamins: true } }))
+      .toBe(true)
+  })
+
+  // `hasOwnProperty`, not a bare lookup -- the defect
+  // `officialPhotos.hasBundledPhoto` exists to avoid.
+  it('does not answer for an inherited property name', () => {
+    expect(isCategoryOpen({ index: 3, category: 'toString', overrides: {} })).toBe(false)
+    expect(isCategoryOpen({ index: 0, category: 'toString', overrides: {} })).toBe(true)
+  })
+
+  it('survives no arguments at all', () => {
+    expect(isCategoryOpen()).toBe(true)
+    expect(isCategoryOpen({})).toBe(true)
   })
 })
