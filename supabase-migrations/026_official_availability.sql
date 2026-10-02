@@ -372,7 +372,47 @@ CREATE TRIGGER trg_stamp_official_availability
 --
 --     DROP FUNCTION public.tmp_cleanup_probe_row();
 --
+-- ─── get_advisors, RUN AFTER APPLYING (CLAUDE.md's rule) ──────────────
+--
+-- It flagged `stamp_official_availability` as a SECURITY DEFINER
+-- function callable by `anon` over `/rest/v1/rpc/`. It is a TRIGGER
+-- function: calling it directly raises 0A000, so it was inert -- but a
+-- trigger function has no business on the REST surface at all, and the
+-- same was true of `stamp_reservation_reference` from migration 024.
+-- Both now have EXECUTE revoked.
+--
+-- ⚠️ REVOKING FROM anon AND authenticated IS NOT ENOUGH ON ITS OWN.
+-- `CREATE FUNCTION` grants EXECUTE to PUBLIC by default, and both roles
+-- inherit it. MEASURED: after the role-level revoke the ACL still read
+-- `=X/postgres`, which is PUBLIC's grant. It took a second
+-- `REVOKE ... FROM PUBLIC`. Verified after:
+--
+--   stamp_official_availability   postgres=X | service_role=X
+--   stamp_reservation_reference   postgres=X | service_role=X
+--   create_court_reservation      postgres=X | anon=X | authenticated=X
+--   track_court_reservation       postgres=X | anon=X | authenticated=X
+--
+-- The last two KEEP their grants: anonymous execute is the whole design
+-- (025), and they are the only anonymous path to `reservations`.
+--
+-- `official_is_active()` and `official_id_for_current_user()` keep
+-- theirs too, deliberately. The first answers a question the public
+-- directory already answers; the second returns the CALLER'S OWN id, so
+-- it tells an official what they already know and returns NULL for
+-- everyone else.
+--
+-- ⚠️ 21 further SECURITY DEFINER functions carry the same advisory and
+-- PREDATE this branch, most of them trigger functions
+-- (`protect_reservation_status`, `stamp_activity_actor`,
+-- `prevent_role_self_change`, the three `notify_*`, ...). They are
+-- inert for the same 0A000 reason and were left alone: tightening
+-- twenty-one grants is its own change with its own review, not
+-- something to slip into a feature branch.
+--
 -- ⚠️ NOTHING IS SEEDED. `official_availability` holds zero rows. Real
 -- consultation hours are something only an official can enter, for
 -- themselves, and inventing them would put times on a public page that
 -- nobody at the barangay agreed to.
+
+-- ─── 6. The REST surface (added after get_advisors, same day) ─────────
+REVOKE EXECUTE ON FUNCTION public.stamp_official_availability() FROM PUBLIC, anon, authenticated;

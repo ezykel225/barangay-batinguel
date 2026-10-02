@@ -247,3 +247,14 @@ COMMENT ON COLUMN public.reservations.reference IS
 -- generate_reservation_reference() is VOLATILE and a set-based UPDATE
 -- would not re-evaluate it per row -- which would have handed all 21
 -- rows the same reference and then failed the unique constraint.
+
+-- ─── 6. The REST surface (added 2026-10-02, after get_advisors) ───────
+--
+-- `stamp_reservation_reference` is a TRIGGER function, so calling it
+-- over `/rest/v1/rpc/` raises 0A000 and it was inert -- but a trigger
+-- function has no business on the REST surface, and `get_advisors`
+-- flags it. ⚠️ The role-level revoke alone did nothing: CREATE FUNCTION
+-- grants EXECUTE to PUBLIC, and anon and authenticated inherit it.
+-- MEASURED -- the ACL still read `=X/postgres` until PUBLIC was
+-- revoked too. Verified after: `postgres=X | service_role=X`.
+REVOKE EXECUTE ON FUNCTION public.stamp_reservation_reference() FROM PUBLIC, anon, authenticated;
