@@ -215,3 +215,16 @@ body {
   white-space: nowrap;
   border: 0;
 }
+
+/* The named wrapper around a missing portrait. `inline-flex` so the
+   icon sits exactly where the bare icon used to -- this element exists
+   to carry an accessible name, not to change a layout. It is in
+   index.css rather than a page stylesheet because PersonAvatar renders
+   on the public Officials page, the Health Center page and the Official
+   Dashboard, and a global owned by one page is the `@keyframes pulse`
+   trap X4 recorded. */
+.person-avatar-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}

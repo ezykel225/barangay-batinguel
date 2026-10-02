@@ -28,7 +28,7 @@ import ActionMenu from '../components/ActionMenu'
 import { useModalA11y } from '../components/useModalA11y'
 import NotificationBell from '../components/NotificationBell'
 import { useNotifications } from '../components/useNotifications'
-import { PersonAvatar } from '../utils/officialPhotos'
+import { PersonAvatar, portraitWillBeLost } from '../utils/officialPhotos'
 import { logActivity } from '../utils/activityLog'
 import { useConfirm } from '../components/ConfirmDialog'
 import {
@@ -1610,10 +1610,53 @@ const OfficialDashboard = () => {
       if (!proceed) return
     }
 
+    // ⚠️ A RENAME UNLINKS THE PORTRAIT, and this is the only moment
+    // anybody can do something about it. `officialPhotos` is keyed on
+    // the exact `barangay_officials.full_name`, so changing the name
+    // leaves the bundled photo matching nothing and the row silently
+    // falls back to an icon.
+    //
+    // This already happened once, on 2026-10-01 at 04:58: `edited` on
+    // display_order 10 turned "Jeffrey Feria Duran" into "Jeffrey
+    // Cataylo Lastimoso" and the portrait was gone, four minutes
+    // before the first of two archive/restore cycles that got the
+    // blame. Nothing anywhere said a word.
+    //
+    // It WARNS, it does not block. Correcting a misspelled name is a
+    // legitimate edit and must not be refused over a picture.
+    if (
+      editingOfficial
+      && portraitWillBeLost(
+        editingOfficial.full_name,
+        newOfficial.full_name,
+        editingOfficial.photo_url,
+      )
+    ) {
+      const proceedWithRename = await confirm({
+        title: 'This rename will remove their photo',
+        message: `The portrait on file is matched to the name `
+          + `"${editingOfficial.full_name}" exactly. Saving "${newOfficial.full_name}" `
+          + 'will leave this official with no photo on the directory and on the '
+          + 'public Officials page, and nothing else will report it. '
+          + 'Correcting a name is still the right thing to do — but the photo '
+          + 'has to be re-matched to the new name in the code before it comes back.',
+        confirmLabel: 'Rename anyway',
+        cancelLabel: 'Keep the name',
+        destructive: false,
+      })
+      if (!proceedWithRename) return
+    }
+
     setSubmitting(true)
     try {
       if (editingOfficial) {
-        const { error } = await supabase
+        // ⚠️ `.select()` and a row count, per the project's own rule:
+        // RLS FILTERS rows rather than raising, so a blocked UPDATE
+        // comes back as success with zero rows affected. Without this
+        // the toast reported "Official updated!" for an edit that
+        // never happened -- the same defect the archive and restore
+        // handlers below already guard against.
+        const { data: updated, error } = await supabase
           .from('barangay_officials')
           .update({
             full_name: newOfficial.full_name,
@@ -1624,9 +1667,12 @@ const OfficialDashboard = () => {
             updated_by: user?.id ?? null,
           })
           .eq('id', editingOfficial.id)
+          .select('id')
 
         if (error) {
           toast.error('Failed to update official!')
+        } else if (!updated || updated.length === 0) {
+          toast.error('Nothing was updated — you may not have permission to change the directory.')
         } else {
           toast.success('Official updated!')
           logActivity({
