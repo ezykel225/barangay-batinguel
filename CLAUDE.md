@@ -65,7 +65,7 @@ banned below: it silences the one check this project has.
 
 ### Tests
 
-Twenty-nine suites, 627 tests:
+Thirty-three suites, 714 tests:
 
 | File | What it covers |
 |---|---|
@@ -96,6 +96,10 @@ Twenty-nine suites, 627 tests:
 | `src/pages/Announcements.test.js` | 8 tests over the browse page, the FIRST suite that renders a page component. The load-bearing pair: the card shows an excerpt and `/announcements/:id` still renders the whole 2,159-character notice, from the same row. Also that each card is ONE link with no nested anchor |
 | `src/pages/Events.test.js` | 14 tests over the Calendar \| List switcher, the list card and date selection. The load-bearing one: a card shows a time **only when `event_time` holds one** — it is NULL on every live row — and never digs one out of `location`, which on three legacy rows begins with a time somebody typed. Two more assert no heading level is skipped in either view |
 | `src/pages/EventDetails.test.js` | 8 tests over the detail page's Time row: shown with a time, **gone — label and all — for null, empty, whitespace and a missing column**, with the location left exactly as stored even when it begins with a time. Run **both directions**: with the condition removed, 5 of 8 fail |
+| `src/documents/documentRegistry.test.js` | 20 tests over the document-type → template mapping and the three generation gates. The load-bearing one: `canGenerate` refuses an official who is **not** the Secretary, so printing cannot widen what the queue already allows. Also that `Business Clearance` and `Other` are unsupported **by decision**, and that an inherited property name (`constructor`) does not resolve as a template |
+| `src/documents/documentData.test.js` | 24 tests over the normalized shape a template receives: the Manila date (assembled from `MONTH_NAMES`, not from a locale's ordering), the `SAMPLE-` reference, long/accented/suffixed names, and the rule that an absent value is **reported, never filled** — no `N/A`, `UNKNOWN` or `TBD` reaches a field |
+| `src/documents/DocumentPreview.test.js` | 26 tests rendering all four prototype templates. Run **both directions**: flipping `DOCUMENT_TEMPLATE_MODE` to `'official'` fails exactly 3 — the watermark tests — and nothing else, which is what proves the one constant controls it. Also that the indigency template states no income or finding, and the residency one no duration |
+| `src/documents/documentPermissions.test.js` | 17 source-reading tests. `canGenerate` could be correct and wired to the wrong flag, so these pin the wiring: the Resident and Nurse dashboards import the generator **not at all**, `isSecretary` is still `position === 'Barangay Secretary'`, there is exactly **one** call site, no template imports Supabase, and nothing reads `residents_registry` |
 | `src/utils/officialAvailability.test.js` | 24 tests over per-official consultation hours. The load-bearing one **reads `026_official_availability.sql`** and asserts the four statuses the form offers are exactly the four the CHECK accepts — the same thing `reservationWindow.test.js` does for migration 020 |
 | `src/components/EServicesMenu.test.js` | 15 tests over the E-Services dropdown and the catalogue: the disclosure pattern, Escape and focus restore, that it does **not** use `role="menu"`, and that every service states its access requirement in words |
 | `src/utils/residentTabs.test.js` | 7 tests over `?tab=` resolution — a hint, never authorization |
@@ -276,6 +280,26 @@ src/
                       `filterDocumentRequests`, which reuses the same
                       `filterRows` normalisation so two tabs' searches
                       cannot drift apart.
+
+  documents/          ⚠️ PROTOTYPE printable documents (X6). The
+                      architecture is real; the LAYOUTS ARE SAMPLES and
+                      are not Barangay Batinguel's official forms.
+    documentConfig    DOCUMENT_TEMPLATE_MODE (the one watermark switch),
+                      the barangay heading lines, the PLACEHOLDER
+                      signatory, A4 geometry.
+    documentData      One request -> the values a template prints, plus
+                      what is MISSING. Pure, no Supabase. The contract
+                      that lets a real form replace a sample without
+                      touching data access.
+    documentRegistry  document_type -> template, and canGenerate's three
+                      gates (Secretary, status, configured template).
+                      Pure.
+    DocumentShell     Header, seal, SAMPLE watermark, signatory rule,
+                      footer -- shared by all four templates.
+    DocumentPreview   The Secretary's modal. Takes the request as a
+                      PROP and reads nothing.
+    templates/        One file per type. No Supabase, no fetching.
+    print/            The A4 sheet and the @media print block.
 
   supabase/
     supabaseClient.js The single Supabase client. Throws at import time
@@ -3460,6 +3484,351 @@ condition removed, **5 of 8 fail**; the other three pass trivially
 because they cover the title, date, description and location, which the
 change does not touch.
 
+
+---
+
+## Printable barangay documents (X6) — ⚠️ PROTOTYPE TEMPLATES
+
+2026-10-02, on `claude/printable-document-generation`, built on `main`
+after PR #23 merged.
+
+### ⚠️ THE CURRENT PRINTABLE DOCUMENTS ARE PROTOTYPE TEMPLATES AND MUST NOT BE TREATED AS VERIFIED BARANGAY BATINGUEL OFFICIAL FORMS
+
+The barangay has **not supplied its official document forms.** Everything
+under `src/documents/templates/` is a SAMPLE layout. The architecture
+around it is real and finished; the layouts and their wording are
+placeholders, and every one of them says so on screen and on paper.
+
+**Nothing was invented**: no certification clause, no legal language, no
+fee, no validity period, no documentary requirement, no official
+numbering convention, no seal placement, no signing authority, no
+witness requirement. Where the repository could not establish a value,
+the prototype prints nothing rather than a guess.
+
+### The baseline this was built on
+
+Read from the live database before any code was written.
+
+| | |
+|---|---|
+| Status vocabulary | the CHECK on `document_requests.status`: `pending`, `approved`, `declined`, `ready_for_pickup`, `claimed`. ⚠️ There is **no** `released` and no `rejected` on this table; `claimed` is terminal |
+| Workflow | `pending` —Approve→ `approved` —Mark Ready→ `ready_for_pickup` —Mark Claimed→ `claimed`, and `pending` —Decline (reason required)→ `declined` |
+| `document_type` | **free text** — no CHECK constraint. The Resident Portal's `DOCUMENT_TYPES` dropdown is the only thing narrowing it, to six values |
+| Who may read | any official (`Officials can view all document requests`) |
+| Who may write | **the Barangay Secretary only** — `Secretary can update document requests`, which joins `profiles.full_name` to `barangay_officials` where `position = 'Barangay Secretary'` and `archived_at IS NULL`. Matched by `isSecretary` in the dashboard |
+| Signatory data | **none exists anywhere.** No signature column, no stored signatory, nothing that says who signs which document |
+| Reference number | **none.** Only the uuid primary key. Reservations got `BCR-2026-AB12CD` in migration 024; document requests got no equivalent |
+
+### Document types, and the two that are deliberately absent
+
+The resident form offers six. Four have templates:
+
+| Type | Template | Requires |
+|---|---|---|
+| Barangay Clearance | ✅ | name, purpose |
+| Barangay Certificate | ✅ | name, purpose |
+| Certificate of Indigency | ✅ | name, purpose |
+| Certificate of Residency | ✅ | name, purpose, **purok** |
+| Business Clearance | ❌ | — |
+| Other | ❌ | — |
+
+⚠️ **The two omissions are decisions, not gaps.** Business Clearance
+needs a business name, address and nature of business, and
+`document_requests` stores none of them — the only fields it has are the
+resident's own. "Other" has no layout by definition: the resident types
+what they need into `purpose`, and which form answers it is the
+Secretary's decision, not a registry's. Both fall through to
+`Printable template not configured for this document type.`
+
+⚠️ **Only the residency certificate requires a purok.** A residency
+document with no address is meaningless; the others are merely shorter
+without one.
+
+### The architecture, and the line each layer does not cross
+
+```
+document_requests row (already fetched by the queue)
+        ↓
+documentData.js      — normalizes; reports what is MISSING
+        ↓
+documentRegistry.js  — type → template, and the three gates
+        ↓
+templates/*.jsx      — presentation only
+        ↓
+DocumentShell.jsx    — header, seal, watermark, signatory, footer
+        ↓
+DocumentPreview.jsx  — modal, toolbar, window.print()
+```
+
+| File | Owns |
+|---|---|
+| `documentConfig.js` | `DOCUMENT_TEMPLATE_MODE`, the barangay heading lines, the placeholder signatory, A4 geometry |
+| `documentData.js` | the normalized shape, the Manila date, the `SAMPLE-` reference, the missing-field check. **Pure** |
+| `documentRegistry.js` | type → template, `requiredFields`, `GENERATABLE_STATUSES`, `canGenerate`. **Pure** |
+| `DocumentShell.jsx` | everything four templates share |
+| `templates/*.jsx` | one layout each, and nothing else |
+| `DocumentPreview.jsx` | the dialog, the toolbar, the blocking warnings |
+| `print/DocumentPrint.css` | the A4 sheet, and `@media print` |
+
+⚠️ **A TEMPLATE NEVER QUERIES THE DATABASE**, and that is the whole
+reason the adapter exists. If templates read Supabase, installing the
+real forms later becomes a rewrite of the data access too. A test
+asserts no template imports the client, uses `useEffect` or calls
+`fetch`.
+
+⚠️ **The preview reads nothing either.** The request row is passed in as
+a **prop** — the queue already fetched it under the official SELECT
+policy — so generation opens no second data source and cannot widen what
+RLS allows. No migration, no new policy, no RPC.
+
+### ⚠️ Where the printed values come from
+
+`document_requests` itself, and nothing else. The row carries
+`full_name`, `contact_number` and `purok` as the **snapshot** the
+Resident Portal copied from the profile at submission. That is the right
+source twice over: it is what the Secretary approved, and it is what the
+official SELECT policy already grants. Re-reading `profiles` at print
+time would print something nobody reviewed.
+
+⚠️ **`residents_registry` IS NOT USED AND MUST NOT BE.** It is the Voter
+Reference List — voter records, not a resident roll. Reading residency
+off it is the exact wrong inference this project's own rules exist to
+prevent, on the one surface where it would be printed and handed over.
+A test asserts no document module touches it.
+
+⚠️ **No field is invented.** The schema holds no birth date, no civil
+status, no street address, no income and no residency duration, so no
+template asks for one and no blank line is left for one.
+
+⚠️ **The resident's uploaded ID never reaches a document.** An ID is
+verification material, not artwork, and its Storage URL is not exposed.
+Asserted by a test that plants `id_document_url` on the row.
+
+### ⚠️ A missing value is reported, never filled
+
+`N/A`, `UNKNOWN`, `TBD` and an em dash all read as statements inside a
+field that looks official. So `buildDocumentData` returns a `missing`
+list, the preview renders the warning **outside** the document, and
+**Print is disabled**:
+
+> Cannot generate this document: the resident's full name is missing
+> from the request.
+> Correct the request through the existing workflow, then generate the
+> document again.
+
+⚠️ **Nothing in the preview is editable.** The document is generated
+from the approved request. A wrong name is corrected on the *request*,
+or the paper and the record disagree and only the paper leaves the
+building.
+
+### The prototype watermark — one switch
+
+`DOCUMENT_TEMPLATE_MODE = 'prototype'` in `documentConfig.js`. In that
+mode `DocumentShell` renders three things, and **all four templates get
+them at once**: a diagonal `SAMPLE TEMPLATE` across the page, a dashed
+`SAMPLE TEMPLATE / FOR SYSTEM DEVELOPMENT ONLY` banner under the
+heading, and a footer line saying the layout is not an official form.
+
+⚠️ **It is not markup in every template.** Switching to verified forms
+is this one constant, so nobody has to find and delete a banner from
+four files and miss the fifth. Verified both directions: flipping it to
+`'official'` fails exactly the three watermark tests and nothing else.
+
+⚠️ **The watermark is TEXT, not a `background-image`.** A background
+does not print unless the reader happens to have "background graphics"
+switched on, and a watermark that vanishes on paper is worse than none.
+It carries `print-color-adjust: exact`.
+
+⚠️ **The `PROTOTYPE WORDING` label is deliberately NOT gated on the
+mode.** The replacement order is: replace the template bodies FIRST,
+then flip the constant. Flipping first would leave prototype prose on a
+page with no watermark; this label survives that mistake and still says
+the wording is a placeholder. Replacing a template removes the
+`<PrototypeProse>` call, and the label goes with it.
+
+### Permissions and status gating
+
+`canGenerate({ status, documentType, isSecretary })` carries all three
+gates, so the dashboard cell cannot drift from the registry.
+
+⚠️ **Secretary only — authorization is not widened by one position.**
+`isSecretary` is the same flag that gates Approve, Decline, Mark Ready
+and Mark Claimed, and the same position the RLS UPDATE policy requires.
+Other officials still see the `Secretary only` note.
+
+⚠️ **Generation opens at `approved` and closes at `claimed`.**
+`GENERATABLE_STATUSES = ['approved', 'ready_for_pickup']` — the window
+in which a sheet actually has to come out of a printer. A print button
+on a `claimed` request invites a second copy of something the record
+says was handed over once.
+
+⚠️ **GENERATING AND PRINTING CHANGE NO STATUS.** A sheet leaving a
+printer is not the same fact as "the resident may collect this" (Mark
+Ready) or "the resident has it" (Mark Claimed). Both stay the deliberate
+actions they already were. Asserted by a test that reads the Generate
+button's own call site.
+
+⚠️ **A button, not an `ActionMenu` item**, and that follows this
+project's own rule. Document Requests was deliberately left out of the ⋮
+conversion because its action cell holds the Secretary's PRIMARY
+decisions, and a primary decision must never be hidden behind a menu.
+Generate beside Mark Ready is a two-button cell; converting the cell to
+a menu would hide Approve, Decline, Mark Ready and Mark Claimed.
+
+### The signatory, and the document number
+
+⚠️ **The signatory is a placeholder, and that is the decision.** The
+repository establishes no signing authority at all. Printing a real
+official's name would assert something nobody has checked, on a form
+that is itself unverified. So the prototype prints a rule,
+`[AUTHORIZED SIGNATORY]` and `[POSITION]`. **No signature image is
+generated or stored** — a fabricated signature on a government form is
+not a layout detail.
+
+⚠️ **The reference is `SAMPLE-3F9A2C71`** — the first eight characters
+of the row's own uuid behind a `SAMPLE-` prefix. It traces back to one
+exact request, reads off paper, and cannot be mistaken for a barangay
+document number. No official numbering scheme was invented and no
+migration was needed.
+
+⚠️ **The printed date is the GENERATION date, recorded as such.**
+`document_requests` stores `created_at` and `updated_at` but **no
+approval timestamp**, so "the date this was approved" is not a value the
+schema can give. The field is labelled `Date generated`, and
+`issueDateBasis: 'generated'` says so in the data. When the barangay's
+form says which date belongs on it, `buildDocumentData` is the one line
+that changes.
+
+⚠️ **The date is assembled from `MONTH_NAMES`, not from a locale.** The
+first version called `Intl.DateTimeFormat('en-PH').format()` and this
+container's ICU produced `October 2, 2026` where `2 October 2026` was
+expected — day/month ORDER is locale data and differs between machines.
+The ZONE comes from Intl (only Intl can give it); the ARRANGEMENT is
+this project's own array, the one the calendars read.
+
+### Printing
+
+Browser-native `window.print()`. **No PDF library, no microservice, and
+no automatic download** — the Secretary reviews first, and the browser's
+own dialog already offers both physical printing and Save as PDF.
+
+⚠️ **The print stylesheet hides EVERYTHING and then shows one subtree.**
+Listing the chrome to hide — navbar, sidebar, topbar, toasts, buttons —
+means the next component added to a dashboard prints by accident. So
+`body * { visibility: hidden }` and `.doc-page, .doc-page * { visibility:
+visible }`, with the sheet lifted to `0,0`.
+
+⚠️ **THE PREVIEW SCALES; THE PAPER DOES NOT — and the first version got
+this wrong.** On a narrow screen the sheet is scaled down so the whole
+page is visible. Measured with the window at 900px, the printed sheet
+came out **794x808 instead of 794x1123** — a 72% document on A4 paper.
+The reset named `.doc-preview-scale`, which is the *wrapper*; the
+transform is on the sheet *inside* it. Both are reset now. Re-measured
+at 375 / 768 / 900 / 1280 / 1440: **794x1123 at every one**, and one PDF
+page.
+
+⚠️ **No fixed heights anywhere.** The extreme case — a 72-character
+unbroken surname, a 74-character purok, a 44-digit contact and a
+900-character purpose — grows the sheet to 794x1246 and prints as two
+pages rather than clipping. `break-inside: avoid` keeps the signatory
+block off a page boundary.
+
+### Activity logging — ⚠️ none, and this is a decision
+
+`activity_log.action` is CHECK-constrained to a fixed vocabulary
+(migration 016) with no `generated`, `previewed`, `printed` or
+`released` value, and `stamp_activity_actor` gates who may write each
+one. Adding one means **a migration plus a trigger change** — out of
+scope for a prototype whose templates are not the barangay's own, and
+exactly the kind of casual migration the brief rules out.
+
+It would also be close to meaningless: opening a print dialog ten times
+is not ten things that happened. The business events on this request —
+`approved`, `ready_for_pickup`, `claimed`, `declined` — are **already
+logged** by the existing handlers, unchanged. A test asserts the preview
+files no entry.
+
+**If logging a generation is wanted later**, it is a migration widening
+`ACTIONS` with one value, the matching entry in `activityLog.js`'s own
+frozen array, and one `logActivity` call. No other layer changes.
+
+### ⚠️ Replacing a prototype with the real barangay form
+
+When the official forms arrive, replacing one is:
+
+1. open `src/documents/templates/<Type>Template.jsx`;
+2. reproduce the verified layout and wording in its body;
+3. bind the **same** normalized fields — `data.resident.fullName`,
+   `data.resident.purok`, `data.resident.contactNumber`, `data.purpose`,
+   `data.reference`, `data.issueDate`, `data.signatory`;
+4. delete the `<PrototypeProse>` block (the `PROTOTYPE WORDING` label
+   goes with it);
+5. once **all four** are replaced, set `DOCUMENT_TEMPLATE_MODE` to
+   `'official'` in `documentConfig.js`;
+6. re-run the print measurement.
+
+It must NOT require changes to the database, request processing,
+authorization, resident lookup, status management, the registry, the
+data adapter or the print infrastructure. If a replacement needs one of
+those, the layering has been broken.
+
+**What the real forms will also settle**, and which this prototype
+deliberately leaves open: who signs each document, the real numbering
+scheme, which date belongs on the page, and whether Business Clearance
+needs columns the schema does not have.
+
+### What was measured, and what was NOT
+
+The preview, the four templates and the print stylesheet were captured
+from the **real component through Jest** and measured against the
+**shipped CSS bundle** in Chromium — the pattern X2, X3 and X4 used.
+
+| Check | Result |
+|---|---|
+| Sheet geometry, 4 widths x 4 templates | **794x1123** = A4 at 96dpi, every time |
+| Printed sheet from window widths 375 / 768 / 900 / 1280 / 1440 | **794x1123 at all five**, transform none, chrome count 0 |
+| PDF page count | 1 for the ordinary and long cases, 2 for the deliberately extreme one |
+| Content past the sheet's right or bottom edge | **0px**, all templates, all widths |
+| Document-level horizontal overflow | **0** at 375 / 768 / 1280 / 1440 |
+| axe-core (WCAG 2.0/2.1 A + AA), 4 states x 2 widths | **0 violations** |
+| Target sizes (SC 2.5.8) | Back 149x36, Print 81x36 |
+| Jest | 33 suites, **714 tests** |
+| Production build | clean, no ESLint warnings, 223 kB gzipped |
+
+⚠️ **TWO REAL DEFECTS WERE FOUND BY MEASURING, not by reading**: the
+72%-scaled print above, and `scrollable-region-focusable` — the preview
+stage scrolls (an A4 sheet is taller than the stage) and was not
+keyboard-reachable. Both fixed and re-measured.
+
+⚠️ **Two axe findings were HARNESS ARTIFACTS**: `document-title` and
+`html-has-lang`, from the bare wrapper the capture was pasted into.
+Confirmed by adding `lang` and `<title>` to the wrapper — the project's
+own rule about asking which step produced a result.
+
+### ⚠️ NOT authenticated-browser verified
+
+The Official Dashboard is behind `ProtectedRoute` and this environment
+still has **no test account**, so the **Generate Document button was
+never clicked on a live page**. Nothing was done to weaken
+authentication for a screenshot.
+
+What that means precisely:
+
+- **Verified from real component output**: the preview, all four
+  templates, the watermark, the blocking warnings, the unsupported
+  state, Escape and focus restoration, `window.print()`, the print
+  stylesheet, the A4 geometry and the responsive scaling.
+- **Verified structurally only**: that the button appears in the
+  Document Requests action cell for the Secretary at `approved` and
+  `ready_for_pickup`. `canGenerate` is unit-tested in every direction
+  and the wiring is pinned by source-reading tests, but the rendered
+  dashboard cell has not been seen.
+
+**Still requiring manual review on the deploy preview**: the button in
+its cell beside Mark Ready; the preview opening over the live queue;
+focus returning to the button on Escape; and one real browser print
+dialog, on paper or to PDF.
+
 ---
 
 ## Health centre
@@ -3644,6 +4013,13 @@ derives her initials from. It is no longer displayed as a label.
   allowed it is still there. The foreign key is what actually fixes it;
   until then the rename warns, and `officialPhotos.test.js` guards the
   eleven canonical keys.
+- **The official barangay document forms.** X6 built the whole
+  generation pipeline against PROTOTYPE layouts because the barangay has
+  not supplied its real clearance, certificate, indigency or residency
+  forms. Blocked on those forms, and on four things only the barangay
+  can settle: who signs each document, the real numbering scheme, which
+  date belongs on the page, and whether Business Clearance needs columns
+  the schema does not have.
 - **019B — the Previous Term Officials roster and its UI.** Migration 019A
   created the tables; both are **empty**, and there is **no frontend**. 019B
   seeds the confirmed roster from SQL and adds the read-only Official Portal
@@ -3658,9 +4034,9 @@ derives her initials from. It is no longer displayed as a label.
 - **Source maps ship to production** (~7 MB), so the original JSX is
   publicly reconstructable. `GENERATE_SOURCEMAP=false` in Vercel fixes it.
 - **`public/logo.png` is 984 KB and referenced by nothing.**
-- **Thin automated test coverage.** 627 tests in twenty-nine suites: one
+- **Thin automated test coverage.** 714 tests in thirty-three suites: one
   smoke test over `<App />`, which fails without `.env` because
-  `supabaseClient.js` throws at import time, and 626 tests over the
+  `supabaseClient.js` throws at import time, and 713 tests over the
   resident workflow rules, the display labels, the booking window, the
   month grid and its three feature layers, the document-request filter,
   the ⋮ menu's keyboard and authorization behaviour, the modal
@@ -3725,6 +4101,26 @@ derives her initials from. It is no longer displayed as a label.
   anywhere. The legacy strings are left exactly as somebody typed them;
   moving them into `event_time` is a data correction for the barangay
   to make, not a display function's guess.
+- ⚠️ **The printable documents are PROTOTYPES.** The barangay has not
+  supplied its official forms, so every template under
+  `src/documents/templates/` is a SAMPLE layout carrying a visible
+  watermark. They must not be treated as verified Barangay Batinguel
+  forms. See *Printable barangay documents (X6)* for the replacement
+  procedure.
+- **`document_requests` has no public reference number and no approval
+  timestamp.** The printed reference is `SAMPLE-<8 hex of the uuid>` and
+  the printed date is the GENERATION date, both labelled as such. A real
+  numbering scheme and the right date are decisions for the barangay's
+  own form, not for a prototype.
+- **Business Clearance and "Other" have no printable template**, by
+  decision: the first needs business fields `document_requests` does not
+  store, the second has no layout. Both show
+  `Printable template not configured for this document type.`
+- **`activity_log` records no document generation or print.** Its
+  `action` CHECK (migration 016) has no such value and
+  `stamp_activity_actor` gates who may write one, so logging a
+  generation needs a migration plus a trigger change. The business
+  transitions on a request are already logged, unchanged.
 - **No lint script and no typecheck script** — see *Commands* and
   *Tests* above.
 

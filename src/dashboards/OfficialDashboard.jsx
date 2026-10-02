@@ -35,6 +35,8 @@ import {
   buildOfficialWeek,
 } from '../utils/officialAvailability'
 import { logActivity } from '../utils/activityLog'
+import DocumentPreview from '../documents/DocumentPreview'
+import { canGenerate } from '../documents/documentRegistry'
 import { useConfirm } from '../components/ConfirmDialog'
 import {
   ArchiveOfficialDialog,
@@ -416,6 +418,11 @@ const OfficialDashboard = () => {
   const [ineligibleNotes, setIneligibleNotes] = useState('')
   const [viewingId, setViewingId] = useState(null)
   const [decliningRequest, setDecliningRequest] = useState(null)
+  // The request whose printable document is open. ⚠️ Holding the ROW
+  // rather than an id means the preview renders from the same object
+  // the queue already fetched -- no second read, and nothing the
+  // official could not already see under the SELECT policy.
+  const [documentRequestToPrint, setDocumentRequestToPrint] = useState(null)
   const [declineNotes, setDeclineNotes] = useState('')
   const [registryEntries, setRegistryEntries] = useState([])
   const [activityLog, setActivityLog] = useState([])
@@ -3616,6 +3623,35 @@ const OfficialDashboard = () => {
                                     Mark Claimed
                                   </button>
                                 )}
+                                {/* ⚠️ A BUTTON, NOT AN ActionMenu ITEM, and
+                                    that follows this project's own rule
+                                    rather than ignoring it. Document
+                                    Requests was deliberately left out of
+                                    the ⋮ conversion because its action
+                                    cell holds the Secretary's PRIMARY
+                                    decisions, and a primary decision must
+                                    never be hidden behind a menu. Adding
+                                    Generate beside Mark Ready makes a
+                                    two-button cell, which is not clutter;
+                                    converting the cell to a menu to
+                                    accommodate it would hide Approve,
+                                    Decline, Mark Ready and Mark Claimed.
+
+                                    ⚠️ `canGenerate` carries all three
+                                    gates -- Secretary, an eligible status,
+                                    and a configured template -- so this
+                                    cell cannot drift from the registry. */}
+                                {canGenerate({
+                                  status: req.status,
+                                  documentType: req.document_type,
+                                  isSecretary,
+                                }) && (
+                                  <button
+                                    className="btn-generate"
+                                    onClick={() => setDocumentRequestToPrint(req)}>
+                                    Generate Document
+                                  </button>
+                                )}
                               </>
                             ) : (
                               <span className="role-restricted-note">Secretary only</span>
@@ -5066,6 +5102,18 @@ const OfficialDashboard = () => {
           </div>
         </div>
       )}
+
+      {/* ⚠️ The preview owns its own dialog semantics and its own
+          `useModalA11y` call, rather than joining the nine-modal list
+          above. It is a self-contained component so the same preview
+          can serve any future caller, and the two hooks never run at
+          once -- the dashboard's sees `false` while the preview is
+          open, because no dashboard modal is. */}
+      <DocumentPreview
+        request={documentRequestToPrint}
+        open={Boolean(documentRequestToPrint)}
+        onClose={() => setDocumentRequestToPrint(null)}
+      />
 
       {decliningRequest && (
         <div className="modal-overlay">

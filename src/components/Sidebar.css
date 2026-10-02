@@ -1546,3 +1546,46 @@
     color: #5f6775;
   }
 }
+
+/* ── Generate Document (X6) ──────────────────────────────────────────
+ *
+ * The Secretary's secondary action in the Document Requests action
+ * cell, beside Mark Ready / Mark Claimed. Navy rather than green or
+ * red: it decides nothing and changes no status -- it opens a preview.
+ *
+ * ⚠️ Appended AFTER the protected mobile table-to-card block, which is
+ * not edited. `.btn-generate` (0,1,0) is the same specificity as the
+ * `.btn-approve` rule inside that block and targets a different class,
+ * so nothing there is overridden and nothing competes.
+ */
+.btn-generate {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background-color: #1e3a8a;
+  color: #ffffff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-12);
+  font-weight: 600;
+  cursor: pointer;
+  font-family: 'Poppins', sans-serif;
+  white-space: nowrap;
+  transition: background-color 0.2s;
+}
+
+.btn-generate:hover {
+  background-color: #1e40af;
+}
+
+/* In card mode the action cell stacks, and a button that does not fill
+   its row reads as misaligned beside two that do. Matches what the
+   protected block already does for `.btn-approve` and `.btn-deny`. */
+@media (max-width: 768px) {
+  .btn-generate {
+    width: 100%;
+    text-align: center;
+  }
+}

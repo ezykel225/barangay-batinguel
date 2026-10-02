@@ -1,0 +1,187 @@
+/* The preview's own chrome. None of this prints -- DocumentPrint.css
+   hides everything but `.doc-page`. */
+
+.doc-preview-overlay {
+  /* `.modal-overlay` already supplies the fixed backdrop and centring;
+     this only widens the box, because an A4 sheet is wider than the
+     dashboard's ordinary modals. */
+  padding: 16px;
+}
+
+.doc-preview {
+  width: min(1000px, 100%);
+  max-width: 100%;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  /* The A4 sheet is 297mm tall and the viewport usually is not, so the
+     modal scrolls -- the X2 rule about a modal putting its own submit
+     button out of reach. */
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+  overflow: hidden;
+}
+
+.doc-preview-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 14px 18px;
+  border-bottom: 1px solid #e5e7eb;
+  background-color: #f9fafb;
+  flex-shrink: 0;
+}
+
+.doc-preview-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--fs-15);
+  font-weight: 600;
+  color: #1f2937;
+  overflow-wrap: anywhere;
+}
+
+.doc-preview-back,
+.doc-preview-print {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  /* WCAG 2.2 SC 2.5.8 -- the padded-wrapper lesson. */
+  min-height: 32px;
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: var(--fs-13);
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.doc-preview-back {
+  background: none;
+  border: 1px solid #d1d5db;
+  color: #374151;
+}
+
+.doc-preview-back:hover { background-color: #ffffff; }
+
+.doc-preview-print {
+  background-color: #1e3a8a;
+  border: 1px solid #1e3a8a;
+  color: #ffffff;
+}
+
+.doc-preview-print:hover:not(:disabled) { background-color: #1e40af; }
+
+.doc-preview-print:disabled {
+  background-color: #9ca3af;
+  border-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+/* The SAMPLE chip in the toolbar. ⚠️ It is text, not a colour: the
+   document's own banner says the same thing in words, and a reader who
+   cannot see the red still reads both. */
+.doc-preview-chip {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  border: 1px dashed #b91c1c;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-12);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #b91c1c;
+}
+
+.doc-preview-blockers {
+  margin: 0;
+  padding: 14px 18px;
+  background-color: #fef2f2;
+  border-bottom: 1px solid #fecaca;
+  color: #b91c1c;
+  font-size: var(--fs-13);
+  flex-shrink: 0;
+}
+
+.doc-preview-blockers p { margin: 0 0 4px; }
+.doc-preview-blockers p:last-child { margin: 0; }
+
+.doc-preview-blocker-hint {
+  color: #5f6775;
+  font-size: var(--fs-12);
+}
+
+.doc-preview-unsupported {
+  margin: 0;
+  padding: 32px 18px;
+  text-align: center;
+  color: #5f6775;
+  font-size: var(--fs-14);
+}
+
+/* ── The stage the sheet sits on ─────────────────────────────────── */
+/* ⚠️ THE SHEET IS NOT RESIZED FOR A PHONE. An A4 document is 210mm
+   wide and stays 210mm wide -- redesigning the print width to suit a
+   viewport would mean the paper changes shape with the screen that
+   previewed it. The stage SCALES it instead, so a phone shows the
+   whole sheet, smaller, and the printed output is untouched. */
+.doc-preview-stage {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 20px;
+  background-color: #e5e7eb;
+  display: flex;
+  justify-content: center;
+}
+
+/* ⚠️ A `transform: scale()` does NOT change an element's layout size.
+   A 0.42-scaled A4 sheet still reserves 794px of width, so the stage
+   would scroll sideways over space that is visually empty. The wrapper
+   carries the SCALED box while the sheet inside it keeps its real
+   210mm geometry and is scaled from its top-left corner -- so nothing
+   inside the document reflows, and what is previewed is what prints. */
+.doc-preview-scale {
+  width: 210mm;
+  flex-shrink: 0;
+}
+
+.doc-preview-stage .doc-page {
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.18);
+  transform-origin: top left;
+}
+
+/* The breakpoints are where 210mm (~794px) plus the stage's padding
+   stops fitting. */
+@media (max-width: 900px) {
+  .doc-preview-stage { padding: 12px; align-items: flex-start; }
+  .doc-preview-scale { width: calc(210mm * 0.72); min-height: calc(297mm * 0.72); }
+  .doc-preview-stage .doc-page { transform: scale(0.72); }
+}
+
+@media (max-width: 768px) {
+  .doc-preview-scale { width: calc(210mm * 0.56); min-height: calc(297mm * 0.56); }
+  .doc-preview-stage .doc-page { transform: scale(0.56); }
+}
+
+/* ⚠️ 0.40, not 0.42, and the 2% is measured rather than tidy. At 375px
+   the modal leaves 343px of content width; a 0.42 sheet is 333px and
+   the stage's own 2x12px padding pushed it to 357, so the stage
+   scrolled sideways by 7px over nothing. 0.40 gives 318 + 16 = 334,
+   inside 343. */
+@media (max-width: 480px) {
+  .doc-preview-bar { padding: 12px; }
+  .doc-preview-stage { padding: 8px; }
+  .doc-preview-scale { width: calc(210mm * 0.40); min-height: calc(297mm * 0.40); }
+  .doc-preview-stage .doc-page { transform: scale(0.40); }
+}
+
+/* The stage is focusable so it can be scrolled from the keyboard; it
+   must therefore show a focus ring like anything else that takes
+   focus. */
+.doc-preview-stage:focus-visible {
+  outline: 3px solid #1e3a8a;
+  outline-offset: -3px;
+}
