@@ -65,7 +65,7 @@ banned below: it silences the one check this project has.
 
 ### Tests
 
-Twenty-five suites, 548 tests:
+Twenty-five suites, 554 tests:
 
 | File | What it covers |
 |---|---|
@@ -89,7 +89,7 @@ Twenty-five suites, 548 tests:
 | `src/utils/reservationTracking.test.js` | 19 tests over the public tracking page. The load-bearing one asserts **no message it can produce mentions "not found", "no such" or "invalid reference"** — an answer distinguishing a wrong reference from a wrong number is an oracle for guessing references. Plus a source-reading guard that the module defines no status word of its own |
 | `src/utils/returnTo.test.js` | 39 tests over the `?next=` allowlist, **26 of them attack strings** that have each defeated a redirect sanitiser written by inspection — `//evil.example`, `/\evil.example`, `https:/evil.example`, `javascript:`, `data:`, a `user:pass@` trick, a double-encoded payload. All fall back to `/` |
 | `src/utils/signupSteps.test.js` | 23 tests over the sign-up rules. The load-bearing ones: step 1 reports nothing about the password, the two advisory password checks **stay advisory** (a long passphrase with no digit is accepted), and `MIN_PASSWORD_LENGTH` can never drop below Supabase's own minimum |
-| `src/utils/officialPhotos.test.js` | 20 tests over the portrait map, `portraitWillBeLost` and `PersonAvatar`. `hasBundledPhoto` uses `hasOwnProperty`, asserted — a bare lookup reports a portrait for an official named `toString` |
+| `src/utils/officialPhotos.test.js` | 26 tests over the portrait map, `portraitWillBeLost` and `PersonAvatar`. `hasBundledPhoto` uses `hasOwnProperty`, asserted — a bare lookup reports a portrait for an official named `toString`. Six are the **2026-10-01 regression guard**: the eleven canonical keys written out in full, that the erroneous rename is not a key, and that no middle name the barangay spells out is abbreviated to an initial. Run **both directions** — re-keying the portrait to `Lastimoso` fails 4, and "tidying" it to `Jeffrey F. Duran` fails 4 |
 | `src/utils/clinicSchedule.test.js` | 21 tests over the clinic week, built from the **live rows including Friday's two**. The load-bearing one: Friday is ONE entry carrying both sessions, and the two are **not merged** |
 | `src/utils/medicineFilter.test.js` | 20 tests over the public medicine list — the three narrowings, an unrecognised category or status matching **nothing rather than everything**, and that the counts always sum to the total |
 | `src/utils/officialAvailability.test.js` | 24 tests over per-official consultation hours. The load-bearing one **reads `026_official_availability.sql`** and asserts the four statuses the form offers are exactly the four the CHECK accepts — the same thing `reservationWindow.test.js` does for migration 020 |
@@ -628,7 +628,9 @@ such row.
 
 ## Database notes
 
-**26 migrations**, `001` through `026`, all applied.
+**27 migrations**, `001` through `027`, all applied. ⚠️ 027 is a
+DATA CORRECTION, not a schema change — see *The portrait is lost by the
+RENAME* under *Public E-Services (X5)*.
 
 **20 tables, RLS enabled on every one.**
 
@@ -2819,17 +2821,57 @@ rows** — every portrait comes from the bundled map.
 not block), and the fallback is **named**: "No photo on file for
 &lt;name&gt;".
 
-⚠️ **`J.Duran.jpg` is NOT re-keyed to the new name.** "Duran" to
-"Lastimoso" is not a typo correction, and attaching one person's face
-to another person's name is the error this file already records for the
-health centre nurse. Only the barangay can say whether that row is the
-same person.
+#### ✅ The data was corrected — migration 027
 
-⚠️ **And that rename produced a LIVE instance of the zero-match
-fragility.** `Jeffrey Feria Duran` holds an account with
-`role = 'official'` whose `profiles.full_name` matches no active
-directory row — so that official has **silently lost their position
-permissions**, right now. Measured while verifying migration 026.
+The barangay confirmed that **Jeffrey F. Duran is the real Kagawad** and
+that the Lastimoso entry was an erroneous rename, not a second official.
+Migration 027 is a **data correction**: one row, one column.
+
+| | |
+|---|---|
+| row id | `311c140b-7a9f-449b-bf1f-9371f46c304f` — **the same row, kept** |
+| `full_name` | `Jeffrey Cataylo Lastimoso` → `Jeffrey Feria Duran` |
+| everything else | `position`, `committee`, `display_order`, `archived_at`, `photo_url`, `created_at` all **untouched** |
+
+⚠️ **The canonical form is `Jeffrey Feria Duran`, spelled out, not
+`Jeffrey F. Duran`.** It was not chosen from memory — four independent
+sources were checked and all four agree: his own `profiles.full_name`
+(created 2026-05-28, never touched by the rename), the `officialPhotos`
+key since the earliest commit, the **original uploaded asset filename**
+(`Jeffrey Feria Duran.jpg`, later shortened to `J.Duran.jpg` with the
+map keeping the exact name), and the directory's own convention, where
+every official spells the middle name out in full — Catan, Flores,
+Katada, Abol, Catadman, Fabillar. An initial would be the only
+abbreviated name in the directory, and would break the match just as
+thoroughly as Lastimoso did while *looking* right.
+
+⚠️ **`J.Duran.jpg` was never re-keyed**, which is why this was a
+one-line fix rather than a reconstruction. The map was already correct
+and waiting for a row to attach to — the same thing that was true of the
+missing Kagawad on 2026-09-30.
+
+⚠️ **The audit trail is not rewritten.** The five `activity_log` rows
+from 2026-10-01 still read "Jeffrey Cataylo Lastimoso — Kagawad",
+because that is what the record genuinely said when each was written.
+`activity_log` is append-only and has no UPDATE or DELETE policy;
+tidying history would destroy the evidence that identified the defect.
+No entry was written for the correction either — `stamp_activity_actor`
+takes the actor from the caller's token, and a direct connection has
+none, so the only possible entry would be unattributed, which is what
+migration 015 exists to prevent. Migration 027's header is the record.
+
+Verified after: his account matches **exactly one** active directory
+row; `official_id_for_current_user()` returns his row id and he can
+write his own availability but not the Treasurer's (`42501`); the public
+page decodes `J.Duran.jpg` at 800×640 under his exact name; archive →
+restore in a rolled-back transaction keeps the id, name, committee and
+order; and **no official account is left without an active directory
+row** — a query that named him before the correction and returns
+`(none)` after it.
+
+⚠️ **The underlying fragility is untouched.** There is still no
+`profile_id` foreign key, so the next rename can do this again. What
+changed is that it will now warn first, and a lost portrait says so.
 
 ### Friday was listed twice
 
@@ -3122,14 +3164,15 @@ derives her initials from. It is no longer displayed as a label.
   beyond 8 hours (the CHECK stays `1..8`), and noon is a coverable hour
   but not a startable one — all noted where they belong.
 - **`profile_id` foreign key** replacing the `full_name` matching above.
-  ⚠️ **There is a LIVE instance of the zero-match half right now.**
-  `Jeffrey Feria Duran` holds an account with `role = 'official'` whose
-  `profiles.full_name` matches no active `barangay_officials` row,
-  because display_order 10 was renamed to `Jeffrey Cataylo Lastimoso`
-  on 2026-10-01. That official has silently lost their position
-  permissions and cannot publish consultation hours. Fixing it is a
-  **data** decision the barangay has to make — whether that row is the
-  same person renamed or a different Kagawad — not a code change.
+  ⚠️ This cost the project a real outage of one official's permissions
+  on 2026-10-01: display_order 10 was renamed to `Jeffrey Cataylo
+  Lastimoso`, and `Jeffrey Feria Duran`'s account stopped matching any
+  active directory row — he silently lost his position permissions and
+  his portrait. **The data was corrected in migration 027** once the
+  barangay confirmed he is the real Kagawad, but the mechanism that
+  allowed it is still there. The foreign key is what actually fixes it;
+  until then the rename warns, and `officialPhotos.test.js` guards the
+  eleven canonical keys.
 - **019B — the Previous Term Officials roster and its UI.** Migration 019A
   created the tables; both are **empty**, and there is **no frontend**. 019B
   seeds the confirmed roster from SQL and adds the read-only Official Portal
@@ -3144,9 +3187,9 @@ derives her initials from. It is no longer displayed as a label.
 - **Source maps ship to production** (~7 MB), so the original JSX is
   publicly reconstructable. `GENERATE_SOURCEMAP=false` in Vercel fixes it.
 - **`public/logo.png` is 984 KB and referenced by nothing.**
-- **Thin automated test coverage.** 548 tests in twenty-five suites: one
+- **Thin automated test coverage.** 554 tests in twenty-five suites: one
   smoke test over `<App />`, which fails without `.env` because
-  `supabaseClient.js` throws at import time, and 547 tests over the
+  `supabaseClient.js` throws at import time, and 553 tests over the
   resident workflow rules, the display labels, the booking window, the
   month grid and its three feature layers, the document-request filter,
   the ⋮ menu's keyboard and authorization behaviour, the modal

@@ -1826,7 +1826,10 @@ const OfficialDashboard = () => {
     // display_order 10 turned "Jeffrey Feria Duran" into "Jeffrey
     // Cataylo Lastimoso" and the portrait was gone, four minutes
     // before the first of two archive/restore cycles that got the
-    // blame. Nothing anywhere said a word.
+    // blame. Nothing anywhere said a word. It also cost that official
+    // his position permissions, because an account is linked to its
+    // directory row by the same exact string. The data was corrected in
+    // migration 027; this dialog is what makes the next one loud.
     //
     // It WARNS, it does not block. Correcting a misspelled name is a
     // legitimate edit and must not be refused over a picture.

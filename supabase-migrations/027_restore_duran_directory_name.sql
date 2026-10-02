@@ -1,0 +1,182 @@
+-- ============================================================
+-- 027  DATA CORRECTION: RESTORE KAGAWAD DURAN'S DIRECTORY NAME
+-- ============================================================
+--
+-- STATUS: APPLIED 2026-10-02 via the Supabase connector. One row, one
+--         column. Verified in both directions; measured results at the
+--         foot of this file.
+--
+-- ⚠️ THIS IS A DATA CORRECTION, NOT A SCHEMA CHANGE. Nothing here
+-- creates, alters or drops anything. It is recorded as a numbered file
+-- because `supabase-migrations/` is this project's record of what was
+-- done to the live database, and a correction to a serving official's
+-- identity is exactly the kind of thing that must not live only in a
+-- commit message.
+--
+-- ─── WHAT WAS WRONG ───────────────────────────────────────────────────
+--
+-- On 2026-10-01 at 04:58 an `edited` action renamed the directory row at
+-- `display_order` 10 from the Kagawad's real name to
+-- "Jeffrey Cataylo Lastimoso". The barangay has since confirmed that
+-- Jeffrey F. Duran is the real Kagawad and that the Lastimoso entry is
+-- not a separate official -- it was an erroneous rename / bad test data.
+--
+-- Two things broke silently, and neither reported anything:
+--
+--   1. THE PORTRAIT. `officialPhotos` is keyed on the exact
+--      `barangay_officials.full_name`, so no key matched and
+--      `PersonAvatar` fell back to an icon.
+--   2. THE PERMISSIONS. An official's login is linked to their
+--      directory record by matching `profiles.full_name` to
+--      `barangay_officials.full_name` as exact strings. With no match,
+--      `official_id_for_current_user()` returned NULL and his
+--      position-based permissions stopped resolving -- the zero-match
+--      half of the fragility CLAUDE.md has recorded since migration 018.
+--
+-- ─── WHY "Jeffrey Feria Duran", AND NOT "Jeffrey F. Duran" ────────────
+--
+-- The canonical form was NOT chosen from memory. Four independent
+-- sources inside the project were checked and ALL FOUR agree:
+--
+--   1. `profiles.full_name` of his own account, created 2026-05-28 and
+--      never touched by the rename:          "Jeffrey Feria Duran"
+--   2. the `officialPhotos` map key, present since the repository's
+--      earliest commit:                      "Jeffrey Feria Duran"
+--   3. the ORIGINAL uploaded portrait's filename, from the repo owner's
+--      own upload (commit feaa03f):          "Jeffrey Feria Duran.jpg"
+--      (later shortened to `J.Duran.jpg` for ASCII safety, with the map
+--      keeping the exact name -- that is the documented pattern)
+--   4. the directory's own convention: every other official spells the
+--      middle name OUT IN FULL -- Caroline *Catan* Amparado, Sheila Mae
+--      *Flores* Bardago, Harold *Katada* Baroy, Arnulfo *Abol* Catalan,
+--      Rey *Catadman* Barba, Adelina *Fabillar* Remata. "Jeffrey F.
+--      Duran" would be the only abbreviated name in the directory.
+--
+-- There was no conflict between the sources, so no judgment call was
+-- required and none was made.
+--
+-- ─── WHAT WAS CHANGED, EXACTLY ────────────────────────────────────────
+--
+--   table   public.barangay_officials
+--   row id  311c140b-7a9f-449b-bf1f-9371f46c304f   (UNCHANGED)
+--   column  full_name
+--   from    'Jeffrey Cataylo Lastimoso'
+--   to      'Jeffrey Feria Duran'
+--
+-- ⚠️ ONLY `full_name`. `position` (Kagawad), `committee` (Environment
+-- and Agriculture), `display_order` (10), `archived_at` (NULL),
+-- `photo_url` (NULL), `created_at` (2026-05-28, the original seed) and
+-- the row id are all untouched. The audit trail records ONE `edited`
+-- event and nothing in the data suggests those columns were corrupted
+-- too, so they were left alone rather than "corrected" on a guess.
+--
+-- ⚠️ NO ROW WAS CREATED AND NO ROW WAS DELETED. `created_at` on this row
+-- is 2026-05-28 01:15:01, identical to the other original officials,
+-- which is how we know this IS the original Duran row renamed rather
+-- than a replacement someone inserted.
+--
+-- ⚠️ THE AUDIT TRAIL IS NOT REWRITTEN. The five `activity_log` rows from
+-- 2026-10-01 still read "Jeffrey Cataylo Lastimoso — Kagawad", because
+-- that is genuinely what the record said at the time each entry was
+-- written. `activity_log` is append-only by design and has no UPDATE or
+-- DELETE policy; editing history to make it tidier would destroy the
+-- only evidence of what happened, which is the evidence that identified
+-- this defect in the first place.
+--
+-- ⚠️ NO `activity_log` ENTRY WAS WRITTEN FOR THIS CORRECTION EITHER.
+-- `stamp_activity_actor` takes the actor from the caller's own token,
+-- and a direct database connection has none -- so the only entry this
+-- could produce would be an unattributed one, which is precisely what
+-- migration 015 exists to prevent. This file is the record instead.
+
+-- ─── THE CORRECTION ───────────────────────────────────────────────────
+-- Guarded on the old value as well as the id, so re-running it after the
+-- fact is a no-op rather than a second rename.
+UPDATE public.barangay_officials
+   SET full_name = 'Jeffrey Feria Duran'
+ WHERE id = '311c140b-7a9f-449b-bf1f-9371f46c304f'
+   AND full_name = 'Jeffrey Cataylo Lastimoso';
+
+-- ============================================================
+-- VERIFICATION  (measured 2026-10-02, after applying)
+-- ============================================================
+--
+-- ─── The row itself ───────────────────────────────────────────────────
+--   id           311c140b-7a9f-449b-bf1f-9371f46c304f   (unchanged)
+--   full_name    Jeffrey Feria Duran
+--   position     Kagawad                                (unchanged)
+--   committee    Environment and Agriculture            (unchanged)
+--   display_order 10                                    (unchanged)
+--   archived_at  NULL                                   (unchanged)
+--   photo_url    NULL -- every portrait comes from the bundled map
+--   created_at   2026-05-28 01:15:01+00                 (unchanged)
+--
+-- ─── A. Exactly one active directory match for his account ────────────
+--   active directory rows matching profiles.full_name          1
+--
+-- ─── F. No duplicate, and nothing else moved ──────────────────────────
+--   rows named 'Jeffrey Feria Duran' (any state)               1
+--   rows still named 'Jeffrey Cataylo Lastimoso'               0
+--   active Kagawads                                            7   (was 7)
+--   total directory rows                                      11   (was 11)
+--   distinct display_order values                             11
+--   officials whose profile has NO active directory row    (none)
+--
+--   ⚠️ That last line is the one worth reading. Before this correction
+--   it named Jeffrey Feria Duran. Every official account in the system
+--   now resolves to an active directory row.
+--
+-- ─── B. Position permissions, driven AS Jeffrey ───────────────────────
+--   (SET LOCAL ROLE authenticated + request.jwt.claims, so auth.uid()
+--    resolves the way it does on a real API request)
+--
+--   is_official(his uid)                                    true
+--   his directory row resolves      311c140b… Kagawad, Environment and Agriculture
+--   any-official power: UPDATE announcements             rows=5
+--   Treasurer-only power: UPDATE reservations            rows=0
+--
+--   ⚠️ The last line is a PASS, not a failure. He is a Kagawad, not the
+--   Treasurer, so 0 is correct -- and it proves the position gate reads
+--   his real position rather than failing open now that his row
+--   resolves again. A correction that handed him powers he never had
+--   would be a worse outcome than the defect.
+--
+-- ─── E. Migration 026 availability ownership ──────────────────────────
+--   official_id_for_current_user()       311c140b-7a9f-449b-bf1f-9371f46c304f
+--   insert his OWN availability          ACCEPTED rows=1
+--   insert the TREASURER's availability  REFUSED 42501
+--
+--   (the probe row was removed afterwards; official_availability holds
+--    zero rows, and nothing in this phase seeds consultation hours)
+--
+-- ─── D. Archive -> restore retains identity and photo ─────────────────
+--   Done inside a transaction and ROLLED BACK, so the live row never
+--   left its active state:
+--
+--   before archive   id=311c140b… name=Jeffrey Feria Duran order=10
+--                    committee=Environment and Agriculture archived=false
+--   archived         id=311c140b… name=Jeffrey Feria Duran archived=true
+--                    photo_url=NULL (bundled map supplies it)
+--   after restore    id=311c140b… name=Jeffrey Feria Duran order=10
+--                    committee=Environment and Agriculture archived=false
+--   profile match    1 active row
+--
+--   The id, the name, the committee and the display order survive the
+--   round trip, so the portrait and the permissions survive it too --
+--   both are resolved from `full_name`, which never changes.
+--
+-- ─── C. The public Officials page ─────────────────────────────────────
+--   Rendered in Chromium against the shipped production bundle with the
+--   LIVE directory rows: 11 portraits resolve, and the only remaining
+--   "No photo on file" is the health centre nurse's, which is
+--   deliberate -- the file that used to sit there was not a picture of
+--   her. Before the correction it was 10 portraits and a named gap for
+--   display_order 10.
+--
+-- ─── Still outstanding, and NOT fixed here ────────────────────────────
+--
+-- ⚠️ The underlying fragility is untouched. There is still no
+-- `profile_id` foreign key on `barangay_officials`, so the next rename
+-- can do this again. What this phase added is that the rename now
+-- WARNS before it happens, and a lost portrait now says "No photo on
+-- file for <name>" instead of silently showing a generic icon.

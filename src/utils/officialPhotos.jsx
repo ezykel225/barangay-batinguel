@@ -50,8 +50,8 @@ export const officialPhotos = {
 // ─── ⚠️ RENAMING AN OFFICIAL UNLINKS THEIR PORTRAIT ───────────────────
 //
 // This map is keyed on the exact `barangay_officials.full_name`, and
-// CLAUDE.md already records that as a known fragility. It has now cost
-// the project a second portrait, and the audit trail says exactly how:
+// CLAUDE.md records that as a known fragility. It has now cost the
+// project a portrait once, and the audit trail says exactly how:
 //
 //   2026-10-01 04:58  edited    Jeffrey Cataylo Lastimoso -- Kagawad
 //   2026-10-01 05:02  archived  (reason: "for testing purposes")
@@ -60,25 +60,38 @@ export const officialPhotos = {
 //   2026-10-01 13:29  restored
 //
 // The portrait was lost at **04:58, by the EDIT**, four minutes before
-// the first archive. `display_order` 10 held `Jeffrey Feria Duran`,
-// whose photo is in this map; the edit changed the name, no key
-// matched any more, and `PersonAvatar` fell back to an icon without a
-// word anywhere. The two archive/restore cycles that followed are a
-// red herring: neither handler reads, writes, clears or deletes
-// anything to do with a photo, `photo_url` is NULL on every row in the
-// directory, and no storage call happens on either path -- all three
-// verified against the live database and the handlers.
+// the first archive. `display_order` 10 held the Kagawad's real name,
+// the edit replaced it, no key matched any more, and `PersonAvatar`
+// fell back to an icon without a word anywhere. The two archive/restore
+// cycles that followed were a red herring: neither handler reads,
+// writes, clears or deletes anything to do with a photo, `photo_url` is
+// NULL on every row in the directory, and no storage call happens on
+// either path -- all three verified against the live database.
 //
-// So the defect is a SILENT one in the rename path, and these helpers
-// exist to make it loud at the only moment anybody can act on it.
+// ─── ✅ THE DATA WAS CORRECTED, 2026-10-02 (migration 027) ────────────
 //
-// ⚠️ `J.Duran.jpg` is NOT re-keyed to the new name, and must not be.
-// A rename from "Duran" to "Lastimoso" is not a typo correction, and
-// attaching one person's face to another person's name is the exact
-// error this file's own header records for the health centre nurse:
-// "a stranger's face presented as barangay staff is worse than no face
-// at all." Only the barangay can say whether that row is the same
-// person. Until it does, the row shows an honest "No photo on file".
+// The barangay confirmed that **Jeffrey F. Duran is the real Kagawad**
+// and that the "Lastimoso" entry was an erroneous rename, not a second
+// official. `barangay_officials` row `311c140b-…` -- the SAME row, kept
+// -- had its `full_name` restored to `Jeffrey Feria Duran`, and nothing
+// else about it changed.
+//
+// ⚠️ `J.Duran.jpg` was NEVER re-keyed, and that is why this was a
+// one-line data fix rather than a reconstruction. The map had carried
+// the exact name since the repository's earliest commit -- the original
+// uploaded file was literally called "Jeffrey Feria Duran.jpg" -- so
+// the portrait resolved again the moment the directory row was right.
+// It is the same lesson as the missing Kagawad of 2026-09-30: the photo
+// map was already correct and waiting for a row to attach to.
+//
+// ⚠️ The canonical form is "Jeffrey Feria Duran", with the middle name
+// SPELLED OUT, not "Jeffrey F. Duran". Four sources agree -- his
+// profile, this map, the original asset filename, and the directory's
+// own convention, where every official spells the middle name in full
+// (Catan, Flores, Katada, Abol, Catadman, Fabillar). Do not "tidy" it
+// to an initial; `officialPhotos.test.js` fails if anybody does.
+//
+// The helpers below exist so the next rename cannot be silent.
 
 // Whether this exact directory name has a bundled portrait.
 export const hasBundledPhoto = (name) =>

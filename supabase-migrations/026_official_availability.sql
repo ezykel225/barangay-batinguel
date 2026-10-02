@@ -348,19 +348,31 @@ CREATE TRIGGER trg_stamp_official_availability
 --
 -- ─── AN OFFICIAL WHOSE NAME NO LONGER MATCHES (fails CLOSED) ──────────
 --
--- `Jeffrey Feria Duran` holds an account with role 'official' whose
--- `profiles.full_name` matches NO active directory row -- the directory
--- row at display_order 10 was renamed to `Jeffrey Cataylo Lastimoso` on
--- 2026-10-01. This is the live instance of the zero-match half of the
--- string-join fragility CLAUDE.md records, and it was found while
--- verifying this migration.
+-- `Jeffrey Feria Duran` held an account with role 'official' whose
+-- `profiles.full_name` matched NO active directory row -- the directory
+-- row at display_order 10 had been renamed to `Jeffrey Cataylo
+-- Lastimoso` on 2026-10-01. This was the live instance of the zero-match
+-- half of the string-join fragility CLAUDE.md records, and it was found
+-- while verifying this migration.
 --
 --   official_id_for_current_user()                    NULL
 --   INSERT (any official_id)                          REFUSED 42501
 --
--- Which is the right direction: that official cannot publish their own
--- hours, and cannot touch anybody else's. The dashboard says so in
+-- Which was the right direction: that official could not publish his own
+-- hours, and could not touch anybody else's. The dashboard says so in
 -- words rather than offering a form that saves nothing.
+--
+-- ✅ THE DATA WAS CORRECTED ON 2026-10-02 -- see migration 027. The
+-- same row, kept, had its `full_name` restored. Re-measured as Jeffrey
+-- afterwards:
+--
+--   official_id_for_current_user()    311c140b-7a9f-449b-bf1f-9371f46c304f
+--   insert his OWN availability       ACCEPTED rows=1
+--   insert the TREASURER's            REFUSED 42501
+--
+-- ⚠️ The guard itself is unchanged and was never the problem: it failed
+-- CLOSED throughout, which is exactly what it is for. A name mismatch
+-- cost that official his own hours and gave him nobody else's.
 --
 -- ⚠️ CLEANUP LEFT FOR THE SQL EDITOR. The single probe row was removed
 -- through a temporary SECURITY DEFINER helper, because the connector

@@ -19,7 +19,7 @@ describe('hasBundledPhoto', () => {
   })
 
   it('is false for a name the map does not hold', () => {
-    expect(hasBundledPhoto('Jeffrey Cataylo Lastimoso')).toBe(false)
+    expect(hasBundledPhoto('Nobody In This Directory')).toBe(false)
     expect(hasBundledPhoto('Somebody Else')).toBe(false)
   })
 
@@ -50,6 +50,78 @@ describe('hasBundledPhoto', () => {
   })
 })
 
+// ⚠️ THE REGRESSION GUARD FOR THE 2026-10-01 INCIDENT.
+//
+// A directory row at `display_order` 10 was renamed from
+// "Jeffrey Feria Duran" to "Jeffrey Cataylo Lastimoso". Two things
+// broke and NEITHER reported anything: the portrait stopped resolving,
+// because this map is keyed on the exact `barangay_officials.full_name`;
+// and the official's position permissions stopped resolving, because an
+// account is linked to its directory row by the same string.
+//
+// The data was corrected in migration 027. These tests are what makes a
+// repeat loud instead of silent -- a Jest failure naming the key, rather
+// than a generic icon on the public Officials page that nobody queries.
+describe('the portrait keys are the canonical directory names', () => {
+  // The exact eleven, written out. A test that derives this list from
+  // the map itself would pass no matter what the map said.
+  const CANONICAL = [
+    'Hon. Frankie Credo',
+    'Alexis Theress P. Tan',
+    'Adelina Fabillar Remata',
+    'Caroline Catan Amparado',
+    'Sheila Mae Flores Bardago',
+    'Harold Katada Baroy',
+    'Moronihea Alcancia Cabrera',
+    'Arnulfo Abol Catalan',
+    'Rey Catadman Barba',
+    'Jeffrey Feria Duran',
+    'Nicholas Khyle R. Mondoñedo',
+  ]
+
+  it('carries exactly the canonical set, no more and no fewer', () => {
+    expect([...Object.keys(officialPhotos)].sort()).toEqual([...CANONICAL].sort())
+  })
+
+  it('still carries the Kagawad whose name was corrupted', () => {
+    expect(hasBundledPhoto('Jeffrey Feria Duran')).toBe(true)
+    expect(photoFor('Jeffrey Feria Duran', null)).toBeTruthy()
+  })
+
+  // ⚠️ The portrait must NEVER be re-keyed to the erroneous name. Doing
+  // so would make the page look fixed while attaching one person's face
+  // to a name the barangay says is not an official -- the exact error
+  // this file's own header records for the health centre nurse.
+  it('does NOT carry the erroneous 2026-10-01 rename as a key', () => {
+    expect(hasBundledPhoto('Jeffrey Cataylo Lastimoso')).toBe(false)
+    expect(Object.keys(officialPhotos)).not.toContain('Jeffrey Cataylo Lastimoso')
+  })
+
+  // ⚠️ The directory spells middle names OUT IN FULL -- Catan, Flores,
+  // Katada, Abol, Catadman, Fabillar. "Jeffrey F. Duran" is a plausible
+  // way to write the same person and would break the match just as
+  // thoroughly as "Lastimoso" did, silently, because an initial LOOKS
+  // right. The two genuine initials in the directory are part of names
+  // the barangay itself abbreviates, so they are named here rather than
+  // pattern-matched away.
+  const SPELLED_WITH_AN_INITIAL = ['Alexis Theress P. Tan', 'Nicholas Khyle R. Mondoñedo']
+
+  it('abbreviates no middle name the barangay spells out', () => {
+    Object.keys(officialPhotos)
+      .filter((name) => !SPELLED_WITH_AN_INITIAL.includes(name))
+      .forEach((name) => {
+        expect(name).not.toMatch(/\b[A-Z]\.(\s|$)/)
+      })
+  })
+
+  it('has no key with stray whitespace, which would never match a row', () => {
+    Object.keys(officialPhotos).forEach((name) => {
+      expect(name).toBe(name.trim())
+      expect(name).not.toMatch(/\s{2,}/)
+    })
+  })
+})
+
 describe('photoFor', () => {
   it('prefers an uploaded photo_url over the bundled map', () => {
     expect(photoFor(KEYED, 'https://example.com/portrait.jpg'))
@@ -62,7 +134,7 @@ describe('photoFor', () => {
   })
 
   it('is null when there is neither', () => {
-    expect(photoFor('Jeffrey Cataylo Lastimoso', null)).toBeNull()
+    expect(photoFor('Nobody In This Directory', null)).toBeNull()
     expect(photoFor(undefined, undefined)).toBeNull()
   })
 })
@@ -73,7 +145,16 @@ describe('photoFor', () => {
 // the warning.
 describe('portraitWillBeLost', () => {
   it('is true when a rename leaves a keyed name for an unkeyed one', () => {
-    expect(portraitWillBeLost(KEYED, 'Jeffrey Cataylo Lastimoso', null)).toBe(true)
+    expect(portraitWillBeLost(KEYED, 'Nobody In This Directory', null)).toBe(true)
+  })
+
+  // ⚠️ THE EXACT RENAME THAT HAPPENED, as a regression case. On
+  // 2026-10-01 at 04:58 an `edited` action replaced the Kagawad's name
+  // with "Jeffrey Cataylo Lastimoso" and his portrait vanished with no
+  // warning anywhere. This is the warning that edit would get today.
+  it('would have warned about the 2026-10-01 rename that cost a portrait', () => {
+    expect(portraitWillBeLost('Jeffrey Feria Duran', 'Jeffrey Cataylo Lastimoso', null))
+      .toBe(true)
   })
 
   it('is false when the official has an uploaded photo to fall back on', () => {
@@ -120,8 +201,8 @@ describe('PersonAvatar', () => {
   // yet. That is precisely how a lost portrait sat on the public page
   // unnoticed.
   it('names the fallback, so a missing photo is not silent', () => {
-    render(<PersonAvatar name="Jeffrey Cataylo Lastimoso" fallbackIcon={<span>icon</span>} />)
-    expect(screen.getByRole('img', { name: 'No photo on file for Jeffrey Cataylo Lastimoso' }))
+    render(<PersonAvatar name="Nobody In This Directory" fallbackIcon={<span>icon</span>} />)
+    expect(screen.getByRole('img', { name: 'No photo on file for Nobody In This Directory' }))
       .toBeInTheDocument()
   })
 
