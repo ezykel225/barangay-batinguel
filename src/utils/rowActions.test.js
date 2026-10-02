@@ -9,6 +9,7 @@
 import fs from 'fs'
 import path from 'path'
 import {
+  actionCellIsEmpty,
   DOCUMENT_ACTION_KEYS,
   DOCUMENT_ACTION_LABELS,
   RESERVATION_ACTION_KEYS,
@@ -304,16 +305,22 @@ describe('every key this module emits is wired in the dashboard', () => {
   // `overflow: auto` and clips an absolutely-positioned menu, which was
   // measured at 69px past the wrapper and not painted at all.
   it('passes portal on both queue menus', () => {
-    const docMenu = OFFICIAL.slice(
-      OFFICIAL.indexOf('items={docRequestMenuItems(req)}') - 400,
-      OFFICIAL.indexOf('items={docRequestMenuItems(req)}'),
-    )
-    expect(docMenu).toContain('portal')
-    const resMenu = OFFICIAL.slice(
-      OFFICIAL.indexOf('items={reservationMenuItems(res)}') - 400,
-      OFFICIAL.indexOf('items={reservationMenuItems(res)}'),
-    )
-    expect(resMenu).toContain('portal')
+    // Every <ActionMenu ... /> element, sliced to its own closing tag,
+    // so neither assertion depends on how the items are spelled at the
+    // call site -- the shape the first version of this test did depend
+    // on, and which the card-mode pass then changed.
+    const elements = []
+    for (let at = OFFICIAL.indexOf('<ActionMenu'); at > -1;
+      at = OFFICIAL.indexOf('<ActionMenu', at + 1)) {
+      elements.push(OFFICIAL.slice(at, OFFICIAL.indexOf('/>', at)))
+    }
+    const queue = elements.filter((el) =>
+      el.includes('documentRequestSubject') || el.includes('reservationSubject'))
+    expect(queue).toHaveLength(2)
+    // ⚠️ `.table-wrapper` has `overflow: auto` and clips an
+    // absolutely-positioned menu -- measured at 69px past the wrapper
+    // and not painted at all. `portal` is what lifted that.
+    queue.forEach((el) => expect(el).toMatch(/\bportal\b/))
   })
 
   // ⚠️ No item carries a `disabled` flag, because `ActionMenu` has no
@@ -323,5 +330,118 @@ describe('every key this module emits is wired in the dashboard', () => {
   it('keeps the re-entrancy guards that the disabled attribute was not', () => {
     expect(OFFICIAL).toContain('if (processingDocRequestIds.has(requestId)) return')
     expect(OFFICIAL).toContain('if (processingReservationIds.has(reservation.id)) return')
+  })
+})
+
+// ─── The card-mode ACTION heading ─────────────────────────────────────
+//
+// ⚠️ Getting this backwards hides the "Secretary only" note instead of
+// the gap, and nothing in the markup would say so -- which is why the
+// rule is a function with tests rather than an `&&` in the JSX.
+describe('whether a row has an empty action cell', () => {
+  it('is empty when there are no items and no note', () => {
+    expect(actionCellIsEmpty({ itemCount: 0, noteShown: false })).toBe(true)
+    expect(actionCellIsEmpty({})).toBe(true)
+    expect(actionCellIsEmpty()).toBe(true)
+  })
+
+  it('is NOT empty when the menu has items', () => {
+    expect(actionCellIsEmpty({ itemCount: 1, noteShown: false })).toBe(false)
+    expect(actionCellIsEmpty({ itemCount: 3, noteShown: false })).toBe(false)
+  })
+
+  // ⚠️ THE LOAD-BEARING ONE. An official who lacks the position gets no
+  // items AND the note explaining why. The heading belongs to that
+  // note, so the cell is not empty -- hiding it would remove the one
+  // line saying why there are no controls.
+  it('is NOT empty when the role note is shown, even with no items', () => {
+    expect(actionCellIsEmpty({ itemCount: 0, noteShown: true })).toBe(false)
+  })
+
+  // The real rows, composed the way the dashboard composes them.
+  const docRowIsEmpty = (status, isSecretary, canGenerateDocument = false) =>
+    actionCellIsEmpty({
+      itemCount: documentRequestActions({ status, isSecretary, canGenerateDocument }).length,
+      noteShown: !isSecretary,
+    })
+
+  it('collapses a claimed or declined document row for the Secretary', () => {
+    expect(docRowIsEmpty('claimed', true)).toBe(true)
+    expect(docRowIsEmpty('declined', true)).toBe(true)
+  })
+
+  it('keeps every actionable document row', () => {
+    expect(docRowIsEmpty('pending', true)).toBe(false)
+    expect(docRowIsEmpty('approved', true)).toBe(false)
+    expect(docRowIsEmpty('ready_for_pickup', true)).toBe(false)
+    // And one that is actionable ONLY because a document may be printed.
+    expect(docRowIsEmpty('approved', true, true)).toBe(false)
+  })
+
+  it('keeps every document row for a non-Secretary, note and all', () => {
+    DOCUMENT_STATUSES.forEach((status) => {
+      expect(docRowIsEmpty(status, false)).toBe(false)
+    })
+  })
+
+  const resRowIsEmpty = (status, isTreasurer) =>
+    actionCellIsEmpty({
+      itemCount: reservationActions({ status, isTreasurer }).length,
+      noteShown: status === 'pending' && !isTreasurer,
+    })
+
+  it('collapses a decided reservation row for everybody', () => {
+    ;['approved', 'declined', 'cancelled'].forEach((status) => {
+      expect(resRowIsEmpty(status, true)).toBe(true)
+      expect(resRowIsEmpty(status, false)).toBe(true)
+    })
+  })
+
+  it('keeps a pending reservation row for the Treasurer and for anybody else', () => {
+    expect(resRowIsEmpty('pending', true)).toBe(false)
+    // The note, not a menu -- but still something the heading names.
+    expect(resRowIsEmpty('pending', false)).toBe(false)
+  })
+})
+
+// ⚠️ The class is only half of it: the CSS has to collapse the heading
+// AND the divider that the protected block leaves on the cell before a
+// hidden one, and it must do neither above 768px.
+describe('the card-mode rule is wired and scoped', () => {
+  const CSS = fs.readFileSync(
+    path.join(__dirname, '..', 'components', 'Sidebar.css'), 'utf8',
+  )
+  const OFFICIAL = fs.readFileSync(
+    path.join(__dirname, '..', 'dashboards', 'OfficialDashboard.jsx'), 'utf8',
+  )
+
+  it('marks the row from the shared predicate in both queues', () => {
+    expect(OFFICIAL.match(/actionCellIsEmpty\(\{/g)).toHaveLength(2)
+    expect(OFFICIAL.match(/'row-no-actions'/g)).toHaveLength(2)
+  })
+
+  it('hides the cell and the divider above it', () => {
+    expect(CSS).toContain('.dashboard-table tr.row-no-actions td:last-child')
+    expect(CSS).toContain('.dashboard-table tr.row-no-actions td:nth-last-child(2)')
+  })
+
+  // ⚠️ Inside the media query, so the desktop column is untouched. The
+  // rule sits AFTER the protected mobile table-to-card block, which is
+  // not edited.
+  //
+  // ⚠️ COMMENTS ARE STRIPPED FIRST, and the first version of this test
+  // did not strip them -- so it PASSED with the rule moved outside the
+  // media query entirely. The explanatory comment above the rule says
+  // the words `@media (max-width: 768px)`, and `lastIndexOf` was
+  // finding that sentence rather than a real at-rule. The project's own
+  // rule: ask which step produced the result.
+  it('applies only below 769px', () => {
+    const code = CSS.replace(/\/\*[\s\S]*?\*\//g, '')
+    const at = code.indexOf('.dashboard-table tr.row-no-actions')
+    expect(at).toBeGreaterThan(-1)
+    const query = code.lastIndexOf('@media (max-width: 768px)', at)
+    expect(query).toBeGreaterThan(-1)
+    // Nothing closes that query between it and the rule.
+    expect(code.slice(query, at)).not.toContain('\n}')
   })
 })

@@ -153,3 +153,25 @@ export const reservationActions = ({ status, isTreasurer = false } = {}) => {
     { key: 'deny', label: RESERVATION_ACTION_LABELS.deny, danger: true },
   ]
 }
+
+// ─── ⚠️ A CARD WITH AN "ACTION" LABEL AND NOTHING UNDER IT ────────────
+//
+// Below 769px `Sidebar.css`'s protected table-to-card block turns every
+// row into a card and prints each cell's `data-label` as a heading
+// through `td::before`. The Action cell is always in the markup --
+// desktop needs it for the column -- so a row with nothing to offer
+// showed the word ACTION with empty space beneath it, which reads as a
+// control that failed to render.
+//
+// ⚠️ "No items" is NOT the same as "nothing to show". An official who
+// lacks the position still gets the existing "Secretary only" /
+// "Treasurer only" note in that cell, and that note is exactly what the
+// label belongs to -- hiding it would remove the one line explaining
+// why there are no controls. So the question this answers is whether
+// the cell renders ANYTHING, not whether the menu has items.
+//
+// Pure and unit-tested, rather than an inline `&&` in the JSX, because
+// getting it backwards hides the note instead of the gap and nothing
+// about the markup would say so.
+export const actionCellIsEmpty = ({ itemCount = 0, noteShown = false } = {}) =>
+  !noteShown && (itemCount || 0) === 0

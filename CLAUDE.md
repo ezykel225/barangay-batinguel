@@ -65,7 +65,7 @@ banned below: it silences the one check this project has.
 
 ### Tests
 
-Thirty-four suites, 753 tests:
+Thirty-four suites, 764 tests:
 
 | File | What it covers |
 |---|---|
@@ -100,7 +100,7 @@ Thirty-four suites, 753 tests:
 | `src/documents/documentData.test.js` | 24 tests over the normalized shape a template receives: the Manila date (assembled from `MONTH_NAMES`, not from a locale's ordering), the `SAMPLE-` reference, long/accented/suffixed names, and the rule that an absent value is **reported, never filled** — no `N/A`, `UNKNOWN` or `TBD` reaches a field |
 | `src/documents/DocumentPreview.test.js` | 26 tests rendering all four prototype templates. Run **both directions**: flipping `DOCUMENT_TEMPLATE_MODE` to `'official'` fails exactly 3 — the watermark tests — and nothing else, which is what proves the one constant controls it. Also that the indigency template states no income or finding, and the residency one no duration |
 | `src/documents/documentPermissions.test.js` | 19 source-reading tests. `canGenerate` could be correct and wired to the wrong flag, so these pin the wiring: the Resident and Nurse dashboards import the generator **not at all**, `isSecretary` is still `position === 'Barangay Secretary'`, there is exactly **one** call site, no template imports Supabase, and nothing reads `residents_registry` |
-| `src/utils/rowActions.test.js` | 31 tests over what each queue row offers. Every document status both directions, including that `claimed` and `declined` offer **nothing** so no ⋮ is rendered at all; that a non-Secretary and a non-Treasurer get an **empty list** rather than disabled items; that Generate Document is gated **only** by the answer `canGenerate` gave and is always the **last** item (the menu focuses its first on open); and that each accessible name reads as English — `Approve document request from Ezequel Bautista`, `Generate Document for Ezequel Bautista`, `Approve reservation on 10 October 2026`. Plus 10 source-reading guards that every key it emits has a handler and an icon in the dashboard, that those handlers are the **existing** ones, and that the processing-set re-entrancy guards survived the loss of the `disabled` attribute |
+| `src/utils/rowActions.test.js` | 42 tests over what each queue row offers. Every document status both directions, including that `claimed` and `declined` offer **nothing** so no ⋮ is rendered at all; that a non-Secretary and a non-Treasurer get an **empty list** rather than disabled items; that Generate Document is gated **only** by the answer `canGenerate` gave and is always the **last** item (the menu focuses its first on open); and that each accessible name reads as English — `Approve document request from Ezequel Bautista`, `Generate Document for Ezequel Bautista`, `Approve reservation on 10 October 2026`. Plus 10 source-reading guards that every key it emits has a handler and an icon in the dashboard, that those handlers are the **existing** ones, and that the processing-set re-entrancy guards survived the loss of the `disabled` attribute |
 | `src/utils/officialAvailability.test.js` | 24 tests over per-official consultation hours. The load-bearing one **reads `026_official_availability.sql`** and asserts the four statuses the form offers are exactly the four the CHECK accepts — the same thing `reservationWindow.test.js` does for migration 020 |
 | `src/components/EServicesMenu.test.js` | 15 tests over the E-Services dropdown and the catalogue: the disclosure pattern, Escape and focus restore, that it does **not** use `role="menu"`, and that every service states its access requirement in words |
 | `src/utils/residentTabs.test.js` | 7 tests over `?tab=` resolution — a hint, never authorization |
@@ -3995,8 +3995,8 @@ were never going to fit.
 | `Generate Document` + icon inside a 166px item | fits, no clipping, 40px tall |
 | Target sizes (SC 2.5.8) | trigger 40x40, each item 166x40 |
 | axe-core 4.13 (A + AA + best practice), 3 states x 2 widths | see below |
-| Jest | 34 suites, **753 tests** |
-| Production build | clean, no ESLint warnings, **224 kB** gzipped, CSS 24 kB (−28 B) |
+| Jest | 34 suites, **764 tests** |
+| Production build | clean, no ESLint warnings, **224 kB** gzipped, CSS 24 kB |
 
 ⚠️ **Two axe findings, both pre-existing or harness.**
 `page-has-heading-one` is the bare capture fragment, which has no `<h1>`
@@ -4019,12 +4019,56 @@ The menu, its items, its accessible names and its anchoring are real
 component output; the **tables around them are reproductions**, matching
 the dashboard JSX column for column and `data-label` for `data-label`.
 
-One thing a live pass should look at, visible in the 375px capture and
-**unchanged by this pass**: in card mode a `claimed` row still renders
-the `ACTION` label with nothing under it, because the `<td>` is always
-present and the protected block's `::before` reads `data-label`. It
-looked the same with the buttons; it is simply more noticeable beside a
-compact ⋮.
+### ✅ The card with an ACTION heading and nothing under it — fixed
+
+Recorded here as pre-existing and out of scope, then fixed on its own.
+Below 769px the protected table-to-card block prints every cell's
+`data-label` through `td::before`, and the Action `<td>` is always in
+the markup because the desktop table needs the column — so a document
+request at `claimed` or `declined`, and a reservation that is no longer
+`pending`, showed the word **ACTION** with empty space beneath it. That
+reads as a control that failed to render.
+
+`actionCellIsEmpty` in `rowActions.js` decides it, and the two queues
+put `row-no-actions` on the **row**. Two appended rules, scoped to
+`@media (max-width: 768px)`, hide the cell and take the divider off the
+one above it.
+
+⚠️ **"No items" is NOT "nothing to show", and that is the load-bearing
+case.** An official who lacks the position still gets *Secretary only*
+/ *Treasurer only* in that cell, and the heading is exactly what that
+note belongs to — hiding it would remove the one line saying why there
+are no controls. So those rows are **never** marked, at any status.
+Verified both directions in the browser: as a non-Secretary all four
+document rows keep the heading and the note; as the Secretary only
+`claimed` and `declined` collapse.
+
+⚠️ **Two declarations, because hiding the cell alone leaves a
+hairline.** `.dashboard-table td:last-child` in the protected block is
+what removes the final divider. With the last cell hidden, the cell
+*before* it becomes the visually last one and keeps its
+`border-bottom`, so a line sat across the bottom of the card with
+nothing under it. `:nth-last-child(2)` takes it off — measured
+(`prevBorder` 1px → 0px), not assumed.
+
+⚠️ **The desktop column is untouched**, which is the point of putting
+the rules inside the media query rather than removing the `<td>`.
+Measured at 1280: a marked row's action cell is still `display: flex`
+and still **73.5px** wide on Document Requests and **142px** on
+Reservations — the same as every unmarked row in the same table, so
+nothing about the column moved. Below 769px the collapsed cards are
+**83px shorter**.
+
+⚠️ **The protected block is still not edited** and still hashes to its
+pre-X2 bytes; both new selectors are `(0,2,2)`, one step above
+`.dashboard-table td:last-child` `(0,2,1)` — raised deliberately,
+because an equal-specificity rule would have to beat `td:last-child` on
+source order alone while saying nothing about which cell it means.
+
+`rowActions.test.js` covers it in both directions, including every
+document status for a non-Secretary and every reservation status for a
+non-Treasurer, plus three guards that the rule is wired from the shared
+predicate in both queues and sits inside the media query.
 
 ### `.btn-generate` was removed, not left behind
 
@@ -4245,9 +4289,9 @@ derives her initials from. It is no longer displayed as a label.
 - **Source maps ship to production** (~7 MB), so the original JSX is
   publicly reconstructable. `GENERATE_SOURCEMAP=false` in Vercel fixes it.
 - **`public/logo.png` is 984 KB and referenced by nothing.**
-- **Thin automated test coverage.** 753 tests in thirty-four suites: one
+- **Thin automated test coverage.** 764 tests in thirty-four suites: one
   smoke test over `<App />`, which fails without `.env` because
-  `supabaseClient.js` throws at import time, and 752 tests over the
+  `supabaseClient.js` throws at import time, and 763 tests over the
   resident workflow rules, the display labels, the booking window, the
   month grid and its three feature layers, the document-request filter,
   the queue rows' action lists, the ⋮ menu's keyboard and authorization

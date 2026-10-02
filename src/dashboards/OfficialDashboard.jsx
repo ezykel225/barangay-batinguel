@@ -42,6 +42,7 @@ import { logActivity } from '../utils/activityLog'
 import DocumentPreview from '../documents/DocumentPreview'
 import { canGenerate } from '../documents/documentRegistry'
 import {
+  actionCellIsEmpty,
   documentRequestActions,
   documentRequestSubject,
   reservationActions,
@@ -3500,7 +3501,22 @@ const OfficialDashboard = () => {
                       </thead>
                       <tbody>
                         {filteredReservations.map((res) => (
-                          <tr key={res.id}>
+                          <tr
+                            key={res.id}
+                            // ⚠️ CARD MODE ONLY -- see the Document
+                            // Requests table. Only `pending` puts
+                            // anything in the Action cell: the menu for
+                            // the Treasurer, the "Treasurer only" note
+                            // for anybody else. A decided booking
+                            // renders nothing, so below 769px the cell,
+                            // its ACTION heading and the divider above
+                            // it are collapsed rather than left as a
+                            // label with a gap under it.
+                            className={actionCellIsEmpty({
+                              itemCount: reservationMenuItems(res).length,
+                              noteShown: res.status === 'pending' && !isTreasurer,
+                            }) ? 'row-no-actions' : undefined}
+                          >
                             <td data-label="Name">{res.full_name}</td>
                             <td data-label="Phone">{res.contact_number || '—'}</td>
                             {/* Truncated with an ellipsis rather than
@@ -3669,8 +3685,27 @@ const OfficialDashboard = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {visibleDocumentRequests.map((req) => (
-                        <tr key={req.id}>
+                      {visibleDocumentRequests.map((req) => {
+                        // Built once: the row needs the count to decide
+                        // whether its card keeps an Action heading, and
+                        // building it twice would be two answers.
+                        const actions = isSecretary ? docRequestMenuItems(req) : []
+                        return (
+                        <tr
+                          key={req.id}
+                          // ⚠️ CARD MODE ONLY. The class carries no
+                          // styling above 768px, so the desktop column
+                          // and every cell in it are untouched; below
+                          // it, the appended rule in `Sidebar.css`
+                          // collapses an Action cell that renders
+                          // nothing, label and divider included. A
+                          // non-Secretary still sees the note, so the
+                          // row is NOT marked empty for them.
+                          className={actionCellIsEmpty({
+                            itemCount: actions.length,
+                            noteShown: !isSecretary,
+                          }) ? 'row-no-actions' : undefined}
+                        >
                           <td data-label="Resident">{req.full_name}</td>
                           <td data-label="Document">{req.document_type}</td>
                           <td data-label="Purpose">{req.purpose}</td>
@@ -3722,14 +3757,15 @@ const OfficialDashboard = () => {
                               <ActionMenu
                                 portal
                                 subject={documentRequestSubject(req.full_name)}
-                                items={docRequestMenuItems(req)}
+                                items={actions}
                               />
                             ) : (
                               <span className="role-restricted-note">Secretary only</span>
                             )}
                           </td>
                         </tr>
-                      ))}
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
