@@ -65,7 +65,7 @@ banned below: it silences the one check this project has.
 
 ### Tests
 
-Twenty-eight suites, 619 tests:
+Twenty-nine suites, 627 tests:
 
 | File | What it covers |
 |---|---|
@@ -95,6 +95,7 @@ Twenty-eight suites, 619 tests:
 | `src/utils/homeSections.test.js` | 19 tests over the Home page's two summaries: the announcement excerpt (a very-long-body regression guard, the word boundary, the unbreakable token) and `nextCollection`, whose load-bearing one is that it returns **null rather than a guess** when no row carries a weekday name, and counts the rows it left out |
 | `src/pages/Announcements.test.js` | 8 tests over the browse page, the FIRST suite that renders a page component. The load-bearing pair: the card shows an excerpt and `/announcements/:id` still renders the whole 2,159-character notice, from the same row. Also that each card is ONE link with no nested anchor |
 | `src/pages/Events.test.js` | 14 tests over the Calendar \| List switcher, the list card and date selection. The load-bearing one: a card shows a time **only when `event_time` holds one** — it is NULL on every live row — and never digs one out of `location`, which on three legacy rows begins with a time somebody typed. Two more assert no heading level is skipped in either view |
+| `src/pages/EventDetails.test.js` | 8 tests over the detail page's Time row: shown with a time, **gone — label and all — for null, empty, whitespace and a missing column**, with the location left exactly as stored even when it begins with a time. Run **both directions**: with the condition removed, 5 of 8 fail |
 | `src/utils/officialAvailability.test.js` | 24 tests over per-official consultation hours. The load-bearing one **reads `026_official_availability.sql`** and asserts the four statuses the form offers are exactly the four the CHECK accepts — the same thing `reservationWindow.test.js` does for migration 020 |
 | `src/components/EServicesMenu.test.js` | 15 tests over the E-Services dropdown and the catalogue: the disclosure pattern, Escape and focus restore, that it does **not** use `role="menu"`, and that every service states its access requirement in words |
 | `src/utils/residentTabs.test.js` | 7 tests over `?tab=` resolution — a hint, never authorization |
@@ -3428,11 +3429,36 @@ page, and the detail page's body length read back.
 announcement and event card rules live in `Home.css` and are shared. Its
 event card is byte-identical at 588x102.
 
-⚠️ **One thing was left alone deliberately.**
-`EventDetails.jsx` renders `<p><strong>Time:</strong> {event.event_time}</p>`
-unconditionally, so on every live event it prints "Time:" followed by
-nothing. Same data fact as above, one page outside this pass's stated
-scope. **Not fixed, recorded here.**
+### ✅ The event detail page's empty Time row — fixed in a follow-up
+
+Recorded here as out of scope and then fixed on its own:
+`EventDetails.jsx` rendered
+`<p><strong>Time:</strong> {event.event_time}</p>` **unconditionally**,
+so on every live event the page printed "Time:" followed by nothing —
+which reads as a value that failed to load rather than one that was
+never recorded.
+
+⚠️ **The whole row is omitted, not just its value.** A label with an
+empty value beside it is the defect; a label with "—" after it would be
+asserting the barangay recorded something.
+
+It calls the same `eventTimeLabel` the list card uses, so the two
+surfaces cannot disagree about whether a row has a time or how it
+reads — and it therefore also does **not** dig one out of `location`.
+`event_time` is `time without time zone`, so the database itself
+refuses anything that is not a time; the empty-string and
+whitespace cases the tests cover can only reach the component from a
+client, never from the column.
+
+⚠️ **The value is now formatted** (`14:00:00` → `2:00 PM`) rather than
+printed raw, which the list card already did and which *No raw database
+value is shown to a user* requires. That is slightly beyond "omit the
+row when empty" — one line to revert if the raw form is wanted.
+
+`EventDetails.test.js`, 8 tests, run **both directions**: with the
+condition removed, **5 of 8 fail**; the other three pass trivially
+because they cover the title, date, description and location, which the
+change does not touch.
 
 ---
 
@@ -3632,9 +3658,9 @@ derives her initials from. It is no longer displayed as a label.
 - **Source maps ship to production** (~7 MB), so the original JSX is
   publicly reconstructable. `GENERATE_SOURCEMAP=false` in Vercel fixes it.
 - **`public/logo.png` is 984 KB and referenced by nothing.**
-- **Thin automated test coverage.** 619 tests in twenty-eight suites: one
+- **Thin automated test coverage.** 627 tests in twenty-nine suites: one
   smoke test over `<App />`, which fails without `.env` because
-  `supabaseClient.js` throws at import time, and 618 tests over the
+  `supabaseClient.js` throws at import time, and 626 tests over the
   resident workflow rules, the display labels, the booking window, the
   month grid and its three feature layers, the document-request filter,
   the ⋮ menu's keyboard and authorization behaviour, the modal
@@ -3693,12 +3719,12 @@ derives her initials from. It is no longer displayed as a label.
   and counted in a note rather than placed on some day anyway.
 - **`events.event_time` is NULL on every row**, and three legacy rows
   carry their time inside `location` instead
-  (`"2:00 PM - Main Covered Court"`). The list card renders a time only
-  when the column holds one and never parses it out of `location`, so
-  today no card shows a separate time. ⚠️ **`EventDetails.jsx` still
-  prints `Time:` unconditionally**, so every live event's detail page
-  shows that label followed by nothing. One line, left for a pass whose
-  scope includes that page.
+  (`"2:00 PM - Main Covered Court"`). Both the list card and the detail
+  page render a Time only when the column holds one, and neither parses
+  it out of `location`, so today no event shows a separate time
+  anywhere. The legacy strings are left exactly as somebody typed them;
+  moving them into `event_time` is a data correction for the barangay
+  to make, not a display function's guess.
 - **No lint script and no typecheck script** — see *Commands* and
   *Tests* above.
 
