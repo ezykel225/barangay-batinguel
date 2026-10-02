@@ -18,6 +18,10 @@ import {
   FaSearch,
   FaTimes,
   FaList,
+  FaCheck,
+  FaBoxOpen,
+  FaCheckDouble,
+  FaPrint,
 } from 'react-icons/fa'
 import { supabase } from '../supabase/supabaseClient'
 import { pathFromPublicUrl } from '../utils/storagePath'
@@ -37,6 +41,12 @@ import {
 import { logActivity } from '../utils/activityLog'
 import DocumentPreview from '../documents/DocumentPreview'
 import { canGenerate } from '../documents/documentRegistry'
+import {
+  documentRequestActions,
+  documentRequestSubject,
+  reservationActions,
+  reservationSubject,
+} from '../utils/rowActions'
 import { useConfirm } from '../components/ConfirmDialog'
 import {
   ArchiveOfficialDialog,
@@ -93,6 +103,24 @@ const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Se
 const longDate = (key) => {
   const parsed = parseDateKey(key)
   return parsed ? `${parsed.day} ${MONTH_NAMES[parsed.month]} ${parsed.year}` : ''
+}
+
+// The ⋮ menu items for the two queues carry an icon each; the words,
+// the order and which statuses offer what live in
+// `src/utils/rowActions.js`, which is pure and unit-tested. Keyed by
+// the same action keys that module emits, so a key it adds without an
+// icon here renders the label alone rather than crashing.
+const DOC_ACTION_ICONS = {
+  approve: <FaCheck />,
+  decline: <FaTimes />,
+  ready: <FaBoxOpen />,
+  claimed: <FaCheckDouble />,
+  generate: <FaPrint />,
+}
+
+const RESERVATION_ACTION_ICONS = {
+  approve: <FaCheck />,
+  deny: <FaTimes />,
 }
 
 // Queue | Calendar, Table | Calendar. One control, two tabs.
@@ -1563,6 +1591,73 @@ const OfficialDashboard = () => {
   // Only the Secretary approves/denies document requests — they manage
   // administrative documents and official records.
   const isSecretary = officialInfo?.position === 'Barangay Secretary'
+
+  // ─── What each ⋮ menu item does ────────────────────────────────────
+  //
+  // ⚠️ THE HANDLERS ARE THE EXISTING ONES, UNCHANGED. Moving a control
+  // from a button into a menu changes where it is clicked and nothing
+  // else: the same approve/decline writes, the same `.select()`
+  // readback, the same decline-reason dialog, the same Mark Claimed
+  // confirmation, the same Activity Log entries and the same SMS
+  // notification, still unawaited and still outside the decision.
+  //
+  // ⚠️ The buttons carried `disabled={processing*Ids.has(id)}` and a
+  // menu item has no disabled state -- deliberately, because an item a
+  // caller may not choose is absent rather than greyed. The double-write
+  // protection was never the attribute: `withDocRequestGuard`,
+  // `handleApproveReservation` and `handleDeclineReservation` each
+  // return immediately when the row is already in their processing set,
+  // and they still do. What is lost is the visual hint on a slow write,
+  // and the alternative -- swapping the trigger for a "Working..."
+  // label -- would unmount the element the menu has just restored focus
+  // to, which is the detached-opener defect `useModalA11y` exists to
+  // prevent.
+  const docActionHandlers = {
+    approve: (req) => handleUpdateDocRequestStatus(req, 'approved'),
+    decline: (req) => handleOpenDeclineRequest(req),
+    ready: (req) => handleUpdateDocRequestStatus(req, 'ready_for_pickup'),
+    claimed: (req) => handleMarkDocRequestClaimed(req),
+    // ⚠️ Generating changes NO status. It opens the preview over the row
+    // the queue already fetched; Mark Ready and Mark Claimed stay the
+    // deliberate actions they were.
+    generate: (req) => setDocumentRequestToPrint(req),
+  }
+
+  const reservationActionHandlers = {
+    approve: (res) => handleApproveReservation(res),
+    deny: (res) => handleDeclineReservation(res),
+  }
+
+  // The two queues' items: shape from the pure module, icon from the map
+  // above, behaviour from the handlers above. Nothing here decides who
+  // may do what -- `documentRequestActions` returns an empty list for a
+  // non-Secretary and `reservationActions` for a non-Treasurer.
+  const docRequestMenuItems = (req) => documentRequestActions({
+    status: req.status,
+    isSecretary,
+    // ⚠️ `canGenerate` remains the only authority on this -- all three
+    // gates (Secretary, an eligible status, a configured template) in
+    // one call, so the cell cannot drift from the registry.
+    canGenerateDocument: canGenerate({
+      status: req.status,
+      documentType: req.document_type,
+      isSecretary,
+    }),
+    residentName: req.full_name,
+  }).map((item) => ({
+    ...item,
+    icon: DOC_ACTION_ICONS[item.key],
+    onSelect: () => docActionHandlers[item.key]?.(req),
+  }))
+
+  const reservationMenuItems = (res) => reservationActions({
+    status: res.status,
+    isTreasurer,
+  }).map((item) => ({
+    ...item,
+    icon: RESERVATION_ACTION_ICONS[item.key],
+    onSelect: () => reservationActionHandlers[item.key]?.(res),
+  }))
 
   // Display name: first name only for greeting
   const firstName = userProfile?.full_name
@@ -3472,23 +3567,27 @@ const OfficialDashboard = () => {
                                 {reservationStatusLabel(res.status)}
                               </span>
                             </td>
-                            <td data-label="Action">
+                            {/* ⚠️ The two decisions are in a ⋮ menu since
+                                the PR #24 polish pass, and the Treasurer
+                                gate is UNCHANGED: `reservationActions`
+                                returns an empty list for anybody else, so
+                                the note below is what they still see. The
+                                handlers, the notification and the audit
+                                entry are the same ones the buttons
+                                called. Only `pending` is decidable, so a
+                                decided booking renders no trigger at all
+                                rather than an empty menu. */}
+                            <td data-label="Action" className="action-cell">
                               {res.status === 'pending' && (
                                 isTreasurer ? (
-                                  <>
-                                    <button
-                                      className="btn-approve"
-                                      disabled={processingReservationIds.has(res.id)}
-                                      onClick={() => handleApproveReservation(res)}>
-                                      Approve
-                                    </button>
-                                    <button
-                                      className="btn-deny"
-                                      disabled={processingReservationIds.has(res.id)}
-                                      onClick={() => handleDeclineReservation(res)}>
-                                      Deny
-                                    </button>
-                                  </>
+                                  <ActionMenu
+                                    portal
+                                    subject={reservationSubject({
+                                      dateLabel: longDate(res.preferred_date),
+                                      residentName: res.full_name,
+                                    })}
+                                    items={reservationMenuItems(res)}
+                                  />
                                 ) : (
                                   <span className="role-restricted-note">Treasurer only</span>
                                 )
@@ -3588,71 +3687,43 @@ const OfficialDashboard = () => {
                           <td data-label="Submitted">
                             {req.created_at ? new Date(req.created_at).toLocaleDateString() : '—'}
                           </td>
+                          {/* ⚠️ A ⋮ MENU SINCE THE PR #24 POLISH PASS,
+                              and the header on `ActionMenu` used to name
+                              this very cell as the reason it could not
+                              be one. That rule was narrowed on the repo
+                              owner's review of the live table: the
+                              Action column was a band of buttons wide
+                              enough to set the row height, and X6's
+                              Generate Document had just made it a
+                              three-control cell.
+
+                              ⚠️ NOTHING ABOUT AUTHORIZATION MOVED.
+                              `isSecretary` is the same flag the RLS
+                              UPDATE policy's position requires, it still
+                              gates the whole cell, and
+                              `documentRequestActions` returns an empty
+                              list without it -- so an action this
+                              official may not perform is ABSENT, never
+                              present and disabled.
+
+                              ⚠️ `canGenerate` still carries all three
+                              gates (Secretary, an eligible status, a
+                              configured template) in one call, inside
+                              `docRequestMenuItems`, so the cell cannot
+                              drift from the registry. Generating changes
+                              no status.
+
+                              `claimed` and `declined` offer nothing, and
+                              the menu renders no trigger at all for an
+                              empty list rather than a ⋮ that opens on
+                              nothing. */}
                           <td data-label="Action" className="action-cell">
                             {isSecretary ? (
-                              <>
-                                {req.status === 'pending' && (
-                                  <>
-                                    <button
-                                      className="btn-approve"
-                                      disabled={processingDocRequestIds.has(req.id)}
-                                      onClick={() => handleUpdateDocRequestStatus(req, 'approved')}>
-                                      Approve
-                                    </button>
-                                    <button
-                                      className="btn-deny"
-                                      disabled={processingDocRequestIds.has(req.id)}
-                                      onClick={() => handleOpenDeclineRequest(req)}>
-                                      Decline
-                                    </button>
-                                  </>
-                                )}
-                                {req.status === 'approved' && (
-                                  <button
-                                    className="btn-approve"
-                                    disabled={processingDocRequestIds.has(req.id)}
-                                    onClick={() => handleUpdateDocRequestStatus(req, 'ready_for_pickup')}>
-                                    Mark Ready
-                                  </button>
-                                )}
-                                {req.status === 'ready_for_pickup' && (
-                                  <button
-                                    className="btn-approve"
-                                    disabled={processingDocRequestIds.has(req.id)}
-                                    onClick={() => handleMarkDocRequestClaimed(req)}>
-                                    Mark Claimed
-                                  </button>
-                                )}
-                                {/* ⚠️ A BUTTON, NOT AN ActionMenu ITEM, and
-                                    that follows this project's own rule
-                                    rather than ignoring it. Document
-                                    Requests was deliberately left out of
-                                    the ⋮ conversion because its action
-                                    cell holds the Secretary's PRIMARY
-                                    decisions, and a primary decision must
-                                    never be hidden behind a menu. Adding
-                                    Generate beside Mark Ready makes a
-                                    two-button cell, which is not clutter;
-                                    converting the cell to a menu to
-                                    accommodate it would hide Approve,
-                                    Decline, Mark Ready and Mark Claimed.
-
-                                    ⚠️ `canGenerate` carries all three
-                                    gates -- Secretary, an eligible status,
-                                    and a configured template -- so this
-                                    cell cannot drift from the registry. */}
-                                {canGenerate({
-                                  status: req.status,
-                                  documentType: req.document_type,
-                                  isSecretary,
-                                }) && (
-                                  <button
-                                    className="btn-generate"
-                                    onClick={() => setDocumentRequestToPrint(req)}>
-                                    Generate Document
-                                  </button>
-                                )}
-                              </>
+                              <ActionMenu
+                                portal
+                                subject={documentRequestSubject(req.full_name)}
+                                items={docRequestMenuItems(req)}
+                              />
                             ) : (
                               <span className="role-restricted-note">Secretary only</span>
                             )}

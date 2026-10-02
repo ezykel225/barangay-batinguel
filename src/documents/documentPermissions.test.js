@@ -87,11 +87,30 @@ describe('the gate the dashboard actually applies', () => {
   it('passes isSecretary into canGenerate at the call site', () => {
     const call = OFFICIAL.slice(
       OFFICIAL.indexOf('canGenerate({'),
-      OFFICIAL.indexOf('canGenerate({') + 220,
+      OFFICIAL.indexOf('})', OFFICIAL.indexOf('canGenerate({')),
     )
     expect(call).toContain('status: req.status')
     expect(call).toContain('documentType: req.document_type')
     expect(call).toContain('isSecretary')
+  })
+
+  // ⚠️ SINCE PR #24 THE BUTTON IS A ⋮ MENU ITEM, and `canGenerate` is
+  // called to decide whether that item exists at all. So the answer has
+  // to reach the item builder and nothing else may decide it:
+  // `rowActions.documentRequestActions` is TOLD the answer and never
+  // re-derives it from the status.
+  it('feeds the answer straight into the item builder', () => {
+    expect(OFFICIAL).toMatch(/canGenerateDocument: canGenerate\(\{/)
+    // Comments stripped: the module EXPLAINS in prose that
+    // `documentRegistry.canGenerate` stays the only authority, and a
+    // guard that flagged its own explanation would push it out of the
+    // file. The same reason the voter-reference guard below does it.
+    const builder = codeOnly(read('utils/rowActions.js'))
+    expect(builder).not.toContain('documentRegistry')
+    expect(builder).not.toContain('canGenerate(')
+    expect(builder).toContain('canGenerateDocument')
+    // And the prose is still there to be read.
+    expect(prose('utils/rowActions.js')).toContain('documentRegistry.canGenerate')
   })
 
   // One call site, so a second ungated button cannot appear beside it.
@@ -169,14 +188,42 @@ describe('generation changes no status', () => {
     expect(preview).not.toContain('update(')
   })
 
-  it('does not call the status handler from the Generate button', () => {
-    const cell = OFFICIAL.slice(
-      OFFICIAL.indexOf('canGenerate({'),
-      OFFICIAL.indexOf('canGenerate({') + 600,
+  // ⚠️ REWRITTEN FOR PR #24, NOT DELETED. This used to slice 600
+  // characters forward from the `canGenerate({` call, which worked
+  // while Generate was a lone button in the action cell and would have
+  // read as a pass for the wrong reason once the four stage-advancing
+  // handlers moved into the same object. It now pins the `generate`
+  // entry of `docActionHandlers` itself -- one key, one line.
+  it('routes the Generate item to the preview and to no status write', () => {
+    const map = OFFICIAL.slice(
+      OFFICIAL.indexOf('const docActionHandlers = {'),
+      OFFICIAL.indexOf('\n  }', OFFICIAL.indexOf('const docActionHandlers = {')),
     )
-    expect(cell).not.toContain('handleUpdateDocRequestStatus')
-    expect(cell).not.toContain('handleMarkDocRequestClaimed')
-    expect(cell).toContain('setDocumentRequestToPrint')
+    const generate = map.slice(map.indexOf('generate: '))
+    expect(generate).toContain('setDocumentRequestToPrint(req)')
+    expect(generate).not.toContain('handleUpdateDocRequestStatus')
+    expect(generate).not.toContain('handleMarkDocRequestClaimed')
+    // And the two that DO advance the status are still their own
+    // separate items, so the preview did not absorb either of them.
+    expect(map).toContain("ready: (req) => handleUpdateDocRequestStatus(req, 'ready_for_pickup')")
+    expect(map).toContain('claimed: (req) => handleMarkDocRequestClaimed(req)')
+  })
+
+  // ⚠️ `GENERATABLE_STATUSES` is still what opens and closes the
+  // window, and the menu cannot have widened it: the item exists only
+  // when `canGenerate` says so, and `documentRequestActions` has no
+  // status branch of its own for it.
+  it('still offers no Generate item at claimed or declined', () => {
+    const { documentRequestActions } = require('../utils/rowActions')
+    ;['claimed', 'declined', 'pending'].forEach((status) => {
+      const keys = documentRequestActions({
+        status,
+        isSecretary: true,
+        // What canGenerate actually returns for these three.
+        canGenerateDocument: false,
+      }).map((item) => item.key)
+      expect(keys).not.toContain('generate')
+    })
   })
 
   // ⚠️ NO ACTIVITY-LOG ENTRY, and this is a decision with a reason.

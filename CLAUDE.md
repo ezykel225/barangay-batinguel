@@ -65,14 +65,14 @@ banned below: it silences the one check this project has.
 
 ### Tests
 
-Thirty-three suites, 714 tests:
+Thirty-four suites, 753 tests:
 
 | File | What it covers |
 |---|---|
 | `src/App.test.js` | One smoke test — renders `<App />` and asserts the brand name appears |
 | `src/utils/residentGroups.test.js` | 38 tests over the resident grouping, status vocabulary, search/filter, and the account ↔ voter-list cross-check — including the ones that hold "not on the voter list" at severity `expected` so a later edit cannot quietly promote ordinary residents into a list of problems |
 | `src/utils/displayLabels.test.js` | 30 tests over the shared status labels, the upcoming-event count, the Activity Log vocabulary, the Manila-vs-UTC date boundary (with fake timers), and a guard that this module never re-acquires a second verification vocabulary |
-| `src/components/ActionMenu.test.js` | 30 tests: 13 over the ⋮ menu's keyboard, Escape and focus-restore behaviour — the parts nobody catches by clicking — then 5 over `portal` (the popup leaves the clipping wrapper for `<body>` while the trigger stays in its row, and the whole keyboard contract survives the move), 5 over **authorization** (an action the caller may not perform is **absent from `items`**, not rendered disabled, so a menu cannot widen what a role can reach), and 7 over `subject`, which are what makes the one-word labels safe: the item reads "Edit" on screen and is **announced** "Edit Anti-Dengue Cleanup Drive". Run **both directions** — with the composition removed, **4 of the 7 fail**; the other three pass trivially because they cover the trigger's name and the no-subject caller |
+| `src/components/ActionMenu.test.js` | 36 tests: 13 over the ⋮ menu's keyboard, Escape and focus-restore behaviour — the parts nobody catches by clicking — then 5 over `portal` (the popup leaves the clipping wrapper for `<body>` while the trigger stays in its row, and the whole keyboard contract survives the move), 5 over **authorization** (an action the caller may not perform is **absent from `items`**, not rendered disabled, so a menu cannot widen what a role can reach), and 7 over `subject`, which are what makes the one-word labels safe: the item reads "Edit" on screen and is **announced** "Edit Anti-Dengue Cleanup Drive". Run **both directions** — with the composition removed, **4 of the 7 fail**; the other three pass trivially because they cover the trigger's name and the no-subject caller. PR #24 added 6 over a **per-item** `subject`: one item may change what FOLLOWS its label — so "Generate Document" is announced *"Generate Document for Ezequel Bautista"* rather than *"... document request from ..."* — while the visible word is still asserted to start **every** accessible name |
 | `src/components/ConfirmDialog.test.js` | 4 tests over the shared confirmation hook. The load-bearing one: a second `confirm()` opened while the first is still showing used to leave the first promise **permanently pending**, hanging its handler with no write and no error. Latent while every caller was an official clicking one row at a time; reachable the moment the resident portal's blocking `window.confirm` calls became asynchronous. Verified both directions — the test fails with the fix removed |
 | `src/utils/monthGrid.test.js` | 26 tests over the date-only arithmetic and the month grid: leap February, month-length refusal (`2026-02-30` is not a date and must not slide to March), December/January wrap, and the rule that **nothing in that module constructs a `Date` from a date string** |
 | `src/components/MonthCalendar.test.js` | 19 tests over the shared grid as rendered: the accessible name of every day, navigation naming the month it goes to, and that today and selection are carried by `aria-current` / `aria-pressed` rather than by colour |
@@ -99,7 +99,8 @@ Thirty-three suites, 714 tests:
 | `src/documents/documentRegistry.test.js` | 20 tests over the document-type → template mapping and the three generation gates. The load-bearing one: `canGenerate` refuses an official who is **not** the Secretary, so printing cannot widen what the queue already allows. Also that `Business Clearance` and `Other` are unsupported **by decision**, and that an inherited property name (`constructor`) does not resolve as a template |
 | `src/documents/documentData.test.js` | 24 tests over the normalized shape a template receives: the Manila date (assembled from `MONTH_NAMES`, not from a locale's ordering), the `SAMPLE-` reference, long/accented/suffixed names, and the rule that an absent value is **reported, never filled** — no `N/A`, `UNKNOWN` or `TBD` reaches a field |
 | `src/documents/DocumentPreview.test.js` | 26 tests rendering all four prototype templates. Run **both directions**: flipping `DOCUMENT_TEMPLATE_MODE` to `'official'` fails exactly 3 — the watermark tests — and nothing else, which is what proves the one constant controls it. Also that the indigency template states no income or finding, and the residency one no duration |
-| `src/documents/documentPermissions.test.js` | 17 source-reading tests. `canGenerate` could be correct and wired to the wrong flag, so these pin the wiring: the Resident and Nurse dashboards import the generator **not at all**, `isSecretary` is still `position === 'Barangay Secretary'`, there is exactly **one** call site, no template imports Supabase, and nothing reads `residents_registry` |
+| `src/documents/documentPermissions.test.js` | 19 source-reading tests. `canGenerate` could be correct and wired to the wrong flag, so these pin the wiring: the Resident and Nurse dashboards import the generator **not at all**, `isSecretary` is still `position === 'Barangay Secretary'`, there is exactly **one** call site, no template imports Supabase, and nothing reads `residents_registry` |
+| `src/utils/rowActions.test.js` | 31 tests over what each queue row offers. Every document status both directions, including that `claimed` and `declined` offer **nothing** so no ⋮ is rendered at all; that a non-Secretary and a non-Treasurer get an **empty list** rather than disabled items; that Generate Document is gated **only** by the answer `canGenerate` gave and is always the **last** item (the menu focuses its first on open); and that each accessible name reads as English — `Approve document request from Ezequel Bautista`, `Generate Document for Ezequel Bautista`, `Approve reservation on 10 October 2026`. Plus 10 source-reading guards that every key it emits has a handler and an icon in the dashboard, that those handlers are the **existing** ones, and that the processing-set re-entrancy guards survived the loss of the `disabled` attribute |
 | `src/utils/officialAvailability.test.js` | 24 tests over per-official consultation hours. The load-bearing one **reads `026_official_availability.sql`** and asserts the four statuses the form offers are exactly the four the CHECK accepts — the same thing `reservationWindow.test.js` does for migration 020 |
 | `src/components/EServicesMenu.test.js` | 15 tests over the E-Services dropdown and the catalogue: the disclosure pattern, Escape and focus restore, that it does **not** use `role="menu"`, and that every service states its access requirement in words |
 | `src/utils/residentTabs.test.js` | 7 tests over `?tab=` resolution — a hint, never authorization |
@@ -199,12 +200,15 @@ src/
                       bell. Takes its data as props, no Supabase import.
     useNotifications  Fetching for the bell, and the one definition of
                       unread the sidebar badges also read.
-    ActionMenu        The ⋮ overflow menu. Six places now, not one --
-                      `portal` lifted the clipping constraint. Items read
-                      one word ("Edit"); `subject` puts the row back into
-                      every accessible name. Read the header before
-                      putting it anywhere else: the PRIMARY-DECISION rule
-                      still stands.
+    ActionMenu        The ⋮ overflow menu. EIGHT places since PR #24 --
+                      `portal` lifted the clipping constraint, and the
+                      two queues joined the five management tables and
+                      the medicine list. Items read one word ("Edit");
+                      `subject` puts the row back into every accessible
+                      name, and ONE ITEM may carry its own subject. Read
+                      the header before putting it anywhere else: the
+                      PRIMARY-DECISION rule is NARROWED, not gone -- the
+                      Residents tab still has no menu.
     MonthCalendar     THE month grid. One generic component behind four
                       calendars; owns the grid, navigation, today,
                       selection and accessibility, and NO business
@@ -246,6 +250,14 @@ src/
                       untouched) and `nextCollection`, which returns
                       NULL rather than a guess when no waste row carries
                       a weekday name. Pure.
+    rowActions        Which actions a Document Requests or Reservations
+                      row offers, the words on them, their order, and the
+                      accessible subject each is announced with. Pure --
+                      it owns no handler, no icon and no permission of
+                      its own, and it is TOLD whether a document may be
+                      generated rather than re-deriving it. Returns an
+                      EMPTY list for a non-Secretary or non-Treasurer, so
+                      a menu can never widen a role.
     storagePath.js    Public URL -> storage object path.
     displayLabels     Stored status -> the words users read: document
                       requests, reservations, availability. Also the
@@ -2415,6 +2427,15 @@ overview's pending list, the Residents tab, Archived Officials (one
 Restore) and the Activity Log (no actions) are left alone for the same
 reasons.
 
+> ✅ **SUPERSEDED for the two queues, 2026-10-02 — see *Queue row
+> actions (PR #24)*.** Document Requests and the Reservations tab are
+> now ⋮ menus, on the repo owner's review of the live authenticated
+> tables. The paragraph above is kept because its reasoning is still
+> what governs the Residents tab, and because the reversal is only
+> legible beside what it reverses. **The overview's pending list, the
+> Residents tab, Archived Officials and the Activity Log are
+> unchanged.**
+
 ⚠️ **A menu must never widen what a role can reach.** The dashboards
 build `items` with the **same conditionals the buttons had**, so an
 action a role may not perform is simply **absent from the array** —
@@ -3666,14 +3687,22 @@ says was handed over once.
 printer is not the same fact as "the resident may collect this" (Mark
 Ready) or "the resident has it" (Mark Claimed). Both stay the deliberate
 actions they already were. Asserted by a test that reads the Generate
-button's own call site.
+item's own entry in the dashboard's handler map — rewritten, not
+deleted, when the button became a menu item: the old test sliced 600
+characters forward from the `canGenerate({` call, which would have
+passed for the wrong reason once the four stage-advancing handlers
+moved into the same object.
 
-⚠️ **A button, not an `ActionMenu` item**, and that follows this
-project's own rule. Document Requests was deliberately left out of the ⋮
-conversion because its action cell holds the Secretary's PRIMARY
-decisions, and a primary decision must never be hidden behind a menu.
-Generate beside Mark Ready is a two-button cell; converting the cell to
-a menu would hide Approve, Decline, Mark Ready and Mark Claimed.
+⚠️ **It shipped as a button and is now an `ActionMenu` item** — see
+*Queue row actions (PR #24)*. X6 made it a button because Document
+Requests was deliberately outside the ⋮ conversion: a primary decision
+must never be hidden behind a menu, and Generate beside Mark Ready was
+a two-button cell rather than clutter. The repo owner reversed that for
+the two queues after reviewing the live tables, so Generate Document is
+now the **last** item in the row's menu. **Nothing about the three
+gates moved**: `canGenerate` is still called exactly once, with the same
+three arguments, and its answer is what decides whether the item exists
+at all. Its `.btn-generate` styling was removed with the button.
 
 ### The signatory, and the document number
 
@@ -3828,6 +3857,188 @@ What that means precisely:
 its cell beside Mark Ready; the preview opening over the live queue;
 focus returning to the button on Escape; and one real browser print
 dialog, on paper or to PDF.
+
+---
+
+## Queue row actions (PR #24)
+
+2026-10-02, on `claude/printable-document-generation`. **The Action
+column of Official Portal → Document Requests and Official Portal →
+Reservations is now the shared ⋮ `ActionMenu`.** No migration, no schema
+change, no RLS change, no permission change, no workflow change and no
+change to the document-generation architecture.
+
+### ⚠️ This REVERSES a rule this file and `ActionMenu.jsx` both stated
+
+Both recorded that Document Requests was deliberately **not** converted,
+naming Approve/Decline on document requests as the worked example of *a
+primary decision must never be hidden behind a ⋮*. The repo owner
+reversed it after reviewing the **live authenticated tables** — which no
+pass has ever been able to load from this environment — where the two
+Action columns were bands of buttons wide enough to set the row height
+for every other column, and X6's `Generate Document` had just made the
+Document Requests cell a three-control cell.
+
+**The rule is narrowed, not abandoned**, and both documents now say so:
+it still governs the **Residents tab**, where Verify / Reject / Not a
+Resident are three *different* outcomes rather than an Edit/Delete-shaped
+pair. **The overview's pending-reservations list, the Residents tab,
+Archived Officials (one Restore) and the Activity Log (no actions) are
+unchanged.**
+
+⚠️ **The overview's pending list was left as buttons deliberately.** It
+is the Dashboard tab, not Reservations, and the brief named the two
+queues. It is a five-row *needs attention* summary where the Approve and
+Deny buttons are the whole point of the card. The consequence to know:
+the same decision now appears as two buttons there and as a ⋮ one tab
+away. Converting it is one call site if that reads as inconsistent.
+
+### ⚠️ A menu did not widen a single role
+
+`src/utils/rowActions.js` is pure, unit-tested, and returns an **empty
+array** for a non-Secretary or a non-Treasurer — so the action is
+**absent**, never present and disabled, which is `ActionMenu`'s own rule.
+Both cells still render their existing `Secretary only` / `Treasurer
+only` note in that case, exactly as the buttons did.
+
+| | |
+|---|---|
+| Gates | `isSecretary` / `isTreasurer`, **unchanged**, still the same `barangay_officials.position` values the RLS UPDATE policies require |
+| Handlers | **the existing ones.** Same writes, same `.select()` readback, same decline-reason dialog, same Mark Claimed confirmation, same Activity Log entries, same unawaited SMS |
+| `canGenerate` | still called **exactly once**, with the same three arguments, and `rowActions` is **told** the answer rather than re-deriving it — `documentRegistry` stays the only authority on the three gates |
+| Statuses | unchanged. `claimed` and `declined` offer nothing, so **no trigger is rendered at all** rather than a ⋮ that opens on nothing |
+
+### What each row offers
+
+| Stored status | Menu |
+|---|---|
+| Document request `pending` | Approve, Decline |
+| `approved` | Mark Ready, Generate Document |
+| `ready_for_pickup` | Mark Claimed, Generate Document |
+| `claimed`, `declined` | — no ⋮ |
+| Reservation `pending` (Treasurer) | Approve, Deny |
+| any other reservation status | — no ⋮ |
+
+⚠️ **Generate Document is always LAST.** The menu focuses its first item
+on open, so the order is the only thing deciding what a keyboard user
+lands on — and it must not be the one action that decides nothing.
+
+### ⚠️ ONE ITEM MAY NOW CARRY ITS OWN SUBJECT
+
+`ActionMenu` announces each item as `<label> <subject>`. The Document
+Requests menu passes `document request from Ezequel Bautista`, which
+reads correctly after four of the five labels and as **"Generate
+Document document request from Ezequel Bautista"** after the fifth. So
+an item may override the **subject** — `for Ezequel Bautista` — and
+is announced *"Generate Document for Ezequel Bautista"*.
+
+⚠️ **There is deliberately no way to replace the LABEL.** The component
+still composes the name, so the visible word remains the first word of
+the accessible name and WCAG 2.5.3 Label in Name holds for every item —
+asserted over all of them, not just the overridden one.
+
+The reservation subject is dated through `longDate`, so it reads
+*"Approve reservation on 10 October 2026"* — and falls back to the
+resident's name when `parseDateKey` refuses the stored value, rather
+than announcing `reservation on `.
+
+### ⚠️ The `disabled` attribute is gone, and the guard it was not
+
+The buttons carried `disabled={processing*Ids.has(id)}`. A menu item has
+no disabled state, deliberately. **The double-write protection was never
+that attribute**: `withDocRequestGuard`, `handleApproveReservation` and
+`handleDeclineReservation` each return immediately when the row is
+already in their processing set, and they still do — a test asserts both
+guards are still in the source.
+
+What is lost is the visual hint during a slow write. The alternative —
+swapping the trigger for a `Working...` label — would **unmount the
+element the menu has just restored focus to**, which is the
+detached-opener defect `useModalA11y` exists to prevent. The decline
+modal's own `Declining...` button is untouched.
+
+### Measured, before and after
+
+Real `ActionMenu` output captured through Jest into faithful
+reproductions of both tables, rendered against the **shipped CSS
+bundle** in Chromium. The "before" bundle is the shipped one plus the
+`.btn-generate` block this pass removed — the only CSS that changed.
+
+| Document Requests | 1280 | 1440 |
+|---|---|---|
+| Action column before | 191.9px | 249px |
+| Action column after | **65.6px** | **76.9px** |
+| Row heights before | 60 / 99 / 89 / 59.5 | 51.5 / 89 / 89 / 46.5 |
+| Row heights after | **61.5 / 61 / 61 / 46.5** | **61.5 / 61 / 61 / 46.5** |
+
+⚠️ **The `pending` row got 10px TALLER at 1440** (51.5 → 61.5): the
+40px ⋮ trigger is taller than the small buttons were. The two
+multi-control rows dropped 28px each, and every row is now one height
+instead of varying 46–89, which is what the column was costing.
+
+| Reservations | 1280 | 1440 |
+|---|---|---|
+| Action column | 88.7 → **65.6px** | 106.7 → **65.6px** |
+| Pending row height | 81 → **61.5px** | 81 → **61.5px** |
+| Table content width | 1002 → **979px** in 906px | fits |
+
+⚠️ **The reservations table still scrolls internally at 1280**, which is
+the one deliberate internal scroll *Responsive layout (X2)* records. It
+narrowed by 23px; it did not go away, and eleven columns of real data
+were never going to fit.
+
+| Check | Result |
+|---|---|
+| Document-level horizontal overflow, both tables **before and after** x 375/768/1280/1440 | **0 across 16** |
+| Menu open: `parentElement === document.body`, inside the viewport, `elementFromPoint` returns `action-menu-item` | **8 of 8**, flip-up exercised in both directions |
+| Menu width with icons, 4 widths | **180px every time** — `.action-menu-list.is-portal` is a fixed `width: 180px`, which is the same number as the `MENU_WIDTH` constant that right-aligns it, so the anchoring cannot be off |
+| `Generate Document` + icon inside a 166px item | fits, no clipping, 40px tall |
+| Target sizes (SC 2.5.8) | trigger 40x40, each item 166x40 |
+| axe-core 4.13 (A + AA + best practice), 3 states x 2 widths | see below |
+| Jest | 34 suites, **753 tests** |
+| Production build | clean, no ESLint warnings, **224 kB** gzipped, CSS 24 kB (−28 B) |
+
+⚠️ **Two axe findings, both pre-existing or harness.**
+`page-has-heading-one` is the bare capture fragment, which has no `<h1>`
+by construction — the artifact X3 and X6 both recorded.
+`region` (best practice, not a WCAG criterion) fires on the portalled
+`.action-menu-list`, because `portal` renders it into `<body>` and
+therefore outside `<main>`. **Confirmed pre-existing** by running the
+same audit against the post-X3 Announcements ⋮ capture, which reports it
+identically — it belongs to `portal` and to all eight menus, not to this
+conversion. Not fixed here: it would change `portal` for every call
+site, and the popup is opened from its trigger, labelled by it, and
+receives focus.
+
+### ⚠️ Still NOT authenticated-browser verified
+
+The dashboards are behind `ProtectedRoute` and this environment still
+has **no test account**, so **neither converted cell was clicked on a
+live page**. Nothing was done to weaken authentication for a screenshot.
+The menu, its items, its accessible names and its anchoring are real
+component output; the **tables around them are reproductions**, matching
+the dashboard JSX column for column and `data-label` for `data-label`.
+
+One thing a live pass should look at, visible in the 375px capture and
+**unchanged by this pass**: in card mode a `claimed` row still renders
+the `ACTION` label with nothing under it, because the `<td>` is always
+present and the protected block's `::before` reads `data-label`. It
+looked the same with the buttons; it is simply more noticeable beside a
+compact ⋮.
+
+### `.btn-generate` was removed, not left behind
+
+The class now reaches no DOM node, so its rule went with it — X4's
+removal-only discipline. The item is styled by `ActionMenu.css` like
+every other one, which is the point: one appearance for row actions
+rather than a colour per action.
+
+⚠️ **`.btn-approve` and `.btn-deny` are still live** — the overview's
+pending list, the Residents tab, the nurse's tables, the resident portal
+and six modals all use them. Only `.btn-generate` became dead.
+
+⚠️ **The protected mobile table-to-card block was not touched**, and
+still hashes to its pre-X2 bytes (`bda35a1…`, lines 1000–1165).
 
 ---
 
@@ -4034,12 +4245,13 @@ derives her initials from. It is no longer displayed as a label.
 - **Source maps ship to production** (~7 MB), so the original JSX is
   publicly reconstructable. `GENERATE_SOURCEMAP=false` in Vercel fixes it.
 - **`public/logo.png` is 984 KB and referenced by nothing.**
-- **Thin automated test coverage.** 714 tests in thirty-three suites: one
+- **Thin automated test coverage.** 753 tests in thirty-four suites: one
   smoke test over `<App />`, which fails without `.env` because
-  `supabaseClient.js` throws at import time, and 713 tests over the
+  `supabaseClient.js` throws at import time, and 752 tests over the
   resident workflow rules, the display labels, the booking window, the
   month grid and its three feature layers, the document-request filter,
-  the ⋮ menu's keyboard and authorization behaviour, the modal
+  the queue rows' action lists, the ⋮ menu's keyboard and authorization
+  behaviour, the modal
   accessibility hook, the public navbar and the confirmation dialog.
   No integration or end-to-end tests,
   and **no test touches the database** — the reservation-window tests
