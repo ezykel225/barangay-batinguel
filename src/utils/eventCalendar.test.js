@@ -17,6 +17,7 @@
 import {
   buildEventCalendar,
   describeEventDay,
+  eventTimeLabel,
   eventsOnDate,
   pastEvents,
   upcomingEvents,
@@ -217,5 +218,46 @@ describe('past events', () => {
 
   it('does not count today as past', () => {
     expect(pastEvents([ev('today', '2026-10-01')], { today })).toEqual([])
+  })
+})
+
+describe('eventTimeLabel', () => {
+  // PostgREST hands a `time` column back as HH:MM:SS, which
+  // `clinicHours.formatTime` does not recognise on its own.
+  it('reads the HH:MM:SS a `time` column actually returns', () => {
+    expect(eventTimeLabel('14:00:00')).toBe('2:00 PM')
+    expect(eventTimeLabel('08:30:00')).toBe('8:30 AM')
+    expect(eventTimeLabel('00:00:00')).toBe('12:00 MN')
+    expect(eventTimeLabel('12:00:00')).toBe('12:00 NN')
+  })
+
+  it('reads it with no seconds, and with fractional seconds', () => {
+    expect(eventTimeLabel('14:00')).toBe('2:00 PM')
+    expect(eventTimeLabel('14:00:00.5')).toBe('2:00 PM')
+  })
+
+  // ⚠️ THE ONE THAT MATTERS TODAY. `events.event_time` is NULL on every
+  // row in the live table, so the caller must be able to render nothing
+  // at all -- a "Time:" label with a blank after it reads as a value
+  // that failed to load.
+  it('is empty for null, undefined and blank', () => {
+    expect(eventTimeLabel(null)).toBe('')
+    expect(eventTimeLabel(undefined)).toBe('')
+    expect(eventTimeLabel('')).toBe('')
+    expect(eventTimeLabel('   ')).toBe('')
+  })
+
+  // ⚠️ It does NOT dig a time out of a location. Three legacy rows
+  // store one there -- "2:00 PM - Main Covered Court" -- and splitting
+  // that string would be guessing at a format nothing guarantees.
+  it('drops anything that is not a time rather than printing it', () => {
+    expect(eventTimeLabel('2:00 PM - Main Covered Court')).toBe('')
+    expect(eventTimeLabel('Barangay Covered Court')).toBe('')
+    expect(eventTimeLabel('all day')).toBe('')
+  })
+
+  it('still reads a display string somebody typed by hand', () => {
+    expect(eventTimeLabel('2:00 PM')).toBe('2:00 PM')
+    expect(eventTimeLabel('8:30 am')).toBe('8:30 AM')
   })
 })

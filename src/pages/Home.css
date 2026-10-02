@@ -368,6 +368,11 @@
   min-width: 0;
 }
 
+/* Both tags: Home nests these under a section <h2> and uses <h3>, the
+   Events page has only an <h1> above them and uses <h2>. Same card,
+   same look, correct outline on each page -- the rule the announcement
+   card already follows. */
+.event-info h2,
 .event-info h3 {
   font-size: var(--fs-16);
   font-weight: 600;
@@ -831,4 +836,105 @@
 
 .waste-schedule-home-grid {
   margin-top: 12px;
+}
+
+/* ── Announcement cards: the pill, the image area, the footer ─────── */
+/* ⚠️ THE CATEGORY PILL WAS STRETCHING THE FULL CARD WIDTH, and the
+   cause was a change made in this file one pass earlier. The badge is
+   `display: inline-block`, which fits its text — but `.announcement-
+   card-body` became a COLUMN flex container when the cards were given
+   equal heights, and a flex item is `align-self: stretch` by default
+   and is blockified besides. Measured at 1280: the pill 346px wide
+   inside a 382px card, computed `display: block`.
+
+   `align-self: flex-start` restores the one thing `inline-block` was
+   there for. Same family as every other finding in this project where
+   a container's layout quietly redefined a child: `[hidden]` under a
+   `display: flex`, the navbar's `li` under the E-Services panel. */
+.announcement-badge {
+  align-self: flex-start;
+  max-width: 100%;
+  /* A category is text somebody typed, so a long one wraps inside the
+     pill rather than setting a floor on the card (X2). */
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* 160px of megaphone over a card whose text is a title, three lines and
+   a date was the tallest thing on it. Reduced, not removed: the icon
+   and the light-blue band are what make the card read as an
+   announcement at a glance. */
+.announcement-card-image {
+  height: 112px;
+  font-size: var(--fs-30);
+}
+
+/* The date and the affordance share the footer line, so the card ends
+   with one row rather than two stacked ones. It wraps on a narrow card
+   instead of pushing it wide. */
+.announcement-card-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+
+.announcement-card-more {
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: var(--primary);
+  white-space: nowrap;
+}
+
+.announcement-card:hover .announcement-card-more {
+  text-decoration: underline;
+}
+
+/* ── Event cards ─────────────────────────────────────────────────── */
+/* Equal heights per row, the same reason the announcement cards got
+   them: one long title made its card 32px taller than the three beside
+   it. Measured before: 102 / 102 / 102 / 134. */
+.event-card-link {
+  display: block;
+  height: 100%;
+}
+
+.event-card {
+  height: 100%;
+}
+
+/* The hover already lifted the card; a border that answers as well
+   makes the whole card read as the control it is, rather than the
+   title alone. */
+.event-card:hover {
+  border-color: #93c5fd;
+}
+
+/* Time and location are one meta row under the title. Each line is
+   rendered only when the column holds something -- `event_time` is
+   NULL on every live row, so the time line is simply absent rather
+   than a label with a blank after it. */
+.event-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 14px;
+  margin-top: 6px;
+  min-width: 0;
+}
+
+.event-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-13);
+  color: var(--text-light);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.event-meta-item svg {
+  flex-shrink: 0;
+  color: #1e3a8a;
 }

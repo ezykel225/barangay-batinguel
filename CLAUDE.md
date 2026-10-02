@@ -65,7 +65,7 @@ banned below: it silences the one check this project has.
 
 ### Tests
 
-Twenty-six suites, 592 tests:
+Twenty-eight suites, 619 tests:
 
 | File | What it covers |
 |---|---|
@@ -81,7 +81,7 @@ Twenty-six suites, 592 tests:
 | `src/components/NotificationBell.test.js` | 24 tests over the bell: the unread count in the accessible name **as words**, Escape and focus restore, click-outside closing *without* stealing focus back, mark-read-then-navigate ordering, and that unread is carried by a class **and** the spoken word "New" rather than by colour |
 | `src/components/useModalA11y.test.js` | 9 tests over Escape, focus entry and focus restoration for the seventeen hand-rolled modals. Run **both directions**: with the hook stubbed, 4 of 9 fail. Includes the case where the opener is removed by the save the modal performed — focusing a detached node silently sends focus to `<body>` |
 | `src/components/Navbar.test.js` | 6 tests over the public mobile menu button, which had **no accessible name at all** before X3: the name changes with state, `aria-expanded` tracks it, and `aria-controls` points at an id that exists |
-| `src/utils/eventCalendar.test.js` | 24 tests over event placement and the upcoming split. The load-bearing one: the homepage filters **then** limits |
+| `src/utils/eventCalendar.test.js` | 24 tests over event placement and the upcoming split. The load-bearing one: the homepage filters **then** limits, plus 6 over `eventTimeLabel`: the `HH:MM:SS` a `time` column really returns, and that anything which is not a time — a location beginning with one included — yields `''` rather than being printed |
 | `src/utils/documentFilter.test.js` | 16 tests over `filterDocumentRequests` — the status narrowing, the five searched fields, and that an unknown status yields nothing rather than everything |
 | `src/utils/reservationWindow.test.js` | 46 tests over the 5–10 PM window, the per-slot and per-kind durations, the noon-spanning exception and the office-hours exception — deliberately mirroring the SQL cases in migration 020's header, so client and database are asserted to agree rather than each checked alone. The load-bearing one is that an exception is read from `exception_reason` and never from the hour |
 
@@ -93,6 +93,8 @@ Twenty-six suites, 592 tests:
 | `src/utils/clinicSchedule.test.js` | 29 tests over the clinic week, built from the **live rows including Friday's two**. Friday is ONE entry carrying both stored sessions in `sessions`, and `displaySessions` presents them as one 8-to-5 span because **both rows record the 12-1 break that exactly fills the gap**. The load-bearing pair runs the other direction: a two-session day whose gap no recorded break covers is **not** joined, and neither is one whose break only partly fills it |
 | `src/utils/medicineFilter.test.js` | 28 tests over the public medicine list — the three narrowings, an unrecognised category or status matching **nothing rather than everything**, that the counts always sum to the total, and 8 over `isCategoryOpen`. The load-bearing one there: **while a filter is applied every rendered group is open**, including one the reader had collapsed — `filterMedicines` has already dropped the non-matches, so a collapsed group would hide a medicine the page has just counted as a result |
 | `src/utils/homeSections.test.js` | 19 tests over the Home page's two summaries: the announcement excerpt (a very-long-body regression guard, the word boundary, the unbreakable token) and `nextCollection`, whose load-bearing one is that it returns **null rather than a guess** when no row carries a weekday name, and counts the rows it left out |
+| `src/pages/Announcements.test.js` | 8 tests over the browse page, the FIRST suite that renders a page component. The load-bearing pair: the card shows an excerpt and `/announcements/:id` still renders the whole 2,159-character notice, from the same row. Also that each card is ONE link with no nested anchor |
+| `src/pages/Events.test.js` | 14 tests over the Calendar \| List switcher, the list card and date selection. The load-bearing one: a card shows a time **only when `event_time` holds one** — it is NULL on every live row — and never digs one out of `location`, which on three legacy rows begins with a time somebody typed. Two more assert no heading level is skipped in either view |
 | `src/utils/officialAvailability.test.js` | 24 tests over per-official consultation hours. The load-bearing one **reads `026_official_availability.sql`** and asserts the four statuses the form offers are exactly the four the CHECK accepts — the same thing `reservationWindow.test.js` does for migration 020 |
 | `src/components/EServicesMenu.test.js` | 15 tests over the E-Services dropdown and the catalogue: the disclosure pattern, Escape and focus restore, that it does **not** use `role="menu"`, and that every service states its access requirement in words |
 | `src/utils/residentTabs.test.js` | 7 tests over `?tab=` resolution — a hint, never authorization |
@@ -107,7 +109,16 @@ imports the client. So a missing `.env` fails that test with a module
 error that never mentions `.env`. If `npm test` fails on a fresh
 checkout, check `.env` before debugging the test.
 
-The other fourteen suites do **not** need it. `residentGroups.js`,
+⚠️ **`Announcements.test.js` and `Events.test.js` render page
+components that DO import the client, and still do not need `.env`.**
+They `jest.mock('../supabase/supabaseClient')`, which is hoisted above
+the imports, so the real module -- and its import-time throw -- never
+runs. Navbar and Footer are stubbed in both, because Navbar pulls in
+`AuthContext` and standing that up would be testing the chrome, which
+has its own suites. Verified by renaming `.env` and running both: 20
+passed. That is the pattern for any future page-level suite.
+
+The other suites do **not** need it. `residentGroups.js`,
 `displayLabels.js`, `reservationWindow.js`, `monthGrid.js`,
 `reservationCalendar.js`, `eventCalendar.js`, `notificationLabels.js`,
 `ActionMenu.jsx`, `MonthCalendar.jsx`, `NotificationBell.jsx` and
@@ -3260,6 +3271,171 @@ loaded in a browser.** Nothing in this pass touches a dashboard.
 
 ---
 
+## Announcements and Events organization pass (post-X5)
+
+A small presentation pass over **`/announcements` and `/events` only**,
+2026-10-02, from the repo owner's review of the deployed PR branch. **No
+routing change, no database change, no change to event or announcement
+CRUD, no RLS change and no navbar change.**
+
+### One compact intro block, shared by both pages
+
+Both pages wrote the same block out separately and both rendered it the
+same wrong way: `<h1><MdAnnouncement /> All Announcements</h1>` put the
+icon INSIDE the heading, where it took a line of its own above the
+title at every width. Four stacked lines for two things to say, and the
+first card 305px down a 1280x1000 viewport.
+
+`src/pages/PageIntro.css` now owns it and both pages import it. The icon
+is a **sibling** marked `aria-hidden`, in a tinted 46px tile beside the
+title, so it reads as one unit; the description sits under the title.
+
+| | |
+|---|---|
+| Heading structure | unchanged -- still exactly one `<h1>` per page |
+| Accessible name of the `<h1>` | now the words alone, with no svg in it |
+| First card / calendar | 305px down → **232px** |
+
+⚠️ **`.page-intro .back-link` is (0,2,0) on purpose.** Each page
+declares `.back-link` at (0,1,0) in its own file, and an
+equal-specificity override would be decided by which file the bundler
+emits first -- the X2 cascade trap. Raising specificity makes it
+independent of emission order.
+
+⚠️ **It lives in its own file**, not in either page's stylesheet. A
+block two pages share, owned by one of them, is the dishonesty
+`@keyframes pulse` taught in X4.
+
+### ⚠️ The category pill was stretching the full card width, and the cause was mine
+
+Reported as a category bar spanning almost the whole card. Measured at
+1280: the pill **346px wide inside a 382px card**, computed
+`display: block`.
+
+`.announcement-badge` is `display: inline-block`, which fits its text.
+But the previous pass made `.announcement-card-body` a **column flex
+container** to give the cards equal heights -- and a flex item is
+`align-self: stretch` by default and is blockified besides. The badge
+had been correct for as long as its parent was a block.
+
+`align-self: flex-start` restores it (60px for "Notice"). Same family as
+every other finding in this project where a container quietly redefined
+a child: `[hidden]` under a `display: flex`, the navbar's `li` under the
+E-Services panel. **A change that fixes one thing can silently redefine
+a sibling; measure the siblings too.**
+
+### The announcement cards became a browse page
+
+`/announcements` printed each notice's **whole body**. Measured with the
+live rows -- a 616-character notice beside a 10-character one -- all
+three cards were **1,293px tall**, because the previous pass's equal
+heights padded the short ones to match the long one.
+
+| | Before | After |
+|---|---|---|
+| Card height | 1,293px (x3) | **317px** (x3) |
+| Body | whole `description` | 3-line excerpt |
+| Category pill | 346px | 60px |
+| Megaphone band | 160px | 112px |
+
+⚠️ **The stored `description` is untouched** and
+`/announcements/:id` still renders it in full -- verified in a browser:
+the card shows 179 characters, the detail page **2,159**, from one row.
+`announcementExcerpt` is the function the Home cards already use, so the
+two surfaces cannot cut at different lengths.
+
+⚠️ **"Read announcement →" is a `<span>`, not a second link.** The
+whole card is already one `<a>`; an `<a>` inside an `<a>` is invalid
+HTML and would give a keyboard user a second stop for one destination.
+A test asserts the card contains no nested anchor.
+
+### The Events header is one row, and the list card gained its meta line
+
+The Calendar | List switcher sat in a band of its own 28px below the
+intro -- 181px of control against the right edge of a 1200x36 empty
+row. It is now the aside of `.page-intro-row`, which **wraps**, so on a
+phone it drops under the text instead of squeezing it. The markup,
+handlers, `role="group"`, label and `aria-pressed` are unchanged.
+
+⚠️ **A list card shows a time only when `event_time` holds one, and
+`event_time` is NULL on every row in the live table.** So today the time
+line is simply absent. A "Time:" label with a blank after it reads as a
+value that failed to load, and inventing one is not an option.
+
+⚠️ **And it does not dig a time out of `location`.** Three legacy
+rows store one there -- `"2:00 PM - Main Covered Court"` -- and
+splitting that string would be guessing at a format nothing guarantees,
+on a column whose job is the place. Those rows show it as part of their
+location, as somebody typed it. `eventTimeLabel` uses
+`clinicHours.toMinutes` as its parse check, which is the same authority
+`formatTime` uses internally, so the two cannot disagree about what
+counts as a time.
+
+Equal heights per row (102/102/102/**134** before), a location pin from
+the icon library already in use, and a border that answers on hover.
+
+### ⚠️ The selected-day panel was a 46px box beside a 532px calendar
+
+Unselected, `.mcal-day-panel` measured **591x46** next to a 591x532
+calendar -- it read as something that failed to render rather than as a
+panel waiting for a click. The **words are unchanged**; the panel now
+carries an `is-waiting` class and is styled as a waiting state: dashed
+edge, centred text, 180px. Selected, it stretches to the calendar's own
+height (591x532) so the two read as a pair.
+
+⚠️ **Every rule is scoped to `.events-calendar-layout`.**
+`.mcal-day-panel` is MonthCalendar's own class and the three dashboard
+calendars use it too; an unscoped rule here would restyle surfaces this
+pass is not about.
+
+### Two heading-order violations, both pre-existing, both invisible to every earlier audit
+
+axe flagged `heading-order` on the Events page in two states:
+
+- **List view**: `<h1>` → `<h3>` on the event card title.
+- **Calendar view with a date selected**: `<h1>` → `<h4>` on the
+  panel's date heading.
+
+Neither had ever been measured. X3 and X5 both audited `/events` in its
+**default** state -- the calendar, with no date selected and with empty
+fixtures -- where the list is not rendered and the panel heading does
+not exist. **A page is not one page to axe; it is one page per state.**
+
+Both are `<h2>` now. The event card keeps `<h3>` on **Home**, where it
+sits under a section `<h2>` -- the same split the announcement card
+already carries -- and both stylesheets match both tags, verified
+pixel-identical (16px / 600 / `rgb(30,41,59)` / 0 top / 5px bottom).
+
+### What was measured, and what was not
+
+Driven in Chromium against the shipped production bundle, network
+stubbed, with deliberately pathological fixtures (a 63-character
+unbreakable title, a 40-character category, a 400-character body, a
+97-character location):
+
+| Check | Result |
+|---|---|
+| Overflow + clipping + 24px targets + one `<h1>` + equal card heights per row, 5 page states x 6 widths (320–1440) | **0 failures across 30** |
+| axe-core 4.13 (A + AA + best practice), 6 page states x 2 widths | **0 violations** |
+| Jest | 28 suites, **619 tests** |
+| Production build | clean, no ESLint warnings, 220 kB gzipped |
+
+Driven, not inspected: the switcher by mouse **and by Enter**, a day
+cell selected by keyboard, an announcement card followed to its detail
+page, and the detail page's body length read back.
+
+⚠️ **`/` was re-measured as a regression check**, because the
+announcement and event card rules live in `Home.css` and are shared. Its
+event card is byte-identical at 588x102.
+
+⚠️ **One thing was left alone deliberately.**
+`EventDetails.jsx` renders `<p><strong>Time:</strong> {event.event_time}</p>`
+unconditionally, so on every live event it prints "Time:" followed by
+nothing. Same data fact as above, one page outside this pass's stated
+scope. **Not fixed, recorded here.**
+
+---
+
 ## Health centre
 
 **Medicine stock is a status, not a quantity** — Available / Low stock /
@@ -3456,9 +3632,9 @@ derives her initials from. It is no longer displayed as a label.
 - **Source maps ship to production** (~7 MB), so the original JSX is
   publicly reconstructable. `GENERATE_SOURCEMAP=false` in Vercel fixes it.
 - **`public/logo.png` is 984 KB and referenced by nothing.**
-- **Thin automated test coverage.** 592 tests in twenty-six suites: one
+- **Thin automated test coverage.** 619 tests in twenty-eight suites: one
   smoke test over `<App />`, which fails without `.env` because
-  `supabaseClient.js` throws at import time, and 591 tests over the
+  `supabaseClient.js` throws at import time, and 618 tests over the
   resident workflow rules, the display labels, the booking window, the
   month grid and its three feature layers, the document-request filter,
   the ⋮ menu's keyboard and authorization behaviour, the modal
@@ -3515,6 +3691,14 @@ derives her initials from. It is no longer displayed as a label.
   `nextCollection` can only answer "which weekday is soonest", and a row
   whose `day_of_week` is not a weekday name is excluded from the summary
   and counted in a note rather than placed on some day anyway.
+- **`events.event_time` is NULL on every row**, and three legacy rows
+  carry their time inside `location` instead
+  (`"2:00 PM - Main Covered Court"`). The list card renders a time only
+  when the column holds one and never parses it out of `location`, so
+  today no card shows a separate time. ⚠️ **`EventDetails.jsx` still
+  prints `Time:` unconditionally**, so every live event's detail page
+  shows that label followed by nothing. One line, left for a pass whose
+  scope includes that page.
 - **No lint script and no typecheck script** — see *Commands* and
   *Tests* above.
 
