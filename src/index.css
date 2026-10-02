@@ -196,6 +196,16 @@ body {
    recorded -- a global owned by one page. */
 .visually-hidden {
   position: absolute;
+  /* ⚠️ Pinned, not left at its static position. MEASURED at 320px on
+     the sign-up stepper: an unpinned clipped span sat 1px past the last
+     chip and extended the document's scrollable width to 322 against a
+     320 viewport -- a 2px horizontal scrollbar whose only cause was a
+     1x1 element nobody can see. Pinning to the top-left corner cannot
+     extend the scroll area in either direction, and changes nothing a
+     screen reader does: announcement order is DOM order, not visual
+     position. */
+  top: 0;
+  left: 0;
   width: 1px;
   height: 1px;
   padding: 0;

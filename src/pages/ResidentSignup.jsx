@@ -6,6 +6,13 @@ import toast from 'react-hot-toast'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { BARANGAY_NAME, PUROKS } from '../constants/barangay'
+import {
+  MIN_PASSWORD_LENGTH,
+  SIGNUP_STEPS,
+  missingAccountMessage,
+  missingIdentityMessage,
+  passwordChecks,
+} from '../utils/signupSteps'
 import './Login.css'
 
 const ResidentSignup = () => {
@@ -29,9 +36,44 @@ const ResidentSignup = () => {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  // ⚠️ Four steps over ONE `formData`, so Back never clears anything --
+  // the fields are hidden, not unmounted. The reason it is steps at all
+  // is that one long form told somebody entering their SURNAME that
+  // their password was too short.
+  //   1 about you   2 your login   3 confirm   4 done
+  const [step, setStep] = useState(1)
+  // What actually happened, set once the account exists. Step 4 reads
+  // it, because "check your email" and "your ID is uploaded" are
+  // different things to be told and the old code said them in a toast
+  // on a page that was navigating away.
+  const [outcome, setOutcome] = useState(null)
 
   const handleChange = (e) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }))
+  }
+
+  const goToStep = (target) => {
+    setError('')
+    setStep(target)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const handleContinueFromIdentity = () => {
+    const missing = missingIdentityMessage(formData)
+    if (missing) {
+      setError(missing)
+      return
+    }
+    goToStep(2)
+  }
+
+  const handleContinueFromAccount = () => {
+    const missing = missingAccountMessage(formData)
+    if (missing) {
+      setError(missing)
+      return
+    }
+    goToStep(3)
   }
 
   const handleSignup = async (e) => {
@@ -39,28 +81,23 @@ const ResidentSignup = () => {
     if (loading) return
     setError('')
 
-    if (!formData.first_name.trim() || !formData.last_name.trim()) {
-      setError('Please enter your first name and last name.')
+    // ⚠️ Re-checked here even though steps 1 and 2 already passed. This
+    // is the handler that creates an account, and the step index is
+    // client state: a check at the gate is not a check at the door.
+    const missingIdentity = missingIdentityMessage(formData)
+    if (missingIdentity) {
+      setError(missingIdentity)
+      goToStep(1)
       return
     }
-    if (!formData.email || !formData.password) {
-      setError('Please fill in your email and password.')
-      return
-    }
-    if (!formData.purok) {
-      setError('Please select the purok where you live.')
+    const missingAccount = missingAccountMessage(formData)
+    if (missingAccount) {
+      setError(missingAccount)
+      goToStep(2)
       return
     }
     if (!confirmsResidency) {
       setError(`Please confirm that you are a resident of ${BARANGAY_NAME}.`)
-      return
-    }
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters long.')
-      return
-    }
-    if (formData.password !== formData.confirm_password) {
-      setError('Passwords do not match.')
       return
     }
 
@@ -118,12 +155,19 @@ const ResidentSignup = () => {
       // will fail. Skip it here and let them upload it later from
       // their dashboard once they've confirmed their email and can
       // actually log in.
+      // This project REQUIRES email confirmation, so signUp() returns a
+      // user and NO session -- `auth.uid()` is not usable yet, and
+      // anything behind RLS (the ID upload writes to a path scoped to
+      // this user) would fail. So this is the ordinary path, not the
+      // exception, and the ID waits until they can actually log in.
       if (!data.session) {
-        toast.success(
-          'Account created! Check your email to confirm your account, then log in. ' +
-          (idFile ? 'You can upload your ID from your dashboard after logging in.' : '')
-        )
-        navigate('/login')
+        setOutcome({
+          needsConfirmation: true,
+          email: formData.email,
+          idPending: !!idFile,
+          idUploaded: false,
+        })
+        goToStep(4)
         return
       }
 
@@ -149,10 +193,16 @@ const ResidentSignup = () => {
 
         if (uploadError) {
           console.error('ID upload error:', uploadError)
-          toast.error(
-            'Account created, but your ID could not be uploaded. You can try again from your dashboard after logging in.'
-          )
-          navigate('/login')
+          // ⚠️ The ACCOUNT exists. Only the upload failed, and saying
+          // so is not the same as saying signing up failed.
+          toast.error('Your account was created, but the ID could not be uploaded.')
+          setOutcome({
+            needsConfirmation: false,
+            email: formData.email,
+            idPending: true,
+            idUploaded: false,
+          })
+          goToStep(4)
           return
         }
 
@@ -165,19 +215,39 @@ const ResidentSignup = () => {
           console.error('ID document link error:', idUrlError)
         }
 
-        toast.success('Account created! An official will verify your ID before you can request documents.')
+        setOutcome({
+          needsConfirmation: false,
+          email: formData.email,
+          idPending: false,
+          idUploaded: true,
+        })
       } else {
-        toast.success(
-          'Account created! Since no ID was uploaded, please visit the Barangay Hall so an official can verify your account in person.'
-        )
+        setOutcome({
+          needsConfirmation: false,
+          email: formData.email,
+          idPending: false,
+          idUploaded: false,
+        })
       }
-      navigate('/login')
+      toast.success('Account created.')
+      goToStep(4)
     } catch (err) {
       console.error('Resident signup error:', err)
       setError('Something went wrong. Please try again.')
     } finally {
       setLoading(false)
     }
+  }
+
+  const checks = passwordChecks(formData.password)
+  const fullNamePreview = [
+    formData.first_name, formData.middle_name, formData.last_name, formData.suffix,
+  ].map((part) => part.trim()).filter(Boolean).join(' ')
+
+  const stepIntro = {
+    1: 'Your name and where you live, as they appear on your valid ID.',
+    2: 'The email and password you will sign in with.',
+    3: 'Check your details, add an ID if you have one, and confirm.',
   }
 
   return (
@@ -213,214 +283,424 @@ const ResidentSignup = () => {
           </div>
 
           <div className="login-right">
-            <h2>Resident Registration</h2>
-            <p>
-              For residents of <strong>{BARANGAY_NAME}</strong> only. Fill in
-              your details as they appear on your valid ID.
-            </p>
-
-            {error && <div className="login-error">{error}</div>}
-
-            <form className="login-form" onSubmit={handleSignup}>
-              <div className="login-form-group">
-                <label htmlFor="signup-first_name">First Name</label>
-                <div className="login-input-wrapper">
-                  <div className="login-input-icon"><FaUser /></div>
-                  <input id="signup-first_name"
-                    type="text"
-                    name="first_name"
-                    placeholder="Juan"
-                    value={formData.first_name}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="login-form-group">
-                <label htmlFor="signup-middle_name">Middle Name <span className="field-optional">(optional)</span></label>
-                <div className="login-input-wrapper">
-                  <div className="login-input-icon"><FaUser /></div>
-                  <input id="signup-middle_name"
-                    type="text"
-                    name="middle_name"
-                    placeholder="Santos"
-                    value={formData.middle_name}
-                    onChange={handleChange}
-                  />
-                </div>
-              </div>
-
-              <div className="login-form-group">
-                <label htmlFor="signup-last_name">Last Name</label>
-                <div className="login-input-wrapper">
-                  <div className="login-input-icon"><FaUser /></div>
-                  <input id="signup-last_name"
-                    type="text"
-                    name="last_name"
-                    placeholder="Dela Cruz"
-                    value={formData.last_name}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="login-form-group">
-                <label htmlFor="signup-suffix">Suffix <span className="field-optional">(optional)</span></label>
-                <div className="login-input-wrapper">
-                  <div className="login-input-icon"><FaUser /></div>
-                  <input id="signup-suffix"
-                    type="text"
-                    name="suffix"
-                    placeholder="Jr., Sr., III"
-                    value={formData.suffix}
-                    onChange={handleChange}
-                  />
-                </div>
-              </div>
-
-              <div className="login-form-group">
-                <label htmlFor="signup-email">Email</label>
-                <div className="login-input-wrapper">
-                  <div className="login-input-icon"><FaEnvelope /></div>
-                  <input id="signup-email"
-                    type="email"
-                    name="email"
-                    placeholder="you@example.com"
-                    value={formData.email}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="login-form-group">
-                <label htmlFor="signup-contact_number">Contact Number</label>
-                <div className="login-input-wrapper">
-                  <div className="login-input-icon"><FaPhone /></div>
-                  <input id="signup-contact_number"
-                    type="tel"
-                    name="contact_number"
-                    placeholder="09xx xxx xxxx"
-                    value={formData.contact_number}
-                    onChange={handleChange}
-                  />
-                </div>
-              </div>
-
-              <div className="login-form-group">
-                <label htmlFor="signup-purok">Purok</label>
-                <div className="login-input-wrapper">
-                  <div className="login-input-icon"><FaMapMarkerAlt /></div>
-                  <select id="signup-purok"
-                    name="purok"
-                    value={formData.purok}
-                    onChange={handleChange}
-                    required
-                  >
-                    <option value="">Select your purok</option>
-                    {PUROKS.map((purok) => (
-                      <option key={purok} value={purok}>{purok}</option>
-                    ))}
-                  </select>
-                </div>
-                <p className="field-hint">
-                  Only puroks within {BARANGAY_NAME} are listed. If you live in
-                  another barangay, request your documents from that barangay
-                  instead.
+            {step === 4 ? (
+              /* ─── STEP 4 ─ DONE ────────────────────────────────────
+                 ⚠️ A PANEL, not a toast on a page that is navigating
+                 away. What happens next to a new account is three
+                 separate things -- confirm the email, sign in, wait for
+                 an official to verify -- and the old flow said all of
+                 them in one toast while pushing the reader to /login,
+                 where the toast then sat over a form that could not
+                 yet be used. */
+              <div className="signup-done">
+                <p className="signup-done-eyebrow">
+                  <span aria-hidden="true">✓</span> Account created
                 </p>
-              </div>
+                <h2>Two things left before you can request documents</h2>
 
-              <div className="login-form-group">
-                <label htmlFor="signup-password">Password</label>
-                <div className="login-input-wrapper">
-                  <div className="login-input-icon"><FaLock /></div>
-                  <input id="signup-password"
-                    type={showPassword ? 'text' : 'password'}
-                    name="password"
-                    placeholder="At least 6 characters"
-                    value={formData.password}
-                    onChange={handleChange}
-                    required
-                  />
+                <ol className="signup-next-steps">
+                  {outcome?.needsConfirmation && (
+                    <li>
+                      <strong>Confirm your email.</strong> A confirmation link
+                      has been sent to{' '}
+                      <strong>{outcome?.email}</strong>. The account cannot be
+                      used until it is clicked, and the message often lands in
+                      the spam folder — look there before asking the barangay.
+                    </li>
+                  )}
+                  <li>
+                    <strong>Wait for an official to verify you.</strong> A new
+                    account starts as <em>Awaiting review</em>. Signing in works
+                    straight away, and so does booking the covered court — but
+                    requesting a barangay document needs a verified account.
+                  </li>
+                </ol>
+
+                {/* ⚠️ The ID is the one part of this that is OPTIONAL by
+                    design, and saying so matters: requiring one would
+                    exclude exactly the residents who most need barangay
+                    documents, such as a Certificate of Indigency. */}
+                <div className="signup-id-status">
+                  {outcome?.idUploaded ? (
+                    <p>
+                      Your ID has been uploaded. An official reviews it — you do
+                      not need to visit the hall unless they ask you to.
+                    </p>
+                  ) : outcome?.idPending ? (
+                    <p>
+                      Your ID has <strong>not</strong> been uploaded yet. You can
+                      add it from your dashboard once you have signed in, or
+                      bring it to the Barangay Hall.
+                    </p>
+                  ) : (
+                    <p>
+                      No ID was uploaded, which is fine — not everyone has one.
+                      An official will verify you in person instead. Visit the
+                      Barangay Hall during office hours, or add an ID later from
+                      your dashboard.
+                    </p>
+                  )}
+                </div>
+
+                <p className="signup-done-note">
+                  You will see your account's status in your own dashboard, in
+                  the same words an official sees it.
+                </p>
+
+                <div className="signup-actions">
                   <button
                     type="button"
-                    className="login-toggle-password"
-                    aria-pressed={showPassword}
-                    aria-label={showPassword ? 'Hide the password' : 'Show the password'}
-                    onClick={() => setShowPassword(!showPassword)}
+                    className="login-submit-btn submit-resident"
+                    onClick={() => navigate('/login')}
                   >
-                    {showPassword ? <FaEyeSlash /> : <FaEye />}
+                    Go to sign in
                   </button>
+                  <Link to="/e-services" className="login-submit-btn signup-btn-plain">
+                    Browse E-Services
+                  </Link>
                 </div>
               </div>
-
-              <div className="login-form-group">
-                <label htmlFor="signup-confirm_password">Confirm Password</label>
-                <div className="login-input-wrapper">
-                  <div className="login-input-icon"><FaLock /></div>
-                  <input id="signup-confirm_password"
-                    type={showPassword ? 'text' : 'password'}
-                    name="confirm_password"
-                    placeholder="Re-enter your password"
-                    value={formData.confirm_password}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="login-form-group">
-                <label htmlFor="signup-valid-id-optional-but-speeds-up-ve">Valid ID (optional, but speeds up verification)</label>
-                <div className="login-input-wrapper">
-                  <div className="login-input-icon"><FaIdCard /></div>
-                  <input id="signup-valid-id-optional-but-speeds-up-ve"
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setIdFile(e.target.files?.[0] || null)}
-                    style={{ padding: '10px 0' }}
-                  />
-                </div>
-                <p style={{ fontSize: 12, color: '#5f6775', marginTop: 6 }}>
-                  A photo of any valid government or barangay-issued ID, if you
-                  have one. Don't have an ID? You can skip this and visit the
-                  Barangay Hall so an official can verify you in person instead.
+            ) : (
+              <>
+                <h2>Resident Registration</h2>
+                <p>
+                  For residents of <strong>{BARANGAY_NAME}</strong> only. Fill in
+                  your details as they appear on your valid ID.
                 </p>
-              </div>
 
-              {/* Last thing before the button, so it is read after the
-                  address has been entered rather than skimmed past at
-                  the top. Not stored as a column: it is a declaration
-                  made at signup, and what an official relies on when
-                  they later mark an account ineligible for not being a
-                  resident. The account record and the activity log
-                  carry that decision. */}
-              <label className="residency-confirm">
-                <input
-                  type="checkbox"
-                  checked={confirmsResidency}
-                  onChange={(e) => setConfirmsResidency(e.target.checked)}
-                />
-                <span>
-                  I certify that I am a resident of {BARANGAY_NAME}, Dumaguete
-                  City, and that the details above are true and correct.
-                </span>
-              </label>
+                {/* The steps. An ordered list, because they are a
+                    sequence; `aria-current="step"` says where the person
+                    is, and the tick is decorative. */}
+                <ol className="signup-steps" aria-label="Sign-up progress">
+                  {SIGNUP_STEPS.map((entry, index) => {
+                    const number = index + 1
+                    const state = number === step
+                      ? 'is-current'
+                      : number < step ? 'is-done' : 'is-todo'
+                    return (
+                      <li
+                        key={entry.key}
+                        className={`signup-step ${state}`}
+                        aria-current={number === step ? 'step' : undefined}
+                      >
+                        <span className="signup-step-num" aria-hidden="true">
+                          {number < step ? '✓' : number}
+                        </span>
+                        <span className="signup-step-label">
+                          <span className="visually-hidden">
+                            {number < step
+                              ? 'Completed: '
+                              : number === step ? 'Current step: ' : 'Not started: '}
+                          </span>
+                          {entry.label}
+                        </span>
+                      </li>
+                    )
+                  })}
+                </ol>
 
-              <button
-                type="submit"
-                className="login-submit-btn submit-resident"
-                disabled={loading}
-              >
-                {loading ? 'Creating Account...' : 'Create Account'}
-              </button>
-            </form>
+                <p className="signup-step-intro">
+                  Step {step} of 3 — {stepIntro[step]}
+                </p>
 
-            <div className="login-form-footer" style={{ justifyContent: 'center', gap: 6 }}>
-              <span>Already have an account?</span>
-              <Link to="/login">Log in</Link>
-            </div>
+                {error && <div className="login-error" role="alert">{error}</div>}
+
+                <form
+                  className="login-form"
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    if (step === 1) return handleContinueFromIdentity()
+                    if (step === 2) return handleContinueFromAccount()
+                    return handleSignup(e)
+                  }}
+                >
+                  {/* ─── STEP 1 ─ ABOUT YOU ───────────────────────── */}
+                  {step === 1 && (
+                    <>
+                      <div className="login-form-group">
+                        <label htmlFor="signup-first_name">First Name</label>
+                        <div className="login-input-wrapper">
+                          <div className="login-input-icon"><FaUser /></div>
+                          <input id="signup-first_name"
+                            type="text"
+                            name="first_name"
+                            placeholder="Juan"
+                            value={formData.first_name}
+                            onChange={handleChange}
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div className="login-form-group">
+                        <label htmlFor="signup-middle_name">Middle Name <span className="field-optional">(optional)</span></label>
+                        <div className="login-input-wrapper">
+                          <div className="login-input-icon"><FaUser /></div>
+                          <input id="signup-middle_name"
+                            type="text"
+                            name="middle_name"
+                            placeholder="Santos"
+                            value={formData.middle_name}
+                            onChange={handleChange}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="login-form-group">
+                        <label htmlFor="signup-last_name">Last Name</label>
+                        <div className="login-input-wrapper">
+                          <div className="login-input-icon"><FaUser /></div>
+                          <input id="signup-last_name"
+                            type="text"
+                            name="last_name"
+                            placeholder="Dela Cruz"
+                            value={formData.last_name}
+                            onChange={handleChange}
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div className="login-form-group">
+                        <label htmlFor="signup-suffix">Suffix <span className="field-optional">(optional)</span></label>
+                        <div className="login-input-wrapper">
+                          <div className="login-input-icon"><FaUser /></div>
+                          <input id="signup-suffix"
+                            type="text"
+                            name="suffix"
+                            placeholder="Jr., Sr., III"
+                            value={formData.suffix}
+                            onChange={handleChange}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="login-form-group">
+                        <label htmlFor="signup-contact_number">Contact Number</label>
+                        <div className="login-input-wrapper">
+                          <div className="login-input-icon"><FaPhone /></div>
+                          <input id="signup-contact_number"
+                            type="tel"
+                            name="contact_number"
+                            placeholder="09xx xxx xxxx"
+                            value={formData.contact_number}
+                            onChange={handleChange}
+                            required
+                          />
+                        </div>
+                        <p className="field-hint">
+                          How the barangay reaches you about a request.
+                        </p>
+                      </div>
+
+                      <div className="login-form-group">
+                        <label htmlFor="signup-purok">Purok</label>
+                        <div className="login-input-wrapper">
+                          <div className="login-input-icon"><FaMapMarkerAlt /></div>
+                          <select id="signup-purok"
+                            name="purok"
+                            value={formData.purok}
+                            onChange={handleChange}
+                            required
+                          >
+                            <option value="">Select your purok</option>
+                            {PUROKS.map((purok) => (
+                              <option key={purok} value={purok}>{purok}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <p className="field-hint">
+                          Only puroks within {BARANGAY_NAME} are listed. If you live in
+                          another barangay, request your documents from that barangay
+                          instead.
+                        </p>
+                      </div>
+                    </>
+                  )}
+
+                  {/* ─── STEP 2 ─ YOUR LOGIN ──────────────────────── */}
+                  {step === 2 && (
+                    <>
+                      <div className="login-form-group">
+                        <label htmlFor="signup-email">Email</label>
+                        <div className="login-input-wrapper">
+                          <div className="login-input-icon"><FaEnvelope /></div>
+                          <input id="signup-email"
+                            type="email"
+                            name="email"
+                            placeholder="you@example.com"
+                            value={formData.email}
+                            onChange={handleChange}
+                            required
+                          />
+                        </div>
+                        <p className="field-hint">
+                          This is also your username. The barangay sends a
+                          confirmation link here, and the account cannot be used
+                          until it is clicked — so use an address you can open.
+                        </p>
+                      </div>
+
+                      <div className="login-form-group">
+                        <label htmlFor="signup-password">Password</label>
+                        <div className="login-input-wrapper">
+                          <div className="login-input-icon"><FaLock /></div>
+                          <input id="signup-password"
+                            type={showPassword ? 'text' : 'password'}
+                            name="password"
+                            placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
+                            value={formData.password}
+                            onChange={handleChange}
+                            required
+                          />
+                          <button
+                            type="button"
+                            className="login-toggle-password"
+                            aria-pressed={showPassword}
+                            aria-label={showPassword ? 'Hide the password' : 'Show the password'}
+                            onClick={() => setShowPassword(!showPassword)}
+                          >
+                            {showPassword ? <FaEyeSlash /> : <FaEye />}
+                          </button>
+                        </div>
+
+                        {/* ⚠️ ONE of these blocks and two are advice, and
+                            the list says which is which in words rather
+                            than only in colour. A rule that rejects a
+                            long passphrase for having no digit makes
+                            passwords worse, not better. */}
+                        <ul className="signup-password-checks">
+                          {checks.map((check) => (
+                            <li
+                              key={check.id}
+                              className={check.met ? 'is-met' : 'is-unmet'}
+                            >
+                              <span aria-hidden="true">{check.met ? '✓' : '•'}</span>
+                              <span>
+                                {check.label}
+                                {check.required ? ' (required)' : ' (suggested)'}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      <div className="login-form-group">
+                        <label htmlFor="signup-confirm_password">Confirm Password</label>
+                        <div className="login-input-wrapper">
+                          <div className="login-input-icon"><FaLock /></div>
+                          <input id="signup-confirm_password"
+                            type={showPassword ? 'text' : 'password'}
+                            name="confirm_password"
+                            placeholder="Re-enter your password"
+                            value={formData.confirm_password}
+                            onChange={handleChange}
+                            required
+                          />
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {/* ─── STEP 3 ─ CONFIRM ─────────────────────────── */}
+                  {step === 3 && (
+                    <>
+                      <dl className="signup-review">
+                        <div className="signup-review-row">
+                          <dt>Name</dt>
+                          <dd>{fullNamePreview}</dd>
+                        </div>
+                        <div className="signup-review-row">
+                          <dt>Purok</dt>
+                          <dd>{formData.purok}</dd>
+                        </div>
+                        <div className="signup-review-row">
+                          <dt>Contact number</dt>
+                          <dd>{formData.contact_number}</dd>
+                        </div>
+                        <div className="signup-review-row">
+                          <dt>Email</dt>
+                          <dd>{formData.email}</dd>
+                        </div>
+                      </dl>
+
+                      <div className="login-form-group">
+                        <label htmlFor="signup-valid-id">
+                          Valid ID <span className="field-optional">(optional)</span>
+                        </label>
+                        <div className="login-input-wrapper">
+                          <div className="login-input-icon"><FaIdCard /></div>
+                          <input id="signup-valid-id"
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            onChange={(e) => setIdFile(e.target.files?.[0] || null)}
+                            style={{ padding: '10px 0' }}
+                          />
+                        </div>
+                        <p className="field-hint">
+                          A photo of any valid government or barangay-issued ID,
+                          if you have one. JPEG, PNG or WebP, up to 5 MB — a
+                          phone photo is fine. It is stored privately and is
+                          seen only by you and by barangay officials.
+                        </p>
+                        <p className="field-hint">
+                          Don't have an ID? Skip this. Uploading one speeds
+                          verification up; it is not required, because requiring
+                          it would shut out the residents who most need barangay
+                          documents.
+                        </p>
+                      </div>
+
+                      {/* Last thing before the button, so it is read after the
+                          details have been entered rather than skimmed past at
+                          the top. Not stored as a column: it is a declaration
+                          made at signup, and what an official relies on when
+                          they later mark an account ineligible for not being a
+                          resident. The account record and the activity log
+                          carry that decision. */}
+                      <label className="residency-confirm">
+                        <input
+                          type="checkbox"
+                          checked={confirmsResidency}
+                          onChange={(e) => setConfirmsResidency(e.target.checked)}
+                        />
+                        <span>
+                          I certify that I am a resident of {BARANGAY_NAME}, Dumaguete
+                          City, and that the details above are true and correct.
+                        </span>
+                      </label>
+                    </>
+                  )}
+
+                  <div className="signup-actions">
+                    {step > 1 && (
+                      <button
+                        type="button"
+                        className="login-submit-btn signup-btn-secondary"
+                        onClick={() => goToStep(step - 1)}
+                        disabled={loading}
+                      >
+                        ← Back
+                      </button>
+                    )}
+                    <button
+                      type="submit"
+                      className="login-submit-btn submit-resident"
+                      disabled={loading}
+                    >
+                      {loading
+                        ? 'Creating Account...'
+                        : step === 3 ? 'Create Account' : 'Continue →'}
+                    </button>
+                  </div>
+                </form>
+
+                <div className="login-form-footer" style={{ justifyContent: 'center', gap: 6 }}>
+                  <span>Already have an account?</span>
+                  <Link to="/login">Log in</Link>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </main>
