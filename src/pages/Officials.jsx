@@ -13,6 +13,8 @@ import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { PersonAvatar } from '../utils/officialPhotos'
 import './Officials.css'
+import { groupByOfficial, todayLine } from '../utils/officialAvailability'
+import { manilaWeekday } from '../utils/clinicHours'
 
 // Health Department — the barangay has one nurse, identified by role
 // rather than by person until the barangay confirms a name and a photo
@@ -48,6 +50,7 @@ const Officials = () => {
   const [schedule, setSchedule] = useState([])
   const [nurseStatus, setNurseStatus] = useState(null)
   const [kapitanStatus, setKapitanStatus] = useState('available')
+  const [availability, setAvailability] = useState([])
   const [loadingOfficials, setLoadingOfficials] = useState(true)
   const [loadingSchedule, setLoadingSchedule] = useState(true)
   const [loadingNurse, setLoadingNurse] = useState(true)
@@ -57,7 +60,31 @@ const Officials = () => {
     fetchSchedule()
     fetchNurseAvailability()
     fetchKapitanStatus()
+    fetchAvailability()
   }, [])
+
+  // ⚠️ ONE request for the whole directory, not one per official.
+  // Eleven cards making eleven requests through the shared Supabase
+  // client is the shape of the `getSession()` lock problem CLAUDE.md
+  // records -- it presented as unrelated public pages hanging.
+  //
+  // ⚠️ And no `.eq('official_id', ...)` filter is needed to keep an
+  // archived official's hours off this page: migration 026's SELECT
+  // policy calls `official_is_active()`, so an archived official's rows
+  // are unreachable at the database -- the same guarantee 018 makes for
+  // the directory itself, and for the same reason. The publishable key
+  // ships in this bundle, so a filter written here would hide nothing
+  // from anybody who called the endpoint directly.
+  const fetchAvailability = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('official_availability')
+        .select('official_id, day_of_week, time_start, time_end, status, note')
+      if (!error) setAvailability(data || [])
+    } catch (err) {
+      console.error('Error fetching official availability:', err)
+    }
+  }
 
   const fetchOfficials = async () => {
     try {
@@ -194,6 +221,40 @@ const Officials = () => {
     )
   }
 
+  const availabilityByOfficial = groupByOfficial(availability)
+  const today = manilaWeekday()
+
+  // The compact line a card carries. ⚠️ `todayLine` distinguishes "no
+  // hours today" from "none published at all" -- saying an official is
+  // unavailable when nobody has published a schedule asserts something
+  // about them that nobody checked.
+  const availabilityFor = (official) =>
+    todayLine(availabilityByOfficial.get(official?.id) || [], today)
+
+  const ConsultationLine = ({ official }) => {
+    const line = availabilityFor(official)
+    return (
+      <div className="council-availability">
+        <span className="council-availability-label">Consultation today</span>
+        {line.kind === 'entry' ? (
+          <>
+            <span className={`council-availability-badge ${line.className}`}>
+              {line.label}
+            </span>
+            {line.hours && (
+              <span className="council-availability-hours">{line.hours}</span>
+            )}
+            {line.note && (
+              <span className="council-availability-note">{line.note}</span>
+            )}
+          </>
+        ) : (
+          <span className="council-availability-none">{line.text}</span>
+        )}
+      </div>
+    )
+  }
+
   const punong = officials.find((o) => o.position === 'Punong Barangay')
   const adminStaff = officials.filter(
     (o) => o.position === 'Barangay Secretary' || o.position === 'Barangay Treasurer'
@@ -324,6 +385,7 @@ const Officials = () => {
                         Ready to help for all programs for our official.
                         Our official commitment to every resident with heart.
                       </p>
+                      <ConsultationLine official={punong} />
                     </div>
                   </div>
                 </div>
@@ -349,6 +411,7 @@ const Officials = () => {
                             ? 'Manages all administrative documents and official records of the barangay.'
                             : 'Manages and oversees the financial affairs and funds of the barangay.'}
                         </p>
+                        <ConsultationLine official={official} />
                       </div>
                     </div>
                   ))}
@@ -378,6 +441,7 @@ const Officials = () => {
                         {member.committee && (
                           <div className="council-small-committee">{member.committee}</div>
                         )}
+                        <ConsultationLine official={member} />
                       </div>
                     </div>
                   ))}

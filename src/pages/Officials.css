@@ -640,3 +640,91 @@ body {
 .dot-unavailable {
   background-color: #b91c1c;
 }
+
+/* ================================
+   CONSULTATION HOURS ON A COUNCIL CARD
+   ================================
+
+   A compact line, not a schedule. The whole week belongs on a page of
+   its own if it is ever wanted; a card answers one question -- can I
+   see this official today.
+
+   ⚠️ The badge classes are the shared ones from
+   `AVAILABILITY_STATUS_LABELS`, so the pill matches what the official's
+   own portal shows for the same stored value -- but the RULES are
+   declared HERE at (0,2,0), so this public page does not depend on
+   `Sidebar.css` being in the bundle. Same reasoning as the tracking
+   page's status pill, and the same trap X4 recorded for
+   `@keyframes pulse`. */
+
+.council-availability {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e5e7eb;
+  min-width: 0;
+}
+
+.council-availability-label {
+  flex-basis: 100%;
+  font-size: var(--fs-12);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #5f6775;
+}
+
+.council-availability-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-12);
+  font-weight: 600;
+  background-color: #e5e7eb;
+  color: #4b5563;
+  white-space: nowrap;
+}
+
+.council-availability-badge.badge-approved {
+  background-color: #dcfce7;
+  color: #126c33;
+}
+
+.council-availability-badge.badge-ready {
+  background-color: #dbeafe;
+  color: #1d4ed8;
+}
+
+.council-availability-badge.badge-claimed {
+  background-color: #e5e7eb;
+  color: #4b5563;
+}
+
+.council-availability-badge.badge-declined {
+  background-color: #fee2e2;
+  color: #b91c1c;
+}
+
+.council-availability-hours {
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: #1f2937;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* The note is free text an official typed, so it is the one element
+   here that needs to be able to break a long word. */
+.council-availability-note,
+.council-availability-none {
+  flex-basis: 100%;
+  font-size: var(--fs-12);
+  color: #5f6775;
+  line-height: 1.5;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

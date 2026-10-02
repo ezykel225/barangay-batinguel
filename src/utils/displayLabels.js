@@ -81,6 +81,14 @@ export const AVAILABILITY_STATUS_LABELS = {
   'on-break': { label: 'On break', className: 'badge-pending' },
   'on-field': { label: 'On field', className: 'badge-pending' },
   'on-leave': { label: 'On leave', className: 'badge-claimed' },
+  // ⚠️ Added for `official_availability` (migration 026). It is in THIS
+  // map rather than a second one because this module owns the
+  // availability vocabulary, exactly as CLAUDE.md records -- and a map
+  // is a LOOKUP, not an offer list. No form has ever offered all five:
+  // the nurse's form offers hers, the officials' consultation form
+  // offers four, and each reads its words from here so two surfaces
+  // cannot show different words for one stored value.
+  'by-appointment': { label: 'By appointment', className: 'badge-ready' },
   unavailable: { label: 'Not available', className: 'badge-declined' },
 }
 
