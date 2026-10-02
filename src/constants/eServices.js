@@ -49,6 +49,15 @@ export const E_SERVICES = [
     cta: 'Reserve Court',
   },
   {
+    key: 'track-reservation',
+    label: 'Track a Court Reservation',
+    to: '/track-reservation',
+    access: 'guest',
+    summary: 'Check what has happened to a booking using its reference number'
+      + ' and the contact number it was made with.',
+    cta: 'Track a Booking',
+  },
+  {
     key: 'request-document',
     label: 'Request Barangay Document',
     to: '/resident?tab=documents',

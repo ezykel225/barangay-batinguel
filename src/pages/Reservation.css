@@ -822,6 +822,16 @@
   background-color: #dbeafe;
 }
 
+.res-reference-track {
+  display: inline-block;
+  margin-top: 14px;
+  padding: 6px 0;
+  min-height: 24px;
+  font-size: var(--fs-14);
+  font-weight: 600;
+  color: #1e40af;
+}
+
 .res-reference-warning {
   font-size: var(--fs-13);
   color: #5f6775;

@@ -886,6 +886,18 @@ const Reservation = () => {
                       <em> and </em> the contact number you gave
                       {submittedBooking?.contact ? ` (${submittedBooking.contact})` : ''}.
                     </p>
+                    {/* ⚠️ The reference is deep-linked, the contact number
+                        is NOT. Half of a two-factor lookup in a URL is a
+                        convenience; both halves in a URL put the lookup
+                        itself into browser history and the referrer
+                        header. The tracking page still asks for the
+                        number. */}
+                    <Link
+                      className="res-reference-track"
+                      to={`/track-reservation?ref=${encodeURIComponent(submittedReference)}`}
+                    >
+                      Check on this booking later →
+                    </Link>
                   </div>
                 )}
 

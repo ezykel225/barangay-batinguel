@@ -3,6 +3,15 @@ import { MemoryRouter } from 'react-router-dom'
 import EServicesMenu from './EServicesMenu'
 import { E_SERVICES, SERVICE_GROUPS, guestServices, residentServices } from '../constants/eServices'
 
+// ⚠️ Anchored at the START of the accessible name, not a loose
+// substring. Adding "Track a Court Reservation" to the catalogue made
+// `/Court Reservation/` match two links, and three tests failed on the
+// ambiguity rather than on anything being wrong -- a test that breaks
+// when a sibling service is added is testing the wrong thing. The
+// accessible name is "<label> <access text>", so the label is a prefix.
+const escapeForRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const nameOf = (label) => new RegExp(`^${escapeForRegExp(label)}`)
+
 const open = () => {
   render(<MemoryRouter><EServicesMenu /></MemoryRouter>)
   fireEvent.click(screen.getByRole('button', { name: 'E-Services' }))
@@ -13,7 +22,7 @@ describe('the E-Services dropdown', () => {
     render(<MemoryRouter><EServicesMenu /></MemoryRouter>)
     const trigger = screen.getByRole('button', { name: 'E-Services' })
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByRole('link', { name: /Court Reservation/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: nameOf('Court Reservation') })).not.toBeInTheDocument()
   })
 
   it('opens on click and points aria-controls at the panel that appears', () => {
@@ -67,7 +76,7 @@ describe('the E-Services dropdown', () => {
   it('renders every catalogue service as a real link to its own route', () => {
     open()
     E_SERVICES.forEach((service) => {
-      const link = screen.getByRole('link', { name: new RegExp(service.label) })
+      const link = screen.getByRole('link', { name: nameOf(service.label) })
       expect(link).toHaveAttribute('href', service.to)
     })
   })
@@ -83,11 +92,11 @@ describe('the E-Services dropdown', () => {
   it('states the access requirement in text on every service', () => {
     open()
     guestServices().forEach((service) => {
-      const link = screen.getByRole('link', { name: new RegExp(service.label) })
+      const link = screen.getByRole('link', { name: nameOf(service.label) })
       expect(link).toHaveTextContent('No account required')
     })
     residentServices().forEach((service) => {
-      const link = screen.getByRole('link', { name: new RegExp(service.label) })
+      const link = screen.getByRole('link', { name: nameOf(service.label) })
       expect(link).toHaveTextContent('Resident login required')
     })
   })
@@ -109,7 +118,7 @@ describe('the E-Services dropdown', () => {
 
   it('closes when a service is chosen, so the panel does not cover the new page', () => {
     open()
-    fireEvent.click(screen.getByRole('link', { name: /Court Reservation/ }))
+    fireEvent.click(screen.getByRole('link', { name: nameOf('Court Reservation') }))
     expect(screen.getByRole('button', { name: 'E-Services' }))
       .toHaveAttribute('aria-expanded', 'false')
   })
