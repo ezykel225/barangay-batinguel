@@ -13,6 +13,8 @@ import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { PersonAvatar } from '../utils/officialPhotos'
 import './Officials.css'
+import { buildOfficialWeek, groupByOfficial, todayLine } from '../utils/officialAvailability'
+import { manilaWeekday } from '../utils/clinicHours'
 
 // Health Department — the barangay has one nurse, identified by role
 // rather than by person until the barangay confirms a name and a photo
@@ -48,6 +50,12 @@ const Officials = () => {
   const [schedule, setSchedule] = useState([])
   const [nurseStatus, setNurseStatus] = useState(null)
   const [kapitanStatus, setKapitanStatus] = useState('available')
+  const [availability, setAvailability] = useState([])
+  // Which cards have their week opened. Keyed by official id, so one
+  // card's disclosure cannot open another's -- and closed by default,
+  // because the card's job is "is my Kagawad in today", which the
+  // compact line already answers.
+  const [openSchedules, setOpenSchedules] = useState({})
   const [loadingOfficials, setLoadingOfficials] = useState(true)
   const [loadingSchedule, setLoadingSchedule] = useState(true)
   const [loadingNurse, setLoadingNurse] = useState(true)
@@ -57,7 +65,31 @@ const Officials = () => {
     fetchSchedule()
     fetchNurseAvailability()
     fetchKapitanStatus()
+    fetchAvailability()
   }, [])
+
+  // ⚠️ ONE request for the whole directory, not one per official.
+  // Eleven cards making eleven requests through the shared Supabase
+  // client is the shape of the `getSession()` lock problem CLAUDE.md
+  // records -- it presented as unrelated public pages hanging.
+  //
+  // ⚠️ And no `.eq('official_id', ...)` filter is needed to keep an
+  // archived official's hours off this page: migration 026's SELECT
+  // policy calls `official_is_active()`, so an archived official's rows
+  // are unreachable at the database -- the same guarantee 018 makes for
+  // the directory itself, and for the same reason. The publishable key
+  // ships in this bundle, so a filter written here would hide nothing
+  // from anybody who called the endpoint directly.
+  const fetchAvailability = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('official_availability')
+        .select('official_id, day_of_week, time_start, time_end, status, note')
+      if (!error) setAvailability(data || [])
+    } catch (err) {
+      console.error('Error fetching official availability:', err)
+    }
+  }
 
   const fetchOfficials = async () => {
     try {
@@ -194,6 +226,115 @@ const Officials = () => {
     )
   }
 
+  const availabilityByOfficial = groupByOfficial(availability)
+  const today = manilaWeekday()
+
+  const toggleSchedule = (id) =>
+    setOpenSchedules((prev) => ({ ...prev, [id]: !prev[id] }))
+
+  // ⚠️ TWO SHAPES, AND THE EMPTY ONE IS THE SHAPE EVERY CARD HAS
+  // TODAY. `official_availability` holds zero rows -- migration 026
+  // seeded nothing, because inventing consultation hours would put
+  // times on a public page nobody at the barangay agreed to. So the
+  // common case is "nothing published", and it gets ONE short line
+  // rather than a labelled block with a sentence in it: eleven cards
+  // each carrying "No consultation hours published yet." was a screen
+  // of apology where a reader was looking for a phone number.
+  //
+  // ⚠️ It still says NOT PUBLISHED, never "unavailable". An absent
+  // schedule is not a closed door; asserting the official is away
+  // asserts something nobody checked. `todayLine` already draws that
+  // distinction and this only chooses how to show it.
+  //
+  // ⚠️ `hideWhenEmpty` exists for the Punong Barangay alone. His
+  // card already carries the full weekly Consultation Schedule from
+  // `kapitan_availability` in `.kapitan-section` above, so an empty
+  // "Not published yet" beside it would contradict a schedule the
+  // reader can see. It HIDES rather than removes: should he ever
+  // publish `official_availability` rows -- a different table -- they
+  // appear on his card like anybody else's.
+  const ConsultationBlock = ({ official, hideWhenEmpty = false }) => {
+    const rows = availabilityByOfficial.get(official?.id) || []
+    const line = todayLine(rows, today)
+    const published = line.kind !== 'none'
+
+    if (!published) {
+      if (hideWhenEmpty) return null
+      return (
+        <div className="council-availability is-unpublished">
+          <span className="council-availability-label">Consultation Schedule</span>
+          <span className="council-availability-none">Not published yet</span>
+        </div>
+      )
+    }
+
+    const week = buildOfficialWeek(rows)
+    const panelId = `consult-${official?.id}`
+    const open = Boolean(openSchedules[official?.id])
+
+    return (
+      <div className="council-availability">
+        <span className="council-availability-label">Consultation Today</span>
+        {line.kind === 'entry' ? (
+          <>
+            <span className={`council-availability-badge ${line.className}`}>
+              {line.label}
+            </span>
+            {line.hours && (
+              <span className="council-availability-hours">{line.hours}</span>
+            )}
+            {line.note && (
+              <span className="council-availability-note">{line.note}</span>
+            )}
+          </>
+        ) : (
+          <span className="council-availability-none">{line.text}</span>
+        )}
+
+        {/* A real disclosure: a <button> with `aria-expanded` and
+            `aria-controls`, never a clickable <div>.
+
+            ⚠️ The accessible name carries the OFFICIAL'S NAME, because
+            eleven cards would otherwise offer eleven controls all
+            announced "View schedule". It is a PREFIX of the visible
+            label, not a replacement for it -- WCAG 2.5.3 Label in Name
+            means somebody saying "click View schedule" must still match
+            it. Same rule, and the same reasoning, as ActionMenu's
+            `subject`. */}
+        <button
+          type="button"
+          className="council-schedule-toggle"
+          aria-expanded={open}
+          aria-controls={panelId}
+          aria-label={`${open ? 'Hide' : 'View'} schedule for ${official?.full_name || 'this official'}`}
+          onClick={() => toggleSchedule(official?.id)}
+        >
+          {open ? 'Hide schedule' : 'View schedule'}
+        </button>
+
+        <ul className="council-schedule-week" id={panelId} hidden={!open}>
+          {week.map((entry) => (
+            <li className="council-schedule-row" key={entry.day}>
+              <span className="council-schedule-day">{entry.day}</span>
+              <span className="council-schedule-value">
+                {/* ⚠️ A day with NO row says so. It does not borrow a
+                    status from another day and it is not omitted -- a
+                    day missing from the list cannot be told apart from
+                    a page that failed to load. */}
+                {entry.hasEntry
+                  ? [entry.label, entry.hours].filter(Boolean).join(' · ')
+                  : 'Not published'}
+              </span>
+              {entry.note && (
+                <span className="council-schedule-note">{entry.note}</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
+    )
+  }
+
   const punong = officials.find((o) => o.position === 'Punong Barangay')
   const adminStaff = officials.filter(
     (o) => o.position === 'Barangay Secretary' || o.position === 'Barangay Treasurer'
@@ -324,6 +465,7 @@ const Officials = () => {
                         Ready to help for all programs for our official.
                         Our official commitment to every resident with heart.
                       </p>
+                      <ConsultationBlock official={punong} hideWhenEmpty />
                     </div>
                   </div>
                 </div>
@@ -349,6 +491,7 @@ const Officials = () => {
                             ? 'Manages all administrative documents and official records of the barangay.'
                             : 'Manages and oversees the financial affairs and funds of the barangay.'}
                         </p>
+                        <ConsultationBlock official={official} />
                       </div>
                     </div>
                   ))}
@@ -378,6 +521,7 @@ const Officials = () => {
                         {member.committee && (
                           <div className="council-small-committee">{member.committee}</div>
                         )}
+                        <ConsultationBlock official={member} />
                       </div>
                     </div>
                   ))}

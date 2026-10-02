@@ -12,6 +12,7 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import Navbar from './Navbar'
+import { E_SERVICES, SERVICE_GROUPS } from '../constants/eServices'
 
 jest.mock('../context/AuthContext', () => ({
   useAuth: () => ({ user: null, role: null, logout: async () => {} }),
@@ -68,5 +69,56 @@ describe('the mobile menu button', () => {
     renderNavbar()
     const svg = toggle().querySelector('svg')
     expect(svg).toHaveAttribute('aria-hidden', 'true')
+  })
+})
+
+// ── The mobile drawer exposes the SAME services as the desktop ───────
+//
+// ⚠️ The requirement is not "mobile has a menu too" -- it is that
+// neither surface owns the list. Both render from
+// src/constants/eServices.js, so a service cannot exist on a desktop
+// and be missing on a phone. These tests compare the drawer against
+// the catalogue itself, not against a hard-coded copy of it, so they
+// keep holding when the catalogue grows.
+describe('the mobile drawer and the E-Services catalogue', () => {
+  const openDrawer = () => {
+    renderNavbar()
+    fireEvent.click(toggle())
+  }
+
+  it('offers every catalogue service, each linking to its own route', () => {
+    openDrawer()
+    E_SERVICES.forEach((service) => {
+      const links = screen.getAllByRole('link', { name: new RegExp(service.label) })
+      expect(links.some((l) => l.getAttribute('href') === service.to)).toBe(true)
+    })
+  })
+
+  it('offers the landing page too', () => {
+    openDrawer()
+    expect(screen.getAllByRole('link', { name: 'E-Services' })[0])
+      .toHaveAttribute('href', '/e-services')
+  })
+
+  it('states the access requirement in words, exactly as the desktop does', () => {
+    openDrawer()
+    SERVICE_GROUPS.forEach((group) => {
+      group.services.forEach((service) => {
+        const link = screen.getAllByRole('link', { name: new RegExp(service.label) })
+          .find((l) => l.getAttribute('href') === service.to)
+        expect(link).toHaveTextContent(group.label)
+      })
+    })
+  })
+
+  it('no longer gives Court Reservation its own top-level entry', () => {
+    openDrawer()
+    // It is still reachable -- as a service inside E-Services, which is
+    // the point of the change.
+    const courtLinks = screen.getAllByRole('link', { name: /Court Reservation/ })
+    expect(courtLinks.length).toBeGreaterThan(0)
+    courtLinks.forEach((link) => {
+      expect(link.closest('.navbar-mobile-sublist')).not.toBeNull()
+    })
   })
 })

@@ -1,4 +1,5 @@
 import { useCallback, useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   FaFileAlt,
   FaEye,
@@ -18,6 +19,7 @@ import {
   RESERVATION_STATUS_LABELS,
 } from '../utils/displayLabels'
 import { residentStatusLabel } from '../utils/reservationWindow'
+import { resolveResidentTab } from '../utils/residentTabs'
 import { logActivity } from '../utils/activityLog'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
@@ -99,7 +101,21 @@ const ResidentDashboard = () => {
     markRead: markNotificationRead,
     markAllRead: markAllNotificationsRead,
   } = useNotifications(user?.id)
-  const [activeTab, setActiveTab] = useState('dashboard')
+  // ⚠️ Seeded from ?tab= so the public E-Services page can send a
+  // resident straight to Document Requests instead of dropping them on
+  // the portal's front page to find it themselves.
+  //
+  // It is a HINT, not authorization -- exactly as `link_tab` is for
+  // notifications. ProtectedRoute still gates this route and RLS still
+  // decides what the tab may load. An unrecognised value falls back to
+  // 'dashboard' rather than rendering an empty portal, and the param is
+  // read for the INITIAL value only, so the sidebar stays in charge of
+  // every later change.
+  const [searchParams] = useSearchParams()
+  const [activeTab, setActiveTab] = useState(() => {
+    const requested = searchParams.get('tab')
+    return resolveResidentTab(requested)
+  })
   const [userProfile, setUserProfile] = useState(null)
   const [requests, setRequests] = useState([])
   const [myReservations, setMyReservations] = useState([])

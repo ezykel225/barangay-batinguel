@@ -1,7 +1,11 @@
+/* 50px of top padding under a navbar that already has its own, with a
+   back link and a four-line intro under that, put the first card 305px
+   down a 1280x1000 viewport. 32px leaves the page breathing without
+   spending a third of the first screen on nothing. */
 .announcements-page-section {
   min-height: 100vh;
   background: #f8fafc;
-  padding: 50px 20px;
+  padding: 32px 20px 50px;
 }
 
 .announcements-page-container {
@@ -17,27 +21,12 @@
   font-weight: 600;
 }
 
-.announcements-page-header {
-  margin-bottom: 28px;
-}
-
-.announcements-page-header h1 {
-  font-size: var(--fs-30);
-  color: #1e3a8a;
-  margin-bottom: 8px;
-}
-
-.announcements-page-header p {
-  color: #64748b;
-  font-size: var(--fs-14);
-}
-
 /* minmax(0, …) for the reason given in Home.css: a bare 1fr track
    cannot shrink below its content's min-content width. */
 .announcements-page-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 24px;
+  gap: 20px;
 }
 
 .announcement-card-link {

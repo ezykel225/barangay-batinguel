@@ -364,20 +364,13 @@
     flex-wrap, so nothing needs a breakpoint of its own and nothing can
     push the document sideways at 375px. */
 
-/* Accessible name for a control whose purpose is already clear visually.
-    Clipped rather than `display: none`, which would hide it from screen
-    readers as well and defeat the point. */
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
+/* ⚠️ `.visually-hidden` now lives in `src/index.css`. It was declared
+    here and used from here only, until the public Covered Court
+    reservation flow needed it too -- at which point a public page would
+    have been depending on the Official Dashboard's stylesheet to be in
+    the bundle. That is the same dishonesty X4 recorded for
+    `@keyframes pulse`: a global owned by one page. The rule's bytes are
+    unchanged; only the file moved. */
 
 /* ── The three group buttons ── */
 .resident-group-tabs {
@@ -900,4 +893,83 @@
   .kapitan-compact-select {
     width: 100%;
   }
+}
+
+/* ================================
+   MY CONSULTATION HOURS
+   ================================
+
+   One editable row per weekday, each saving itself. A single Save over
+   seven days means one bad day blocks the other six.
+
+   ⚠️ `minmax(0, ...)`, never a bare fr -- the note field holds free
+   text an official typed, and a bare track cannot shrink below its
+   content's min-content width. Written narrow-first and widened by
+   flex-wrap, so nothing needs a breakpoint of its own. */
+
+.availability-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.availability-day {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-md);
+  background-color: #f9fafb;
+}
+
+.availability-day-name {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: var(--fs-13);
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.availability-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 130px;
+  min-width: 0;
+}
+
+.availability-field-wide {
+  flex: 2 1 200px;
+}
+
+.availability-field label {
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: #5f6775;
+}
+
+/* ⚠️ The padding is on the CONTROL, not on a wrapper around it. A
+   borderless field inside a padded wrapper looks tall and can only be
+   hit over a fraction of itself -- the post-X3 finding on the shared
+   filter bar, which is this same shape of control. */
+.availability-field input,
+.availability-field select {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: var(--radius-sm);
+  background-color: #ffffff;
+  font-size: var(--fs-13);
+  color: #1f2937;
+  font-family: 'Poppins', sans-serif;
+}
+
+.availability-save {
+  flex: 0 0 auto;
+  min-height: 38px;
 }

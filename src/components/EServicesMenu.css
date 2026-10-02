@@ -1,0 +1,210 @@
+/* ================================
+   E-SERVICES DROPDOWN (public navbar)
+   ================================
+
+   Matches `.navbar-menu a` deliberately: the trigger sits in the same
+   row as Home / Officials / Health Center and must not read as a
+   different kind of control. Same colour, size, weight and the same
+   2px underline treatment for hover and the active route. */
+.eservices-menu {
+  position: relative;
+}
+
+.eservices-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  /* Matching the siblings, which are links with no button chrome. */
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: 'Poppins', sans-serif;
+  color: #374151;
+  font-size: var(--fs-14);
+  font-weight: 500;
+  padding: 0 0 4px;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  /* WCAG 2.2 SC 2.5.8. The siblings are inline links and exempt; this
+     is a standalone control and is not. */
+  min-height: 24px;
+}
+
+.eservices-trigger:hover,
+.eservices-trigger[aria-expanded='true'] {
+  color: #1e3a8a;
+  border-bottom-color: #1e3a8a;
+}
+
+.eservices-trigger.active {
+  color: #1e3a8a;
+  border-bottom-color: #1e3a8a;
+  font-weight: 600;
+}
+
+.eservices-chevron {
+  font-size: 10px;
+  transition: transform 0.2s;
+}
+
+.eservices-trigger[aria-expanded='true'] .eservices-chevron {
+  transform: rotate(180deg);
+}
+
+/* ── The panel ─────────────────────────────────────────────────────
+   z-index 1200 matches ActionMenu's portalled popup, which is the
+   highest thing this application puts over page content. */
+.eservices-panel {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  min-width: 290px;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  padding: 8px;
+  z-index: 1200;
+}
+
+.eservices-panel-all {
+  display: block;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: #1e3a8a;
+  text-decoration: none;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 4px;
+}
+
+.eservices-panel-all:hover {
+  background-color: #eff6ff;
+}
+
+.eservices-group + .eservices-group {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid #f3f4f6;
+}
+
+.eservices-group-label {
+  margin: 0;
+  padding: 8px 12px 4px;
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: #5f6775;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.eservices-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* ⚠️ THE ALIGNMENT FIX, and it is not a padding problem.
+   MEASURED in Chromium: the four service labels sat at 82px, 54px,
+   41px and 62px from the panel's left edge -- a different offset each,
+   varying with the length of the text. That is CENTRING, not
+   indentation.
+
+   The panel renders inside the public navbar, so its own `<li>`
+   elements also match `.navbar-menu li { display: flex; align-items:
+   center; justify-content: center }`. Each `<a>` became a block-level
+   FLEX ITEM, shrink-wrapped to its text, and was then centred in its
+   row. Every row therefore started somewhere different.
+
+   This resets the panel's list items to ordinary blocks at (0,3,1),
+   which outranks `.navbar-menu li` at (0,1,1) without touching the
+   navbar rule that every other nav item depends on. One left edge for
+   the lot; the hierarchy comes from weight, size and spacing. */
+.eservices-panel .eservices-list li {
+  display: block;
+}
+
+.eservices-panel .eservices-item {
+  width: 100%;
+}
+
+.eservices-item {
+  display: block;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  /* min-content width floor is the X2 lesson: a service label is text
+     somebody wrote and must be allowed to wrap. */
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.eservices-item:hover {
+  background-color: #f9fafb;
+}
+
+.eservices-item-label {
+  display: block;
+  font-size: var(--fs-14);
+  font-weight: 500;
+  color: #374151;
+}
+
+/* ⚠️ The access requirement is TEXT, never colour alone -- a resident
+   who cannot see the grey has to be told in words that an account is
+   needed, and told before the click rather than after the form. */
+.eservices-item-access {
+  display: block;
+  font-size: var(--fs-12);
+  color: #5f6775;
+  margin-top: 1px;
+}
+
+/* ── Mobile: the same services, inline in the drawer ───────────────
+   No disclosure on a phone. The drawer is already a disclosure, and
+   nesting a second one inside it buys nothing but another tap. */
+.navbar-mobile .eservices-mobile-label {
+  margin: 0;
+  padding: 12px 20px 4px;
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: #5f6775;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.navbar-mobile .eservices-mobile-access {
+  display: block;
+  font-size: var(--fs-12);
+  font-weight: 400;
+  color: #5f6775;
+  margin-top: 1px;
+}
+
+/* The service list inside the mobile drawer.
+   ⚠️ An earlier version of this comment said `.navbar-mobile li`
+   already supplied the row padding and separator. It does not -- there
+   is NO `.navbar-mobile li` rule anywhere, and the drawer spaces its
+   rows with `gap: 16px` on the flex column instead. That is why these
+   anchors carry their own padding, and why the drawer's four top-level
+   links needed a target-size fix of their own (see Navbar.css). */
+.navbar-mobile-sublist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.navbar-mobile-sublist li {
+  padding: 0;
+  border: none;
+}
+
+.navbar-mobile-sublist a {
+  display: block;
+  padding: 10px 20px 10px 32px;
+  /* A service label is text somebody wrote: let it wrap rather than
+     set a min-content floor on the drawer (X2). */
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

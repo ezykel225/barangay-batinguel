@@ -640,3 +640,176 @@ body {
 .dot-unavailable {
   background-color: #b91c1c;
 }
+
+/* ================================
+   CONSULTATION HOURS ON A COUNCIL CARD
+   ================================
+
+   A compact line, not a schedule. The whole week belongs on a page of
+   its own if it is ever wanted; a card answers one question -- can I
+   see this official today.
+
+   ⚠️ The badge classes are the shared ones from
+   `AVAILABILITY_STATUS_LABELS`, so the pill matches what the official's
+   own portal shows for the same stored value -- but the RULES are
+   declared HERE at (0,2,0), so this public page does not depend on
+   `Sidebar.css` being in the bundle. Same reasoning as the tracking
+   page's status pill, and the same trap X4 recorded for
+   `@keyframes pulse`. */
+
+.council-availability {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e5e7eb;
+  min-width: 0;
+}
+
+.council-availability-label {
+  flex-basis: 100%;
+  font-size: var(--fs-12);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #5f6775;
+}
+
+.council-availability-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-12);
+  font-weight: 600;
+  background-color: #e5e7eb;
+  color: #4b5563;
+  white-space: nowrap;
+}
+
+.council-availability-badge.badge-approved {
+  background-color: #dcfce7;
+  color: #126c33;
+}
+
+.council-availability-badge.badge-ready {
+  background-color: #dbeafe;
+  color: #1d4ed8;
+}
+
+.council-availability-badge.badge-claimed {
+  background-color: #e5e7eb;
+  color: #4b5563;
+}
+
+.council-availability-badge.badge-declined {
+  background-color: #fee2e2;
+  color: #b91c1c;
+}
+
+.council-availability-hours {
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: #1f2937;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* The note is free text an official typed, so it is the one element
+   here that needs to be able to break a long word. */
+.council-availability-note,
+.council-availability-none {
+  flex-basis: 100%;
+  font-size: var(--fs-12);
+  color: #5f6775;
+  line-height: 1.5;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* ── The consultation disclosure on a council card ────────────────── */
+/* The unpublished shape is one short line, not a labelled block with a
+   sentence in it. `official_availability` holds zero rows today, so
+   this is what every card shows -- eleven copies of a full-sentence
+   apology was a screen of nothing where a reader wanted a name and a
+   committee. */
+.council-availability.is-unpublished {
+  gap: 4px 8px;
+}
+
+.council-availability.is-unpublished .council-availability-label {
+  flex-basis: auto;
+}
+
+.council-schedule-toggle {
+  margin-left: auto;
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: 4px 0;
+  /* WCAG 2.2 SC 2.5.8. A padded wrapper is not a target -- the lesson
+     the filter bar's borderless input taught. */
+  min-height: 24px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: #1e3a8a;
+  text-decoration: underline;
+}
+
+.council-schedule-toggle:hover {
+  color: #15803d;
+}
+
+.council-schedule-week {
+  flex-basis: 100%;
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* ⚠️ `[hidden]` is a UA rule on the ELEMENT selector, so the
+   `display: flex` above beats it and the panel would stay on screen
+   with `aria-expanded="false"` announcing otherwise. Exactly the
+   defect measured on `.medicine-list` -- see HealthCenter.css. */
+.council-schedule-week[hidden] {
+  display: none;
+}
+
+.council-schedule-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  font-size: var(--fs-12);
+  min-width: 0;
+}
+
+.council-schedule-day {
+  flex-shrink: 0;
+  min-width: 76px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.council-schedule-value {
+  color: #5f6775;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* A note is text an official typed, so it must be allowed to wrap. */
+.council-schedule-note {
+  flex-basis: 100%;
+  color: #5f6775;
+  font-style: italic;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

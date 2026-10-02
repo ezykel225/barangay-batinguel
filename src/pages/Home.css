@@ -105,57 +105,6 @@
   transform: translateY(-1px);
 }
 
-/* ================================
-   ABOUT SECTION
-================================ */
-.about {
-  padding: 64px 40px;
-  background-color: var(--surface);
-}
-
-.about-container {
-  max-width: 1200px;
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 42px;
-  align-items: center;
-}
-
-.about-content h2 {
-  font-size: var(--fs-30);
-  font-weight: 700;
-  color: var(--primary);
-  margin-bottom: 18px;
-}
-
-.about-content p {
-  font-size: var(--fs-14);
-  color: var(--text-light);
-  line-height: 1.9;
-  margin-bottom: 14px;
-}
-
-.about-content strong {
-  color: var(--primary);
-}
-
-/* Google Map beside About */
-.about-map {
-  width: 100%;
-  height: 330px;
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  box-shadow: var(--shadow-md);
-  border: 1px solid #e2e8f0;
-}
-
-.about-map-iframe {
-  width: 100%;
-  height: 100%;
-  border: none;
-  display: block;
-}
 
 /* ================================
    CONTACT INFO SECTION
@@ -205,6 +154,13 @@
   justify-content: center;
 }
 
+/* ⚠️ Both tags. These four were <h4> directly under the section's
+   <h2>, which axe flags as heading-order: the old Home had the history
+   block and its own sub-headings above them, and X5 moved that to
+   /about and left the skip behind. They are <h3> now; the h4 selector
+   stays so the rule is correct either way and so nothing depends on
+   which tag a card happens to use. */
+.contact-content h3,
 .contact-content h4 {
   font-size: var(--fs-13);
   font-weight: 700;
@@ -412,6 +368,11 @@
   min-width: 0;
 }
 
+/* Both tags: Home nests these under a section <h2> and uses <h3>, the
+   Events page has only an <h1> above them and uses <h2>. Same card,
+   same look, correct outline on each page -- the rule the announcement
+   card already follows. */
+.event-info h2,
 .event-info h3 {
   font-size: var(--fs-16);
   font-weight: 600;
@@ -526,7 +487,7 @@
 ================================ */
 @media (max-width: 1024px) {
   .contact-info-container {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .announcements-grid {
@@ -537,14 +498,6 @@
 @media (max-width: 768px) {
   .hero h1 {
     font-size: var(--fs-34);
-  }
-
-  .about-container {
-    grid-template-columns: 1fr;
-  }
-
-  .about-map {
-    height: 280px;
   }
 
   /* ⚠️ A SINGLE column still needs minmax(0, …). One `1fr` track is
@@ -558,8 +511,11 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  /* ⚠️ minmax(0, …) on a SINGLE column too, for the reason the
+     comment above says: a bare `1fr` is `minmax(auto, 1fr)` whatever
+     the count. These two tracks were still bare after X2. */
   .contact-info-container {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .hero {
@@ -567,7 +523,6 @@
     min-height: 460px;
   }
 
-  .about,
   .announcements,
   .events,
   .contact-info,
@@ -581,123 +536,7 @@
     gap: 10px;
   }
 }
-/* ── About: history subheads ─────────────────────────────────── */
-.about-lead {
-  font-size: var(--fs-15);
-  line-height: 1.7;
-  color: #374151;
-  margin-bottom: 18px;
-}
 
-.about-subhead {
-  font-size: var(--fs-13);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: #15803d;
-  font-weight: 700;
-  margin: 22px 0 8px;
-}
-
-/* ── Barangay profile & school ───────────────────────────────── */
-.barangay-profile {
-  padding: 48px 20px;
-  background: #f9fafb;
-}
-
-.barangay-profile-container {
-  max-width: 1100px;
-  margin: 0 auto;
-  display: grid;
-  /* auto-fit collapses to one column on a phone without a media
-     query, and the 300px floor stops a card squeezing its labels. */
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 20px;
-}
-
-.profile-card {
-  background: #fff;
-  border-radius: var(--radius-md);
-  padding: 26px;
-  box-shadow: var(--shadow-sm);
-}
-
-.profile-card h3 {
-  font-size: var(--fs-18);
-  color: #1e3a8a;
-  margin: 0 0 14px;
-}
-
-.profile-description {
-  font-size: var(--fs-14);
-  line-height: 1.7;
-  color: #4b5563;
-  margin: 0 0 18px;
-}
-
-.profile-facts { margin: 0; }
-
-.profile-fact {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 16px;
-  padding: 9px 0;
-  border-bottom: 1px solid #f3f4f6;
-}
-
-.profile-fact:last-child { border-bottom: none; }
-
-.profile-fact dt {
-  font-size: var(--fs-13);
-  color: #5f6775;
-  flex-shrink: 0;
-}
-
-.profile-fact dd {
-  margin: 0;
-  font-size: var(--fs-14);
-  font-weight: 600;
-  color: #111827;
-  text-align: right;
-}
-
-.profile-subhead {
-  font-size: var(--fs-12);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: #15803d;
-  font-weight: 700;
-  margin: 22px 0 10px;
-}
-
-.profile-boundaries {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 8px;
-}
-
-.profile-boundaries li {
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
-  border-radius: var(--radius-sm);
-  padding: 10px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.boundary-direction {
-  font-size: var(--fs-12);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #15803d;
-  font-weight: 700;
-}
-
-.boundary-name { font-size: var(--fs-13); color: #374151; }
 
 /* Lunch break sits between the hours and the closed note, styled
    like a caution rather than a closure — the office reopens. */
@@ -705,4 +544,397 @@
   color: #92400e;
   font-size: var(--fs-13);
   font-weight: 500;
+}
+
+/* ================================
+   E-SERVICES, AND THE ABOUT DOORWAY
+   ================================
+
+   ⚠️ These two sections replaced the history, the map, the facts table
+   and the school card, which moved to /about. A resident arriving to
+   check when their rubbish is collected should not read three
+   paragraphs of history first.
+
+   Every value below is a token or a hex literal already used on this
+   page. Nothing new was added to the colour system. */
+
+.home-services {
+  padding: 64px 40px;
+  background-color: #ffffff;
+}
+
+.home-services-container,
+.home-about-teaser-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* ⚠️ auto-FILL, not auto-fit. With auto-fit the empty tracks collapse,
+   so a catalogue holding one service would stretch that card across
+   the whole row and read as a banner -- measured on the E-Services
+   landing page before it was changed there. */
+.home-services-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  gap: 18px;
+}
+
+.home-service-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-md);
+  background-color: #ffffff;
+  box-shadow: var(--shadow-sm);
+  text-decoration: none;
+  transition: var(--transition-fast);
+}
+
+.home-service-card:hover {
+  border-color: #1e40af;
+  box-shadow: var(--shadow-md);
+}
+
+.home-service-name {
+  font-size: var(--fs-16);
+  font-weight: 700;
+  color: #1e3a8a;
+  overflow-wrap: anywhere;
+}
+
+.home-service-summary {
+  font-size: var(--fs-13);
+  color: #5f6775;
+  line-height: 1.6;
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+
+/* The access requirement, in words. It is the last line of the card
+   rather than a badge at the top, because it is what somebody checks
+   just before deciding to click. */
+.home-service-access {
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: #5f6775;
+  margin-top: 4px;
+}
+
+.home-about-teaser {
+  padding: 48px 40px;
+  background-color: #f9fafb;
+  border-top: 1px solid #e5e7eb;
+}
+
+.home-about-teaser-container {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px 32px;
+}
+
+.home-about-teaser-container > div {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.home-about-teaser h2 {
+  font-size: var(--fs-22);
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 8px;
+}
+
+.home-about-teaser p {
+  font-size: var(--fs-14);
+  color: #5f6775;
+  line-height: 1.7;
+  margin: 0;
+  max-width: 70ch;
+  overflow-wrap: anywhere;
+}
+
+.home-about-teaser-btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 12px 22px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, #1e3a8a, #1e40af);
+  color: #ffffff;
+  font-size: var(--fs-14);
+  font-weight: 600;
+  text-decoration: none;
+  transition: var(--transition-fast);
+}
+
+.home-about-teaser-btn:hover {
+  filter: brightness(1.08);
+}
+
+@media (max-width: 768px) {
+  .home-services,
+  .home-about-teaser {
+    padding: 42px 20px;
+  }
+
+  .home-about-teaser-btn {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+}
+
+/* ── Announcement cards: equal heights, three-line excerpt ────────── */
+/* ⚠️ The cards used to be as tall as their text. One long announcement
+   beside two short ones made a row of three wildly different cards and
+   pushed the events and waste sections down the page. Two separate
+   things fix it and both are needed:
+
+   - the card STRETCHES to its row, so three cards are one height
+     whatever is in them;
+   - the excerpt CLAMPS to three lines, so the tallest card cannot be
+     set by whoever wrote the longest notice.
+
+   `announcementExcerpt` also bounds the text in the DOM. The clamp is
+   what makes the boundary exact at any width; the excerpt is what keeps
+   a 4,000-character notice out of a page already fetching five
+   sections. Neither touches the stored `description`, which the detail
+   page still renders in full. */
+.announcement-card-link {
+  display: block;
+  height: 100%;
+}
+
+.announcement-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.announcement-card-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  /* A flex item's default min-width is its min-content width (X2). */
+  min-width: 0;
+}
+
+.announcement-card-excerpt {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+/* The date sits on the card's bottom edge rather than directly under a
+   short excerpt, so three cards' footers line up. */
+.announcement-card-footer {
+  margin-top: auto;
+}
+
+/* ── Next waste collection ───────────────────────────────────────── */
+.waste-next {
+  background-color: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  margin-bottom: 16px;
+}
+
+.waste-next-label {
+  display: block;
+  font-size: var(--fs-12);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #126c33;
+}
+
+.waste-next-day {
+  display: block;
+  font-size: var(--fs-20);
+  color: var(--text);
+  margin-top: 2px;
+}
+
+.waste-next-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.waste-next-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  font-size: var(--fs-13);
+  min-width: 0;
+}
+
+.waste-next-icon {
+  flex-shrink: 0;
+  color: #126c33;
+}
+
+/* A purok is a stored value that may hold an off-list spelling, and a
+   waste type is free text -- both are text somebody typed, so both are
+   allowed to wrap rather than set a min-content floor (X2). */
+.waste-next-purok {
+  font-weight: 600;
+  color: var(--text);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.waste-next-type,
+.waste-next-time {
+  color: var(--text-light);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.waste-next-note {
+  margin: 10px 0 0;
+  font-size: var(--fs-12);
+  color: var(--text-light);
+}
+
+.waste-toggle {
+  background: none;
+  border: none;
+  padding: 6px 0;
+  /* WCAG 2.2 SC 2.5.8. */
+  min-height: 24px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.waste-toggle:hover {
+  color: #126c33;
+}
+
+/* ⚠️ `[hidden]` is a UA rule on the ELEMENT selector, so the grid's own
+   `display: grid` beats it and the schedule would stay on screen with
+   `aria-expanded="false"` announcing it closed. The defect measured on
+   `.medicine-list` -- see HealthCenter.css. */
+.waste-schedule-home-grid[hidden] {
+  display: none;
+}
+
+.waste-schedule-home-grid {
+  margin-top: 12px;
+}
+
+/* ── Announcement cards: the pill, the image area, the footer ─────── */
+/* ⚠️ THE CATEGORY PILL WAS STRETCHING THE FULL CARD WIDTH, and the
+   cause was a change made in this file one pass earlier. The badge is
+   `display: inline-block`, which fits its text — but `.announcement-
+   card-body` became a COLUMN flex container when the cards were given
+   equal heights, and a flex item is `align-self: stretch` by default
+   and is blockified besides. Measured at 1280: the pill 346px wide
+   inside a 382px card, computed `display: block`.
+
+   `align-self: flex-start` restores the one thing `inline-block` was
+   there for. Same family as every other finding in this project where
+   a container's layout quietly redefined a child: `[hidden]` under a
+   `display: flex`, the navbar's `li` under the E-Services panel. */
+.announcement-badge {
+  align-self: flex-start;
+  max-width: 100%;
+  /* A category is text somebody typed, so a long one wraps inside the
+     pill rather than setting a floor on the card (X2). */
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* 160px of megaphone over a card whose text is a title, three lines and
+   a date was the tallest thing on it. Reduced, not removed: the icon
+   and the light-blue band are what make the card read as an
+   announcement at a glance. */
+.announcement-card-image {
+  height: 112px;
+  font-size: var(--fs-30);
+}
+
+/* The date and the affordance share the footer line, so the card ends
+   with one row rather than two stacked ones. It wraps on a narrow card
+   instead of pushing it wide. */
+.announcement-card-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+
+.announcement-card-more {
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: var(--primary);
+  white-space: nowrap;
+}
+
+.announcement-card:hover .announcement-card-more {
+  text-decoration: underline;
+}
+
+/* ── Event cards ─────────────────────────────────────────────────── */
+/* Equal heights per row, the same reason the announcement cards got
+   them: one long title made its card 32px taller than the three beside
+   it. Measured before: 102 / 102 / 102 / 134. */
+.event-card-link {
+  display: block;
+  height: 100%;
+}
+
+.event-card {
+  height: 100%;
+}
+
+/* The hover already lifted the card; a border that answers as well
+   makes the whole card read as the control it is, rather than the
+   title alone. */
+.event-card:hover {
+  border-color: #93c5fd;
+}
+
+/* Time and location are one meta row under the title. Each line is
+   rendered only when the column holds something -- `event_time` is
+   NULL on every live row, so the time line is simply absent rather
+   than a label with a blank after it. */
+.event-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 14px;
+  margin-top: 6px;
+  min-width: 0;
+}
+
+.event-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-13);
+  color: var(--text-light);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.event-meta-item svg {
+  flex-shrink: 0;
+  color: #1e3a8a;
 }

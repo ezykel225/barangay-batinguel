@@ -2,8 +2,22 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { FaBars, FaTimes, FaUser } from 'react-icons/fa'
 import { useAuth } from '../context/AuthContext'
+import EServicesMenu from './EServicesMenu'
+import { SERVICE_GROUPS } from '../constants/eServices'
 import { supabase } from '../supabase/supabaseClient'
 import './Navbar.css'
+
+// Every destination the E-Services menu can reach, so the navbar can
+// tell when the visitor is already on one. Derived from the catalogue
+// rather than written out again -- a service added there lights the
+// trigger here with no second edit. Query strings are stripped: a
+// resident service deep-links with ?tab=, and location.pathname has no
+// query to compare against.
+const E_SERVICE_PATHS = [
+  '/e-services',
+  ...SERVICE_GROUPS.flatMap((group) =>
+    group.services.map((service) => service.to.split('?')[0])),
+]
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false)
@@ -84,13 +98,16 @@ const Navbar = () => {
               Health Center
             </Link>
           </li>
+          {/* ⚠️ This was a `Court Reservation` link. One service does
+              not deserve a top-level navigation slot while three others
+              have none, so the slot now opens the whole catalogue and
+              Court Reservation is the first item inside it.
+              `isActive` covers every e-services destination, so the
+              trigger stays underlined while somebody is on one. */}
           <li>
-            <Link
-              to="/reservation"
-              className={location.pathname === '/reservation'
-                ? 'active' : ''}>
-              Court Reservation
-            </Link>
+            <EServicesMenu
+              isActive={E_SERVICE_PATHS.some((path) => location.pathname === path)}
+            />
           </li>
           {isLoggedInResident ? (
             <li className="navbar-profile-item">
@@ -158,11 +175,30 @@ const Navbar = () => {
             Health Center
           </Link>
         </li>
+        {/* The SAME catalogue the desktop dropdown renders. Neither
+            surface owns the list, so a service cannot exist on one and
+            not the other. The drawer is already a disclosure, so these
+            are inline rather than behind a second tap. */}
         <li>
-          <Link to="/reservation" onClick={toggleMenu}>
-            Court Reservation
+          <Link to="/e-services" onClick={toggleMenu}>
+            E-Services
           </Link>
         </li>
+        {SERVICE_GROUPS.map((group) => (
+          <li key={group.access}>
+            <p className="eservices-mobile-label">{group.groupLabel}</p>
+            <ul className="navbar-mobile-sublist">
+              {group.services.map((service) => (
+                <li key={service.key}>
+                  <Link to={service.to} onClick={toggleMenu}>
+                    {service.label}
+                    <span className="eservices-mobile-access">{group.label}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </li>
+        ))}
         {isLoggedInResident ? (
           <>
             <li>

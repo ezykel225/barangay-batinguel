@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../supabase/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import Navbar from '../components/Navbar'
@@ -6,6 +7,11 @@ import Footer from '../components/Footer'
 import toast from 'react-hot-toast'
 import { PUROKS } from '../constants/barangay'
 import { isKnownPurok } from '../utils/residentGroups'
+import {
+  RESERVATION_STEPS,
+  missingDetailMessage,
+  missingTimeMessage,
+} from '../utils/reservationSteps'
 import {
   COURT_CLOSES_HOUR,
   COURT_OPENS_HOUR,
@@ -85,7 +91,35 @@ const Reservation = () => {
   const [reservations, setReservations] = useState([])
   const [loading, setLoading] = useState(false)
   const [fetchingSlots, setFetchingSlots] = useState(false)
-  const [showPaymentStep, setShowPaymentStep] = useState(false)
+  // ⚠️ The flow is four steps now, not two. `step` is the single
+  // source of where the person is:
+  //   1 date & time   2 your details   3 review   4 success
+  //
+  // All four render from ONE `formData`, so going Back never clears
+  // anything -- the fields are not unmounted-and-remounted, only
+  // hidden. That is the whole reason this is a step index rather than
+  // separate routes.
+  const [step, setStep] = useState(1)
+  // Set only after a successful submit, and the only thing step 4 has
+  // that the others do not. A guest cannot read their own booking back
+  // (no anonymous SELECT policy), so this comes from the
+  // create_court_reservation RPC's return value -- see migration 025.
+  const [submittedReference, setSubmittedReference] = useState('')
+  // ⚠️ A SNAPSHOT, because the form is cleared on success. Step 4 has to
+  // keep showing what was booked, and formData is empty by then -- the
+  // reset is what lets somebody file a second booking without a reload.
+  const [submittedBooking, setSubmittedBooking] = useState(null)
+
+  // The calendar and the slot grid lock once the person has moved past
+  // picking a time, so a stale selection cannot be changed underneath a
+  // review they are reading.
+  //
+  // ⚠️ Defence in depth rather than the control. Step 1 is the only step
+  // that RENDERS the calendar and the slot grid, so these handlers are
+  // unreachable past it -- but they are also the handlers that mutate
+  // `preferred_time`, and a guard on the mutation is worth more than a
+  // guard on the markup.
+  const timeLocked = step > 1
 
   // Availability calendar: shows which days in the visible month are
   // fully booked before the resident has to pick a date, instead of
@@ -417,7 +451,7 @@ const Reservation = () => {
   // clears the reason, because the database rejects an evening booking
   // that carries one (there is nothing for an official to decide).
   const switchBookingMode = (mode) => {
-    if (showPaymentStep) return
+    if (timeLocked) return
     setBookingMode(mode)
     setFormData((prev) => ({
       ...prev,
@@ -436,7 +470,7 @@ const Reservation = () => {
   }
 
   const handleTimeSelect = (slot) => {
-    if (showPaymentStep) return
+    if (timeLocked) return
     if (!fits(slot, formData.duration_hours)) {
       toast.error(durationFitMessage(slot, formData.duration_hours))
       return
@@ -457,28 +491,12 @@ const Reservation = () => {
   // Step 1 -> Step 2. Step 2 is a plain review-and-confirm screen; it
   // is only reached once the reservation details are valid.
   const handleContinueToPayment = () => {
-    if (!formData.full_name || !formData.purok || !formData.contact_number || !formData.email) {
-      toast.error('Please fill in all your contact details.')
-      return
-    }
-    if (!formData.residency_status) {
-      toast.error('Please select your residency status.')
-      return
-    }
-    if (!formData.preferred_date) {
-      toast.error('Please select a date.')
-      return
-    }
-    if (!formData.preferred_time) {
-      toast.error('Please select a start time.')
-      return
-    }
-    if (!formData.purpose) {
-      toast.error('Please tell us the purpose of your reservation.')
-      return
-    }
-    if (!formData.activity_type) {
-      toast.error('Please choose what the court will be used for.')
+    // The presence checks live in reservationSteps.js, which is where a
+    // test can reach them; the window, duration and overlap checks stay
+    // below, because they are reservationWindow.js's and the database's.
+    const missing = missingTimeMessage(formData)
+    if (missing) {
+      toast.error(missing)
       return
     }
     if (!fits(formData.preferred_time, formData.duration_hours)) {
@@ -497,15 +515,78 @@ const Reservation = () => {
       )
       return
     }
-    setShowPaymentStep(true)
+    setStep(2)
     window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  // Step 2 -> 3. The requester fields, checked here rather than at
+  // step 1 so somebody is never told their NAME is missing while they
+  // are choosing a date.
+  const handleContinueToReview = () => {
+    // One message per field, from the module: "Please fill in all your
+    // contact details" did not say which of five was blank.
+    const missing = missingDetailMessage(formData)
+    if (missing) {
+      toast.error(missing)
+      return
+    }
+    setStep(3)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const goBackTo = (target) => {
+    setStep(target)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  // Step 4 -> step 1. The form itself was already cleared on success, so
+  // this only has to put the step back and drop the snapshot -- keeping
+  // the old reference on screen beside a fresh empty form would be
+  // actively misleading.
+  const startAnotherReservation = () => {
+    setSubmittedReference('')
+    setSubmittedBooking(null)
+    setStep(1)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  // ⚠️ Guarded, not assumed. `navigator.clipboard` is undefined outside a
+  // secure context and absent in jsdom, and an unguarded call throws
+  // inside a click handler -- which on this particular page would break
+  // the one screen that shows a reference the person cannot get back.
+  const copyReference = async () => {
+    if (!navigator.clipboard?.writeText) {
+      toast('Please write the reference number down - copying is not available in this browser.')
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(submittedReference)
+      toast.success('Reference number copied.')
+    } catch (error) {
+      console.error('Copy reference error:', error)
+      toast('Please write the reference number down instead.')
+    }
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
 
-    if (!formData.preferred_date || !formData.preferred_time) {
-      toast.error('Please go back and select a date and time.')
+    // ⚠️ Re-checked here even though steps 1 and 2 already passed. This
+    // is the handler that writes, and the step index is client state: a
+    // check at the gate is not a check at the door. The database is the
+    // real control either way -- `create_court_reservation` declares
+    // every one of these NOT NULL -- but a sentence beats a 23502.
+    const missingTime = missingTimeMessage(formData)
+    if (missingTime) {
+      toast.error(missingTime)
+      goBackTo(1)
+      return
+    }
+
+    const missingDetail = missingDetailMessage(formData)
+    if (missingDetail) {
+      toast.error(missingDetail)
+      goBackTo(2)
       return
     }
 
@@ -573,38 +654,49 @@ const Reservation = () => {
         return
       }
 
-      const { error } = await supabase.from('reservations').insert([
+      // ⚠️ An RPC, not a table insert, and the reason is measured
+      // rather than stylistic. A guest has no SELECT policy on
+      // `reservations`, and PostgREST's `.insert().select()` is
+      // INSERT ... RETURNING -- so asking for the reference back over
+      // the table API is refused 42501 even though the insert itself is
+      // allowed. The success step needs that reference, and the fix is
+      // NOT to open up anonymous SELECT. See migration 025.
+      //
+      // The function is stricter than the policy it replaces: `status`,
+      // `reviewed_by` and `resident_id` are not parameters at all, so a
+      // caller cannot ask for an approved booking or attribute one to
+      // somebody else. resident_id comes from auth.uid() inside the
+      // function -- which is exactly what the old
+      // `role === 'resident' ? user?.id : null` line was computing here,
+      // only now the client cannot get it wrong.
+      //
+      // Every trigger still runs: the window guard (020/021), the
+      // reference stamp (024), the overlap constraint (010) and the
+      // Treasurer's notification (022).
+      const { data: newReference, error } = await supabase.rpc(
+        'create_court_reservation',
         {
-          full_name: formData.full_name,
-          purok: formData.purok,
-          contact_number: formData.contact_number,
-          email: formData.email,
-          residency_status: formData.residency_status,
-          preferred_date: formData.preferred_date,
-          preferred_time: formData.preferred_time,
-          end_time: calculatedEndTime,
-          duration_hours: Number(formData.duration_hours),
-          purpose: formData.purpose,
-          activity_type: formData.activity_type,
-          additional_notes: formData.additional_notes,
+          p_full_name: formData.full_name,
+          p_purok: formData.purok,
+          p_contact_number: formData.contact_number,
+          p_email: formData.email,
+          p_residency_status: formData.residency_status,
+          p_preferred_date: formData.preferred_date,
+          p_preferred_time: formData.preferred_time,
+          p_duration_hours: Number(formData.duration_hours),
+          p_end_time: calculatedEndTime,
+          p_purpose: formData.purpose,
+          p_activity_type: formData.activity_type,
+          p_additional_notes: formData.additional_notes,
           // Null for an ordinary evening booking. The database refuses a
           // reason on one, and refuses a daytime booking without one --
           // so this is not a hint the trigger takes on trust, it is the
           // same rule written on both sides.
-          exception_reason: needsExceptionReason
+          p_exception_reason: needsExceptionReason
             ? formData.exception_reason.trim()
             : null,
-          // No payment fields are sent, and none exist on the table any
-          // more (migration 006). The court is free to use; donations are
-          // voluntary, handed over in person, and recorded in the
-          // Treasurer's own ledger rather than in this system.
-          status: 'pending',
-          // Only set for a logged-in resident so they can see this
-          // booking under "My Reservations" — null for anonymous/
-          // walk-in bookings, which keep working exactly as before.
-          resident_id: role === 'resident' ? user?.id ?? null : null,
-        },
-      ])
+        }
+      )
 
       if (error) {
         // Logged in full (message/details/hint/code) because a failed
@@ -651,9 +743,35 @@ const Reservation = () => {
         return
       }
 
-      toast.success(
-        'Reservation submitted successfully. It is now pending verification.'
-      )
+      // ⚠️ Step 4 is the ONLY place the reference is shown, and it is
+      // the only way a guest can ever track this booking -- there is no
+      // email and no SMS on this path. So it is rendered on the page
+      // rather than announced in a toast that disappears.
+      // ⚠️ Coerced and type-checked, not just `|| ''`. The function
+      // returns `text`, so this is a string in practice -- but the
+      // failure this guards against was MEASURED, in the harness that
+      // drove this step: a stub that answered the RPC with `[]` gave
+      // `newReference = []`, which is truthy, so the reference panel
+      // rendered its heading, its Copy button and its "write this down"
+      // warning around an EMPTY code. A panel that says "here is your
+      // reference number" and shows nothing is worse than no panel.
+      // Anything that is not a non-empty string is treated as absent,
+      // and step 4 says so in words instead.
+      const reference = typeof newReference === 'string' ? newReference.trim() : ''
+      setSubmittedReference(reference)
+      setSubmittedBooking({
+        date: formData.preferred_date,
+        startTime: formData.preferred_time,
+        endTime: calculatedEndTime,
+        hours: Number(formData.duration_hours),
+        activity: formData.activity_type,
+        contact: formData.contact_number,
+        isException: needsExceptionReason,
+      })
+      setStep(4)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+
+      toast.success('Reservation request submitted.')
 
       setFormData({
         full_name: '',
@@ -672,7 +790,9 @@ const Reservation = () => {
 
       setReservations([])
       setBookingMode('evening')
-      setShowPaymentStep(false)
+      // NOT setStep(1): the person is on the success step and the
+      // snapshot above is what it renders. Step 1 is one click away via
+      // "Make another reservation".
     } catch (error) {
       console.error('Submit reservation error:', error)
       toast.error(error.message || 'Something went wrong.')
@@ -681,473 +801,801 @@ const Reservation = () => {
     }
   }
 
+  // The sentence under the step heading. One per step, so the heading
+  // can stay two words and the explanation does not have to.
+  const stepIntro = {
+    1: 'Pick a date, then a start time and how long you need the court.',
+    2: 'Tell us who the booking is for and what the court will be used for.',
+    3: 'Check everything below. Nothing is submitted until you confirm.',
+  }
+
   return (
     <div className="reservation-page">
       <Navbar />
 
       <main id="main-content" tabIndex={-1}>
 
-      <section className="reservation-hero">
+      {/* ⚠️ Deliberately shorter than the informational pages' heroes.
+          This one was `min-height: 500px`, which put the first step of
+          the booking flow below the fold on a laptop -- somebody who
+          reaches this page has already decided to book something. The
+          photograph, the dark-blue overlay, the badge and the type scale
+          are unchanged; only the height came down. */}
+      <section className="reservation-hero reservation-hero-compact">
         <div className="reservation-hero-content">
           <span className="reservation-badge">
-            🏛️ Barangay Batinguel E-Processing
+            🏛️ Barangay Batinguel E-Services
           </span>
           <h1>Covered Court Reservation</h1>
           <p>
-            Reserve the covered court by selecting a date, start time, and
-            duration.
+            Free to use, and no account needed. Choose a time, give your
+            contact details, and the barangay reviews your request.
           </p>
         </div>
       </section>
 
       <section className="reservation-section">
         <div className="reservation-container">
-          <div className="reservation-header">
-            <h2>Court Reservation Form</h2>
-            <p>
-              {showPaymentStep
-                ? 'Step 2 of 2 — review your details and confirm your booking.'
-                : 'Step 1 of 2 — fill in your details and pick a time slot.'}
-            </p>
-          </div>
 
-          <div className="reservation-grid">
-            <div className="reservation-form-card">
-              {!showPaymentStep ? (
-                <form
-                  className="reservation-form"
-                  onSubmit={(e) => {
-                    e.preventDefault()
-                    handleContinueToPayment()
-                  }}
-                >
-                  <div className="form-group">
-                    <label htmlFor="res-full_name">Full Name</label>
-                    <input id="res-full_name"
-                      type="text"
-                      name="full_name"
-                      value={formData.full_name}
-                      onChange={handleChange}
-                      placeholder="Enter your full name"
-                      required
-                    />
-                  </div>
+          {step === 4 ? (
+            <div className="res-single">
+              {/* ⚠️ This panel is the ONLY place the reference is ever
+                  shown. A guest has no account to look it up in, and
+                  this path sends no email and no SMS -- so it is on the
+                  page, not in a toast that disappears. */}
+              <div className="res-success-card">
+                <p className="res-success-eyebrow">
+                  <span aria-hidden="true">✓</span> Request submitted
+                </p>
+                <h2>Your reservation request is with the barangay</h2>
+                <p className="res-success-text">
+                  It is recorded as <strong>pending</strong>. The hours you
+                  chose are held for you while an official reviews it, so
+                  nobody else can book them in the meantime.
+                </p>
 
-                  <div className="form-group">
-                    <label htmlFor="reservation-purok">Purok</label>
-                    {/* The barangay's own list rather than a text box. This
-                        field is open to anonymous walk-ins as well as signed-in
-                        residents, so it was the last resident-facing place a
-                        new free-text purok could still enter the database --
-                        the signup and settings forms already offer the list.
-
-                        A prefilled value the list does not contain is kept as
-                        an extra option and stays selected: a resident opening
-                        the booking form must not have what the barangay already
-                        holds about them quietly blanked. */}
-                    <select
-                      id="reservation-purok"
-                      name="purok"
-                      value={formData.purok}
-                      onChange={handleChange}
-                      required
-                    >
-                      <option value="">Select your purok</option>
-                      {PUROKS.map((purok) => (
-                        <option key={purok} value={purok}>{purok}</option>
-                      ))}
-                      {formData.purok && !isKnownPurok(formData.purok) && (
-                        <option value={formData.purok}>
-                          {formData.purok} (as recorded — not on the list)
-                        </option>
-                      )}
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label htmlFor="res-contact_number">Contact Number</label>
-                    <input id="res-contact_number"
-                      type="text"
-                      name="contact_number"
-                      value={formData.contact_number}
-                      onChange={handleChange}
-                      placeholder="09XXXXXXXXX"
-                      required
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label htmlFor="res-email">Email Address</label>
-                    <input id="res-email"
-                      type="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleChange}
-                      placeholder="Enter your email"
-                      required
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label htmlFor="res-residency_status">Residency Status</label>
-                    <select id="res-residency_status"
-                      name="residency_status"
-                      value={formData.residency_status}
-                      onChange={handleChange}
-                      required
-                    >
-                      <option value="">Select status</option>
-                      <option value="resident">Resident</option>
-                      <option value="non-resident">Non-Resident</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="res-activity_type">Type of Activity</label>
-                    <select id="res-activity_type"
-                      name="activity_type"
-                      value={formData.activity_type}
-                      onChange={handleChange}
-                      required
-                    >
-                      <option value="">Select activity</option>
-                      {ACTIVITY_TYPES.map((type) => (
-                        <option key={type} value={type}>{type}</option>
-                      ))}
-                    </select>
-                    <p style={{ fontSize: 12, color: '#5f6775', marginTop: 6 }}>
-                      Shown publicly on the availability calendar so others can see
-                      what the court is booked for. Your name and purpose stay private.
+                {!submittedReference ? (
+                  /* The booking IS filed -- the write came back without an
+                     error, which is the only way this step is reached. Only
+                     the reference did not. So this says what is true and
+                     what to do, rather than showing an empty code box. */
+                  <div className="res-reference res-reference-missing">
+                    <p className="res-reference-label">Reference number</p>
+                    <p className="res-reference-warning">
+                      Your request is filed, but the reference number did not
+                      come back to this page. Please contact the Barangay Hall
+                      with your name, your contact number and the date and time
+                      below, and they can find the booking.
                     </p>
                   </div>
-                  <div className="form-group">
-                    <label htmlFor="res-purpose">Purpose</label>
-                    <input id="res-purpose"
-                      type="text"
-                      name="purpose"
-                      value={formData.purpose}
-                      onChange={handleChange}
-                      placeholder="Purpose of reservation"
-                      required
-                    />
-                  </div>
-
-                  {bookingMode === 'office-hours' && (
-                    <div className="form-group">
-                      <label htmlFor="exception-reason">
-                        Reason for using the court during office hours
-                      </label>
-                      <textarea
-                        id="exception-reason"
-                        name="exception_reason"
-                        value={formData.exception_reason}
-                        onChange={handleChange}
-                        placeholder="Describe the activity and why it has to happen during the day."
-                        rows="3"
-                        required
-                      />
-                      <p className="field-note">
-                        Required for a booking that starts before 5:00 PM. An
-                        official reads this and decides — a reason is a request,
-                        not an approval.
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="form-group">
-                    <label htmlFor="res-preferred_date">Preferred Date</label>
-                    <input id="res-preferred_date"
-                      type="date"
-                      name="preferred_date"
-                      value={formData.preferred_date}
-                      onChange={handleChange}
-                      min={toDateString(today.getFullYear(), today.getMonth(), today.getDate())}
-                      required
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label htmlFor="res-duration_hours">Duration (Hours)</label>
-                    <select id="res-duration_hours"
-                      name="duration_hours"
-                      value={formData.duration_hours}
-                      onChange={handleChange}
-                      required
+                ) : (
+                  <div className="res-reference">
+                    <p className="res-reference-label">Your reference number</p>
+                    <p className="res-reference-code">{submittedReference}</p>
+                    <button
+                      type="button"
+                      className="res-reference-copy"
+                      onClick={copyReference}
                     >
-                      {/* Only the durations that actually fit: the cap for
-                          this kind of booking, then closing time. An
-                          ordinary evening booking is up to 4 hours and one
-                          hour at 9:00 PM; an office-hours request is up to
-                          8 -- the ceiling the reservations table's own
-                          CHECK has always had. */}
-                      {durationOptions.map((hour) => (
-                        <option key={hour} value={hour}>
-                          {hour} Hour{hour > 1 ? 's' : ''}
-                        </option>
-                      ))}
-                    </select>
+                      Copy reference number
+                    </button>
+                    <p className="res-reference-warning">
+                      <strong>Please write this down.</strong> It is not emailed
+                      or texted to you, and this is the only time it is shown.
+                      Checking on this booking later needs the reference number
+                      <em> and </em> the contact number you gave
+                      {submittedBooking?.contact ? ` (${submittedBooking.contact})` : ''}.
+                    </p>
+                    {/* ⚠️ The reference is deep-linked, the contact number
+                        is NOT. Half of a two-factor lookup in a URL is a
+                        convenience; both halves in a URL put the lookup
+                        itself into browser history and the referrer
+                        header. The tracking page still asks for the
+                        number. */}
+                    <Link
+                      className="res-reference-track"
+                      to={`/track-reservation?ref=${encodeURIComponent(submittedReference)}`}
+                    >
+                      Check on this booking later →
+                    </Link>
+                  </div>
+                )}
+
+                {submittedBooking && (
+                  <dl className="res-review-list">
+                    <div className="res-review-row">
+                      <dt>Date</dt>
+                      <dd>{submittedBooking.date}</dd>
+                    </div>
+                    <div className="res-review-row">
+                      <dt>Time</dt>
+                      <dd>
+                        {submittedBooking.startTime} – {submittedBooking.endTime}
+                        {' '}({submittedBooking.hours} hour{submittedBooking.hours === 1 ? '' : 's'})
+                      </dd>
+                    </div>
+                    <div className="res-review-row">
+                      <dt>Activity</dt>
+                      <dd>{submittedBooking.activity}</dd>
+                    </div>
+                    {submittedBooking.isException && (
+                      <div className="res-review-row">
+                        <dt>Office-hours request</dt>
+                        <dd>Yes — an official decides this one individually.</dd>
+                      </div>
+                    )}
+                  </dl>
+                )}
+
+                <h3 className="res-next-heading">What happens next</h3>
+                <ol className="res-next-steps">
+                  <li>
+                    The Barangay Treasurer reviews the request. Only the
+                    Treasurer can approve or decline a court booking.
+                  </li>
+                  <li>
+                    You will be contacted on the number you gave. If the
+                    barangay cannot reach you, visit the Barangay Hall with
+                    your reference number.
+                  </li>
+                  <li>
+                    If it is declined, or if you cancel, the hours are released
+                    for somebody else straight away.
+                  </li>
+                </ol>
+
+                <div className="res-actions">
+                  <button
+                    type="button"
+                    className="reservation-submit-btn res-btn-secondary"
+                    onClick={startAnotherReservation}
+                  >
+                    Make another reservation
+                  </button>
+                  <Link to="/e-services" className="reservation-submit-btn res-btn-link">
+                    Back to E-Services
+                  </Link>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* An ordered list, because the steps are a sequence and a
+                  screen reader should say how many there are. The number
+                  in each bubble is decorative -- the visible step name is
+                  the label, and `aria-current="step"` is what says where
+                  the person is. */}
+              <ol className="res-steps" aria-label="Reservation progress">
+                {RESERVATION_STEPS.map((entry, index) => {
+                  const number = index + 1
+                  const state = number === step
+                    ? 'is-current'
+                    : number < step ? 'is-done' : 'is-todo'
+                  return (
+                    <li
+                      key={entry.key}
+                      className={`res-step ${state}`}
+                      aria-current={number === step ? 'step' : undefined}
+                    >
+                      <span className="res-step-num" aria-hidden="true">
+                        {number < step ? '✓' : number}
+                      </span>
+                      <span className="res-step-label">
+                        <span className="visually-hidden">
+                          {number < step
+                            ? 'Completed: '
+                            : number === step ? 'Current step: ' : 'Not started: '}
+                        </span>
+                        {entry.label}
+                      </span>
+                    </li>
+                  )
+                })}
+              </ol>
+
+              <div className="reservation-header">
+                <h2>
+                  Step {step} of {RESERVATION_STEPS.length} — {RESERVATION_STEPS[step - 1].label}
+                </h2>
+                <p>{stepIntro[step]}</p>
+              </div>
+
+              {/* ─── STEP 1 ─ DATE & TIME ─────────────────────────────
+                  Two cards: the month calendar, then the day's slots.
+                  They were already these two blocks; what changed is
+                  that the requester's own details are no longer beside
+                  them competing for attention. */}
+              {step === 1 && (
+                <div className="reservation-grid">
+                  <div className="reservation-slots-card">
+                    <h3>1. Choose a date</h3>
+                    {/* A cell is greyed when `cell.isPast || cell.isFull`, so
+                        most greyed dates in the current month are simply past.
+                        The note used to say only "fully booked", which the
+                        cell's own tooltip ("Past date") contradicted. */}
+                    <p className="slots-note">
+                      Past dates and fully-booked dates are greyed out. Pick an
+                      open date to see its time slots.
+                    </p>
+
+                    <div className="availability-calendar">
+                      <div className="calendar-header">
+                        <button type="button" onClick={goToPreviousMonth} className="calendar-nav-btn">‹</button>
+                        <span className="calendar-month-label">
+                          {MONTH_NAMES[calendarMonth]} {calendarYear}
+                        </span>
+                        <button type="button" onClick={goToNextMonth} className="calendar-nav-btn">›</button>
+                      </div>
+
+                      <div className="calendar-weekdays">
+                        {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((d) => (
+                          <div key={d} className="calendar-weekday">{d}</div>
+                        ))}
+                      </div>
+
+                      <div className="calendar-grid">
+                        {calendarDays.map((cell, idx) => {
+                          if (!cell) return <div key={`empty-${idx}`} className="calendar-cell empty" />
+                          const isSelected = formData.preferred_date === cell.dateStr
+                          const unavailable = cell.isPast || cell.isFull
+                          return (
+                            <button
+                              key={cell.dateStr}
+                              type="button"
+                              className={`calendar-cell
+                                ${unavailable ? 'unavailable' : ''}
+                                ${isSelected ? 'selected' : ''}
+                                ${!unavailable && cell.remaining < offeredSlots.length ? 'partial' : ''}`}
+                              onClick={() => handleCalendarDayClick(cell)}
+                              disabled={unavailable}
+                              title={
+                                cell.isPast ? 'Past date'
+                                  : cell.isFull ? `Fully booked${activityList(cell.dateStr)}`
+                                    : `${cell.remaining} slot${cell.remaining === 1 ? '' : 's'} available${activityList(cell.dateStr)}`
+                              }
+                            >
+                              {cell.day}
+                            </button>
+                          )
+                        })}
+                      </div>
+
+                      <div className="calendar-legend">
+                        <span><i className="legend-dot legend-open" /> Open</span>
+                        <span><i className="legend-dot legend-partial" /> Partly booked</span>
+                        <span><i className="legend-dot legend-full" /> Fully booked</span>
+                      </div>
+                    </div>
+
+                    {/* ⚠️ There is no `<input type="date">` here any more.
+                        The page carried both, and both wrote the same
+                        `formData.preferred_date` -- so a date typed into
+                        the input silently moved the calendar's selection
+                        and vice versa, and the two could show different
+                        things while the calendar was on another month.
+                        The calendar is authoritative because it is the
+                        only one of the two that knows what is already
+                        booked. */}
                   </div>
 
-                  <div className="form-group">
-                    <label htmlFor="res-additional_notes">Additional Notes</label>
-                    <textarea id="res-additional_notes"
-                      name="additional_notes"
-                      value={formData.additional_notes}
-                      onChange={handleChange}
-                      placeholder="Optional notes"
-                      rows="4"
-                    />
-                  </div>
+                  <div className="reservation-slots-card">
+                    <h3>2. Choose a start time</h3>
+                    <p className="slots-note">
+                      Pending and approved reservations hold their covered slots.
+                    </p>
 
-                  <div className="payment-box">
-                    <p style={{ fontStyle: 'italic', color: '#374151', marginBottom: 8 }}>
+                    {/* The window, and the way into the exception. The daytime
+                        slots are deliberately not just further down the same
+                        list: an office-hours booking is something the barangay
+                        decides one at a time, so asking for one has to be a
+                        deliberate act rather than a scroll. */}
+                    <div className="booking-window-note">
+                      <p>
+                        The covered court is reservable{' '}
+                        <strong>
+                          {hourLabel(COURT_OPENS_HOUR)} – {hourLabel(COURT_CLOSES_HOUR)}
+                        </strong>
+                        . It is made available for booking after office hours, so a
+                        booking has to <em>finish</em> by {hourLabel(COURT_CLOSES_HOUR)}.
+                      </p>
+
+                      {bookingMode === 'evening' ? (
+                        <button
+                          type="button"
+                          className="exception-toggle"
+                          onClick={() => switchBookingMode('office-hours')}
+                          disabled={timeLocked}
+                        >
+                          Need the court during office hours? Request an exception
+                        </button>
+                      ) : (
+                        <>
+                          <p className="exception-explainer">
+                            You are asking for an <strong>office-hours exception</strong>.
+                            The barangay may allow a daytime booking depending on the
+                            activity and on which officials are available that day —
+                            an ayuda or distribution activity, a health activity, or a
+                            city or government activity are the kinds of thing it gave
+                            as examples. Picking one of those categories approves
+                            nothing: an official reads your reason and decides.
+                          </p>
+                          <p className="exception-explainer">
+                            A daytime request may run for up to{' '}
+                            <strong>{MAX_EXCEPTION_DURATION_HOURS} hours</strong> and may
+                            run straight through {hourLabel(12)} — an activity that takes
+                            most of the day does not have to stop for lunch. It still has
+                            to finish by {hourLabel(COURT_CLOSES_HOUR)}.
+                          </p>
+                          <button
+                            type="button"
+                            className="exception-toggle"
+                            onClick={() => switchBookingMode('evening')}
+                            disabled={timeLocked}
+                          >
+                            ← Back to the {hourLabel(COURT_OPENS_HOUR)} – {hourLabel(COURT_CLOSES_HOUR)} slots
+                          </button>
+                        </>
+                      )}
+                    </div>
+
+                    <form
+                      className="reservation-form"
+                      onSubmit={(e) => {
+                        e.preventDefault()
+                        handleContinueToPayment()
+                      }}
+                    >
+                      <div className="form-group">
+                        <label htmlFor="res-duration_hours">How long do you need the court?</label>
+                        <select id="res-duration_hours"
+                          name="duration_hours"
+                          value={formData.duration_hours}
+                          onChange={handleChange}
+                          required
+                        >
+                          {/* Only the durations that actually fit: the cap for
+                              this kind of booking, then closing time. An
+                              ordinary evening booking is up to 4 hours and one
+                              hour at 9:00 PM; an office-hours request is up to
+                              8 -- the ceiling the reservations table's own
+                              CHECK has always had. */}
+                          {durationOptions.map((hour) => (
+                            <option key={hour} value={hour}>
+                              {hour} Hour{hour > 1 ? 's' : ''}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="field-note">
+                          Changing this clears the start time below, because a
+                          longer booking may no longer fit where a shorter one did.
+                        </p>
+                      </div>
+
+                      {!formData.preferred_date ? (
+                        <div className="slots-empty">
+                          Select a date to see its time slots.
+                        </div>
+                      ) : fetchingSlots ? (
+                        <div className="slots-empty">
+                          Loading available slots...
+                        </div>
+                      ) : (
+                        <>
+                          <div className="slots-grid">
+                            {offeredSlots.map((slot) => {
+                              const isReserved = reservedSlots.has(slot)
+                              const isSelected = selectedSlots.includes(slot)
+
+                              return (
+                                <button
+                                  key={slot}
+                                  type="button"
+                                  className={`slot-btn ${isReserved ? 'reserved' : ''} ${isSelected ? 'selected' : ''}`}
+                                  onClick={() => handleTimeSelect(slot)}
+                                  disabled={isReserved || timeLocked}
+                                >
+                                  {slot}
+                                  <span className="slot-status">
+                                    {isReserved ? (slotActivity[slot] || 'Reserved') : 'Available'}
+                                  </span>
+                                </button>
+                              )
+                            })}
+                          </div>
+
+                          <div className="slot-legend">
+                            <div className="legend-item">
+                              <span className="legend-box available"></span>
+                              Available
+                            </div>
+                            <div className="legend-item">
+                              <span className="legend-box selected"></span>
+                              Selected
+                            </div>
+                            <div className="legend-item">
+                              <span className="legend-box reserved"></span>
+                              Reserved
+                            </div>
+                          </div>
+
+                          {availableSlots.length === 0 && (
+                            <div className="no-slots-box">
+                              No available time slots for this date. Please choose another date.
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      {/* Only rendered while the exception panel is open, and
+                          required there. The database applies the same rule
+                          from the other side: it refuses a daytime booking
+                          with no reason, and refuses an evening one that
+                          carries one. */}
+                      {bookingMode === 'office-hours' && (
+                        <div className="form-group">
+                          <label htmlFor="exception-reason">
+                            Reason for using the court during office hours
+                          </label>
+                          <textarea
+                            id="exception-reason"
+                            name="exception_reason"
+                            value={formData.exception_reason}
+                            onChange={handleChange}
+                            placeholder="Describe the activity and why it has to happen during the day."
+                            rows="3"
+                            required
+                          />
+                          <p className="field-note">
+                            Required for a booking that starts before {hourLabel(COURT_OPENS_HOUR)}. An
+                            official reads this and decides — a reason is a request,
+                            not an approval.
+                          </p>
+                        </div>
+                      )}
+
+                      <div className="selected-slot-box">
+                        <h4>Your preferred schedule</h4>
+                        <p><strong>Date:</strong> {formData.preferred_date || 'Not selected'}</p>
+                        <p><strong>Start Time:</strong> {formData.preferred_time || 'Not selected'}</p>
+                        <p><strong>Covered Slots:</strong> {selectedSlots.length ? selectedSlots.join(', ') : 'Not selected'}</p>
+                        <p><strong>Ends At:</strong> {calculatedEndTime || 'Not selected'}</p>
+                      </div>
+
+                      <div className="res-actions">
+                        <button type="submit" className="reservation-submit-btn">
+                          Continue to your details →
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+              {/* ─── STEP 2 ─ YOUR DETAILS ───────────────────────────── */}
+              {step === 2 && (
+                <div className="res-single">
+                  <div className="reservation-form-card">
+                    <div className="res-chosen-summary">
+                      <p className="res-chosen-label">Booking</p>
+                      <p className="res-chosen-value">
+                        {formData.preferred_date} · {formData.preferred_time} – {calculatedEndTime}
+                        {' '}({formData.duration_hours} hour{Number(formData.duration_hours) === 1 ? '' : 's'})
+                      </p>
+                      <button
+                        type="button"
+                        className="res-chosen-change"
+                        onClick={() => goBackTo(1)}
+                      >
+                        Change date or time
+                      </button>
+                    </div>
+
+                    <form
+                      className="reservation-form"
+                      onSubmit={(e) => {
+                        e.preventDefault()
+                        handleContinueToReview()
+                      }}
+                    >
+                      <div className="form-group">
+                        <label htmlFor="res-full_name">Full Name</label>
+                        <input id="res-full_name"
+                          type="text"
+                          name="full_name"
+                          value={formData.full_name}
+                          onChange={handleChange}
+                          placeholder="Enter your full name"
+                          required
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor="reservation-purok">Purok</label>
+                        {/* The barangay's own list rather than a text box. This
+                            field is open to anonymous walk-ins as well as signed-in
+                            residents, so it was the last resident-facing place a
+                            new free-text purok could still enter the database --
+                            the signup and settings forms already offer the list.
+
+                            A prefilled value the list does not contain is kept as
+                            an extra option and stays selected: a resident opening
+                            the booking form must not have what the barangay already
+                            holds about them quietly blanked. */}
+                        <select
+                          id="reservation-purok"
+                          name="purok"
+                          value={formData.purok}
+                          onChange={handleChange}
+                          required
+                        >
+                          <option value="">Select your purok</option>
+                          {PUROKS.map((purok) => (
+                            <option key={purok} value={purok}>{purok}</option>
+                          ))}
+                          {formData.purok && !isKnownPurok(formData.purok) && (
+                            <option value={formData.purok}>
+                              {formData.purok} (as recorded — not on the list)
+                            </option>
+                          )}
+                        </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor="res-contact_number">Contact Number</label>
+                        <input id="res-contact_number"
+                          type="text"
+                          name="contact_number"
+                          value={formData.contact_number}
+                          onChange={handleChange}
+                          placeholder="09XXXXXXXXX"
+                          required
+                        />
+                        <p className="field-note">
+                          This is how the barangay reaches you about this booking,
+                          and — with your reference number — how you check on it
+                          later. Please make sure it is right.
+                        </p>
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor="res-email">Email Address</label>
+                        <input id="res-email"
+                          type="email"
+                          name="email"
+                          value={formData.email}
+                          onChange={handleChange}
+                          placeholder="Enter your email"
+                          required
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor="res-residency_status">Residency Status</label>
+                        <select id="res-residency_status"
+                          name="residency_status"
+                          value={formData.residency_status}
+                          onChange={handleChange}
+                          required
+                        >
+                          <option value="">Select status</option>
+                          <option value="resident">Resident</option>
+                          <option value="non-resident">Non-Resident</option>
+                        </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor="res-activity_type">Type of Activity</label>
+                        <select id="res-activity_type"
+                          name="activity_type"
+                          value={formData.activity_type}
+                          onChange={handleChange}
+                          required
+                        >
+                          <option value="">Select activity</option>
+                          {ACTIVITY_TYPES.map((type) => (
+                            <option key={type} value={type}>{type}</option>
+                          ))}
+                        </select>
+                        <p className="field-note">
+                          Shown publicly on the availability calendar so others can
+                          see what the court is booked for. Your name and purpose
+                          stay private.
+                        </p>
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor="res-purpose">Purpose</label>
+                        <input id="res-purpose"
+                          type="text"
+                          name="purpose"
+                          value={formData.purpose}
+                          onChange={handleChange}
+                          placeholder="Purpose of reservation"
+                          required
+                        />
+                        <p className="field-note">
+                          Read by barangay officials only. It is never shown on the
+                          public availability calendar.
+                        </p>
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor="res-additional_notes">Additional Notes</label>
+                        <textarea id="res-additional_notes"
+                          name="additional_notes"
+                          value={formData.additional_notes}
+                          onChange={handleChange}
+                          placeholder="Optional notes"
+                          rows="4"
+                        />
+                      </div>
+
+                      <div className="res-actions">
+                        <button
+                          type="button"
+                          className="reservation-submit-btn res-btn-secondary"
+                          onClick={() => goBackTo(1)}
+                        >
+                          ← Back
+                        </button>
+                        <button type="submit" className="reservation-submit-btn">
+                          Review your request →
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+              {/* ─── STEP 3 ─ REVIEW ─────────────────────────────────── */}
+              {step === 3 && (
+                <div className="res-single">
+                  <div className="reservation-form-card">
+                    <form onSubmit={handleSubmit} className="reservation-form">
+                      <dl className="res-review-list">
+                        <div className="res-review-row">
+                          <dt>Date</dt>
+                          <dd>{formData.preferred_date}</dd>
+                        </div>
+                        <div className="res-review-row">
+                          <dt>Time</dt>
+                          <dd>
+                            {formData.preferred_time} – {calculatedEndTime}
+                            {' '}({formData.duration_hours} hour{Number(formData.duration_hours) === 1 ? '' : 's'})
+                          </dd>
+                        </div>
+                        <div className="res-review-row">
+                          <dt>Activity</dt>
+                          <dd>{formData.activity_type}</dd>
+                        </div>
+                        <div className="res-review-row">
+                          <dt>Purpose</dt>
+                          <dd>{formData.purpose}</dd>
+                        </div>
+                        <div className="res-review-row">
+                          <dt>Name</dt>
+                          <dd>{formData.full_name}</dd>
+                        </div>
+                        <div className="res-review-row">
+                          <dt>Purok</dt>
+                          <dd>{formData.purok}</dd>
+                        </div>
+                        <div className="res-review-row">
+                          <dt>Contact number</dt>
+                          <dd>{formData.contact_number}</dd>
+                        </div>
+                        <div className="res-review-row">
+                          <dt>Email</dt>
+                          <dd>{formData.email}</dd>
+                        </div>
+                        <div className="res-review-row">
+                          <dt>Residency status</dt>
+                          <dd>{formData.residency_status === 'resident' ? 'Resident' : 'Non-Resident'}</dd>
+                        </div>
+                        {formData.additional_notes && (
+                          <div className="res-review-row">
+                            <dt>Notes</dt>
+                            <dd>{formData.additional_notes}</dd>
+                          </div>
+                        )}
+                        {needsExceptionReason && (
+                          <>
+                            <div className="res-review-row">
+                              <dt>Office-hours request</dt>
+                              <dd>Yes — awaiting a barangay decision</dd>
+                            </div>
+                            <div className="res-review-row">
+                              <dt>Reason given</dt>
+                              <dd>{formData.exception_reason}</dd>
+                            </div>
+                          </>
+                        )}
+                      </dl>
+
+                      <p className="res-review-note">
+                        Submitting records this as a <strong>pending</strong>
+                        {' '}request and holds the hours while the Barangay
+                        Treasurer reviews it. It is not an approval.
+                      </p>
+
+                      <div className="res-actions">
+                        <button
+                          type="button"
+                          className="reservation-submit-btn res-btn-secondary"
+                          onClick={() => goBackTo(2)}
+                          disabled={loading}
+                        >
+                          ← Back
+                        </button>
+                        <button
+                          type="submit"
+                          className="reservation-submit-btn"
+                          disabled={loading}
+                        >
+                          {loading ? 'Submitting...' : 'Submit Reservation'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+              {/* ─── COURT INFORMATION ───────────────────────────────────
+                  Secondary, and below the flow rather than inside it. The
+                  donation message used to sit in the middle of the form,
+                  between the notes field and the submit button, where it
+                  read as a step -- which for a facility that is free, and
+                  whose database has no money columns at all, is the one
+                  thing it must not do. */}
+              <div className="res-info" aria-labelledby="court-info-heading">
+                <h2 id="court-info-heading">Court information</h2>
+                <div className="res-info-grid">
+                  <div className="res-info-card">
+                    <h3>Reserving the court is free</h3>
+                    <p>
+                      There is nothing to pay and nothing to upload. Any
+                      donation — big or small, in cash or in kind, given in
+                      person at the Barangay Hall — helps keep the court clean
+                      and well-maintained for every family in the barangay.
+                      Giving is completely optional and has no effect on whether
+                      a reservation is approved.
+                    </p>
+                    <p className="res-info-quote">
                       "Ang tunay na yaman ay hindi sa kung ano ang natatanggap,
                       kundi sa kung ano ang naibabahagi."
                     </p>
-                    <p style={{ fontSize: 13, color: '#5f6775' }}>
-                      This covered court is free to use. Any donation — big or small,
-                      in cash or in kind, given in person at the Barangay Hall — helps
-                      keep it clean and well-maintained for every family in the
-                      barangay. Giving is completely optional and won't affect whether
-                      your reservation is approved.
-                    </p>
                   </div>
 
-                  <button type="submit" className="reservation-submit-btn">
-                    Continue →
-                  </button>
-                </form>
-              ) : (
-                <form onSubmit={handleSubmit} className="reservation-form">
-                  <div className="selected-slot-box" style={{ marginBottom: 16 }}>
-                    <h4>Your Reservation Details</h4>
-                    <p><strong>Name:</strong> {formData.full_name}</p>
-                    <p><strong>Date:</strong> {formData.preferred_date}</p>
-                    <p><strong>Time:</strong> {formData.preferred_time} ({formData.duration_hours}h)</p>
-                    <p><strong>Purpose:</strong> {formData.purpose}</p>
-                    <p><strong>Activity:</strong> {formData.activity_type}</p>
-                    {needsExceptionReason && (
-                      <>
-                        <p><strong>Office-hours request:</strong> yes — awaiting a barangay decision</p>
-                        <p><strong>Reason given:</strong> {formData.exception_reason}</p>
-                      </>
-                    )}
+                  <div className="res-info-card">
+                    <h3>Hours and rules</h3>
+                    <ul>
+                      <li>
+                        Reservable {hourLabel(COURT_OPENS_HOUR)} – {hourLabel(COURT_CLOSES_HOUR)};
+                        a booking has to finish by {hourLabel(COURT_CLOSES_HOUR)}.
+                      </li>
+                      <li>
+                        Up to {MAX_DURATION_HOURS} hours for an ordinary evening
+                        booking.
+                      </li>
+                      <li>
+                        A daytime booking is an <strong>exception</strong> the
+                        barangay decides one at a time, needs a written reason,
+                        and may run up to {MAX_EXCEPTION_DURATION_HOURS} hours.
+                      </li>
+                      <li>
+                        Your hours are held as soon as you submit, so nobody
+                        else can take them while the request is pending.
+                      </li>
+                      <li>
+                        Only the Barangay Treasurer approves or declines a court
+                        reservation.
+                      </li>
+                    </ul>
                   </div>
-
-                  <div className="payment-box">
-                    <h3>Reserving the Court is Free</h3>
-                    <p style={{ fontSize: 13, color: '#5f6775' }}>
-                      There is nothing to pay and nothing to upload — just submit
-                      your reservation. If you'd like to support the court's
-                      upkeep, donations are welcome in person at the Barangay
-                      Hall, in cash or in kind. Giving is entirely optional and
-                      has no effect on whether your reservation is approved.
-                    </p>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: 12 }}>
-                    <button
-                      type="button"
-                      className="reservation-submit-btn"
-                      style={{ background: '#5f6775' }}
-                      onClick={() => setShowPaymentStep(false)}
-                    >
-                      ← Back to Details
-                    </button>
-                    <button
-                      type="submit"
-                      className="reservation-submit-btn"
-                      disabled={loading}
-                    >
-                      {loading ? 'Submitting...' : 'Submit Reservation'}
-                    </button>
-                  </div>
-                </form>
-              )}
-            </div>
-
-            <div className="reservation-slots-card">
-              <h3>Check Availability</h3>
-              {/* A cell is greyed when `cell.isPast || cell.isFull`, so
-                  most greyed dates in the current month are simply past.
-                  The note used to say only "fully booked", which the
-                  cell's own tooltip ("Past date") contradicted. */}
-              <p className="slots-note">
-                Past dates and fully-booked dates are greyed out. Pick an open
-                date to see its time slots.
-              </p>
-
-              <div className="availability-calendar">
-                <div className="calendar-header">
-                  <button type="button" onClick={goToPreviousMonth} className="calendar-nav-btn">‹</button>
-                  <span className="calendar-month-label">
-                    {MONTH_NAMES[calendarMonth]} {calendarYear}
-                  </span>
-                  <button type="button" onClick={goToNextMonth} className="calendar-nav-btn">›</button>
-                </div>
-
-                <div className="calendar-weekdays">
-                  {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((d) => (
-                    <div key={d} className="calendar-weekday">{d}</div>
-                  ))}
-                </div>
-
-                <div className="calendar-grid">
-                  {calendarDays.map((cell, idx) => {
-                    if (!cell) return <div key={`empty-${idx}`} className="calendar-cell empty" />
-                    const isSelected = formData.preferred_date === cell.dateStr
-                    const unavailable = cell.isPast || cell.isFull
-                    return (
-                      <button
-                        key={cell.dateStr}
-                        type="button"
-                        className={`calendar-cell
-                          ${unavailable ? 'unavailable' : ''}
-                          ${isSelected ? 'selected' : ''}
-                          ${!unavailable && cell.remaining < offeredSlots.length ? 'partial' : ''}`}
-                        onClick={() => handleCalendarDayClick(cell)}
-                        disabled={unavailable}
-                        title={
-                          cell.isPast ? 'Past date'
-                            : cell.isFull ? `Fully booked${activityList(cell.dateStr)}`
-                              : `${cell.remaining} slot${cell.remaining === 1 ? '' : 's'} available${activityList(cell.dateStr)}`
-                        }
-                      >
-                        {cell.day}
-                      </button>
-                    )
-                  })}
-                </div>
-
-                <div className="calendar-legend">
-                  <span><i className="legend-dot legend-open" /> Open</span>
-                  <span><i className="legend-dot legend-partial" /> Partly booked</span>
-                  <span><i className="legend-dot legend-full" /> Fully booked</span>
                 </div>
               </div>
-
-              <h3 style={{ marginTop: 24 }}>Available Time Slots</h3>
-              <p className="slots-note">
-                Pending and approved reservations hold their covered slots.
-              </p>
-
-              {/* The window, and the way into the exception. The daytime
-                  slots are deliberately not just further down the same
-                  list: an office-hours booking is something the barangay
-                  decides one at a time, so asking for one has to be a
-                  deliberate act rather than a scroll. */}
-              <div className="booking-window-note">
-                <p>
-                  The covered court is reservable{' '}
-                  <strong>
-                    {hourLabel(COURT_OPENS_HOUR)} – {hourLabel(COURT_CLOSES_HOUR)}
-                  </strong>
-                  . It is made available for booking after office hours, so a
-                  booking has to <em>finish</em> by {hourLabel(COURT_CLOSES_HOUR)}.
-                </p>
-
-                {bookingMode === 'evening' ? (
-                  <button
-                    type="button"
-                    className="exception-toggle"
-                    onClick={() => switchBookingMode('office-hours')}
-                    disabled={showPaymentStep}
-                  >
-                    Need the court during office hours? Request an exception
-                  </button>
-                ) : (
-                  <>
-                    <p className="exception-explainer">
-                      You are asking for an <strong>office-hours exception</strong>.
-                      The barangay may allow a daytime booking depending on the
-                      activity and on which officials are available that day —
-                      an ayuda or distribution activity, a health activity, or a
-                      city or government activity are the kinds of thing it gave
-                      as examples. Picking one of those categories approves
-                      nothing: an official reads your reason and decides.
-                    </p>
-                    <p className="exception-explainer">
-                      A daytime request may run for up to{' '}
-                      <strong>{MAX_EXCEPTION_DURATION_HOURS} hours</strong> and may
-                      run straight through {hourLabel(12)} — an activity that takes
-                      most of the day does not have to stop for lunch. It still has
-                      to finish by {hourLabel(COURT_CLOSES_HOUR)}.
-                    </p>
-                    <button
-                      type="button"
-                      className="exception-toggle"
-                      onClick={() => switchBookingMode('evening')}
-                      disabled={showPaymentStep}
-                    >
-                      ← Back to the {hourLabel(COURT_OPENS_HOUR)} – {hourLabel(COURT_CLOSES_HOUR)} slots
-                    </button>
-                  </>
-                )}
-              </div>
-
-              {!formData.preferred_date ? (
-                <div className="slots-empty">
-                  Select a date above to see its time slots.
-                </div>
-              ) : fetchingSlots ? (
-                <div className="slots-empty">
-                  Loading available slots...
-                </div>
-              ) : (
-                <>
-                  <div className="slots-grid">
-                    {offeredSlots.map((slot) => {
-                      const isReserved = reservedSlots.has(slot)
-                      const isSelected = selectedSlots.includes(slot)
-
-                      return (
-                        <button
-                          key={slot}
-                          type="button"
-                          className={`slot-btn ${isReserved ? 'reserved' : ''} ${isSelected ? 'selected' : ''}`}
-                          onClick={() => handleTimeSelect(slot)}
-                          disabled={isReserved || showPaymentStep}
-                        >
-                          {slot}
-                          <span className="slot-status">
-                            {isReserved ? (slotActivity[slot] || 'Reserved') : 'Available'}
-                          </span>
-                        </button>
-                      )
-                    })}
-                  </div>
-
-                  <div className="slot-legend">
-                    <div className="legend-item">
-                      <span className="legend-box available"></span>
-                      Available
-                    </div>
-                    <div className="legend-item">
-                      <span className="legend-box selected"></span>
-                      Selected
-                    </div>
-                    <div className="legend-item">
-                      <span className="legend-box reserved"></span>
-                      Reserved
-                    </div>
-                  </div>
-
-                  <div className="selected-slot-box">
-                    <h4>Your Preferred Schedule</h4>
-                    <p><strong>Date:</strong> {formData.preferred_date || 'Not selected'}</p>
-                    <p><strong>Start Time:</strong> {formData.preferred_time || 'Not selected'}</p>
-                    <p><strong>Covered Slots:</strong> {selectedSlots.length ? selectedSlots.join(', ') : 'Not selected'}</p>
-                    <p><strong>Ends At:</strong> {calculatedEndTime || 'Not selected'}</p>
-                  </div>
-
-                  {availableSlots.length === 0 && (
-                    <div className="no-slots-box">
-                      No available time slots for this date. Please choose another date.
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
+            </>
+          )}
         </div>
       </section>
 

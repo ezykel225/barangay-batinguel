@@ -1,0 +1,256 @@
+/* ================================
+   ABOUT BARANGAY BATINGUEL
+   ================================
+
+   ⚠️ These rules were MOVED here from `Home.css`, not copied. The
+   history, the map, Barangay at a Glance and the Batinguel Elementary
+   card used to sit on the home page, where they pushed the things a
+   resident actually came for -- announcements, events, the waste
+   schedule, the services -- below several screens of reading.
+
+   They are the same bytes. Nothing was restyled in the move; what
+   changed is which page renders them. */
+
+.about-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.about-page main {
+  flex: 1;
+}
+
+/* A compact gradient hero, like the E-Services and tracking pages --
+   this page is a destination from a link rather than a landing page,
+   so it does not earn a photographic header. */
+.about-hero {
+  background: linear-gradient(135deg, #1e3a8a, #1e40af);
+  color: #ffffff;
+  padding: 48px 40px 44px;
+}
+
+.about-hero-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.about-hero-label {
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: #bfdbfe;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 0 0 8px;
+}
+
+.about-hero h1 {
+  font-size: var(--fs-36);
+  font-weight: 700;
+  margin: 0 0 10px;
+}
+
+.about-hero-text {
+  font-size: var(--fs-15);
+  color: #dbeafe;
+  line-height: 1.7;
+  margin: 0;
+  max-width: 70ch;
+}
+
+/* ================================
+   ABOUT SECTION
+================================ */
+.about {
+  padding: 64px 40px;
+  background-color: var(--surface);
+}
+
+.about-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 42px;
+  align-items: center;
+}
+
+.about-content h2 {
+  font-size: var(--fs-30);
+  font-weight: 700;
+  color: var(--primary);
+  margin-bottom: 18px;
+}
+
+.about-content p {
+  font-size: var(--fs-14);
+  color: var(--text-light);
+  line-height: 1.9;
+  margin-bottom: 14px;
+}
+
+.about-content strong {
+  color: var(--primary);
+}
+
+/* Google Map beside About */
+.about-map {
+  width: 100%;
+  height: 330px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+  border: 1px solid #e2e8f0;
+}
+
+.about-map-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+}
+
+/* ── About: history subheads ─────────────────────────────────── */
+.about-lead {
+  font-size: var(--fs-15);
+  line-height: 1.7;
+  color: #374151;
+  margin-bottom: 18px;
+}
+
+.about-subhead {
+  font-size: var(--fs-13);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #15803d;
+  font-weight: 700;
+  margin: 22px 0 8px;
+}
+
+/* ── Barangay profile & school ───────────────────────────────── */
+.barangay-profile {
+  padding: 48px 20px;
+  background: #f9fafb;
+}
+
+.barangay-profile-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: grid;
+  /* auto-fit collapses to one column on a phone without a media
+     query, and the 300px floor stops a card squeezing its labels. */
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.profile-card {
+  background: #fff;
+  border-radius: var(--radius-md);
+  padding: 26px;
+  box-shadow: var(--shadow-sm);
+}
+
+.profile-card h3 {
+  font-size: var(--fs-18);
+  color: #1e3a8a;
+  margin: 0 0 14px;
+}
+
+.profile-description {
+  font-size: var(--fs-14);
+  line-height: 1.7;
+  color: #4b5563;
+  margin: 0 0 18px;
+}
+
+.profile-facts { margin: 0; }
+
+.profile-fact {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 9px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.profile-fact:last-child { border-bottom: none; }
+
+.profile-fact dt {
+  font-size: var(--fs-13);
+  color: #5f6775;
+  flex-shrink: 0;
+}
+
+.profile-fact dd {
+  margin: 0;
+  font-size: var(--fs-14);
+  font-weight: 600;
+  color: #111827;
+  text-align: right;
+}
+
+.profile-subhead {
+  font-size: var(--fs-12);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #15803d;
+  font-weight: 700;
+  margin: 22px 0 10px;
+}
+
+.profile-boundaries {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.profile-boundaries li {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.boundary-direction {
+  font-size: var(--fs-12);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #15803d;
+  font-weight: 700;
+}
+
+.boundary-name { font-size: var(--fs-13); color: #374151; }
+
+
+@media (max-width: 768px) {
+  .about-hero {
+    padding: 34px 20px 30px;
+  }
+
+  .about-hero h1 {
+    font-size: var(--fs-28);
+  }
+
+  /* ⚠️ minmax(0, …) on a single column as well. A bare `1fr` is
+     `minmax(auto, 1fr)` whatever the count -- X2's biggest finding,
+     and this rule was still bare when it moved out of Home.css. */
+  .about-container {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .about-map {
+    height: 280px;
+  }
+
+  .about,
+  .barangay-profile {
+    padding: 42px 20px;
+  }
+}

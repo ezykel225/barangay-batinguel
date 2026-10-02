@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useState } from 'react'
 import { FaFacebook } from 'react-icons/fa'
 import './Footer.css'
@@ -123,6 +124,13 @@ const Footer = () => {
         <div className="footer-bottom">
           <p>© {currentYear} Barangay Batinguel. All Rights Reserved.</p>
           <div className="footer-bottom-links">
+            {/* ⚠️ A real LINK beside four modal buttons, because /about
+                is a page and the other four are dialogs. Dressing a
+                navigation up as a button takes away everything people
+                navigate a site by -- middle-click, open in a new tab,
+                the browser's own back. The footer styles both the same
+                way, so nothing looks out of place. */}
+            <Link to="/about">About the Barangay</Link>
             <button onClick={() => setActiveModal('contact')}>Contact Us</button>
             <button onClick={() => setActiveModal('privacy')}>Privacy Policy</button>
             <button onClick={() => setActiveModal('terms')}>Terms of Service</button>

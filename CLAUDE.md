@@ -65,7 +65,7 @@ banned below: it silences the one check this project has.
 
 ### Tests
 
-Fifteen suites, 340 tests:
+Twenty-nine suites, 627 tests:
 
 | File | What it covers |
 |---|---|
@@ -81,9 +81,24 @@ Fifteen suites, 340 tests:
 | `src/components/NotificationBell.test.js` | 24 tests over the bell: the unread count in the accessible name **as words**, Escape and focus restore, click-outside closing *without* stealing focus back, mark-read-then-navigate ordering, and that unread is carried by a class **and** the spoken word "New" rather than by colour |
 | `src/components/useModalA11y.test.js` | 9 tests over Escape, focus entry and focus restoration for the seventeen hand-rolled modals. Run **both directions**: with the hook stubbed, 4 of 9 fail. Includes the case where the opener is removed by the save the modal performed — focusing a detached node silently sends focus to `<body>` |
 | `src/components/Navbar.test.js` | 6 tests over the public mobile menu button, which had **no accessible name at all** before X3: the name changes with state, `aria-expanded` tracks it, and `aria-controls` points at an id that exists |
-| `src/utils/eventCalendar.test.js` | 24 tests over event placement and the upcoming split. The load-bearing one: the homepage filters **then** limits |
+| `src/utils/eventCalendar.test.js` | 24 tests over event placement and the upcoming split. The load-bearing one: the homepage filters **then** limits, plus 6 over `eventTimeLabel`: the `HH:MM:SS` a `time` column really returns, and that anything which is not a time — a location beginning with one included — yields `''` rather than being printed |
 | `src/utils/documentFilter.test.js` | 16 tests over `filterDocumentRequests` — the status narrowing, the five searched fields, and that an unknown status yields nothing rather than everything |
 | `src/utils/reservationWindow.test.js` | 46 tests over the 5–10 PM window, the per-slot and per-kind durations, the noon-spanning exception and the office-hours exception — deliberately mirroring the SQL cases in migration 020's header, so client and database are asserted to agree rather than each checked alone. The load-bearing one is that an exception is read from `exception_reason` and never from the hour |
+
+| `src/utils/reservationSteps.test.js` | 18 tests over which step of the booking flow owns which field. The load-bearing pair: the two field sets are **disjoint**, and together they cover every value `create_court_reservation` requires — so nobody choosing a date can be told their NAME is missing, and no required field can reach the RPC blank |
+| `src/utils/reservationTracking.test.js` | 19 tests over the public tracking page. The load-bearing one asserts **no message it can produce mentions "not found", "no such" or "invalid reference"** — an answer distinguishing a wrong reference from a wrong number is an oracle for guessing references. Plus a source-reading guard that the module defines no status word of its own |
+| `src/utils/returnTo.test.js` | 39 tests over the `?next=` allowlist, **26 of them attack strings** that have each defeated a redirect sanitiser written by inspection — `//evil.example`, `/\evil.example`, `https:/evil.example`, `javascript:`, `data:`, a `user:pass@` trick, a double-encoded payload. All fall back to `/` |
+| `src/utils/signupSteps.test.js` | 23 tests over the sign-up rules. The load-bearing ones: step 1 reports nothing about the password, the two advisory password checks **stay advisory** (a long passphrase with no digit is accepted), and `MIN_PASSWORD_LENGTH` can never drop below Supabase's own minimum |
+| `src/utils/officialPhotos.test.js` | 26 tests over the portrait map, `portraitWillBeLost` and `PersonAvatar`. `hasBundledPhoto` uses `hasOwnProperty`, asserted — a bare lookup reports a portrait for an official named `toString`. Six are the **2026-10-01 regression guard**: the eleven canonical keys written out in full, that the erroneous rename is not a key, and that no middle name the barangay spells out is abbreviated to an initial. Run **both directions** — re-keying the portrait to `Lastimoso` fails 4, and "tidying" it to `Jeffrey F. Duran` fails 4 |
+| `src/utils/clinicSchedule.test.js` | 29 tests over the clinic week, built from the **live rows including Friday's two**. Friday is ONE entry carrying both stored sessions in `sessions`, and `displaySessions` presents them as one 8-to-5 span because **both rows record the 12-1 break that exactly fills the gap**. The load-bearing pair runs the other direction: a two-session day whose gap no recorded break covers is **not** joined, and neither is one whose break only partly fills it |
+| `src/utils/medicineFilter.test.js` | 28 tests over the public medicine list — the three narrowings, an unrecognised category or status matching **nothing rather than everything**, that the counts always sum to the total, and 8 over `isCategoryOpen`. The load-bearing one there: **while a filter is applied every rendered group is open**, including one the reader had collapsed — `filterMedicines` has already dropped the non-matches, so a collapsed group would hide a medicine the page has just counted as a result |
+| `src/utils/homeSections.test.js` | 19 tests over the Home page's two summaries: the announcement excerpt (a very-long-body regression guard, the word boundary, the unbreakable token) and `nextCollection`, whose load-bearing one is that it returns **null rather than a guess** when no row carries a weekday name, and counts the rows it left out |
+| `src/pages/Announcements.test.js` | 8 tests over the browse page, the FIRST suite that renders a page component. The load-bearing pair: the card shows an excerpt and `/announcements/:id` still renders the whole 2,159-character notice, from the same row. Also that each card is ONE link with no nested anchor |
+| `src/pages/Events.test.js` | 14 tests over the Calendar \| List switcher, the list card and date selection. The load-bearing one: a card shows a time **only when `event_time` holds one** — it is NULL on every live row — and never digs one out of `location`, which on three legacy rows begins with a time somebody typed. Two more assert no heading level is skipped in either view |
+| `src/pages/EventDetails.test.js` | 8 tests over the detail page's Time row: shown with a time, **gone — label and all — for null, empty, whitespace and a missing column**, with the location left exactly as stored even when it begins with a time. Run **both directions**: with the condition removed, 5 of 8 fail |
+| `src/utils/officialAvailability.test.js` | 24 tests over per-official consultation hours. The load-bearing one **reads `026_official_availability.sql`** and asserts the four statuses the form offers are exactly the four the CHECK accepts — the same thing `reservationWindow.test.js` does for migration 020 |
+| `src/components/EServicesMenu.test.js` | 15 tests over the E-Services dropdown and the catalogue: the disclosure pattern, Escape and focus restore, that it does **not** use `role="menu"`, and that every service states its access requirement in words |
+| `src/utils/residentTabs.test.js` | 7 tests over `?tab=` resolution — a hint, never authorization |
 
 Schema and policy changes are still verified by impersonating each role
 in SQL, with the results recorded in the migration headers — not by
@@ -95,7 +110,16 @@ imports the client. So a missing `.env` fails that test with a module
 error that never mentions `.env`. If `npm test` fails on a fresh
 checkout, check `.env` before debugging the test.
 
-The other fourteen suites do **not** need it. `residentGroups.js`,
+⚠️ **`Announcements.test.js` and `Events.test.js` render page
+components that DO import the client, and still do not need `.env`.**
+They `jest.mock('../supabase/supabaseClient')`, which is hoisted above
+the imports, so the real module -- and its import-time throw -- never
+runs. Navbar and Footer are stubbed in both, because Navbar pulls in
+`AuthContext` and standing that up would be testing the chrome, which
+has its own suites. Verified by renaming `.env` and running both: 20
+passed. That is the pattern for any future page-level suite.
+
+The other suites do **not** need it. `residentGroups.js`,
 `displayLabels.js`, `reservationWindow.js`, `monthGrid.js`,
 `reservationCalendar.js`, `eventCalendar.js`, `notificationLabels.js`,
 `ActionMenu.jsx`, `MonthCalendar.jsx`, `NotificationBell.jsx` and
@@ -140,7 +164,7 @@ in `react-scripts` → `webpack-dev-server`, which never ships. `--force`
 
 ```
 src/
-  App.js              All routing: 11 public routes, 3 role-protected
+  App.js              All routing: 14 public routes, 3 role-protected
                       (/official, /nurse, /resident) wrapped in
                       ProtectedRoute, plus path="*" — see the note below.
   index.js            CRA entry point.
@@ -201,6 +225,23 @@ src/
   utils/
     officialPhotos    Maps barangay_officials.full_name -> portrait file.
     clinicHours.js    Parses the "8:00 AM" display strings.
+    clinicSchedule    The clinic week as it is READ. One entry per
+                      weekday; `displaySessions` joins two sessions into
+                      one span ONLY when a break recorded on that day's
+                      own rows exactly fills the gap -- which is why
+                      Friday's two live rows read as one 8-to-5 day. The
+                      database still holds both; `sessions` still reports
+                      both. Pure.
+    medicineFilter    Narrows and counts the public medicine list, and
+                      owns `isCategoryOpen` -- the collapse default
+                      (first group open) and the rule that a FILTER
+                      opens every rendered group, because every row left
+                      is a match. Pure.
+    homeSections      The two Home summaries: `announcementExcerpt` (the
+                      card's text only -- the stored description is
+                      untouched) and `nextCollection`, which returns
+                      NULL rather than a guess when no waste row carries
+                      a weekday name. Pure.
     storagePath.js    Public URL -> storage object path.
     displayLabels     Stored status -> the words users read: document
                       requests, reservations, availability. Also the
@@ -617,9 +658,11 @@ such row.
 
 ## Database notes
 
-**23 migrations**, `001` through `023`, all applied.
+**27 migrations**, `001` through `027`, all applied. ⚠️ 027 is a
+DATA CORRECTION, not a schema change — see *The portrait is lost by the
+RENAME* under *Public E-Services (X5)*.
 
-**19 tables, RLS enabled on every one.**
+**20 tables, RLS enabled on every one.**
 
 | Table | Holds |
 |---|---|
@@ -640,6 +683,7 @@ such row.
 | `medicine_stock` | Medicine availability as a status, not a count |
 | `barangay_terms` | One row per barangay term. **Empty** — schema only, migration 019A |
 | `barangay_term_members` | Who served in a term. **Empty** — schema only, migration 019A |
+| `official_availability` | Weekly consultation hours per elected official. Migration 026. **Empty** — only an official can enter their own |
 | `notifications` | In-app notifications. **Client-read-only** — written only by triggers; see *Notifications* |
 | `notification_reads` | Who has seen which notification. Insert and select only |
 
@@ -2611,6 +2655,813 @@ reproductions X2 and X3 used, rendered against both bundles.
 
 ---
 
+## Public E-Services (X5)
+
+A public-site workflow phase, 2026-10-02. **Not a visual-theme
+rewrite:** the white navbar, the blue institutional palette, the
+photographic heroes with their dark-blue overlays, the typography, the
+card language and every accepted X2/X3/X4 decision are unchanged. What
+changed is the information architecture and five workflows.
+
+The navigation is now **Home / Officials / Health Center / E-Services /
+Login**, and *Court Reservation* is no longer a top-level item.
+
+### One catalogue, four surfaces
+
+`src/constants/eServices.js` is the single list of services. The
+desktop dropdown, the mobile drawer, the `/e-services` landing page and
+the Home page's services section all render from it, and
+`returnTo.js`'s allowlist is derived from it too — so a service added
+once appears in all four and becomes returnable, and a service removed
+stops being linked and stops being returnable at the same moment.
+
+⚠️ **Do not add a service before its route exists.** `path="*"` renders
+`Home`, so a premature entry does not 404; it silently takes somebody
+to the homepage and looks like the service is broken.
+
+⚠️ **`access` is a promise to the reader, never a gate.** It decides the
+words shown beside a service, so a resident learns an account is needed
+*before* clicking. `ProtectedRoute` and RLS decide what is actually
+reachable, exactly as before.
+
+### The booking flow is four steps, over one `formData`
+
+`Reservation.jsx` asked for everything at once, so the first thing it
+said to somebody who had typed their name was that their password —
+sorry, their *date* — was missing. Worse, it carried **two** date
+controls writing the same `formData.preferred_date`: a calendar and an
+`<input type="date">`. The input is gone; the calendar is authoritative
+because it is the only one of the two that knows what is already booked.
+
+| Step | Asks for |
+|---|---|
+| 1 Date & Time | calendar, booking window, exception panel, duration, slots |
+| 2 Your Details | who the booking is for, and what for |
+| 3 Review | a `<dl>` of everything; nothing is written until confirmed |
+| 4 Done | the reference number, what was booked, what happens next |
+
+All four render from **one** `formData`, so Back never clears anything
+— the fields are hidden, not unmounted. `src/utils/reservationSteps.js`
+owns which step asks for what, and its tests assert the two field sets
+are **disjoint** and together cover every value
+`create_court_reservation` requires.
+
+⚠️ **The window, the duration caps, the overlap check and the
+office-hours rule are NOT restated there.** Those are
+`reservationWindow.js` and the database triggers (020, 021). A second
+home for a rule is how two copies drift.
+
+The donation message moved out of the form into a *Court Information*
+section below the flow. It sat between Additional Notes and the submit
+button, where it read as a payment step — which for a facility that is
+free, and whose table has had no money columns since 006 dropped all
+ten, is the one thing it must not look like.
+
+### A guest can check on a booking — migrations 024 and 025
+
+A guest may book without an account (008) and now gets a reference:
+**`BCR-2026-AB12CD`**. Random, not sequential: a sequential public
+number tells anybody holding one that the neighbouring numbers exist,
+which turns the tracking page into a directory of other people's
+bookings. Crockford base32 with I, L, O and U removed; lookup maps the
+look-alikes back, so an O read for a zero still finds the booking.
+
+⚠️ **The reference is an identifier, never a credential.**
+`track_court_reservation(p_reference, p_contact)` requires the
+reference **and** the contact number, returns at most one row through a
+fixed narrow column list, and masks the name and the number **in SQL**
+— a client-side mask ships the real value to the browser and hides it
+with CSS. `reservations` still has **no anonymous SELECT policy**.
+
+⚠️ **A wrong reference and a wrong contact number give the same empty
+result.** An answer that distinguishes them confirms which guesses are
+live. The page keeps that property, and
+`reservationTracking.test.js` asserts no message it can produce says
+"not found", "no such" or "invalid reference".
+
+⚠️ **Creation is an RPC, not a table insert, and the reason is
+measured.** A guest has no SELECT policy on `reservations`, and
+PostgREST's `.insert().select()` is `INSERT ... RETURNING` — so asking
+for the reference back over the table API is refused `42501` even
+though the insert itself is allowed. The fix is **not** to open up
+anonymous SELECT. `create_court_reservation` is *stricter* than the
+policy it replaces: `status`, `reviewed_by` and `resident_id` are not
+parameters at all.
+
+### `?next=` is an allowlist, not a sanitiser
+
+`src/utils/returnTo.js` does not inspect the value. It decodes it
+**once** and compares it against a fixed list of paths this application
+serves. Anything not exactly on the list becomes the fallback, and
+cannot be made to pass by any encoding, because nothing is parsed.
+
+⚠️ **Decoding in a loop is how a double-encoded payload gets past a
+check that ran before the last decode.** Exactly one decode.
+
+⚠️ **It is not authorization either**, and the dashboards are absent
+from the list anyway — asserted by a test, because no public page links
+to one. `next` is honoured for a **resident** only: a staff member
+arriving from an E-Services link would otherwise be bounced by
+`ProtectedRoute` and read it as a broken login.
+
+### The login role picker is gone, and nothing lost a control
+
+It was Official / Nurse / Resident in three accent colours, defaulting
+to **Official** on a public barangay website. It compared the chosen
+button against `profiles.role` and, on a mismatch, signed the person
+back out with *"Invalid role selected."* — **after**
+`signInWithPassword` had already succeeded. So it never kept anybody
+out of anything (RLS did and does), and what it produced was a
+correctly typed password reported as a role error.
+
+Two tabs now, **Resident first and default**, with `role="tab"`,
+`aria-selected` and a `tabpanel`. They choose the heading, the help
+text and the sign-up prompt — nothing else. Where somebody lands is
+decided entirely by `profiles.role`.
+
+### Sign-up is four steps, and the password guidance guides
+
+Minimum **8**, where Supabase's own default is 6. ⚠️ The client being
+*stricter* than the server is safe in that direction — an account this
+form refuses is simply not created — and unsafe in the other, where a
+form promising less than the server enforces produces an error nobody
+can act on. A test pins it at ≥ 6.
+
+⚠️ **One check blocks (length); two are suggestions and must stay
+suggestions.** A rule that rejects a long passphrase for having no
+digit makes passwords worse, not better. Which is which is said in
+words as well as by the tick. The common-password list is a courtesy,
+**not** leaked-password protection — that is Pro-only and cannot be
+enabled here.
+
+Step 4 replaced a `toast.success` fired while the page was navigating
+to `/login`, where the toast then sat over a form that could not yet be
+used. It names the address the confirmation went to, says the message
+often lands in spam, and says plainly that signing in and booking the
+court work straight away while requesting a document does not.
+
+### ⚠️ Two defects that CLIP rather than scroll
+
+X2 and X3 both looked for a document that scrolls sideways. Neither of
+these does: the overflow is cut off by an `overflow: hidden` ancestor,
+so `document.scrollWidth` equals the viewport width and **every
+overflow probe reports a clean page**. Both were found with a
+screenshot and then measured with a clipping detector — each element's
+right edge against its nearest *clipping* ancestor, not against the
+document.
+
+- **`.login-box` was `grid-template-columns: 1fr 1.5fr`**, and `1fr` on
+  a phone. That is X2's own biggest finding still sitting in the file.
+  The panels stayed 438px wide at a 375px viewport, so 63px of every
+  heading and paragraph on the login, sign-up and reset-password pages
+  was simply **gone** on a phone.
+- **`.login-input-wrapper input` had `flex: 1` and no `min-width: 0`.**
+  A flex item's default `min-width: auto` is its min-content width, and
+  for an `<input>` that is the default `size="20"`. Measured at 375px:
+  the input cut by 58px and the **show/hide-password button by 102px**
+  — entirely off the end of its own field, on the login page.
+
+Both are the same family as the bare `1fr`: a default `auto` minimum
+nothing can shrink past. **When a container has `overflow: hidden`, the
+overflow detector is blind to it — screenshot, or measure against the
+clipping ancestor.**
+
+### The portrait is lost by the RENAME, not by archiving
+
+Reported as "archiving an official loses their photo". It does not.
+The audit trail:
+
+```
+2026-10-01 04:58  edited    Jeffrey Cataylo Lastimoso — Kagawad
+2026-10-01 05:02  archived  ("for testing purposes")
+2026-10-01 05:04  restored
+2026-10-01 05:10  archived  ("gi kapoy na")
+2026-10-01 13:29  restored
+```
+
+The portrait was gone at **04:58, by the EDIT**, four minutes before
+the first archive. `display_order` 10 held `Jeffrey Feria Duran`, whose
+photo is in `officialPhotos`; the rename left no key matching, and
+`PersonAvatar` fell back to an icon with no word anywhere. Verified
+that archiving is not the cause: neither handler sends `photo_url`,
+neither makes a storage call, and `photo_url` is **NULL on all eleven
+rows** — every portrait comes from the bundled map.
+
+`portraitWillBeLost()` now warns on the rename (it **warns**, it does
+not block), and the fallback is **named**: "No photo on file for
+&lt;name&gt;".
+
+#### ✅ The data was corrected — migration 027
+
+The barangay confirmed that **Jeffrey F. Duran is the real Kagawad** and
+that the Lastimoso entry was an erroneous rename, not a second official.
+Migration 027 is a **data correction**: one row, one column.
+
+| | |
+|---|---|
+| row id | `311c140b-7a9f-449b-bf1f-9371f46c304f` — **the same row, kept** |
+| `full_name` | `Jeffrey Cataylo Lastimoso` → `Jeffrey Feria Duran` |
+| everything else | `position`, `committee`, `display_order`, `archived_at`, `photo_url`, `created_at` all **untouched** |
+
+⚠️ **The canonical form is `Jeffrey Feria Duran`, spelled out, not
+`Jeffrey F. Duran`.** It was not chosen from memory — four independent
+sources were checked and all four agree: his own `profiles.full_name`
+(created 2026-05-28, never touched by the rename), the `officialPhotos`
+key since the earliest commit, the **original uploaded asset filename**
+(`Jeffrey Feria Duran.jpg`, later shortened to `J.Duran.jpg` with the
+map keeping the exact name), and the directory's own convention, where
+every official spells the middle name out in full — Catan, Flores,
+Katada, Abol, Catadman, Fabillar. An initial would be the only
+abbreviated name in the directory, and would break the match just as
+thoroughly as Lastimoso did while *looking* right.
+
+⚠️ **`J.Duran.jpg` was never re-keyed**, which is why this was a
+one-line fix rather than a reconstruction. The map was already correct
+and waiting for a row to attach to — the same thing that was true of the
+missing Kagawad on 2026-09-30.
+
+⚠️ **The audit trail is not rewritten.** The five `activity_log` rows
+from 2026-10-01 still read "Jeffrey Cataylo Lastimoso — Kagawad",
+because that is what the record genuinely said when each was written.
+`activity_log` is append-only and has no UPDATE or DELETE policy;
+tidying history would destroy the evidence that identified the defect.
+No entry was written for the correction either — `stamp_activity_actor`
+takes the actor from the caller's token, and a direct connection has
+none, so the only possible entry would be unattributed, which is what
+migration 015 exists to prevent. Migration 027's header is the record.
+
+Verified after: his account matches **exactly one** active directory
+row; `official_id_for_current_user()` returns his row id and he can
+write his own availability but not the Treasurer's (`42501`); the public
+page decodes `J.Duran.jpg` at 800×640 under his exact name; archive →
+restore in a rolled-back transaction keeps the id, name, committee and
+order; and **no official account is left without an active directory
+row** — a query that named him before the correction and returns
+`(none)` after it.
+
+⚠️ **The underlying fragility is untouched.** There is still no
+`profile_id` foreign key, so the next rename can do this again. What
+changed is that it will now warn first, and a lost portrait says so.
+
+### Friday was listed twice
+
+`nurse_availability` has no uniqueness on `day_of_week`, and the live
+table holds **two Friday rows** (08:00–12:00 and 13:00–17:00, both
+stored 24-hour while every other row is a display string). The Clinic
+Hours list printed Friday, then printed Friday again underneath it.
+
+`src/utils/clinicSchedule.js` builds **one entry per weekday** carrying
+every session recorded for it.
+
+⚠️ **It first refused to merge them, and that was wrong — corrected in
+the post-X5 polish pass.** The original reasoning was that 08:00–12:00
+plus 13:00–17:00 only *looks* like the standard day with a lunch break,
+so joining them would be inferring what the barangay meant. The page
+therefore printed two blocks and the line *"Two sessions — closed in
+between"*, which readers took to mean the clinic keeps unusual Friday
+hours.
+
+It is not an inference, and **the rows themselves settle it**: both
+Friday rows record a break of 12:00–13:00, which is exactly the gap
+between the two sessions. The barangay has already written down that the
+closure between them is the lunch break. So `bridgingBreak` joins two
+sessions into one span **if and only if** a break recorded on one of
+that day's own rows starts precisely where the first session ends and
+ends precisely where the second begins. Friday now reads
+`8:00 AM – 5:00 PM` with `Lunch 12:00 NN – 1:00 PM`, like every other
+day.
+
+⚠️ **The rule is derived, not keyed to a weekday.** Nothing in the
+module names Friday, and a day whose gap no recorded break accounts for
+— a genuine morning-only / late-afternoon clinic day — is still shown as
+two blocks, because flattening it would promise hours the clinic does
+not keep. A break that only *partly* fills the gap does not join either.
+Friday is the only day in the live table with two rows, which is why it
+is the only day this changes; a test asserts every other day renders
+exactly as stored.
+
+⚠️ **Nothing was written to the database.** There are still two Friday
+rows, and `sessions` still reports both; `displaySessions` is what the
+page renders. A data correction remains the barangay's to make.
+
+⚠️ **A break is shown only when it falls inside the session it was
+stored against.** Friday's second row carries a 12:00 PM–1:00 PM break
+against a session that *starts* at 1:00 PM; printing it would tell a
+resident the clinic shuts an hour before it opens.
+
+⚠️ **And `fetchWeekSchedule` was not selecting `break_start` /
+`break_end` at all**, so `isOnScheduledBreak` got `undefined`, returned
+null, and the automatic lunch-break detection **had never once fired**
+on the public page.
+
+### Consultation hours for every official — migration 026
+
+`kapitan_availability` could not carry this: it has **no column naming
+an official**. Adding one would leave existing rows with a NULL meaning
+"the Kapitan, implicitly" beside new rows where NULL means nothing.
+⚠️ **`kapitan_availability` and `kapitan_status` are untouched.**
+
+`official_availability` is keyed to `barangay_officials.id`, public to
+read **for active officials only**, and writable by that official alone.
+
+⚠️ **Ownership resolves through the `full_name` string join and FAILS
+CLOSED.** A mismatch means the official cannot publish their own hours
+— never that they can edit somebody else's. Contrast the self-archive
+guard (018), which compares the same strings and fails *open*; that is
+accepted there only because archiving yourself reduces your own
+privileges.
+
+⚠️ **`official_id` is CHECKED, not stamped.** 015's pattern is to
+overwrite what the client sent, which is right for an actor. It is
+wrong for the column deciding *whose* schedule a row is: stamping would
+silently reassign a mistaken insert rather than refusing it.
+`updated_by` and `updated_at` **are** stamped.
+
+⚠️ **The UPDATE policy needs its `WITH CHECK` as much as its `USING`.**
+Without it an official could update their own row and set `official_id`
+to somebody else's — passing on the way in, landing on the other
+official's schedule on the way out. Verified refused.
+
+⚠️ **Archiving hides the hours from officials too**, deliberately
+unlike 018. A directory record is history worth keeping visible; a
+consultation schedule is operational.
+
+⚠️ **Nothing is seeded.** The table holds zero rows. Inventing
+consultation hours would put times on a public page nobody at the
+barangay agreed to.
+
+### Home lost its history, and gained its services
+
+The home page opened with three paragraphs of history, an embedded map,
+a facts table and a school card — above the announcements, the events
+and the waste schedule. Somebody arriving to check when their rubbish
+is collected read several screens of history first.
+
+All of it moved to **`/about`** — the same bytes, the same text from
+`constants/about.js`, nothing restyled and nothing rewritten. Home now
+carries an E-Services section where the history was, and a one-line
+doorway to `/about`. ⚠️ **Not a second copy of the history**: two copies
+of the barangay's own text is two places for it to drift.
+
+### ⚠️ The Supabase connector gates more than migration 024 recorded
+
+024's header says `DROP TRIGGER` cannot be sent through the connector —
+it is treated as a destructive statement and the call times out waiting
+for a confirmation that never arrives. Measured again here, it is
+broader: **plain `DELETE`, `DROP FUNCTION` and `REVOKE` behave the same
+way.** In the SQL Editor they are all fine.
+
+Consequence recorded in 026's header: one dead helper function,
+`tmp_cleanup_probe_row`, could not be dropped from here. It has been
+neutralised (SECURITY INVOKER, a body that deletes nothing and raises)
+and needs one line in the SQL Editor:
+`DROP FUNCTION public.tmp_cleanup_probe_row();`
+
+### What was measured, and what was not
+
+Every public route — `/`, `/about`, `/e-services`,
+`/track-reservation`, `/officials`, `/health-center`, `/reservation`,
+`/announcements`, `/events`, `/login`, `/signup` — driven in Chromium
+against the **shipped production bundle**:
+
+| Check | Result |
+|---|---|
+| Document-level horizontal overflow, 8 widths (320–1440) | **0 failures across 88 measurements** |
+| Clipping against the nearest `overflow: hidden` ancestor, 6 widths | **0 across 66** |
+| Controls under WCAG 2.2 SC 2.5.8's 24px | **0 across 66** |
+| Every `<label>` associated with a control | **true on every route** |
+| Exactly one `<h1>` per page | **true on every route** |
+
+The four-step booking flow, the four-step sign-up and the tracking page
+were **driven**, not just rendered: every step reached, Back verified
+to keep every value, and the two `?next=` and reference-lookup
+behaviours exercised.
+
+⚠️ **The dashboards are still behind `ProtectedRoute` and this
+environment still has no test account, so no authenticated page was
+loaded in a browser.** The Official Dashboard's new consultation-hours
+editor is covered by the migration's own role-impersonation
+verification and by unit tests over its pure module — **not** by a live
+page. Step 4 of the booking flow and the tracking page's result were
+reached with the **real** components and the **real** CSS bundle and
+only the **network** stubbed, because Supabase is not reachable from
+this container's browser.
+
+---
+
+## Manual review polish pass (post-X5)
+
+Eight corrections, 2026-10-02, from the repo owner's own review of the
+deployed PR branch. **No migration, no schema change, no permission
+change, no new table and no change to authentication, RLS or the
+reservation security model** — the pass is presentation, plus two real
+defects where a control reported one state and the page showed another.
+
+### ⚠️ Two controls that reported a state the page did not have
+
+Both are the **same Postgres-of-CSS fact**, and it is worth stating once
+because it will come back: **`[hidden]` is a UA rule on the ELEMENT
+selector, so any author `display` declaration beats it.**
+
+- **The medicine category disclosures did nothing.** `hidden` was set,
+  `aria-expanded` flipped, the chevron turned — and `.medicine-list`
+  sets `display: flex`, so the list never moved. Measured in Chromium
+  after one click: `aria-expanded="false"`, `ul.hidden === true`,
+  computed `display: flex`, the list still **126px tall with both
+  medicines on screen**. A screen reader was told the group was closed
+  while everybody could see it.
+- Fixed with `.medicine-list[hidden] { display: none }`. The two new
+  disclosures added in this pass — the officials' week and the waste
+  grid — each carry the same guard next to their own `display`, by
+  construction rather than after the fact.
+
+Same family as `@keyframes pulse` and `animation-name` in X4: the
+attribute reads right and the CSS silently defeats it. **Checking the
+attribute alone passes a broken page** — measure the computed `display`
+and the box.
+
+### ⚠️ The E-Services dropdown was centring, not indenting
+
+Reported as uneven padding. Measured inside the panel, the four service
+labels sat at **82px, 54px, 41px and 62px** from its left edge — a
+different offset each, varying with the length of the text. That is not
+padding; that is centring.
+
+The panel renders **inside the public navbar**, so its own `<li>`
+elements also match `.navbar-menu li { display: flex; align-items:
+center; justify-content: center }`. Each `<a>` became a block-level flex
+item, shrink-wrapped to its text, and was then centred in its row.
+
+`.eservices-panel .eservices-list li { display: block }` at **(0,3,1)**
+outranks `.navbar-menu li` at **(0,1,1)**, so the fix never touches the
+rule every other nav item depends on. Re-measured at 1024/1280/1440:
+all five entries, the *All E-Services* link included, at **21px**.
+
+⚠️ **The general lesson is not about this panel.** A component rendered
+inside another component's DOM inherits that component's descendant
+selectors. The X2 cascade note says a media query is not a tiebreaker;
+this one says **proximity in the file tree is not isolation**.
+
+### Medicine categories: a default, and a filter that overrides it
+
+The groups exist to shorten a page that was unreadably long, so leaving
+them all open defeated the thing they were added for. `isCategoryOpen`
+in `medicineFilter.js` is the one rule: **first group open, the rest
+folded**, overridden by what the reader has clicked.
+
+⚠️ **While a filter is applied EVERY rendered group is open**, and that
+is not a convenience. `filterMedicines` has already dropped the
+non-matches, so every group still on screen *is* a match — a collapsed
+one would hide a medicine the page has just counted as a result
+("Showing 1 of 6" over an empty screen). Verified in the browser:
+searching `Ascorbic`, whose only match lives in a group that is
+collapsed by default, renders it open with the medicine visible; and
+searching `Paracetamol` with that group **explicitly** collapsed still
+shows both matches.
+
+⚠️ **While filtered the group title is a plain heading, not a button.**
+There is nothing left to disclose, and a disclosure whose control cannot
+change anything is worse than no control — `aria-expanded` would
+announce a state the click does not alter.
+
+⚠️ **The override map stores only what the reader clicked.** An absent
+key means "never touched", which is what lets the default differ per
+group. A plain `collapsed[key] = true/false` map could not tell the two
+apart, so the first click on a group folded *by default* would have
+written `true` and left it folded. `toggleCategory` flips the
+**effective** state, not the stored one.
+
+### The Home page
+
+- **The hero badge is the system's name**, `Barangay Batinguel
+  E-Services`, not `Official Barangay Portal` — which could sit on any
+  barangay's homepage, above a heading that already says which one this
+  is.
+- **The primary action is the catalogue**, `Explore E-Services` →
+  `/e-services`. It was `Book a Reservation`, which made the covered
+  court the headline errand of the whole barangay — above requesting a
+  document, which is why most residents open this site. Health Center
+  stays secondary, unchanged; the image, the overlay and the typography
+  are untouched.
+- **Announcement cards carry an excerpt**, and ⚠️ **the stored
+  `description` is not touched** — `/announcements/:id` still renders it
+  in full, verified: 179 characters on the card, **2,159 on the detail
+  page**, from one row. Two things bound the card and both are needed:
+  `announcementExcerpt` keeps a long notice out of the DOM, and a
+  three-line CSS clamp makes the boundary exact at any width. Measured
+  at 320/375/768/1024/1280/1440: **every row of cards is one height**,
+  three at 365px across at 1280 and 1440.
+- ⚠️ **The clamp's own ellipsis can follow the excerpt's three dots** on
+  a narrow screen, where 179 characters do not fit three lines. Cosmetic,
+  and the alternative — dropping the clamp — gives the phone a card as
+  tall as whoever wrote the longest notice.
+
+### ⚠️ The next waste collection is DERIVED, and absent when it cannot be
+
+`waste_schedule.day_of_week` holds a weekday **name** and the schedule
+recurs weekly, so "the next collection" is a question the stored data
+can answer: the fewest days from the Manila weekday to that weekday.
+`nextCollection` in `src/utils/homeSections.js` does exactly that and
+**returns null rather than a guess** when no row carries a weekday name,
+in which case the page renders no summary at all. Nothing is hard-coded
+— no day, no purok, no time.
+
+What the table does **not** hold is a date, a fortnightly or monthly
+pattern, or a holiday exception. So a row whose `day_of_week` is not a
+weekday name is left out of the computation and **counted in a note**,
+rather than quietly dropped: a summary that loses rows looks complete
+while being short.
+
+⚠️ **Today counts as the next collection, not as missed.** `time_label`
+is free text — one live row reads `7:00 AM - 10:00` — so deciding
+whether today's window has passed would mean parsing a range the column
+does not guarantee, and telling somebody their collection is six days
+away on the morning it happens is the worse error. Same rule as
+`upcomingEvents`: an event this afternoon has not happened yet.
+
+⚠️ **There is no public waste-schedule route, so nothing links to one.**
+`path="*"` renders `Home`, so a *"View Full Waste Schedule"* link would
+land a resident back on the page they started from and look broken. The
+full grid was already on this page; it now sits behind a real disclosure
+(`<button>`, `aria-expanded`, `aria-controls`) under the summary. A
+dedicated public page is **not built** — see *Known gaps*.
+
+### The officials' consultation hours have two shapes
+
+`official_availability` holds **zero rows** (026 seeded nothing, by
+decision), so the common case is "nothing published" — and eleven cards
+each carrying the sentence *"No consultation hours published yet."* was a
+screen of apology where a reader wanted a name and a committee. That
+case is now one short line: **Consultation Schedule / Not published
+yet**.
+
+⚠️ **It still says NOT PUBLISHED, never "unavailable".** An absent
+schedule is not a closed door, and `todayLine` already draws that
+distinction; this only chose how to show it. Nothing fabricates a status.
+
+When an official *has* published, the card reads **Consultation Today**,
+the status and the hours, with a **View schedule** disclosure revealing
+all seven days. Days with no row read *Not published* rather than being
+omitted.
+
+⚠️ **The disclosure's accessible name carries the official's name** —
+eleven cards would otherwise offer eleven controls all announced "View
+schedule" — and it is a **prefix** of the visible label, never a
+replacement: WCAG 2.5.3 means somebody saying "click View schedule" must
+still match. The same rule, and the same reasoning, as `ActionMenu`'s
+`subject`.
+
+⚠️ **The Punong Barangay's card hides the empty shape, and only the
+empty shape.** His card already carries the full weekly Consultation
+Schedule from `kapitan_availability` in `.kapitan-section`, so
+"Not published yet" beside a schedule the reader can see would
+contradict it. Verified both directions: with the table empty his card
+has no block and `.kapitan-section` still shows its days; give him
+`official_availability` rows — a **different** table — and the block
+appears like anybody else's.
+
+### Two findings from passing, both target size
+
+- ⚠️ **The public mobile drawer's four nav links were 21px tall**, under
+  WCAG 2.2 SC 2.5.8's 24px. `.navbar-mobile` spaces its rows with
+  `gap: 16px` on the flex column, so the space around each link belongs
+  to the **list**, not the link — the same "a padded wrapper is not a
+  target" defect as the dashboard filter bar's borderless input. X3 and
+  X5 both missed it because **neither sweep opened the drawer**: a
+  `display: none` control has a zero box and every target check skips
+  it. Three of the four are pre-existing; E-Services is the one X5
+  added. Fixed with `.navbar-mobile > li > a`, which keeps off the
+  service sub-list (already padded) and off the login button (its
+  padding is `!important`).
+- ⚠️ **A comment in `EServicesMenu.css` asserted a rule that does not
+  exist** — that `.navbar-mobile li` supplies the row padding. There is
+  no such rule anywhere. The comment is corrected; it was the reason the
+  21px links read as already handled.
+- **Home's four contact cards jumped `<h2>` to `<h4>`** (axe
+  `heading-order`). The old Home had the history block and its own
+  sub-headings above them; X5 moved that to `/about` and left the skip
+  behind. They are `<h3>` now, and the stylesheet matches **both** tags
+  so nothing depends on which one a card uses — verified pixel-identical
+  (13px / 700 / `#bfdbfe` / 5px margin).
+
+### What was measured, and what was not
+
+Driven in Chromium against the **shipped production bundle**, with only
+the network stubbed:
+
+| Check | Result |
+|---|---|
+| Document overflow + clipping + 24px targets, every public route, 6 widths | **0 failures across 66** |
+| The same with each new control OPEN (dropdown, every medicine group, a filter applied, the waste grid, every officials week), 8 widths | **0 failures across 40** |
+| axe-core 4.13 (WCAG 2.0/2.1 A + AA + best practice), 9 page states x 2 widths | **0 violations** |
+| Announcement card heights per row, 6 widths | one height in every row |
+| Dropdown label offsets, 3 widths | 21px for all five entries |
+| Jest | 26 suites, **592 tests**, all passing |
+| Production build | clean, no ESLint warnings, **220 kB** gzipped |
+
+Every control was **clicked**, not inspected: the dropdown (open,
+Escape, focus restored to the trigger), each medicine group (collapse,
+expand, and the two filter cases), the waste disclosure (open, grid
+`display: grid`, both purok cards present), each officials week (open by
+mouse, closed by Enter), and the hero CTA and an announcement card
+followed to their destinations.
+
+⚠️ **The dashboards are still behind `ProtectedRoute` and this
+environment still has no test account, so no authenticated page was
+loaded in a browser.** Nothing in this pass touches a dashboard.
+
+---
+
+## Announcements and Events organization pass (post-X5)
+
+A small presentation pass over **`/announcements` and `/events` only**,
+2026-10-02, from the repo owner's review of the deployed PR branch. **No
+routing change, no database change, no change to event or announcement
+CRUD, no RLS change and no navbar change.**
+
+### One compact intro block, shared by both pages
+
+Both pages wrote the same block out separately and both rendered it the
+same wrong way: `<h1><MdAnnouncement /> All Announcements</h1>` put the
+icon INSIDE the heading, where it took a line of its own above the
+title at every width. Four stacked lines for two things to say, and the
+first card 305px down a 1280x1000 viewport.
+
+`src/pages/PageIntro.css` now owns it and both pages import it. The icon
+is a **sibling** marked `aria-hidden`, in a tinted 46px tile beside the
+title, so it reads as one unit; the description sits under the title.
+
+| | |
+|---|---|
+| Heading structure | unchanged -- still exactly one `<h1>` per page |
+| Accessible name of the `<h1>` | now the words alone, with no svg in it |
+| First card / calendar | 305px down → **232px** |
+
+⚠️ **`.page-intro .back-link` is (0,2,0) on purpose.** Each page
+declares `.back-link` at (0,1,0) in its own file, and an
+equal-specificity override would be decided by which file the bundler
+emits first -- the X2 cascade trap. Raising specificity makes it
+independent of emission order.
+
+⚠️ **It lives in its own file**, not in either page's stylesheet. A
+block two pages share, owned by one of them, is the dishonesty
+`@keyframes pulse` taught in X4.
+
+### ⚠️ The category pill was stretching the full card width, and the cause was mine
+
+Reported as a category bar spanning almost the whole card. Measured at
+1280: the pill **346px wide inside a 382px card**, computed
+`display: block`.
+
+`.announcement-badge` is `display: inline-block`, which fits its text.
+But the previous pass made `.announcement-card-body` a **column flex
+container** to give the cards equal heights -- and a flex item is
+`align-self: stretch` by default and is blockified besides. The badge
+had been correct for as long as its parent was a block.
+
+`align-self: flex-start` restores it (60px for "Notice"). Same family as
+every other finding in this project where a container quietly redefined
+a child: `[hidden]` under a `display: flex`, the navbar's `li` under the
+E-Services panel. **A change that fixes one thing can silently redefine
+a sibling; measure the siblings too.**
+
+### The announcement cards became a browse page
+
+`/announcements` printed each notice's **whole body**. Measured with the
+live rows -- a 616-character notice beside a 10-character one -- all
+three cards were **1,293px tall**, because the previous pass's equal
+heights padded the short ones to match the long one.
+
+| | Before | After |
+|---|---|---|
+| Card height | 1,293px (x3) | **317px** (x3) |
+| Body | whole `description` | 3-line excerpt |
+| Category pill | 346px | 60px |
+| Megaphone band | 160px | 112px |
+
+⚠️ **The stored `description` is untouched** and
+`/announcements/:id` still renders it in full -- verified in a browser:
+the card shows 179 characters, the detail page **2,159**, from one row.
+`announcementExcerpt` is the function the Home cards already use, so the
+two surfaces cannot cut at different lengths.
+
+⚠️ **"Read announcement →" is a `<span>`, not a second link.** The
+whole card is already one `<a>`; an `<a>` inside an `<a>` is invalid
+HTML and would give a keyboard user a second stop for one destination.
+A test asserts the card contains no nested anchor.
+
+### The Events header is one row, and the list card gained its meta line
+
+The Calendar | List switcher sat in a band of its own 28px below the
+intro -- 181px of control against the right edge of a 1200x36 empty
+row. It is now the aside of `.page-intro-row`, which **wraps**, so on a
+phone it drops under the text instead of squeezing it. The markup,
+handlers, `role="group"`, label and `aria-pressed` are unchanged.
+
+⚠️ **A list card shows a time only when `event_time` holds one, and
+`event_time` is NULL on every row in the live table.** So today the time
+line is simply absent. A "Time:" label with a blank after it reads as a
+value that failed to load, and inventing one is not an option.
+
+⚠️ **And it does not dig a time out of `location`.** Three legacy
+rows store one there -- `"2:00 PM - Main Covered Court"` -- and
+splitting that string would be guessing at a format nothing guarantees,
+on a column whose job is the place. Those rows show it as part of their
+location, as somebody typed it. `eventTimeLabel` uses
+`clinicHours.toMinutes` as its parse check, which is the same authority
+`formatTime` uses internally, so the two cannot disagree about what
+counts as a time.
+
+Equal heights per row (102/102/102/**134** before), a location pin from
+the icon library already in use, and a border that answers on hover.
+
+### ⚠️ The selected-day panel was a 46px box beside a 532px calendar
+
+Unselected, `.mcal-day-panel` measured **591x46** next to a 591x532
+calendar -- it read as something that failed to render rather than as a
+panel waiting for a click. The **words are unchanged**; the panel now
+carries an `is-waiting` class and is styled as a waiting state: dashed
+edge, centred text, 180px. Selected, it stretches to the calendar's own
+height (591x532) so the two read as a pair.
+
+⚠️ **Every rule is scoped to `.events-calendar-layout`.**
+`.mcal-day-panel` is MonthCalendar's own class and the three dashboard
+calendars use it too; an unscoped rule here would restyle surfaces this
+pass is not about.
+
+### Two heading-order violations, both pre-existing, both invisible to every earlier audit
+
+axe flagged `heading-order` on the Events page in two states:
+
+- **List view**: `<h1>` → `<h3>` on the event card title.
+- **Calendar view with a date selected**: `<h1>` → `<h4>` on the
+  panel's date heading.
+
+Neither had ever been measured. X3 and X5 both audited `/events` in its
+**default** state -- the calendar, with no date selected and with empty
+fixtures -- where the list is not rendered and the panel heading does
+not exist. **A page is not one page to axe; it is one page per state.**
+
+Both are `<h2>` now. The event card keeps `<h3>` on **Home**, where it
+sits under a section `<h2>` -- the same split the announcement card
+already carries -- and both stylesheets match both tags, verified
+pixel-identical (16px / 600 / `rgb(30,41,59)` / 0 top / 5px bottom).
+
+### What was measured, and what was not
+
+Driven in Chromium against the shipped production bundle, network
+stubbed, with deliberately pathological fixtures (a 63-character
+unbreakable title, a 40-character category, a 400-character body, a
+97-character location):
+
+| Check | Result |
+|---|---|
+| Overflow + clipping + 24px targets + one `<h1>` + equal card heights per row, 5 page states x 6 widths (320–1440) | **0 failures across 30** |
+| axe-core 4.13 (A + AA + best practice), 6 page states x 2 widths | **0 violations** |
+| Jest | 28 suites, **619 tests** |
+| Production build | clean, no ESLint warnings, 220 kB gzipped |
+
+Driven, not inspected: the switcher by mouse **and by Enter**, a day
+cell selected by keyboard, an announcement card followed to its detail
+page, and the detail page's body length read back.
+
+⚠️ **`/` was re-measured as a regression check**, because the
+announcement and event card rules live in `Home.css` and are shared. Its
+event card is byte-identical at 588x102.
+
+### ✅ The event detail page's empty Time row — fixed in a follow-up
+
+Recorded here as out of scope and then fixed on its own:
+`EventDetails.jsx` rendered
+`<p><strong>Time:</strong> {event.event_time}</p>` **unconditionally**,
+so on every live event the page printed "Time:" followed by nothing —
+which reads as a value that failed to load rather than one that was
+never recorded.
+
+⚠️ **The whole row is omitted, not just its value.** A label with an
+empty value beside it is the defect; a label with "—" after it would be
+asserting the barangay recorded something.
+
+It calls the same `eventTimeLabel` the list card uses, so the two
+surfaces cannot disagree about whether a row has a time or how it
+reads — and it therefore also does **not** dig one out of `location`.
+`event_time` is `time without time zone`, so the database itself
+refuses anything that is not a time; the empty-string and
+whitespace cases the tests cover can only reach the component from a
+client, never from the column.
+
+⚠️ **The value is now formatted** (`14:00:00` → `2:00 PM`) rather than
+printed raw, which the list card already did and which *No raw database
+value is shown to a user* requires. That is slightly beyond "omit the
+row when empty" — one line to revert if the raw form is wanted.
+
+`EventDetails.test.js`, 8 tests, run **both directions**: with the
+condition removed, **5 of 8 fail**; the other three pass trivially
+because they cover the title, date, description and location, which the
+change does not touch.
+
+---
+
 ## Health centre
 
 **Medicine stock is a status, not a quantity** — Available / Low stock /
@@ -2784,6 +3635,15 @@ derives her initials from. It is no longer displayed as a label.
   beyond 8 hours (the CHECK stays `1..8`), and noon is a coverable hour
   but not a startable one — all noted where they belong.
 - **`profile_id` foreign key** replacing the `full_name` matching above.
+  ⚠️ This cost the project a real outage of one official's permissions
+  on 2026-10-01: display_order 10 was renamed to `Jeffrey Cataylo
+  Lastimoso`, and `Jeffrey Feria Duran`'s account stopped matching any
+  active directory row — he silently lost his position permissions and
+  his portrait. **The data was corrected in migration 027** once the
+  barangay confirmed he is the real Kagawad, but the mechanism that
+  allowed it is still there. The foreign key is what actually fixes it;
+  until then the rename warns, and `officialPhotos.test.js` guards the
+  eleven canonical keys.
 - **019B — the Previous Term Officials roster and its UI.** Migration 019A
   created the tables; both are **empty**, and there is **no frontend**. 019B
   seeds the confirmed roster from SQL and adds the read-only Official Portal
@@ -2798,9 +3658,9 @@ derives her initials from. It is no longer displayed as a label.
 - **Source maps ship to production** (~7 MB), so the original JSX is
   publicly reconstructable. `GENERATE_SOURCEMAP=false` in Vercel fixes it.
 - **`public/logo.png` is 984 KB and referenced by nothing.**
-- **Thin automated test coverage.** 340 tests in fifteen suites: one
+- **Thin automated test coverage.** 627 tests in twenty-nine suites: one
   smoke test over `<App />`, which fails without `.env` because
-  `supabaseClient.js` throws at import time, and 339 tests over the
+  `supabaseClient.js` throws at import time, and 626 tests over the
   resident workflow rules, the display labels, the booking window, the
   month grid and its three feature layers, the document-request filter,
   the ⋮ menu's keyboard and authorization behaviour, the modal
@@ -2825,7 +3685,46 @@ derives her initials from. It is no longer displayed as a label.
   than a fix.
 - **An InfinityFree deployment** may still be serving an old broken build.
 - **No 404 page.** `path="*"` in `App.js` renders `Home`, so a mistyped
-  URL looks like the homepage instead of reporting an error.
+  URL looks like the homepage instead of reporting an error. ⚠️ This is
+  also why `constants/eServices.js` must never list a service before
+  its route exists: a premature entry does not 404, it silently lands
+  on the homepage and looks like the service is broken.
+- **`nurse_availability` has no uniqueness on `day_of_week`**, which is
+  how the live table ended up with two Friday rows. `clinicSchedule.js`
+  renders them as ONE 8-to-5 day with a lunch break, because both rows
+  record the 12–1 break that exactly fills the gap between them — but
+  nothing stops a third row, and a third would not be joined (the rule
+  takes exactly two sessions), so it would reappear as a second block.
+  A unique index cannot simply be added — it would fail on the
+  existing data, and a clinic day may legitimately be split, which is
+  exactly why `official_availability` has that constraint and this
+  table does not.
+- **Friday's two clinic rows are stored 24-hour** (`08:00`) while every
+  other row is a display string (`8:00 AM`). `clinicHours.toMinutes`
+  accepts both, so nothing breaks — which is why nobody noticed.
+- **One dead database function**, `tmp_cleanup_probe_row`, left by
+  migration 026's verification because this connector gates
+  `DROP FUNCTION`. Neutralised; needs one line in the SQL Editor.
+- **No public waste-schedule route.** The collection schedule is a
+  section of the Home page and nothing else. Home now carries a derived
+  *Next collection* summary with the full weekly grid behind a
+  disclosure, which is why there is no *"View Full Waste Schedule"*
+  link: `path="*"` renders `Home`, so one would land a resident back
+  where they started. A dedicated page is an unbuilt feature, not a
+  defect.
+- **`waste_schedule` records a weekday name and nothing else** — no
+  date, no fortnightly or monthly pattern, no holiday exception. So
+  `nextCollection` can only answer "which weekday is soonest", and a row
+  whose `day_of_week` is not a weekday name is excluded from the summary
+  and counted in a note rather than placed on some day anyway.
+- **`events.event_time` is NULL on every row**, and three legacy rows
+  carry their time inside `location` instead
+  (`"2:00 PM - Main Covered Court"`). Both the list card and the detail
+  page render a Time only when the column holds one, and neither parses
+  it out of `location`, so today no event shows a separate time
+  anywhere. The legacy strings are left exactly as somebody typed them;
+  moving them into `event_time` is a data correction for the barangay
+  to make, not a display function's guess.
 - **No lint script and no typecheck script** — see *Commands* and
   *Tests* above.
 

@@ -28,7 +28,12 @@ import ActionMenu from '../components/ActionMenu'
 import { useModalA11y } from '../components/useModalA11y'
 import NotificationBell from '../components/NotificationBell'
 import { useNotifications } from '../components/useNotifications'
-import { PersonAvatar } from '../utils/officialPhotos'
+import { PersonAvatar, portraitWillBeLost } from '../utils/officialPhotos'
+import {
+  OFFICIAL_AVAILABILITY_STATUSES,
+  availabilityLabel,
+  buildOfficialWeek,
+} from '../utils/officialAvailability'
 import { logActivity } from '../utils/activityLog'
 import { useConfirm } from '../components/ConfirmDialog'
 import {
@@ -248,6 +253,110 @@ const RESERVATION_FILTER_OPTIONS = [
   { value: 'cancelled', label: 'Cancelled' },
 ]
 
+// One editable day of an official's consultation hours.
+//
+// ⚠️ Each row keeps its OWN draft and saves itself. The alternative --
+// one form over seven days with a single Save -- means a mistake in one
+// day blocks the other six, and it is the shape that produced the
+// "Nothing was saved" confusion elsewhere in this dashboard. Here the
+// unit of work is a day, and so is the unit of feedback.
+const AvailabilityDayRow = ({ entry, saving, onSave }) => {
+  const [draft, setDraft] = useState({
+    status: entry.row?.status || 'unavailable',
+    time_start: entry.row?.time_start || '',
+    time_end: entry.row?.time_end || '',
+    note: entry.row?.note || '',
+  })
+
+  // Re-seed when the saved row changes underneath, so a successful save
+  // leaves the field showing what the database now holds rather than
+  // what was typed.
+  useEffect(() => {
+    setDraft({
+      status: entry.row?.status || 'unavailable',
+      time_start: entry.row?.time_start || '',
+      time_end: entry.row?.time_end || '',
+      note: entry.row?.note || '',
+    })
+  }, [entry.row])
+
+  const idFor = (field) => `avail-${entry.day}-${field}`
+  const needsHours = draft.status === 'available'
+
+  return (
+    <div className="availability-day">
+      <h4 className="availability-day-name">{entry.day}</h4>
+
+      <div className="availability-field">
+        <label htmlFor={idFor('status')}>Status</label>
+        <select
+          id={idFor('status')}
+          value={draft.status}
+          onChange={(e) => setDraft({ ...draft, status: e.target.value })}
+        >
+          {/* ⚠️ The words come from the shared availability map, and the
+              VALUES are the stored ones -- which are exactly what
+              migration 026's CHECK accepts. A word offered here that
+              the database refuses produces a bare 23514 instead of a
+              sentence; a test walks the migration file to hold the two
+              together. */}
+          {OFFICIAL_AVAILABILITY_STATUSES.map((status) => (
+            <option key={status} value={status}>{availabilityLabel(status)}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Only an available day has hours, so the fields appear only
+          then -- rather than sitting there greyed out, which invites
+          somebody to fill them in and wonder why they vanished. */}
+      {needsHours && (
+        <>
+          <div className="availability-field">
+            <label htmlFor={idFor('start')}>From</label>
+            <input
+              id={idFor('start')}
+              type="text"
+              value={draft.time_start}
+              onChange={(e) => setDraft({ ...draft, time_start: e.target.value })}
+              placeholder="9:00 AM"
+            />
+          </div>
+          <div className="availability-field">
+            <label htmlFor={idFor('end')}>To</label>
+            <input
+              id={idFor('end')}
+              type="text"
+              value={draft.time_end}
+              onChange={(e) => setDraft({ ...draft, time_end: e.target.value })}
+              placeholder="11:00 AM"
+            />
+          </div>
+        </>
+      )}
+
+      <div className="availability-field availability-field-wide">
+        <label htmlFor={idFor('note')}>Note (optional)</label>
+        <input
+          id={idFor('note')}
+          type="text"
+          value={draft.note}
+          onChange={(e) => setDraft({ ...draft, note: e.target.value })}
+          placeholder="Walk-ins welcome"
+        />
+      </div>
+
+      <button
+        type="button"
+        className="btn-approve availability-save"
+        disabled={saving}
+        onClick={() => onSave(draft)}
+      >
+        {saving ? 'Saving...' : 'Save'}
+      </button>
+    </div>
+  )
+}
+
 const OfficialDashboard = () => {
   const { user } = useAuth()
   // Destructive actions go through this rather than acting on the first
@@ -375,6 +484,11 @@ const OfficialDashboard = () => {
   // Logged-in user info from profiles + barangay_officials
   const [userProfile, setUserProfile] = useState(null)
   const [officialInfo, setOfficialInfo] = useState(null)
+  // ⚠️ The signed-in official's OWN consultation hours, and nobody
+  // else's. Migration 026's policies are what enforce that -- this
+  // state is only what the form shows.
+  const [myAvailability, setMyAvailability] = useState([])
+  const [savingAvailability, setSavingAvailability] = useState('')
 
   // Modal States
   const [showAnnouncementModal, setShowAnnouncementModal] = useState(false)
@@ -476,6 +590,33 @@ const OfficialDashboard = () => {
     // produced data nothing displayed yet.
     if (user?.id) fetchUserInfo(user.id)
   }, [user])
+
+  // ⚠️ Filtered to the caller's own directory row here AND restricted
+  // to it by RLS. The filter is for the query's sake; migration 026's
+  // UPDATE/INSERT/DELETE policies are the control, and they resolve
+  // "own" through `official_id_for_current_user()`, which fails CLOSED
+  // on a name mismatch.
+  const fetchMyAvailability = useCallback(async (officialId) => {
+    if (!officialId) {
+      setMyAvailability([])
+      return
+    }
+    const { data, error } = await supabase
+      .from('official_availability')
+      .select('*')
+      .eq('official_id', officialId)
+    if (!error) setMyAvailability(data || [])
+  }, [])
+
+  // ⚠️ Keyed on the resolved directory row, not on the profile. The
+  // hours belong to `barangay_officials.id`, so there is nothing to
+  // fetch until that lookup has succeeded -- and for an official whose
+  // name no longer matches a directory row it never does, which is
+  // exactly the case the card renders an explanation for instead of a
+  // form.
+  useEffect(() => {
+    fetchMyAvailability(officialInfo?.id)
+  }, [officialInfo, fetchMyAvailability])
 
   const fetchUserInfo = async (userId) => {
     // Get profile (name, role)
@@ -619,6 +760,71 @@ const OfficialDashboard = () => {
   // SELECT policy is what stops anonymous callers retrieving archived
   // rows. Filtering here as well documents the intent and keeps the
   // dashboard correct if a policy is ever changed carelessly.
+  // One day at a time, so a change is saved where it was made.
+  //
+  // ⚠️ `.select()` and a row check, per the project's own rule: RLS
+  // FILTERS rows rather than raising, so a blocked write comes back as
+  // success with zero rows affected. An official whose profile name no
+  // longer matches their directory row hits exactly that, and has to
+  // be told rather than shown a false save.
+  const handleSaveAvailability = async (day, next) => {
+    const officialId = officialInfo?.id
+    if (!officialId) {
+      toast.error('Your account is not linked to an active directory record, so this cannot be saved.')
+      return
+    }
+
+    if (next.status === 'available' && (!next.time_start.trim() || !next.time_end.trim())) {
+      toast.error('A day marked Available needs a start and an end time.')
+      return
+    }
+
+    setSavingAvailability(day)
+    try {
+      const existing = myAvailability.find((row) => row.day_of_week === day)
+      const payload = {
+        official_id: officialId,
+        day_of_week: day,
+        // Only an available day carries hours. The database says the
+        // same thing from the other side -- 026's
+        // `official_availability_hours_present` CHECK -- so this is one
+        // rule written on both sides, not a hint the trigger takes on
+        // trust.
+        time_start: next.status === 'available' ? next.time_start.trim() : null,
+        time_end: next.status === 'available' ? next.time_end.trim() : null,
+        status: next.status,
+        note: next.note.trim() || null,
+      }
+
+      const query = existing
+        ? supabase.from('official_availability').update(payload).eq('id', existing.id)
+        : supabase.from('official_availability').insert(payload)
+
+      const { data, error } = await query.select('id')
+
+      if (error) {
+        console.error('Save availability error:', {
+          message: error.message, details: error.details, hint: error.hint, code: error.code,
+        })
+        // 23514 is one of 026's CHECK constraints; its message is the
+        // raw constraint name, which means nothing to a reader.
+        toast.error(error.code === '23514'
+          ? 'That combination is not allowed — an Available day needs hours.'
+          : 'Could not save your consultation hours.')
+        return
+      }
+      if (!data || data.length === 0) {
+        toast.error('Nothing was saved — your account may not be linked to an active directory record.')
+        return
+      }
+
+      toast.success(`${day} saved.`)
+      fetchMyAvailability(officialId)
+    } finally {
+      setSavingAvailability('')
+    }
+  }
+
   const fetchOfficialsList = async () => {
     const { data, error } = await supabase
       .from('barangay_officials')
@@ -1610,10 +1816,56 @@ const OfficialDashboard = () => {
       if (!proceed) return
     }
 
+    // ⚠️ A RENAME UNLINKS THE PORTRAIT, and this is the only moment
+    // anybody can do something about it. `officialPhotos` is keyed on
+    // the exact `barangay_officials.full_name`, so changing the name
+    // leaves the bundled photo matching nothing and the row silently
+    // falls back to an icon.
+    //
+    // This already happened once, on 2026-10-01 at 04:58: `edited` on
+    // display_order 10 turned "Jeffrey Feria Duran" into "Jeffrey
+    // Cataylo Lastimoso" and the portrait was gone, four minutes
+    // before the first of two archive/restore cycles that got the
+    // blame. Nothing anywhere said a word. It also cost that official
+    // his position permissions, because an account is linked to its
+    // directory row by the same exact string. The data was corrected in
+    // migration 027; this dialog is what makes the next one loud.
+    //
+    // It WARNS, it does not block. Correcting a misspelled name is a
+    // legitimate edit and must not be refused over a picture.
+    if (
+      editingOfficial
+      && portraitWillBeLost(
+        editingOfficial.full_name,
+        newOfficial.full_name,
+        editingOfficial.photo_url,
+      )
+    ) {
+      const proceedWithRename = await confirm({
+        title: 'This rename will remove their photo',
+        message: `The portrait on file is matched to the name `
+          + `"${editingOfficial.full_name}" exactly. Saving "${newOfficial.full_name}" `
+          + 'will leave this official with no photo on the directory and on the '
+          + 'public Officials page, and nothing else will report it. '
+          + 'Correcting a name is still the right thing to do — but the photo '
+          + 'has to be re-matched to the new name in the code before it comes back.',
+        confirmLabel: 'Rename anyway',
+        cancelLabel: 'Keep the name',
+        destructive: false,
+      })
+      if (!proceedWithRename) return
+    }
+
     setSubmitting(true)
     try {
       if (editingOfficial) {
-        const { error } = await supabase
+        // ⚠️ `.select()` and a row count, per the project's own rule:
+        // RLS FILTERS rows rather than raising, so a blocked UPDATE
+        // comes back as success with zero rows affected. Without this
+        // the toast reported "Official updated!" for an edit that
+        // never happened -- the same defect the archive and restore
+        // handlers below already guard against.
+        const { data: updated, error } = await supabase
           .from('barangay_officials')
           .update({
             full_name: newOfficial.full_name,
@@ -1624,9 +1876,12 @@ const OfficialDashboard = () => {
             updated_by: user?.id ?? null,
           })
           .eq('id', editingOfficial.id)
+          .select('id')
 
         if (error) {
           toast.error('Failed to update official!')
+        } else if (!updated || updated.length === 0) {
+          toast.error('Nothing was updated — you may not have permission to change the directory.')
         } else {
           toast.success('Official updated!')
           logActivity({
@@ -4265,6 +4520,61 @@ const OfficialDashboard = () => {
             <div className="official-dashboard-header">
               <h1>Settings</h1>
               <p>Manage your account preferences.</p>
+            </div>
+
+            {/* ─── MY CONSULTATION HOURS ─────────────────────────────
+                ⚠️ YOUR OWN ROW, AND NOBODY ELSE'S. Migration 026's
+                INSERT, UPDATE and DELETE policies resolve "own" through
+                `official_id_for_current_user()`; this form cannot be
+                made to write another official's schedule by editing it,
+                because the database is what decides. Verified by
+                impersonating two different officials over the API: the
+                Secretary's UPDATE of the Treasurer's row matched 0 rows.
+
+                It is also why there is no "edit somebody else's hours"
+                control anywhere -- not hidden, absent, the same rule
+                ActionMenu follows. */}
+            <div className="dashboard-card" style={{ maxWidth: 760, marginBottom: 20 }}>
+              <div className="dashboard-card-header">
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <FaCalendarAlt style={{ color: '#1e3a8a' }} /> My Consultation Hours
+                </h3>
+              </div>
+
+              {!officialInfo?.id ? (
+                /* ⚠️ The orphaned-official case, said in words rather
+                   than shown as a form that silently saves nothing.
+                   An official whose `profiles.full_name` no longer
+                   matches an active `barangay_officials.full_name` has
+                   no directory row to attach hours to -- the project's
+                   documented string-join fragility, and there is at
+                   least one such account in the live data right now. */
+                <p className="dashboard-empty">
+                  Your account is not linked to an active record in the Officials
+                  Directory, so consultation hours cannot be saved yet. This
+                  happens when the name on your account and the name in the
+                  directory are not identical. Ask another official to check both.
+                </p>
+              ) : (
+                <>
+                  <p style={{ fontSize: 13, color: '#5f6775', marginBottom: 14, lineHeight: 1.6 }}>
+                    Shown on the public Officials page so residents know when they
+                    can see you. Only you can change your own hours. A day left
+                    blank simply shows nothing.
+                  </p>
+
+                  <div className="availability-editor">
+                    {buildOfficialWeek(myAvailability).map((entry) => (
+                      <AvailabilityDayRow
+                        key={entry.day}
+                        entry={entry}
+                        saving={savingAvailability === entry.day}
+                        onSave={(next) => handleSaveAvailability(entry.day, next)}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="dashboard-card" style={{ maxWidth: 480, marginBottom: 20 }}>

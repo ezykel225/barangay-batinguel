@@ -18,6 +18,7 @@
 // `toDateKey`, which never constructs a Date at all.
 
 import { groupByDateKey, toDateKey } from './monthGrid'
+import { formatTime, toMinutes } from './clinicHours'
 import { manilaToday } from './displayLabels'
 
 // ── A month of events, indexed by date ───────────────────────────
@@ -94,4 +95,39 @@ export const pastEvents = (events, { today = manilaToday() } = {}) => {
     .filter(({ key }) => key !== '' && key < today)
     .sort((a, b) => (a.key > b.key ? -1 : a.key < b.key ? 1 : 0))
     .map(({ event }) => event)
+}
+
+// ─── The time, when there IS one ──────────────────────────────────────
+//
+// ⚠️ `events.event_time` is a `time` column and is NULL on every row in
+// the live table. So this returns '' far more often than not, and the
+// caller must render nothing at all rather than a label with a blank
+// after it -- "Time:" followed by white space reads as a value that
+// failed to load.
+//
+// PostgREST hands a `time` back as `HH:MM:SS`, which `formatTime` does
+// not recognise (its pattern allows one optional `:MM` group, not two).
+// Trimming the seconds first is the whole job; the 12-hour rendering
+// stays in `clinicHours`, so the clinic, the officials' consultation
+// hours and an event all print a time the same way.
+//
+// ⚠️ It does NOT dig a time out of `location`. Three legacy rows store
+// one there -- "2:00 PM - Main Covered Court" -- and splitting that
+// string would be guessing at a format nothing guarantees, on a column
+// whose job is the place. Those rows show the time as part of their
+// location, exactly as somebody typed it.
+export const eventTimeLabel = (value) => {
+  if (!value) return ''
+  const text = String(value).trim()
+  if (!text) return ''
+  const trimmed = text.replace(/^(\d{1,2}:\d{2}):\d{2}(\.\d+)?$/, '$1')
+
+  // ⚠️ `formatTime` returns its input UNTOUCHED when it cannot parse
+  // it, which is right for the clinic's hand-typed display strings and
+  // wrong here: it would print "2:00 PM - Main Covered Court" as though
+  // it were a time. `toMinutes` is the parse check and it is the SAME
+  // authority `formatTime` uses internally, so the two cannot disagree
+  // about what counts as a time.
+  if (toMinutes(trimmed) === null) return ''
+  return formatTime(trimmed)
 }

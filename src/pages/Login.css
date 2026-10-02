@@ -18,9 +18,28 @@
   padding: 40px 20px;
 }
 
+/* ⚠️ minmax(0, ...), never a bare fr -- and the single-column rule in
+   the 768px block below needs it just as much.
+
+   This was `1fr 1.5fr` with `grid-template-columns: 1fr` on a phone,
+   which is X2's single biggest finding still sitting in the file:
+   "Collapsing to one column does not fix it. A single 1fr track is
+   just as much minmax(auto, 1fr) as three of them." The track could
+   not shrink below its content's min-content width -- an unbreakable
+   email address, mostly -- so the panels stayed 438px wide at a 375px
+   viewport.
+
+   ⚠️ AND IT CLIPPED RATHER THAN SCROLLED, which is why X2 did not find
+   it. `overflow: hidden` on this element means the 63px that did not
+   fit were not pushed into a horizontal scrollbar, they were simply
+   gone: `document.scrollWidth` stayed at exactly the viewport width
+   while the right-hand end of every heading and every paragraph on the
+   login, sign-up and reset-password pages was cut off on a phone.
+   Measured with a screenshot, not with the overflow detector -- the
+   detector reports 0 for this defect by construction. */
 .login-box {
   display: grid;
-  grid-template-columns: 1fr 1.5fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
   max-width: 900px;
   width: 100%;
   border-radius: var(--radius-lg);
@@ -33,7 +52,9 @@
 ================================ */
 .login-left {
   background: linear-gradient(135deg, #0f172a, #1e3a8a);
-  ;
+  /* A grid item's default `min-width: auto` is its min-content width
+     too, so the track fix above needs this to bind. */
+  min-width: 0;
   padding: 48px 36px;
   display: flex;
   flex-direction: column;
@@ -173,96 +194,96 @@
   margin-bottom: 24px;
 }
 
-.login-role-label {
-  font-size: var(--fs-12);
-  font-weight: 600;
-  color: #5f6775;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 10px;
-}
+/* ================================
+   WHO IS SIGNING IN
+   ================================
 
-.login-role-buttons {
+   ⚠️ A TAB LIST, not a role picker. What was here was a three-column
+   grid of Official / Nurse / Resident buttons in three different
+   accent colours, each with a matching "Logging in as ..." pill
+   beneath it -- eight rules and three colour families for a control
+   that granted nothing and, on a mismatch, reported a correct password
+   as "Invalid role selected."
+
+   Two tabs now, in one colour: the selected one is carried by the
+   border, the weight AND `aria-selected`, never by colour alone. */
+.login-audience-tabs {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 10px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
-.login-role-btn {
+.login-audience-tab {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 10px 8px;
+  gap: 8px;
+  min-width: 0;
+  padding: 11px 10px;
   border: 2px solid #e5e7eb;
   border-radius: var(--radius-sm);
   background-color: #f9fafb;
   color: #5f6775;
-  font-size: var(--fs-13);
+  font-size: var(--fs-14);
   font-weight: 500;
+  font-family: 'Poppins', sans-serif;
   cursor: pointer;
   transition: all 0.2s;
-  font-family: 'Poppins', sans-serif;
 }
 
-.login-role-btn:hover {
+.login-audience-tab:hover {
   border-color: #1e3a8a;
   color: #1e3a8a;
   background-color: #eff6ff;
 }
 
-.login-role-btn.active-official {
+.login-audience-tab.is-selected {
   border-color: #1e3a8a;
   color: #1e3a8a;
   background-color: #eff6ff;
+  font-weight: 700;
+}
+
+.login-audience-help {
+  font-size: var(--fs-13);
+  color: #5f6775;
+  line-height: 1.6;
+  margin: 0 0 20px;
+}
+
+.login-signup-prompt {
+  margin-top: 18px;
+  text-align: center;
+  font-size: var(--fs-14);
+  color: #5f6775;
+}
+
+.login-signup-prompt a {
+  color: #1e40af;
   font-weight: 600;
 }
 
-.login-role-btn.active-nurse {
-  border-color: #0891b2;
-  color: #0891b2;
-  background-color: #ecfeff;
-  font-weight: 600;
+.login-note {
+  font-size: var(--fs-13);
+  color: #5f6775;
+  line-height: 1.7;
+  margin: 10px 0 0;
+  text-align: left;
 }
 
-.login-role-btn.active-resident {
-  border-color: #15803d;
-  color: #15803d;
-  background-color: #f0fdf4;
-  font-weight: 600;
+.login-note-standalone {
+  margin-top: 18px;
+  padding: 12px 14px;
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-sm);
 }
 
-.login-selected-role {
-  margin-bottom: 20px;
-}
-
-.role-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  border-radius: var(--radius-pill);
-  font-size: var(--fs-12);
-  font-weight: 600;
-}
-
-.official-badge {
-  background-color: #eff6ff;
-  color: #1e3a8a;
-  border: 1px solid #bfdbfe;
-}
-
-.nurse-badge {
-  background-color: #ecfeff;
-  color: #0891b2;
-  border: 1px solid #a5f3fc;
-}
-
-.resident-badge {
-  background-color: #f0fdf4;
-  color: #15803d;
-  border: 1px solid #bbf7d0;
+.login-modal-note {
+  font-size: var(--fs-13);
+  color: #5f6775;
+  line-height: 1.6;
 }
 
 .login-form {
@@ -300,6 +321,7 @@
 }
 
 .login-input-icon {
+  flex-shrink: 0;
   padding: 12px 14px;
   color: #5f6775;
   font-size: var(--fs-16);
@@ -307,8 +329,26 @@
   border-right: 1px solid #e5e7eb;
 }
 
+/* ⚠️ `min-width: 0`, and it is load-bearing. `flex: 1` is
+   `flex: 1 1 0%`, so the basis is zero -- but a flex item's DEFAULT
+   `min-width: auto` is its min-content width, and for an `<input>`
+   that is driven by the default `size="20"`, roughly 180px before
+   padding. Add the leading icon and the show-password button and the
+   row could not shrink below ~430px.
+
+   ⚠️ AND `.login-input-wrapper` has `overflow: hidden`, so the excess
+   was CLIPPED, not scrolled. Measured at 375px: the input was cut by
+   58px and the show/hide-password button by 102px -- which is to say
+   the button was entirely off the end of its own field, on a phone,
+   on the login page. `document.scrollWidth` reported no overflow at
+   all, which is why neither X2 nor X3 found it: both looked for a
+   document that scrolls sideways, and this one does not.
+
+   Same family as the bare `1fr` fixed above: a default `auto` minimum
+   that nothing can shrink past. */
 .login-input-wrapper input {
   flex: 1;
+  min-width: 0;
   padding: 12px 14px;
   border: none;
   font-size: var(--fs-14);
@@ -322,6 +362,7 @@
 }
 
 .login-toggle-password {
+  flex-shrink: 0;
   padding: 12px 14px;
   color: #5f6775;
   font-size: var(--fs-16);
@@ -389,8 +430,21 @@
   margin-top: 16px;
 }
 
+/* ⚠️ The padding is a TARGET SIZE fix, not spacing. Measured in
+   Chromium at all six widths: "Forgot your password?" was 149x20 and
+   "Support Portal" 94x20 -- both under WCAG 2.2 SC 2.5.8's 24px
+   minimum, on the two controls somebody who cannot get in has to
+   reach. Pre-existing; X3 did not catch it because axe does not check
+   target size and the keyboard pass does not measure boxes.
+   `inline-flex` so the min-height binds on a <button> and an <a>
+   alike, and vertical padding only, so nothing moves sideways. */
 .login-form-footer a,
+.login-signup-prompt a,
 .login-link-btn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 4px 0;
   font-size: var(--fs-13);
   color: #1e3a8a;
   text-decoration: none;
@@ -399,7 +453,10 @@
   border: none;
   cursor: pointer;
   font-family: 'Poppins', sans-serif;
-  padding: 0;
+}
+
+.login-signup-prompt a {
+  font-size: var(--fs-14);
 }
 
 .login-form-footer a:hover,
@@ -516,7 +573,7 @@
 ================================ */
 @media (max-width: 768px) {
   .login-box {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .login-left {
@@ -531,8 +588,8 @@
     font-size: var(--fs-22);
   }
 
-  .login-role-buttons {
-    grid-template-columns: 1fr;
+  .login-audience-tabs {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 /* ── Resident signup: split name fields, purok list, residency
@@ -578,12 +635,290 @@
 }
 
 .residency-confirm input[type='checkbox'] {
-  /* 18px keeps the tap target usable on a phone without the checkbox
-     drifting away from the first line of text it belongs to. */
+  /* 18px keeps the box aligned with the first line of text it belongs
+     to.
+
+     ⚠️ This is NOT an 18px target, and must not be "fixed" to 24px.
+     The checkbox is WRAPPED by its `<label>`, so the target WCAG 2.2
+     SC 2.5.8 measures is the whole label row. Measured: 346x59, and
+     clicking the label TEXT 40px from the box toggles it. A probe that
+     measures the `<input>` element reports 18x18 and is measuring the
+     wrong box -- which it did here, and is recorded so the next person
+     does not chase it. */
   width: 18px;
   height: 18px;
   margin-top: 1px;
   flex-shrink: 0;
   accent-color: #15803d;
   cursor: pointer;
+}
+
+/* ================================
+   RESIDENT SIGN-UP: THE FOUR STEPS
+   ================================
+
+   ⚠️ In Login.css because the signup, login and reset-password pages
+   all share this stylesheet -- the same reason the purok and residency
+   rules above live here. Nothing below is a new colour, radius or
+   shadow: every value is a token or a hex literal already used on
+   these pages.
+
+   One `formData` across four steps, so Back never clears anything.
+   The reason it is steps at all is that one long form told somebody
+   entering their SURNAME that their password was too short. */
+
+.signup-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  margin: 18px 0 12px;
+  padding: 0;
+}
+
+.signup-step {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 6px 12px 6px 8px;
+  border-radius: var(--radius-pill);
+  background-color: #f3f4f6;
+  border: 1px solid #e5e7eb;
+}
+
+.signup-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background-color: #ffffff;
+  border: 1px solid #d1d5db;
+  color: #5f6775;
+  font-size: var(--fs-12);
+  font-weight: 700;
+}
+
+.signup-step-label {
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: #5f6775;
+  overflow-wrap: anywhere;
+}
+
+/* Three cues for the current step -- border, weight and
+   `aria-current="step"` -- so none of the states is told apart by
+   colour alone. */
+.signup-step.is-current {
+  background-color: #eff6ff;
+  border-color: #1e40af;
+}
+
+.signup-step.is-current .signup-step-num {
+  background-color: #1e40af;
+  border-color: #1e40af;
+  color: #ffffff;
+}
+
+.signup-step.is-current .signup-step-label {
+  color: #1e3a8a;
+  font-weight: 700;
+}
+
+.signup-step.is-done .signup-step-num {
+  background-color: #126c33;
+  border-color: #126c33;
+  color: #ffffff;
+}
+
+.signup-step.is-done .signup-step-label {
+  color: #126c33;
+}
+
+.signup-step-intro {
+  font-size: var(--fs-13);
+  color: #5f6775;
+  line-height: 1.6;
+  margin: 0 0 18px;
+}
+
+/* ── Password guidance ──────────────────────────────────────────────
+   ⚠️ The required / suggested distinction is carried IN THE WORDS as
+   well as in the tick and the colour -- a checklist where only green
+   means "done" is unreadable to somebody who cannot see the green, and
+   worse here, because two of the three items never have to be met. */
+.signup-password-checks {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.signup-password-checks li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: var(--fs-12);
+  line-height: 1.5;
+  color: #5f6775;
+}
+
+.signup-password-checks li.is-met {
+  color: #126c33;
+}
+
+/* ── Review ─────────────────────────────────────────────────────── */
+.signup-review {
+  margin: 0 0 20px;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.signup-review-row {
+  display: grid;
+  grid-template-columns: minmax(0, 140px) minmax(0, 1fr);
+  gap: 4px 14px;
+  padding: 10px 14px;
+}
+
+.signup-review-row + .signup-review-row {
+  border-top: 1px solid #e5e7eb;
+}
+
+.signup-review-row dt {
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: #5f6775;
+  margin: 0;
+}
+
+.signup-review-row dd {
+  font-size: var(--fs-14);
+  color: #1f2937;
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* ── Actions ────────────────────────────────────────────────────── */
+.signup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.signup-actions .login-submit-btn {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.signup-btn-secondary {
+  background: #5f6775;
+}
+
+.signup-btn-plain {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  color: #1e40af;
+  border: 1px solid #1e40af;
+  text-decoration: none;
+}
+
+.signup-btn-plain:hover {
+  background-color: #eff6ff;
+}
+
+/* ── Step 4 ─────────────────────────────────────────────────────── */
+.signup-done-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-12);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #126c33;
+  margin: 0 0 10px;
+}
+
+.signup-done h2 {
+  font-size: var(--fs-22);
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 18px;
+}
+
+/* ⚠️ `list-style` set explicitly: `@tailwind base` emits Preflight,
+   which carries `ol,ul{list-style:none;margin:0;padding:0}` across the
+   whole application, so a list that wants its numbers has to ask. */
+.signup-next-steps {
+  list-style: decimal;
+  margin: 0 0 20px;
+  padding-left: 22px;
+}
+
+.signup-next-steps li {
+  font-size: var(--fs-14);
+  color: #5f6775;
+  line-height: 1.7;
+}
+
+.signup-next-steps li + li {
+  margin-top: 10px;
+}
+
+.signup-id-status {
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  margin-bottom: 18px;
+}
+
+.signup-id-status p {
+  font-size: var(--fs-13);
+  color: #5f6775;
+  line-height: 1.7;
+  margin: 0;
+}
+
+.signup-done-note {
+  font-size: var(--fs-13);
+  color: #5f6775;
+  line-height: 1.7;
+  margin: 0 0 20px;
+}
+
+@media (max-width: 600px) {
+  .signup-review-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .signup-actions .login-submit-btn {
+    flex: 1 1 100%;
+  }
+}
+
+/* ⚠️ `overflow-wrap: anywhere`, not `word-break: break-all`. These are
+   the elements that hold text a person typed or an address they own --
+   the one place a single unbreakable token sets a layout floor. X2's
+   rule: break only a word that cannot otherwise fit, and only on the
+   handful of elements that hold user text, never globally. */
+.login-left-content p,
+.signup-next-steps li,
+.signup-id-status p,
+.signup-done h2,
+.login-error,
+.login-note {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }

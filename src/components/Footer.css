@@ -41,7 +41,12 @@
    to 28px without moving the text or changing the row's layout -- the
    flex gap already separates them. The phone numbers on the Home page
    are left alone: those ARE inline in a sentence and are exempt. */
+.footer-bottom-links a,
 .footer-bottom-links button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  text-decoration: none;
   background: none;
   border: none;
   color: #bfdbfe;
@@ -52,6 +57,7 @@
   transition: 0.2s ease;
 }
 
+.footer-bottom-links a:hover,
 .footer-bottom-links button:hover {
   color: #ffffff;
   text-decoration: underline;
@@ -170,6 +176,7 @@
   }
 
   .footer-bottom p,
+  .footer-bottom-links a,
   .footer-bottom-links button {
     font-size: var(--fs-12);
   }

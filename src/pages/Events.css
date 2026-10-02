@@ -1,7 +1,9 @@
+/* Same trim as the announcements page: the first screen was spending
+   its top third on padding and a loosely stacked intro. */
 .events-page-section {
   min-height: 100vh;
   background: #f8fafc;
-  padding: 50px 20px;
+  padding: 32px 20px 50px;
 }
 
 .events-page-container {
@@ -17,25 +19,10 @@
   font-weight: 600;
 }
 
-.events-page-header {
-  margin-bottom: 28px;
-}
-
-.events-page-header h1 {
-  font-size: var(--fs-30);
-  color: #1e3a8a;
-  margin-bottom: 8px;
-}
-
-.events-page-header p {
-  color: #64748b;
-  font-size: var(--fs-14);
-}
-
 .events-page-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 24px;
+  gap: 20px;
 }
 
 .event-card-link {
@@ -51,10 +38,13 @@
  * The toggle and the calendar layout. `.view-toggle` and `.mcal-*` come
  * from MonthCalendar.css, which Events.jsx pulls in via the component.
  */
+/* ⚠️ The toggle now lives INSIDE the intro row, so it no longer
+   needs a band of its own. The old `display: flex; justify-content:
+   flex-end; margin-bottom: 16px` made a full-width 36px row for a
+   181px control; `.page-intro-row` positions it at the end of the
+   header line instead, and wraps it below on a phone. */
 .events-view-toggle {
   display: flex;
-  justify-content: flex-end;
-  margin-bottom: 16px;
 }
 
 .events-calendar-layout {
@@ -104,5 +94,55 @@
   .events-view-toggle .view-toggle button {
     flex: 1;
     justify-content: center;
+  }
+}
+
+/* ⚠️ The selected-day panel, PAIRED with the grid rather than
+   floating beside it.
+
+   Measured before, unselected: a 591x46 box next to a 591x532
+   calendar, which reads as a box that failed to fill rather than one
+   waiting for a click. `min-height` ties it to the calendar's own
+   height on a wide screen, and the waiting state says so with a dashed
+   edge and centred text instead of looking unfinished. The WORDS are
+   unchanged.
+
+   Scoped to `.events-calendar-layout` throughout: `.mcal-day-panel` is
+   MonthCalendar's own class and the three dashboard calendars use it
+   too, so an unscoped rule here would restyle surfaces this pass is
+   not about. */
+.events-calendar-layout .mcal-day-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.events-calendar-layout .mcal-day-panel.is-waiting {
+  align-items: center;
+  justify-content: center;
+  border-style: dashed;
+  border-color: #dbeafe;
+  background-color: #f8fafc;
+  min-height: 180px;
+  padding: 24px 18px;
+  text-align: center;
+}
+
+/* The date the reader picked is the panel's heading, so it carries a
+   rule under it rather than sitting flush against the first event. */
+.events-calendar-layout .mcal-day-panel h2 {
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+@media (max-width: 900px) {
+  /* Stacked, the panel is under the grid rather than beside it, so a
+     full-height match would be a tall empty box on a phone. */
+  .events-calendar-layout .mcal-day-panel {
+    min-height: 0;
+  }
+
+  .events-calendar-layout .mcal-day-panel.is-waiting {
+    min-height: 0;
   }
 }

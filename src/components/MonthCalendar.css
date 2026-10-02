@@ -235,6 +235,11 @@
   background-color: #f9fafb;
 }
 
+/* Both tags. The public Events page renders this heading as <h2> --
+   its only other heading is the page <h1>, so an <h4> skips two
+   levels -- while the dashboard calendars keep <h4> under their own
+   tab heading. Matching both keeps one look for one thing. */
+.mcal-day-panel h2,
 .mcal-day-panel h4 {
   font-size: var(--fs-14);
   font-weight: 600;

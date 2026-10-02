@@ -1,0 +1,212 @@
+/* ================================
+   E-SERVICES LANDING PAGE
+   ================================
+
+   Public page, public design system: the same navbar, footer,
+   typography, brand blue and card language as Home / Officials /
+   Health Center. It must not read as a dashboard -- a visitor here has
+   not signed in. */
+
+.eservices-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.eservices-page main {
+  flex: 1;
+}
+
+/* ── Hero ──────────────────────────────────────────────────────────
+   Deliberately SHORTER than the informational pages' photographic
+   heroes. This page exists to get somebody into a service, so the
+   cards start sooner. The brand gradient stands in for the photo: a
+   service index has no one building to picture. */
+.eservices-hero {
+  background: linear-gradient(135deg, #1e3a8a, #1e40af);
+  color: #ffffff;
+  padding: 56px 40px 48px;
+}
+
+.eservices-hero-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.eservices-hero-label {
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: #bfdbfe;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 0 0 8px;
+}
+
+.eservices-hero h1 {
+  font-size: var(--fs-36);
+  font-weight: 700;
+  margin: 0 0 10px;
+}
+
+.eservices-hero-text {
+  font-size: var(--fs-15);
+  color: #dbeafe;
+  margin: 0;
+  max-width: 60ch;
+}
+
+/* ── Body ──────────────────────────────────────────────────────── */
+.eservices-body {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 48px 40px 64px;
+  width: 100%;
+}
+
+.eservices-section + .eservices-section {
+  margin-top: 48px;
+}
+
+.eservices-section-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-bottom: 20px;
+}
+
+.eservices-section-head h2 {
+  font-size: var(--fs-22);
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0;
+}
+
+.eservices-section-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--fs-13);
+  color: #5f6775;
+}
+
+/* ⚠️ minmax(0, 1fr), never a bare 1fr. X2's biggest finding: a bare
+   track cannot shrink below its content's min-content width, and these
+   cards hold service names and sentences. */
+/* ⚠️ auto-FILL, not auto-fit. With auto-fit the empty tracks collapse,
+   so a group holding ONE service stretched that card across the whole
+   1120px row and it read as a banner rather than a card beside its
+   siblings -- measured at 1280 and 1440 before changing this. auto-fill
+   keeps the tracks, so one card is card-sized and the row simply has
+   space to its right. */
+.eservices-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: 20px;
+}
+
+.eservices-card {
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-md);
+  padding: 24px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.eservices-card h3 {
+  font-size: var(--fs-16);
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 8px;
+  overflow-wrap: anywhere;
+}
+
+.eservices-card-text {
+  font-size: var(--fs-14);
+  color: #5f6775;
+  line-height: 1.6;
+  margin: 0 0 20px;
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+
+.eservices-card-btn {
+  display: inline-block;
+  text-align: center;
+  background: linear-gradient(135deg, #1e3a8a, #1e40af);
+  color: #ffffff;
+  padding: 11px 20px;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-14);
+  font-weight: 600;
+  text-decoration: none;
+  transition: var(--transition-fast);
+  align-self: flex-start;
+}
+
+.eservices-card-btn:hover {
+  filter: brightness(1.08);
+}
+
+.eservices-card-alt {
+  font-size: var(--fs-13);
+  color: #5f6775;
+  margin: 12px 0 0;
+}
+
+/* ⚠️ Target size again, measured at 173x19 -- under SC 2.5.8's 24px,
+   and introduced earlier on this same branch. `inline-flex` with
+   vertical padding only, so the sentence around it does not move. */
+.eservices-card-alt a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 0;
+  color: #1e40af;
+  font-weight: 600;
+}
+
+.eservices-help {
+  margin-top: 48px;
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-md);
+  padding: 24px;
+}
+
+.eservices-help h2 {
+  font-size: var(--fs-16);
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 8px;
+}
+
+.eservices-help p {
+  font-size: var(--fs-14);
+  color: #5f6775;
+  line-height: 1.6;
+  margin: 0;
+  max-width: 70ch;
+}
+
+@media (max-width: 768px) {
+  .eservices-hero {
+    padding: 40px 20px 36px;
+  }
+
+  .eservices-hero h1 {
+    font-size: var(--fs-28);
+  }
+
+  .eservices-body {
+    padding: 32px 20px 48px;
+  }
+
+  .eservices-section + .eservices-section {
+    margin-top: 36px;
+  }
+}
