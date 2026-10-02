@@ -65,7 +65,7 @@ banned below: it silences the one check this project has.
 
 ### Tests
 
-Fifteen suites, 340 tests:
+Twenty-five suites, 548 tests:
 
 | File | What it covers |
 |---|---|
@@ -84,6 +84,17 @@ Fifteen suites, 340 tests:
 | `src/utils/eventCalendar.test.js` | 24 tests over event placement and the upcoming split. The load-bearing one: the homepage filters **then** limits |
 | `src/utils/documentFilter.test.js` | 16 tests over `filterDocumentRequests` — the status narrowing, the five searched fields, and that an unknown status yields nothing rather than everything |
 | `src/utils/reservationWindow.test.js` | 46 tests over the 5–10 PM window, the per-slot and per-kind durations, the noon-spanning exception and the office-hours exception — deliberately mirroring the SQL cases in migration 020's header, so client and database are asserted to agree rather than each checked alone. The load-bearing one is that an exception is read from `exception_reason` and never from the hour |
+
+| `src/utils/reservationSteps.test.js` | 18 tests over which step of the booking flow owns which field. The load-bearing pair: the two field sets are **disjoint**, and together they cover every value `create_court_reservation` requires — so nobody choosing a date can be told their NAME is missing, and no required field can reach the RPC blank |
+| `src/utils/reservationTracking.test.js` | 19 tests over the public tracking page. The load-bearing one asserts **no message it can produce mentions "not found", "no such" or "invalid reference"** — an answer distinguishing a wrong reference from a wrong number is an oracle for guessing references. Plus a source-reading guard that the module defines no status word of its own |
+| `src/utils/returnTo.test.js` | 39 tests over the `?next=` allowlist, **26 of them attack strings** that have each defeated a redirect sanitiser written by inspection — `//evil.example`, `/\evil.example`, `https:/evil.example`, `javascript:`, `data:`, a `user:pass@` trick, a double-encoded payload. All fall back to `/` |
+| `src/utils/signupSteps.test.js` | 23 tests over the sign-up rules. The load-bearing ones: step 1 reports nothing about the password, the two advisory password checks **stay advisory** (a long passphrase with no digit is accepted), and `MIN_PASSWORD_LENGTH` can never drop below Supabase's own minimum |
+| `src/utils/officialPhotos.test.js` | 20 tests over the portrait map, `portraitWillBeLost` and `PersonAvatar`. `hasBundledPhoto` uses `hasOwnProperty`, asserted — a bare lookup reports a portrait for an official named `toString` |
+| `src/utils/clinicSchedule.test.js` | 21 tests over the clinic week, built from the **live rows including Friday's two**. The load-bearing one: Friday is ONE entry carrying both sessions, and the two are **not merged** |
+| `src/utils/medicineFilter.test.js` | 20 tests over the public medicine list — the three narrowings, an unrecognised category or status matching **nothing rather than everything**, and that the counts always sum to the total |
+| `src/utils/officialAvailability.test.js` | 24 tests over per-official consultation hours. The load-bearing one **reads `026_official_availability.sql`** and asserts the four statuses the form offers are exactly the four the CHECK accepts — the same thing `reservationWindow.test.js` does for migration 020 |
+| `src/components/EServicesMenu.test.js` | 15 tests over the E-Services dropdown and the catalogue: the disclosure pattern, Escape and focus restore, that it does **not** use `role="menu"`, and that every service states its access requirement in words |
+| `src/utils/residentTabs.test.js` | 7 tests over `?tab=` resolution — a hint, never authorization |
 
 Schema and policy changes are still verified by impersonating each role
 in SQL, with the results recorded in the migration headers — not by
@@ -140,7 +151,7 @@ in `react-scripts` → `webpack-dev-server`, which never ships. `--force`
 
 ```
 src/
-  App.js              All routing: 11 public routes, 3 role-protected
+  App.js              All routing: 14 public routes, 3 role-protected
                       (/official, /nurse, /resident) wrapped in
                       ProtectedRoute, plus path="*" — see the note below.
   index.js            CRA entry point.
@@ -617,9 +628,9 @@ such row.
 
 ## Database notes
 
-**23 migrations**, `001` through `023`, all applied.
+**26 migrations**, `001` through `026`, all applied.
 
-**19 tables, RLS enabled on every one.**
+**20 tables, RLS enabled on every one.**
 
 | Table | Holds |
 |---|---|
@@ -640,6 +651,7 @@ such row.
 | `medicine_stock` | Medicine availability as a status, not a count |
 | `barangay_terms` | One row per barangay term. **Empty** — schema only, migration 019A |
 | `barangay_term_members` | Who served in a term. **Empty** — schema only, migration 019A |
+| `official_availability` | Weekly consultation hours per elected official. Migration 026. **Empty** — only an official can enter their own |
 | `notifications` | In-app notifications. **Client-read-only** — written only by triggers; see *Notifications* |
 | `notification_reads` | Who has seen which notification. Insert and select only |
 
@@ -2611,6 +2623,332 @@ reproductions X2 and X3 used, rendered against both bundles.
 
 ---
 
+## Public E-Services (X5)
+
+A public-site workflow phase, 2026-10-02. **Not a visual-theme
+rewrite:** the white navbar, the blue institutional palette, the
+photographic heroes with their dark-blue overlays, the typography, the
+card language and every accepted X2/X3/X4 decision are unchanged. What
+changed is the information architecture and five workflows.
+
+The navigation is now **Home / Officials / Health Center / E-Services /
+Login**, and *Court Reservation* is no longer a top-level item.
+
+### One catalogue, four surfaces
+
+`src/constants/eServices.js` is the single list of services. The
+desktop dropdown, the mobile drawer, the `/e-services` landing page and
+the Home page's services section all render from it, and
+`returnTo.js`'s allowlist is derived from it too — so a service added
+once appears in all four and becomes returnable, and a service removed
+stops being linked and stops being returnable at the same moment.
+
+⚠️ **Do not add a service before its route exists.** `path="*"` renders
+`Home`, so a premature entry does not 404; it silently takes somebody
+to the homepage and looks like the service is broken.
+
+⚠️ **`access` is a promise to the reader, never a gate.** It decides the
+words shown beside a service, so a resident learns an account is needed
+*before* clicking. `ProtectedRoute` and RLS decide what is actually
+reachable, exactly as before.
+
+### The booking flow is four steps, over one `formData`
+
+`Reservation.jsx` asked for everything at once, so the first thing it
+said to somebody who had typed their name was that their password —
+sorry, their *date* — was missing. Worse, it carried **two** date
+controls writing the same `formData.preferred_date`: a calendar and an
+`<input type="date">`. The input is gone; the calendar is authoritative
+because it is the only one of the two that knows what is already booked.
+
+| Step | Asks for |
+|---|---|
+| 1 Date & Time | calendar, booking window, exception panel, duration, slots |
+| 2 Your Details | who the booking is for, and what for |
+| 3 Review | a `<dl>` of everything; nothing is written until confirmed |
+| 4 Done | the reference number, what was booked, what happens next |
+
+All four render from **one** `formData`, so Back never clears anything
+— the fields are hidden, not unmounted. `src/utils/reservationSteps.js`
+owns which step asks for what, and its tests assert the two field sets
+are **disjoint** and together cover every value
+`create_court_reservation` requires.
+
+⚠️ **The window, the duration caps, the overlap check and the
+office-hours rule are NOT restated there.** Those are
+`reservationWindow.js` and the database triggers (020, 021). A second
+home for a rule is how two copies drift.
+
+The donation message moved out of the form into a *Court Information*
+section below the flow. It sat between Additional Notes and the submit
+button, where it read as a payment step — which for a facility that is
+free, and whose table has had no money columns since 006 dropped all
+ten, is the one thing it must not look like.
+
+### A guest can check on a booking — migrations 024 and 025
+
+A guest may book without an account (008) and now gets a reference:
+**`BCR-2026-AB12CD`**. Random, not sequential: a sequential public
+number tells anybody holding one that the neighbouring numbers exist,
+which turns the tracking page into a directory of other people's
+bookings. Crockford base32 with I, L, O and U removed; lookup maps the
+look-alikes back, so an O read for a zero still finds the booking.
+
+⚠️ **The reference is an identifier, never a credential.**
+`track_court_reservation(p_reference, p_contact)` requires the
+reference **and** the contact number, returns at most one row through a
+fixed narrow column list, and masks the name and the number **in SQL**
+— a client-side mask ships the real value to the browser and hides it
+with CSS. `reservations` still has **no anonymous SELECT policy**.
+
+⚠️ **A wrong reference and a wrong contact number give the same empty
+result.** An answer that distinguishes them confirms which guesses are
+live. The page keeps that property, and
+`reservationTracking.test.js` asserts no message it can produce says
+"not found", "no such" or "invalid reference".
+
+⚠️ **Creation is an RPC, not a table insert, and the reason is
+measured.** A guest has no SELECT policy on `reservations`, and
+PostgREST's `.insert().select()` is `INSERT ... RETURNING` — so asking
+for the reference back over the table API is refused `42501` even
+though the insert itself is allowed. The fix is **not** to open up
+anonymous SELECT. `create_court_reservation` is *stricter* than the
+policy it replaces: `status`, `reviewed_by` and `resident_id` are not
+parameters at all.
+
+### `?next=` is an allowlist, not a sanitiser
+
+`src/utils/returnTo.js` does not inspect the value. It decodes it
+**once** and compares it against a fixed list of paths this application
+serves. Anything not exactly on the list becomes the fallback, and
+cannot be made to pass by any encoding, because nothing is parsed.
+
+⚠️ **Decoding in a loop is how a double-encoded payload gets past a
+check that ran before the last decode.** Exactly one decode.
+
+⚠️ **It is not authorization either**, and the dashboards are absent
+from the list anyway — asserted by a test, because no public page links
+to one. `next` is honoured for a **resident** only: a staff member
+arriving from an E-Services link would otherwise be bounced by
+`ProtectedRoute` and read it as a broken login.
+
+### The login role picker is gone, and nothing lost a control
+
+It was Official / Nurse / Resident in three accent colours, defaulting
+to **Official** on a public barangay website. It compared the chosen
+button against `profiles.role` and, on a mismatch, signed the person
+back out with *"Invalid role selected."* — **after**
+`signInWithPassword` had already succeeded. So it never kept anybody
+out of anything (RLS did and does), and what it produced was a
+correctly typed password reported as a role error.
+
+Two tabs now, **Resident first and default**, with `role="tab"`,
+`aria-selected` and a `tabpanel`. They choose the heading, the help
+text and the sign-up prompt — nothing else. Where somebody lands is
+decided entirely by `profiles.role`.
+
+### Sign-up is four steps, and the password guidance guides
+
+Minimum **8**, where Supabase's own default is 6. ⚠️ The client being
+*stricter* than the server is safe in that direction — an account this
+form refuses is simply not created — and unsafe in the other, where a
+form promising less than the server enforces produces an error nobody
+can act on. A test pins it at ≥ 6.
+
+⚠️ **One check blocks (length); two are suggestions and must stay
+suggestions.** A rule that rejects a long passphrase for having no
+digit makes passwords worse, not better. Which is which is said in
+words as well as by the tick. The common-password list is a courtesy,
+**not** leaked-password protection — that is Pro-only and cannot be
+enabled here.
+
+Step 4 replaced a `toast.success` fired while the page was navigating
+to `/login`, where the toast then sat over a form that could not yet be
+used. It names the address the confirmation went to, says the message
+often lands in spam, and says plainly that signing in and booking the
+court work straight away while requesting a document does not.
+
+### ⚠️ Two defects that CLIP rather than scroll
+
+X2 and X3 both looked for a document that scrolls sideways. Neither of
+these does: the overflow is cut off by an `overflow: hidden` ancestor,
+so `document.scrollWidth` equals the viewport width and **every
+overflow probe reports a clean page**. Both were found with a
+screenshot and then measured with a clipping detector — each element's
+right edge against its nearest *clipping* ancestor, not against the
+document.
+
+- **`.login-box` was `grid-template-columns: 1fr 1.5fr`**, and `1fr` on
+  a phone. That is X2's own biggest finding still sitting in the file.
+  The panels stayed 438px wide at a 375px viewport, so 63px of every
+  heading and paragraph on the login, sign-up and reset-password pages
+  was simply **gone** on a phone.
+- **`.login-input-wrapper input` had `flex: 1` and no `min-width: 0`.**
+  A flex item's default `min-width: auto` is its min-content width, and
+  for an `<input>` that is the default `size="20"`. Measured at 375px:
+  the input cut by 58px and the **show/hide-password button by 102px**
+  — entirely off the end of its own field, on the login page.
+
+Both are the same family as the bare `1fr`: a default `auto` minimum
+nothing can shrink past. **When a container has `overflow: hidden`, the
+overflow detector is blind to it — screenshot, or measure against the
+clipping ancestor.**
+
+### The portrait is lost by the RENAME, not by archiving
+
+Reported as "archiving an official loses their photo". It does not.
+The audit trail:
+
+```
+2026-10-01 04:58  edited    Jeffrey Cataylo Lastimoso — Kagawad
+2026-10-01 05:02  archived  ("for testing purposes")
+2026-10-01 05:04  restored
+2026-10-01 05:10  archived  ("gi kapoy na")
+2026-10-01 13:29  restored
+```
+
+The portrait was gone at **04:58, by the EDIT**, four minutes before
+the first archive. `display_order` 10 held `Jeffrey Feria Duran`, whose
+photo is in `officialPhotos`; the rename left no key matching, and
+`PersonAvatar` fell back to an icon with no word anywhere. Verified
+that archiving is not the cause: neither handler sends `photo_url`,
+neither makes a storage call, and `photo_url` is **NULL on all eleven
+rows** — every portrait comes from the bundled map.
+
+`portraitWillBeLost()` now warns on the rename (it **warns**, it does
+not block), and the fallback is **named**: "No photo on file for
+&lt;name&gt;".
+
+⚠️ **`J.Duran.jpg` is NOT re-keyed to the new name.** "Duran" to
+"Lastimoso" is not a typo correction, and attaching one person's face
+to another person's name is the error this file already records for the
+health centre nurse. Only the barangay can say whether that row is the
+same person.
+
+⚠️ **And that rename produced a LIVE instance of the zero-match
+fragility.** `Jeffrey Feria Duran` holds an account with
+`role = 'official'` whose `profiles.full_name` matches no active
+directory row — so that official has **silently lost their position
+permissions**, right now. Measured while verifying migration 026.
+
+### Friday was listed twice
+
+`nurse_availability` has no uniqueness on `day_of_week`, and the live
+table holds **two Friday rows** (08:00–12:00 and 13:00–17:00, both
+stored 24-hour while every other row is a display string). The Clinic
+Hours list printed Friday, then printed Friday again underneath it.
+
+`src/utils/clinicSchedule.js` builds **one entry per weekday** carrying
+every session recorded for it. ⚠️ **The two rows are NOT merged.**
+08:00–12:00 plus 13:00–17:00 looks exactly like the standard day with a
+lunch break, and writing that down as one 8-to-5 row would be inferring
+what the barangay meant and then showing the inference as fact.
+
+⚠️ **A break is shown only when it falls inside the session it was
+stored against.** Friday's second row carries a 12:00 PM–1:00 PM break
+against a session that *starts* at 1:00 PM; printing it would tell a
+resident the clinic shuts an hour before it opens.
+
+⚠️ **And `fetchWeekSchedule` was not selecting `break_start` /
+`break_end` at all**, so `isOnScheduledBreak` got `undefined`, returned
+null, and the automatic lunch-break detection **had never once fired**
+on the public page.
+
+### Consultation hours for every official — migration 026
+
+`kapitan_availability` could not carry this: it has **no column naming
+an official**. Adding one would leave existing rows with a NULL meaning
+"the Kapitan, implicitly" beside new rows where NULL means nothing.
+⚠️ **`kapitan_availability` and `kapitan_status` are untouched.**
+
+`official_availability` is keyed to `barangay_officials.id`, public to
+read **for active officials only**, and writable by that official alone.
+
+⚠️ **Ownership resolves through the `full_name` string join and FAILS
+CLOSED.** A mismatch means the official cannot publish their own hours
+— never that they can edit somebody else's. Contrast the self-archive
+guard (018), which compares the same strings and fails *open*; that is
+accepted there only because archiving yourself reduces your own
+privileges.
+
+⚠️ **`official_id` is CHECKED, not stamped.** 015's pattern is to
+overwrite what the client sent, which is right for an actor. It is
+wrong for the column deciding *whose* schedule a row is: stamping would
+silently reassign a mistaken insert rather than refusing it.
+`updated_by` and `updated_at` **are** stamped.
+
+⚠️ **The UPDATE policy needs its `WITH CHECK` as much as its `USING`.**
+Without it an official could update their own row and set `official_id`
+to somebody else's — passing on the way in, landing on the other
+official's schedule on the way out. Verified refused.
+
+⚠️ **Archiving hides the hours from officials too**, deliberately
+unlike 018. A directory record is history worth keeping visible; a
+consultation schedule is operational.
+
+⚠️ **Nothing is seeded.** The table holds zero rows. Inventing
+consultation hours would put times on a public page nobody at the
+barangay agreed to.
+
+### Home lost its history, and gained its services
+
+The home page opened with three paragraphs of history, an embedded map,
+a facts table and a school card — above the announcements, the events
+and the waste schedule. Somebody arriving to check when their rubbish
+is collected read several screens of history first.
+
+All of it moved to **`/about`** — the same bytes, the same text from
+`constants/about.js`, nothing restyled and nothing rewritten. Home now
+carries an E-Services section where the history was, and a one-line
+doorway to `/about`. ⚠️ **Not a second copy of the history**: two copies
+of the barangay's own text is two places for it to drift.
+
+### ⚠️ The Supabase connector gates more than migration 024 recorded
+
+024's header says `DROP TRIGGER` cannot be sent through the connector —
+it is treated as a destructive statement and the call times out waiting
+for a confirmation that never arrives. Measured again here, it is
+broader: **plain `DELETE`, `DROP FUNCTION` and `REVOKE` behave the same
+way.** In the SQL Editor they are all fine.
+
+Consequence recorded in 026's header: one dead helper function,
+`tmp_cleanup_probe_row`, could not be dropped from here. It has been
+neutralised (SECURITY INVOKER, a body that deletes nothing and raises)
+and needs one line in the SQL Editor:
+`DROP FUNCTION public.tmp_cleanup_probe_row();`
+
+### What was measured, and what was not
+
+Every public route — `/`, `/about`, `/e-services`,
+`/track-reservation`, `/officials`, `/health-center`, `/reservation`,
+`/announcements`, `/events`, `/login`, `/signup` — driven in Chromium
+against the **shipped production bundle**:
+
+| Check | Result |
+|---|---|
+| Document-level horizontal overflow, 8 widths (320–1440) | **0 failures across 88 measurements** |
+| Clipping against the nearest `overflow: hidden` ancestor, 6 widths | **0 across 66** |
+| Controls under WCAG 2.2 SC 2.5.8's 24px | **0 across 66** |
+| Every `<label>` associated with a control | **true on every route** |
+| Exactly one `<h1>` per page | **true on every route** |
+
+The four-step booking flow, the four-step sign-up and the tracking page
+were **driven**, not just rendered: every step reached, Back verified
+to keep every value, and the two `?next=` and reference-lookup
+behaviours exercised.
+
+⚠️ **The dashboards are still behind `ProtectedRoute` and this
+environment still has no test account, so no authenticated page was
+loaded in a browser.** The Official Dashboard's new consultation-hours
+editor is covered by the migration's own role-impersonation
+verification and by unit tests over its pure module — **not** by a live
+page. Step 4 of the booking flow and the tracking page's result were
+reached with the **real** components and the **real** CSS bundle and
+only the **network** stubbed, because Supabase is not reachable from
+this container's browser.
+
+---
+
 ## Health centre
 
 **Medicine stock is a status, not a quantity** — Available / Low stock /
@@ -2784,6 +3122,14 @@ derives her initials from. It is no longer displayed as a label.
   beyond 8 hours (the CHECK stays `1..8`), and noon is a coverable hour
   but not a startable one — all noted where they belong.
 - **`profile_id` foreign key** replacing the `full_name` matching above.
+  ⚠️ **There is a LIVE instance of the zero-match half right now.**
+  `Jeffrey Feria Duran` holds an account with `role = 'official'` whose
+  `profiles.full_name` matches no active `barangay_officials` row,
+  because display_order 10 was renamed to `Jeffrey Cataylo Lastimoso`
+  on 2026-10-01. That official has silently lost their position
+  permissions and cannot publish consultation hours. Fixing it is a
+  **data** decision the barangay has to make — whether that row is the
+  same person renamed or a different Kagawad — not a code change.
 - **019B — the Previous Term Officials roster and its UI.** Migration 019A
   created the tables; both are **empty**, and there is **no frontend**. 019B
   seeds the confirmed roster from SQL and adds the read-only Official Portal
@@ -2798,9 +3144,9 @@ derives her initials from. It is no longer displayed as a label.
 - **Source maps ship to production** (~7 MB), so the original JSX is
   publicly reconstructable. `GENERATE_SOURCEMAP=false` in Vercel fixes it.
 - **`public/logo.png` is 984 KB and referenced by nothing.**
-- **Thin automated test coverage.** 340 tests in fifteen suites: one
+- **Thin automated test coverage.** 548 tests in twenty-five suites: one
   smoke test over `<App />`, which fails without `.env` because
-  `supabaseClient.js` throws at import time, and 339 tests over the
+  `supabaseClient.js` throws at import time, and 547 tests over the
   resident workflow rules, the display labels, the booking window, the
   month grid and its three feature layers, the document-request filter,
   the ⋮ menu's keyboard and authorization behaviour, the modal
@@ -2825,7 +3171,23 @@ derives her initials from. It is no longer displayed as a label.
   than a fix.
 - **An InfinityFree deployment** may still be serving an old broken build.
 - **No 404 page.** `path="*"` in `App.js` renders `Home`, so a mistyped
-  URL looks like the homepage instead of reporting an error.
+  URL looks like the homepage instead of reporting an error. ⚠️ This is
+  also why `constants/eServices.js` must never list a service before
+  its route exists: a premature entry does not 404, it silently lands
+  on the homepage and looks like the service is broken.
+- **`nurse_availability` has no uniqueness on `day_of_week`**, which is
+  how the live table ended up with two Friday rows. `clinicSchedule.js`
+  now renders them as one day with two sessions, but nothing stops a
+  third. A unique index cannot simply be added — it would fail on the
+  existing data, and a clinic day may legitimately be split, which is
+  exactly why `official_availability` has that constraint and this
+  table does not.
+- **Friday's two clinic rows are stored 24-hour** (`08:00`) while every
+  other row is a display string (`8:00 AM`). `clinicHours.toMinutes`
+  accepts both, so nothing breaks — which is why nobody noticed.
+- **One dead database function**, `tmp_cleanup_probe_row`, left by
+  migration 026's verification because this connector gates
+  `DROP FUNCTION`. Neutralised; needs one line in the SQL Editor.
 - **No lint script and no typecheck script** — see *Commands* and
   *Tests* above.
 

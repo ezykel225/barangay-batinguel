@@ -8,6 +8,7 @@ import Home from './pages/Home'
 import Reservation from './pages/Reservation'
 import EServices from './pages/EServices'
 import TrackReservation from './pages/TrackReservation'
+import About from './pages/About'
 import HealthCenter from './pages/HealthCenter'
 import Officials from './pages/Officials'
 import Login from './pages/Login'
@@ -44,6 +45,7 @@ function App() {
           <Route path="/e-services" element={<EServices />} />
           <Route path="/reservation" element={<Reservation />} />
           <Route path="/track-reservation" element={<TrackReservation />} />
+          <Route path="/about" element={<About />} />
           <Route path="/health-center" element={<HealthCenter />} />
           <Route path="/officials" element={<Officials />} />
           <Route path="/login" element={<Login />} />
