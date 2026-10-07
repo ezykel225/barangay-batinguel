@@ -7,32 +7,46 @@ import './ActionMenu.css'
 //
 // ─── WHERE THIS MAY AND MAY NOT BE USED ───────────────────────────────
 //
-// Six places: the nurse's medicine list, and five Official Portal
+// Eight places: the nurse's medicine list, and seven Official Portal
 // tables -- Announcements, Events, Waste Management, Voter Reference
-// List and Officials Directory. The medicine row carried five controls
-// -- three availability buttons plus Edit and Remove -- and the three
-// availability buttons are the whole point of that screen, so the two
-// that are not stay visible and the two that are occasional move in
-// here. The five tables carry only Edit/Delete-shaped management
-// actions, which is the same shape.
+// List, Officials Directory, and since the PR #24 polish pass the two
+// queues, Document Requests and Reservations. The medicine row carried
+// five controls -- three availability buttons plus Edit and Remove --
+// and the three availability buttons are the whole point of that
+// screen, so the two that are occasional move in here.
 //
-// ⚠️ It is NOT a general replacement for row buttons. Two things used
-// to decide where it could go; ONE IS NOW SOLVED and one still stands:
+// ⚠️ It is still NOT a general replacement for row buttons. Two things
+// used to decide where it could go; BOTH HAVE NOW MOVED:
 //
-//   1. **A primary decision must never be hidden behind it.** Verify,
-//      Reject and Not a Resident on the Residents tab are the reason an
-//      official opened that tab; an extra click before each is a cost
-//      with no benefit. Same for Approve/Decline on reservations and
-//      document requests.
+//   1. **A primary decision should not be hidden behind it** -- which
+//      is why the Residents tab still has none. Verify, Reject and Not
+//      a Resident are the reason an official opened that tab, they are
+//      three distinct outcomes rather than an Edit/Delete pair, and an
+//      extra click before each is a cost with no benefit. Archived
+//      Officials (one Restore) and the Activity Log (no actions at all)
+//      are left alone for the plainer reason that there is nothing to
+//      collect.
 //
-//      ⚠️ THIS IS WHY DOCUMENT REQUESTS HAS NO ⋮ MENU, although it was
-//      asked for by name. Its action cell holds nothing but the
-//      Secretary's primary decisions: Approve and Decline at
-//      `pending`, and a single `Mark Ready` or `Mark Claimed`
-//      otherwise. A one-button cell behind a ⋮ is strictly worse than
-//      the button. Same for the Reservations queue, the overview's
-//      pending list, the Residents tab, Archived Officials (one
-//      Restore) and the Activity Log (no actions at all).
+//      ⚠️ THIS HEADER USED TO NAME DOCUMENT REQUESTS AND THE
+//      RESERVATIONS QUEUE AS THE WORKED EXAMPLES OF THAT RULE, and
+//      they are now converted. That is the repo owner's decision after
+//      reviewing the live authenticated tables, which this environment
+//      has never been able to load -- the two Action columns were wide
+//      bands of buttons that set the row height for every other column,
+//      and X6's `Generate Document` had just made the Document Requests
+//      cell a three-control cell. The rule is therefore narrowed rather
+//      than abandoned: it still holds where the actions are several
+//      DIFFERENT outcomes with no shared shape (the Residents tab), and
+//      it no longer forbids collecting a queue row's two or three
+//      stage-advancing actions.
+//
+//      ⚠️ What did NOT change with it: the menu never widens what a
+//      role can reach. `src/utils/rowActions.js` returns an EMPTY list
+//      for a non-Secretary or a non-Treasurer, so the dashboards render
+//      their existing "Secretary only" / "Treasurer only" note instead
+//      of a menu, and no action a role may not perform is ever present
+//      and disabled.
+//
 //   2. **`.table-wrapper` clips an absolutely-positioned menu.** It has
 //      `overflow-x: auto` and `overflow-y: auto`, and an overflow
 //      container clips absolute descendants. Measured: a menu in a
@@ -40,8 +54,7 @@ import './ActionMenu.css'
 //      `elementFromPoint` at its centre returned `.dashboard-main` --
 //      not painted at all.
 //
-//      ⚠️ THIS IS NOW SOLVED, by `portal`, rather than being a reason
-//      not to use the menu in a table. Pass `portal` and the popup is
+//      ⚠️ THIS IS SOLVED, by `portal`. Pass `portal` and the popup is
 //      rendered into <body> with `position: fixed`, measured from the
 //      trigger. The medicine list is a card list with no clipping
 //      ancestor, so it keeps the simpler absolute anchoring and its
@@ -88,7 +101,21 @@ import './ActionMenu.css'
 // (the nurse's medicine list passes one directly) and wins over the
 // derived one when both are given.
 //
-// `items` is an array of { key, label, icon, onSelect, danger }.
+// ⚠️ ONE ITEM MAY CARRY ITS OWN `subject`, and the reason is a sentence
+// that does not parse. Document Requests passes the menu-level subject
+// "document request from Ezequel Bautista", which reads correctly after
+// Approve, Decline, Mark Ready and Mark Claimed -- and as "Generate
+// Document document request from Ezequel Bautista" after the fifth.
+// So that item passes `subject: 'for Ezequel Bautista'` and is
+// announced "Generate Document for Ezequel Bautista".
+//
+// It is still composed the same way, `<item.label> <subject>`, so the
+// visible word remains the FIRST word of the accessible name and
+// WCAG 2.5.3 Label in Name still holds. An item-level subject can
+// change what FOLLOWS the label; there is deliberately no way to
+// replace the label itself.
+//
+// `items` is an array of { key, label, icon, onSelect, danger, subject }.
 const ActionMenu = ({ items = [], label, subject, portal = false }) => {
   const [open, setOpen] = useState(false)
   // Where to draw the popup when `portal` is set. Measured from the
@@ -209,8 +236,13 @@ const ActionMenu = ({ items = [], label, subject, portal = false }) => {
 
   const triggerLabel = label
     || (subject ? `More actions for ${subject}` : 'More actions')
-  // Extends the visible word, never replaces it -- see the header.
-  const itemLabel = (item) => (subject ? `${item.label} ${subject}` : undefined)
+  // Extends the visible word, never replaces it -- see the header. An
+  // item may override only the SUBJECT, never the label, so the first
+  // word of the accessible name is always the word on screen.
+  const itemLabel = (item) => {
+    const itemSubject = item.subject || subject
+    return itemSubject ? `${item.label} ${itemSubject}` : undefined
+  }
 
   const popup = (
     <div

@@ -362,3 +362,88 @@ describe('subject-derived accessible names', () => {
     expect(screen.getByRole('button', { name: 'More actions for Paracetamol' })).toBeInTheDocument()
   })
 })
+
+// ─── One item may carry its own subject (PR #24) ──────────────────────
+//
+// The Document Requests menu passes "document request from <name>",
+// which reads correctly after Approve, Decline, Mark Ready and Mark
+// Claimed -- and as "Generate Document document request from <name>"
+// after the fifth. So that one item passes its own subject.
+//
+// ⚠️ These tests pin the LIMIT as much as the feature: an item may
+// change what follows the label, never the label itself, so WCAG 2.5.3
+// Label in Name still holds for every item in the menu.
+describe('a per-item subject', () => {
+  const QUEUE_ITEMS = [
+    { key: 'approve', label: 'Approve', onSelect: () => {} },
+    { key: 'ready', label: 'Mark Ready', onSelect: () => {} },
+    { key: 'generate', label: 'Generate Document', subject: 'for Ezequel Bautista', onSelect: () => {} },
+  ]
+
+  const openQueue = () => {
+    render(
+      <ActionMenu
+        portal
+        subject="document request from Ezequel Bautista"
+        items={QUEUE_ITEMS}
+      />
+    )
+    fireEvent.click(screen.getByRole('button', { name: /More actions/ }))
+  }
+
+  it('uses the item subject for that item', () => {
+    openQueue()
+    expect(screen.getByRole('menuitem', { name: 'Generate Document for Ezequel Bautista' }))
+      .toBeInTheDocument()
+  })
+
+  it('leaves every other item on the menu-level subject', () => {
+    openQueue()
+    expect(screen.getByRole('menuitem', { name: 'Approve document request from Ezequel Bautista' }))
+      .toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Mark Ready document request from Ezequel Bautista' }))
+      .toBeInTheDocument()
+  })
+
+  it('does not change the trigger, which keeps the menu-level subject', () => {
+    openQueue()
+    expect(
+      screen.getByRole('button', { name: 'More actions for document request from Ezequel Bautista' })
+    ).toBeInTheDocument()
+  })
+
+  it('still shows only the short words on screen', () => {
+    openQueue()
+    expect(screen.getByRole('menuitem', { name: /^Generate Document for/ }))
+      .toHaveTextContent(/^Generate Document$/)
+    expect(screen.getByRole('menuitem', { name: /^Approve document/ }))
+      .toHaveTextContent(/^Approve$/)
+  })
+
+  // ⚠️ The override cannot escape the prefix rule, because the
+  // component composes the name rather than taking it whole.
+  it('keeps the visible label at the start of EVERY accessible name', () => {
+    openQueue()
+    screen.getAllByRole('menuitem').forEach((item) => {
+      const visible = item.textContent.trim()
+      expect(item.getAttribute('aria-label')).toMatch(new RegExp(`^${visible}\\b`))
+    })
+  })
+
+  // An item subject with no menu-level subject is still honoured, so a
+  // caller is not forced to supply one it has no use for.
+  it('works with no menu-level subject, and names only that item', () => {
+    render(
+      <ActionMenu
+        items={[
+          { key: 'a', label: 'Approve', onSelect: () => {} },
+          { key: 'g', label: 'Generate Document', subject: 'for Maria Cruz', onSelect: () => {} },
+        ]}
+      />
+    )
+    fireEvent.click(screen.getByRole('button', { name: /More actions/ }))
+    expect(screen.getByRole('menuitem', { name: 'Generate Document for Maria Cruz' }))
+      .toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Approve' })).not.toHaveAttribute('aria-label')
+  })
+})

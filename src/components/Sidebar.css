@@ -1546,3 +1546,61 @@
     color: #5f6775;
   }
 }
+
+/* ── Generate Document: no longer a button (PR #24) ─────────────────
+ *
+ * X6 appended a `.btn-generate` rule here for the Secretary's Generate
+ * Document button in the Document Requests action cell. The PR #24
+ * polish pass moved that action into the shared ⋮ `ActionMenu`, so the
+ * class reaches no DOM node any more and the rule was removed rather
+ * than left behind -- X4's removal-only discipline, and the reason that
+ * pass could establish "dead" at all is that every class in this
+ * project arrives through a `className` prop.
+ *
+ * The item is now styled by `ActionMenu.css` like every other menu
+ * item, which is the point: one appearance for row actions instead of a
+ * per-action colour.
+ */
+
+/* ── A card with an ACTION heading and nothing under it ──────────────
+ *
+ * Below 769px the protected table-to-card block turns each row into a
+ * card and prints every cell's `data-label` through `td::before`. The
+ * Action cell is always in the markup, because the desktop table needs
+ * the column -- so a Document Request at `claimed` or `declined`, and a
+ * reservation that is no longer `pending`, showed the word ACTION with
+ * empty space beneath it. That reads as a control that failed to
+ * render, which is the same fault `.mcal-day-panel`'s 46px box was.
+ *
+ * `row-no-actions` is put on the ROW by the two queues, and only when
+ * the cell renders NOTHING -- `actionCellIsEmpty` in
+ * `src/utils/rowActions.js`, which is unit-tested. An official who
+ * lacks the position still sees "Secretary only" / "Treasurer only",
+ * and that note is exactly what the heading belongs to, so those rows
+ * are not marked.
+ *
+ * ⚠️ Two declarations, because hiding the cell alone is not enough.
+ * `.dashboard-table td:last-child` in the protected block is what
+ * removes the final divider; with the last cell hidden, the cell BEFORE
+ * it becomes the visually last one and keeps its `border-bottom`,
+ * leaving a hairline across the bottom of the card with nothing under
+ * it. `:nth-last-child(2)` takes it off. Measured, not assumed.
+ *
+ * ⚠️ Appended AFTER the protected block, which is not edited, and
+ * scoped to `@media (max-width: 768px)` so the desktop column, its
+ * width and every cell in it are untouched. Both selectors are (0,2,2),
+ * one step above the protected `.dashboard-table td:last-child`
+ * (0,2,1) -- raised deliberately, because an equal-specificity rule
+ * would still have to beat `td:last-child` on source order alone while
+ * saying nothing about which cell it means. X2's cascade lesson applied
+ * on purpose rather than discovered.
+ */
+@media (max-width: 768px) {
+  .dashboard-table tr.row-no-actions td:last-child {
+    display: none;
+  }
+
+  .dashboard-table tr.row-no-actions td:nth-last-child(2) {
+    border-bottom: none;
+  }
+}

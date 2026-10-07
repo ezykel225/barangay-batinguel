@@ -1,0 +1,349 @@
+/* ================================================================
+   THE PRINTED DOCUMENT
+   ================================================================
+
+   Two jobs, and they are separate on purpose:
+
+   - the `.doc-page` rules below style the A4 sheet itself, on screen
+     and on paper identically, so the preview is not a different
+     document from the print;
+   - the `@media print` block at the end removes the application and
+     leaves only that sheet.
+
+   ⚠️ NO FIXED HEIGHTS ANYWHERE. A long resident name, a long purok or
+   a two-sentence purpose must push the page down, not spill out of a
+   box. Every container grows; `min-height` on the page gives the sheet
+   its shape without capping its content.
+*/
+
+.doc-page {
+  position: relative;
+  box-sizing: border-box;
+  width: 210mm;
+  min-height: 297mm;
+  margin: 0 auto;
+  padding: 18mm 18mm 14mm;
+  background: #ffffff;
+  color: #111827;
+  font-family: 'Poppins', sans-serif;
+  font-size: 11pt;
+  line-height: 1.55;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── The SAMPLE watermark ───────────────────────────────────────── */
+/* ⚠️ Rendered only in prototype mode, by DocumentShell. It is not a
+   background-image: a background does not print unless the reader
+   happens to have "background graphics" switched on, and a watermark
+   that vanishes on paper is worse than none. This is real text with
+   `print-color-adjust: exact`, which Chromium and Firefox honour. */
+.doc-watermark {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.doc-watermark span {
+  transform: rotate(-32deg);
+  font-size: 46pt;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: rgba(185, 28, 28, 0.13);
+  white-space: nowrap;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* Everything else sits above the watermark. */
+.doc-page > *:not(.doc-watermark) {
+  position: relative;
+  z-index: 2;
+}
+
+/* ── Heading ─────────────────────────────────────────────────────── */
+.doc-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  text-align: center;
+}
+
+.doc-seal {
+  width: 22mm;
+  height: 22mm;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.doc-heading-lines p {
+  margin: 0;
+  font-size: 10.5pt;
+  line-height: 1.4;
+}
+
+.doc-barangay-name {
+  font-weight: 700;
+  font-size: 13pt;
+  letter-spacing: 0.04em;
+}
+
+/* ── The banner, which is the words a reader actually reads ──────── */
+.doc-sample-banner {
+  margin: 10mm 0 0;
+  padding: 5px 10px;
+  border: 1.5px dashed #b91c1c;
+  border-radius: 3px;
+  text-align: center;
+  color: #b91c1c;
+  font-size: 9.5pt;
+  letter-spacing: 0.06em;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.doc-sample-banner strong { display: block; font-size: 11pt; }
+.doc-sample-banner span { display: block; }
+
+.doc-title {
+  margin: 10mm 0 0;
+  text-align: center;
+  font-size: 16pt;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  /* A title is still text that has to fit the sheet. */
+  overflow-wrap: anywhere;
+}
+
+/* ── Body ────────────────────────────────────────────────────────── */
+/* `flex: 1` is what pushes the signatory to the bottom of a short
+   document without pinning it there on a long one. */
+.doc-body {
+  flex: 1;
+  margin-top: 8mm;
+  min-width: 0;
+}
+
+.doc-prose-label {
+  margin: 0 0 4px;
+  font-size: 8pt;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: #b91c1c;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.doc-prose p:last-child {
+  margin: 0;
+  text-align: justify;
+}
+
+/* ── Fields ──────────────────────────────────────────────────────── */
+.doc-fields {
+  margin: 8mm 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4mm;
+}
+
+.doc-field {
+  display: grid;
+  /* `minmax(0, 1fr)` for the reason X2 recorded: a bare `1fr` cannot
+     shrink below its content's min-content width, so one unbroken
+     value would push the sheet wide. */
+  grid-template-columns: 42mm minmax(0, 1fr);
+  gap: 6mm;
+  align-items: baseline;
+  /* Keep a label and its value on one page. */
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.doc-field dt {
+  margin: 0;
+  font-size: 9.5pt;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #374151;
+}
+
+.doc-field dd {
+  margin: 0;
+  font-weight: 600;
+  border-bottom: 0.4mm solid #111827;
+  padding-bottom: 1mm;
+  min-width: 0;
+  /* A 60-character unbroken name wraps rather than widening the sheet. */
+  overflow-wrap: anywhere;
+}
+
+/* ── Signatory and footer ────────────────────────────────────────── */
+.doc-foot {
+  margin-top: 14mm;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8mm;
+  /* ⚠️ The signatory must not be split across a page break. */
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.doc-signatory {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 70mm;
+  max-width: 100%;
+  text-align: center;
+  min-width: 0;
+}
+
+.doc-sign-rule {
+  display: block;
+  width: 70mm;
+  max-width: 100%;
+  border-top: 0.4mm solid #111827;
+  margin-bottom: 2mm;
+}
+
+.doc-sign-name {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.doc-sign-position {
+  font-size: 9.5pt;
+  color: #374151;
+  overflow-wrap: anywhere;
+}
+
+.doc-meta {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 1mm 5mm;
+  font-size: 9pt;
+  color: #374151;
+  min-width: 0;
+}
+
+.doc-meta dt { margin: 0; font-weight: 600; }
+.doc-meta dd { margin: 0; overflow-wrap: anywhere; }
+
+.doc-footer {
+  margin-top: 10mm;
+  padding-top: 3mm;
+  border-top: 0.3mm solid #d1d5db;
+  font-size: 8.5pt;
+  color: #374151;
+  text-align: center;
+}
+
+.doc-footer p { margin: 0 0 2px; }
+
+.doc-footer-sample {
+  color: #b91c1c;
+  font-weight: 600;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* ================================================================
+   @media print — remove the application, keep the sheet
+   ================================================================ */
+@page {
+  size: A4 portrait;
+  /* The sheet carries its own 18mm padding, so the page box adds
+     none. Two sets of margins is how a one-page document becomes two. */
+  margin: 0;
+}
+
+@media print {
+  /* ⚠️ HIDE EVERYTHING, THEN SHOW ONE SUBTREE. Listing the chrome to
+     hide -- navbar, sidebar, topbar, toasts, buttons -- means the next
+     component added to the dashboard prints by accident. This way the
+     default is hidden and `.doc-page` is the exception. */
+  body * {
+    visibility: hidden;
+  }
+
+  .doc-page,
+  .doc-page * {
+    visibility: visible;
+  }
+
+  /* `visibility` leaves the boxes in place, so the sheet is lifted out
+     of the modal and positioned against the paper itself. Without this
+     the document prints wherever the overlay happened to put it. */
+  .doc-page {
+    position: absolute;
+    left: 0;
+    top: 0;
+    margin: 0;
+    box-shadow: none;
+    width: 210mm;
+  }
+
+  /* Belt and braces for the controls: `visibility: hidden` already
+     removes them, and `display: none` also removes their boxes, so a
+     toolbar cannot reserve space at the top of the sheet. */
+  .no-print,
+  .doc-preview-bar,
+  .doc-preview-blockers,
+  .doc-preview-unsupported {
+    display: none !important;
+  }
+
+  /* The overlay's own scroll container and dark backdrop have no
+     meaning on paper, and a backdrop that printed would use a
+     cartridge of ink. */
+  .doc-preview-overlay,
+  .doc-preview,
+  .doc-preview-stage {
+    position: static !important;
+    display: block !important;
+    overflow: visible !important;
+    background: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-height: none !important;
+    width: auto !important;
+    transform: none !important;
+  }
+
+  /* ⚠️ THE PREVIEW SCALES THE SHEET DOWN ON A NARROW SCREEN, AND PRINT
+     MUST UNDO BOTH HALVES OF THAT.
+
+     Measured: with the browser window at 900px, the printed sheet came
+     out 794x808 instead of 794x1123 -- a 72% document on A4 paper.
+     The first version of this reset named `.doc-preview-scale`, which
+     is the WRAPPER; the `transform` is on the sheet inside it, so the
+     reset applied to an element that was never scaled and the real one
+     kept its 0.72.
+
+     Both are reset here: the wrapper's scaled box, and the sheet's own
+     transform. Re-measured at 375 / 768 / 900 / 1280: 794x1123 on all
+     four, and one PDF page. The preview may scale; the paper does not. */
+  .doc-preview-scale {
+    transform: none !important;
+    width: auto !important;
+    min-height: 0 !important;
+    height: auto !important;
+  }
+
+  .doc-preview-stage .doc-page,
+  .doc-page {
+    transform: none !important;
+  }
+}
