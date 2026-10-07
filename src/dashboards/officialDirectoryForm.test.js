@@ -19,10 +19,10 @@ import path from 'path'
 
 const read = (file) => fs.readFileSync(path.join(__dirname, '..', file), 'utf8')
 const OFFICIAL = read('dashboards/OfficialDashboard.jsx')
-const MIGRATION = fs.readFileSync(
-  path.join(__dirname, '..', '..', 'supabase-migrations', '028_protect_official_position.sql'),
-  'utf8',
-)
+const migration = (file) => fs.readFileSync(
+  path.join(__dirname, '..', '..', 'supabase-migrations', file), 'utf8')
+const MIGRATION = migration('028_protect_official_position.sql')
+const MIGRATION_029 = migration('029_protect_official_identity_fields.sql')
 
 // The Add/Edit modal, sliced from its heading to its buttons.
 const MODAL = OFFICIAL.slice(
@@ -30,11 +30,17 @@ const MODAL = OFFICIAL.slice(
   OFFICIAL.indexOf('</div>', OFFICIAL.indexOf('{submitting ? \'Saving...\' : editingOfficial')),
 )
 
-// The EDIT branch of the Position group: between the ternary's `?` and
-// its `) : (`. Sliced on the ternary itself rather than on indentation,
-// so reformatting the JSX cannot silently empty it.
-const TERNARY_AT = MODAL.indexOf('{editingOfficial ? (')
-const POSITION_BLOCK = MODAL.slice(TERNARY_AT, MODAL.indexOf(') : (', TERNARY_AT))
+// The EDIT branch of a read-only field group: between that group's
+// `{editingOfficial ? (` and its `) : (`. Anchored on the group's own
+// label id rather than on order or indentation, because there are now
+// two such groups and reformatting the JSX must not silently empty one.
+const editBranchFor = (labelId) => {
+  const at = MODAL.lastIndexOf('{editingOfficial ? (', MODAL.indexOf(`id="${labelId}"`))
+  expect(at).toBeGreaterThan(-1)
+  return MODAL.slice(at, MODAL.indexOf(') : (', at))
+}
+const POSITION_BLOCK = editBranchFor('off-position-label')
+const NAME_BLOCK = editBranchFor('off-full-name-label')
 
 const editPayload = () => {
   const at = OFFICIAL.indexOf('.update({', OFFICIAL.indexOf("if (editingOfficial) {"))
@@ -82,12 +88,6 @@ describe('Edit Official no longer offers an editable Position', () => {
     expect(POSITION_BLOCK).toContain('modal-form-static')
   })
 
-  // An unexplained read-only field reads as something broken.
-  it('says where the value is maintained instead', () => {
-    expect(POSITION_BLOCK).toContain('modal-form-hint')
-    expect(POSITION_BLOCK.toLowerCase()).toContain('database')
-  })
-
   // The label is a <span> with an id, not a <label htmlFor>, because
   // there is no form control for it to point at. It still names the
   // value through aria-labelledby.
@@ -98,16 +98,107 @@ describe('Edit Official no longer offers an editable Position', () => {
   })
 })
 
+// ─── A1b: Full Name is read-only too, TEMPORARILY ────────────────────
+//
+// ⚠️ Not because names should be un-editable, but because a name is
+// still an authorization key. Measured before migration 029: a Kagawad
+// could rename their own row, archive the real Secretary, insert a new
+// row under their own profile name as Secretary, and then approve a
+// document request. Three steps, all through this form.
+describe('Edit Official no longer offers an editable Full Name', () => {
+  it('renders the name input only when ADDING', () => {
+    const input = MODAL.indexOf('<input id="off-full-name"')
+    expect(input).toBeGreaterThan(-1)
+    // It sits after the name ternary's `) : (`, i.e. in the add branch.
+    expect(input).toBeGreaterThan(MODAL.indexOf(') : (', MODAL.indexOf('off-full-name-label')))
+  })
+
+  it('has exactly one name input in the whole dashboard', () => {
+    expect(OFFICIAL.match(/<input id="off-full-name"/g)).toHaveLength(1)
+  })
+
+  it('does not ship a disabled name control instead', () => {
+    expect(NAME_BLOCK).not.toMatch(/<input/)
+    expect(NAME_BLOCK).not.toMatch(/disabled/)
+    expect(NAME_BLOCK).not.toMatch(/readOnly/)
+  })
+
+  it('still SHOWS the name when editing, and says where it is maintained', () => {
+    expect(NAME_BLOCK).toContain('newOfficial.full_name')
+    expect(NAME_BLOCK).toContain('modal-form-static')
+    expect(NAME_BLOCK).toContain('modal-form-hint')
+    expect(NAME_BLOCK.toLowerCase()).toContain('database')
+  })
+
+  it('associates the shown name with its label', () => {
+    expect(NAME_BLOCK).toContain('id="off-full-name-label"')
+    expect(NAME_BLOCK).toContain('aria-labelledby="off-full-name-label"')
+  })
+
+  // ⚠️ The reason has to stay written down, or A3 will not know to
+  // undo it and the field will be read-only forever.
+  it('records that this is TEMPORARY and names what restores it', () => {
+    const prose = MODAL.slice(MODAL.indexOf('FULL NAME IS READ-ONLY'), MODAL.indexOf('off-full-name-label'))
+    expect(prose).toMatch(/TEMPORARY/i)
+    expect(prose).toContain('A3')
+    expect(prose).toContain('official_account_links')
+  })
+})
+
+// ─── A1b: the Add form cannot assign a powered position ──────────────
+describe('Add Official cannot create a powered position', () => {
+  const POWERED = ['Punong Barangay', 'Barangay Secretary', 'Barangay Treasurer']
+
+  it('offers only the non-powered positions', () => {
+    expect(OFFICIAL).toContain(
+      "const CLIENT_ASSIGNABLE_POSITIONS = ['Kagawad', 'SK Chairperson']")
+    expect(OFFICIAL).toContain('CLIENT_ASSIGNABLE_POSITIONS.map(')
+  })
+
+  // ⚠️ Omitted, not disabled: migration 029 refuses an API INSERT
+  // naming any of them, so a disabled option would advertise a control
+  // the database turns down.
+  it('does not render the powered positions as options at all', () => {
+    const select = MODAL.slice(MODAL.indexOf('<select id="off-position"'),
+      MODAL.indexOf('</select>'))
+    POWERED.forEach((p) => expect(select).not.toContain(p))
+  })
+
+  it('still says where they are assigned', () => {
+    const after = MODAL.slice(MODAL.indexOf('</select>'))
+    expect(after).toContain('POWERED_POSITIONS.join')
+    expect(after.toLowerCase()).toContain('database')
+  })
+
+  // The frontend list and the database's list must be the same three.
+  it('names the same three the migration and the gates do', () => {
+    expect(OFFICIAL).toContain(
+      "const POWERED_POSITIONS = ['Punong Barangay', 'Barangay Secretary', 'Barangay Treasurer']")
+    POWERED.forEach((p) => expect(MIGRATION_029).toContain(`'${p}'`))
+  })
+})
+
 describe('the payloads', () => {
   it('does not send position on an edit', () => {
     expect(editPayload()).not.toContain('position:')
   })
 
-  // Everything else the form legitimately edits still goes.
+  // ⚠️ `full_name` is gone from the edit payload too (029), and the
+  // comment has to say it comes back at A3.
+  it('does not send full_name on an edit', () => {
+    expect(editPayload()).not.toContain('full_name:')
+  })
+
+  // Everything the form legitimately edits still goes.
   it('still sends every other editable field on an edit', () => {
     const p = editPayload()
-    ;['full_name:', 'committee:', 'contact_number:', 'display_order:', 'updated_by:']
+    ;['committee:', 'contact_number:', 'display_order:', 'updated_by:']
       .forEach((field) => expect(p).toContain(field))
+  })
+
+  // ⚠️ ADD still sends a name, and must — a new row has to have one.
+  it('still sends full_name on an ADD', () => {
+    expect(insertPayload()).toContain('full_name: newOfficial.full_name')
   })
 
   // ⚠️ ADD still sets a position, and must. A new directory row has to

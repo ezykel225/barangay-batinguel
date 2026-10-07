@@ -99,6 +99,26 @@ import './OfficialDashboard.css'
 
 const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
+// ─── Who the Add form may create, and who it may not ─────────────────
+//
+// ⚠️ These three decide permissions. `position` is read by the Secretary
+// and Treasurer RLS policies, and migration 029 REFUSES an API INSERT
+// that names any of them -- so offering them here would be offering a
+// control the database turns down.
+//
+// The database is the authority; this list only keeps the form honest.
+// The same three are named by
+// `barangay_officials_one_active_per_powered_position` (028) and by the
+// `isKapitan` / `isTreasurer` / `isSecretary` gates below. A fourth
+// powered position has to be added to all four together.
+const POWERED_POSITIONS = ['Punong Barangay', 'Barangay Secretary', 'Barangay Treasurer']
+
+// Kagawad is a seven-seat office and SK Chairperson carries no
+// permission, so both stay creatable. Add Official is how the missing
+// Kagawad of 2026-09-30 was restored, with no code change -- that is
+// the property worth keeping.
+const CLIENT_ASSIGNABLE_POSITIONS = ['Kagawad', 'SK Chairperson']
+
 // A date key as a heading. Through parseDateKey, so a 'YYYY-MM-DD' is
 // never handed to `new Date()` and cannot shift a day.
 const longDate = (key) => {
@@ -1919,6 +1939,12 @@ const OfficialDashboard = () => {
       if (!proceed) return
     }
 
+    // ⚠️ UNREACHABLE WHILE MIGRATION 029 HOLDS, AND DELIBERATELY KEPT.
+    // The Edit form no longer offers Full Name, so `newOfficial.full_name`
+    // always equals `editingOfficial.full_name` here and this never
+    // fires. It is exactly what A3 needs back the moment name editing
+    // is restored, and deleting it now would mean writing it again.
+    //
     // ⚠️ A RENAME UNLINKS THE PORTRAIT, and this is the only moment
     // anybody can do something about it. `officialPhotos` is keyed on
     // the exact `barangay_officials.full_name`, so changing the name
@@ -1970,14 +1996,16 @@ const OfficialDashboard = () => {
         // handlers below already guard against.
         const { data: updated, error } = await supabase
           .from('barangay_officials')
-          // ⚠️ `position` is NOT sent. The form no longer offers it and
-          // migration 028 refuses it, so including it would be a field
-          // this payload claims to set and does not. The trigger uses
-          // `IS DISTINCT FROM`, so re-sending the unchanged value would
-          // still save -- that tolerance exists so an ordinary edit is
-          // never broken by it, not as a licence to send it.
+          // ⚠️ Neither `position` (028) nor `full_name` (029) is sent.
+          // The form offers neither and the database refuses both, so
+          // including them would be fields this payload claims to set
+          // and does not. Both triggers use `IS DISTINCT FROM`, so
+          // re-sending an unchanged value would still save -- that
+          // tolerance exists so an ordinary edit is never broken by it,
+          // not as a licence to send it.
+          //
+          // ⚠️ `full_name` goes back in at A3, with the input.
           .update({
-            full_name: newOfficial.full_name,
             committee: newOfficial.committee || null,
             contact_number: newOfficial.contact_number || null,
             display_order: requestedOrder,
@@ -4986,16 +5014,50 @@ const OfficialDashboard = () => {
           <div className="modal" role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="offdlg-3-title">
             <h3 id="offdlg-3-title">{editingOfficial ? 'Edit Official' : 'Add Official'}</h3>
 
-            <div className="modal-form-group">
-              <label htmlFor="off-full-name" className="modal-form-label">Full Name</label>
-              <input id="off-full-name"
-                type="text"
-                className="modal-form-input"
-                placeholder="e.g. Hon. Frankie Credo"
-                value={newOfficial.full_name}
-                onChange={(e) => setNewOfficial({ ...newOfficial, full_name: e.target.value })}
-              />
-            </div>
+            {/* ⚠️ FULL NAME IS READ-ONLY WHEN EDITING, AND THAT IS
+                TEMPORARY — see migration 029.
+
+                It is not a view that display names should be
+                un-editable. It is that a display name is currently an
+                AUTHORIZATION KEY: the Secretary and Treasurer policies
+                still join `profiles.full_name` to
+                `barangay_officials.full_name`, so renaming a row moves
+                a permission. Measured: a Kagawad could rename their own
+                row, archive the real Secretary, insert a new row under
+                their own profile name as Secretary, and then approve a
+                document request. Three steps, all through this form.
+
+                ⚠️ A3 RESTORES THIS FIELD. Once `official_account_links`
+                carries identity, a name is just a name again — drop the
+                `full_name` branch from `protect_official_record()` and
+                put the input back. The `position` rule stays, because
+                that one is about permissions rather than identity.
+
+                Add still edits it: a new row has to have a name. */}
+            {editingOfficial ? (
+              <div className="modal-form-group">
+                <span className="modal-form-label" id="off-full-name-label">Full Name</span>
+                <p className="modal-form-static" aria-labelledby="off-full-name-label">
+                  {newOfficial.full_name || '—'}
+                </p>
+                <p className="modal-form-hint">
+                  Names and positions are what link an official's account to
+                  their permissions, so both are corrected directly in the
+                  database rather than from this form.
+                </p>
+              </div>
+            ) : (
+              <div className="modal-form-group">
+                <label htmlFor="off-full-name" className="modal-form-label">Full Name</label>
+                <input id="off-full-name"
+                  type="text"
+                  className="modal-form-input"
+                  placeholder="e.g. Hon. Frankie Credo"
+                  value={newOfficial.full_name}
+                  onChange={(e) => setNewOfficial({ ...newOfficial, full_name: e.target.value })}
+                />
+              </div>
+            )}
 
             {/* ⚠️ POSITION IS READ-ONLY WHEN EDITING, and the control is
                 GONE rather than disabled, because migration 028 refuses
@@ -5025,11 +5087,6 @@ const OfficialDashboard = () => {
                 <p className="modal-form-static" aria-labelledby="off-position-label">
                   {newOfficial.position || '—'}
                 </p>
-                <p className="modal-form-hint">
-                  Positions decide who may approve document requests and
-                  reservations, so they are maintained directly in the
-                  database rather than from this form.
-                </p>
               </div>
             ) : (
               <div className="modal-form-group">
@@ -5040,12 +5097,21 @@ const OfficialDashboard = () => {
                   onChange={(e) => setNewOfficial({ ...newOfficial, position: e.target.value })}
                 >
                   <option value="">Select position</option>
-                  <option value="Punong Barangay">Punong Barangay</option>
-                  <option value="Barangay Secretary">Barangay Secretary</option>
-                  <option value="Barangay Treasurer">Barangay Treasurer</option>
-                  <option value="Kagawad">Kagawad</option>
-                  <option value="SK Chairperson">SK Chairperson</option>
+                  {CLIENT_ASSIGNABLE_POSITIONS.map((p) => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
                 </select>
+                {/* ⚠️ The three powered positions are OMITTED, not shown
+                    disabled. Migration 029 refuses an API INSERT naming
+                    any of them, so a disabled option would advertise a
+                    control the database turns down -- and a reader
+                    cannot tell a disabled option from a bug. The
+                    sentence says where they are assigned instead. */}
+                <p className="modal-form-hint">
+                  {POWERED_POSITIONS.join(', ')} are assigned directly in
+                  the database, because they decide who may approve
+                  document requests and reservations.
+                </p>
               </div>
             )}
 

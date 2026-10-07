@@ -65,7 +65,7 @@ banned below: it silences the one check this project has.
 
 ### Tests
 
-Thirty-five suites, 784 tests:
+Thirty-five suites, 795 tests:
 
 | File | What it covers |
 |---|---|
@@ -101,7 +101,7 @@ Thirty-five suites, 784 tests:
 | `src/documents/DocumentPreview.test.js` | 26 tests rendering all four prototype templates. Run **both directions**: flipping `DOCUMENT_TEMPLATE_MODE` to `'official'` fails exactly 3 — the watermark tests — and nothing else, which is what proves the one constant controls it. Also that the indigency template states no income or finding, and the residency one no duration |
 | `src/documents/documentPermissions.test.js` | 19 source-reading tests. `canGenerate` could be correct and wired to the wrong flag, so these pin the wiring: the Resident and Nurse dashboards import the generator **not at all**, `isSecretary` is still `position === 'Barangay Secretary'`, there is exactly **one** call site, no template imports Supabase, and nothing reads `residents_registry` |
 | `src/utils/rowActions.test.js` | 42 tests over what each queue row offers. Every document status both directions, including that `claimed` and `declined` offer **nothing** so no ⋮ is rendered at all; that a non-Secretary and a non-Treasurer get an **empty list** rather than disabled items; that Generate Document is gated **only** by the answer `canGenerate` gave and is always the **last** item (the menu focuses its first on open); and that each accessible name reads as English — `Approve document request from Ezequel Bautista`, `Generate Document for Ezequel Bautista`, `Approve reservation on 10 October 2026`. Plus 10 source-reading guards that every key it emits has a handler and an icon in the dashboard, that those handlers are the **existing** ones, and that the processing-set re-entrancy guards survived the loss of the `disabled` attribute |
-| `src/dashboards/officialDirectoryForm.test.js` | 20 tests over the Officials Directory form after migration 028. ⚠️ **They do not prove the security property** — that is a database trigger, and only SQL can prove a trigger; the role-impersonation results live in 028's header. What they pin is the half Jest can see: the position `<select>` renders **only** in the Add branch, the Edit branch ships **no** control (not a disabled one), the value is still shown with the sentence saying where it IS maintained, `position` is gone from the edit payload but still sent on an Add, archive/restore are byte-identical, and the three positions 028's unique index names are the same three the dashboard gates on — the cross-check `officialAvailability.test.js` runs against migration 026 |
+| `src/dashboards/officialDirectoryForm.test.js` | 31 tests over the Officials Directory form after migrations 028 and 029. ⚠️ **They do not prove the security property** — that is a database trigger, and only SQL can prove a trigger; the role-impersonation results live in the two migration headers. What they pin is the half Jest can see: the Position `<select>` **and** the Full Name `<input>` render **only** in the Add branch, the Edit branch ships **no** control for either (not a disabled one), both values are still shown and still associated with a label, the edit payload carries neither while an Add carries both, archive/restore are byte-identical, and the Add `<select>` offers **only** the two unpowered positions while the hint still names all three powered ones. Two load-bearing guards run against the SQL: the three powered positions the dashboard gates on are the same three 028's unique index and 029's `powered` array name, and the Full Name prose must still record that it is **temporary** and name `A3` and `official_account_links` — so A3 cannot quietly become permanent. The cross-check `officialAvailability.test.js` runs against migration 026 |
 | `src/utils/officialAvailability.test.js` | 24 tests over per-official consultation hours. The load-bearing one **reads `026_official_availability.sql`** and asserts the four statuses the form offers are exactly the four the CHECK accepts — the same thing `reservationWindow.test.js` does for migration 020 |
 | `src/components/EServicesMenu.test.js` | 15 tests over the E-Services dropdown and the catalogue: the disclosure pattern, Escape and focus restore, that it does **not** use `role="menu"`, and that every service states its access requirement in words |
 | `src/utils/residentTabs.test.js` | 7 tests over `?tab=` resolution — a hint, never authorization |
@@ -320,7 +320,7 @@ src/
 
   assets/images/      11 official portraits, page backgrounds, logo.
 
-supabase-migrations/  28 numbered SQL files. A record, not a runner.
+supabase-migrations/  29 numbered SQL files. A record, not a runner.
 supabase/functions/   Edge Function source (notify-reservation-sms).
 docs/                 SETUP.md, TESTING-WALKTHROUGH.pdf + its generator.
 ```
@@ -453,12 +453,20 @@ Officials who lack a given permission still **see** the data — the action
 buttons are replaced with a "Treasurer only" note. Deliberate, for
 transparency.
 
-⚠️ **`position` is SQL/admin maintenance only since migration 028.** It
-decides who holds those permissions, and until 028 any official could
-rewrite it from the Edit Official form — including their own. See
-*MASTER-A step A1* below. The Edit form now **shows** the position and
-offers no control; Add still sets one, because a new directory row has
-to say what the person does.
+⚠️ **`position` AND `full_name` are SQL/admin maintenance only, since
+migrations 028 and 029.** Position decides who holds those permissions,
+and the name is what the policies join on — so both are authorization
+data, and until 028/029 any official could rewrite either from the Edit
+Official form, including their own. See *MASTER-A steps A1 and A1b*
+below. The Edit form now **shows** both and offers no control for
+either; Add still sets a name, and a position **from the two
+unpowered ones** — a new directory row has to say who the person is and
+what they do, but it may not hand out a powered position.
+
+⚠️ **The `full_name` half is temporary.** It is there only because the
+name is currently an authorization key; **A3 gives the field back** once
+`official_account_links` carries identity. The `position` half is
+permanent.
 
 ---
 
@@ -491,14 +499,18 @@ zero-match half remains: an official with no active directory row still
 silently loses their position permissions, which is what the missing
 Kagawad below actually was.
 
-⚠️ **Migration 028 removed a DIFFERENT and worse half**, found in the
-MASTER-A architecture checkpoint: the string join was not only fragile,
-the *other* side of it — `barangay_officials.position` — was writable by
-any official. See *MASTER-A step A1* below. The join itself is
-**unchanged and still the authorization key**; the approved replacement
-is a private `official_account_links` table, **not** a `profile_id`
-column on `barangay_officials`, because that table is read by `anon`
-with `select('*')` on the public Officials page.
+⚠️ **Migrations 028 and 029 removed a DIFFERENT and worse half**, found
+in the MASTER-A architecture checkpoint: the string join was not only
+fragile, **both sides of it were writable by any official.** 028 closed
+`barangay_officials.position`; 029 closed `barangay_officials.full_name`
+and the INSERT path that got round 028 by taking somebody else's name.
+See *MASTER-A steps A1 and A1b* below.
+
+⚠️ **The join itself is unchanged and still the authorization key** —
+what changed is that the app can no longer move it. The approved
+replacement is a private `official_account_links` table, **not** a
+`profile_id` column on `barangay_officials`, because that table is read
+by `anon` with `select('*')` on the public Officials page.
 
 ### The missing Kagawad, 2026-09-30
 
@@ -711,7 +723,7 @@ such row.
 
 ## Database notes
 
-**28 migrations**, `001` through `028`, all applied. ⚠️ 027 is a
+**29 migrations**, `001` through `029`, all applied. ⚠️ 027 is a
 DATA CORRECTION, not a schema change — see *The portrait is lost by the
 RENAME* under *Public E-Services (X5)*.
 
@@ -724,7 +736,7 @@ RENAME* under *Public E-Services (X5)*.
 | `document_requests` | Document requests and their status |
 | `announcements` | Public announcements |
 | `events` | Public barangay events |
-| `barangay_officials` | The officials directory, including `position`, which drives permissions, and `archived_at`/`archived_by` since migration 018 |
+| `barangay_officials` | The officials directory. ⚠️ **Two of its columns are authorization data, not description**: `position`, which drives permissions, and `full_name`, which the policies join on — both are SQL/admin maintenance only since migrations 028 and 029. Also `archived_at`/`archived_by` since migration 018 |
 | `residents_registry` | **Voter reference records**, not a resident roll — see *What `residents_registry` actually holds* |
 | `waste_schedule` | Collection days per purok |
 | `activity_log` | Append-only audit trail. INSERT and SELECT policies only |
@@ -4103,11 +4115,17 @@ still hashes to its pre-X2 bytes (`bda35a1…`, lines 1000–1165).
 
 ---
 
-## MASTER-A step A1 — the position write path (migration 028)
+## MASTER-A steps A1 and A1b — the directory write path (028, 029)
 
 2026-10-07, on `claude/master-a-directory-auth-hardening`, from the
-MASTER-A architecture checkpoint. **A1 only. MASTER-A is NOT finished** —
-see *What A1 does not fix* at the end of this section.
+MASTER-A architecture checkpoint. **A1 and A1b only. MASTER-A is NOT
+finished** — see *What A1 and A1b do not fix* at the end of this section.
+
+⚠️ **A1 alone was not enough, and A1b is why.** Migration 028 closed the
+one-step escalation. The three-step one — rename, archive, re-insert —
+was still open, because **the name is still the authorization key**.
+Migration 029 closes it. Read both halves; the second only makes sense
+beside the first.
 
 ### ⚠️ What was exploitable
 
@@ -4251,22 +4269,116 @@ maintained. An unexplained read-only field reads as something broken.
 Add still offers the select, because a new row has to say what the
 person does.
 
-Measured against the shipped CSS bundle at 375/768/1280/1440, both
-states: zero document overflow, the modal fits the viewport at every
-width, and on Edit the position is **out of the tab order** entirely
-(full name → committee → contact → display order → Cancel → Update).
-
 ⚠️ **No privileged UI was added to replace it**, by decision. A
 Punong-Barangay position-management screen is a feature, not part of a
 security fix.
 
-### ⚠️ What A1 does NOT fix
+### A1b — the three-step chain 028 left open (migration 029)
+
+A1 was re-attacked rather than assumed finished, and the escalation
+completed anyway. Not by writing `position` — 028 refuses that — but by
+**moving the name the policy joins on**, in three ordinary form actions:
+
+| | as a Kagawad, before 029 |
+|---|---|
+| 1. Rename his own directory row | `Harold Katada Baroy` → `Alexis Theress P. Tan` — **accepted** |
+| 2. Archive the real Secretary's row | **accepted**, the ⋮ menu's own Archive |
+| 3. Insert a new row: his own profile name, `position = 'Barangay Secretary'` | **accepted** |
+| → `document_requests` UPDATE | **rows=1, status → `approved`** |
+
+Step 1 vacates the name so step 3 can take it; step 2 vacates the
+powered position so the unique index lets step 3 through. ⚠️ **Both
+unique indexes were working** — they are precisely what forced three
+steps instead of one, since every shortcut was refused `23505`. The
+indexes were not the failure.
+
+⚠️ **Reproduced the same way A0 was**, as `authenticated` with his own
+JWT claims inside a block that always ends in `RAISE EXCEPTION`, so
+Postgres undoes every statement. Live state re-read afterwards: 11 rows,
+11 active, 0 archived, the three powered positions on their real
+incumbents. Nothing persisted.
+
+**029 breaks the chain at two independent points**, either of which
+alone would be enough — which is the point of doing both:
+
+| Point | Rule |
+|---|---|
+| **Step 1** | `protect_official_record()` now also refuses an API caller's change to **`full_name`** |
+| **Step 3** | `trg_protect_official_insert` — a **second trigger on the same function** — refuses an API caller's INSERT naming any of the three powered positions |
+
+⚠️ **The `full_name` rule is TEMPORARY, and the comment in the code says
+so.** It is not a view that display names should be un-editable; it is
+that a display name is currently an *authorization key*. **A3 removes
+this branch** once `official_account_links` carries identity, and the
+input goes back into the form. The `position` rule stays — that one is
+about permissions, not identity.
+
+⚠️ **A second trigger rather than a rewritten one, for a connector
+reason**, recorded so nobody wonders: the Supabase connector gates
+`DROP TRIGGER` (024's header, re-measured in X5), so
+`trg_protect_official_record` could not be re-created `BEFORE INSERT OR
+UPDATE`. Both triggers call the same function, which branches on
+`TG_OP`. Consolidating them is one line in the SQL Editor and changes no
+behaviour.
+
+⚠️ **The INSERT guard is the authoritative one; the form is not.** The
+Add form offers `Kagawad` and `SK Chairperson` only, and the three
+powered positions are **omitted, not shown disabled** — a disabled
+option advertises a control the database turns down, and a reader cannot
+tell a disabled option from a bug. A sentence under the select says
+where they are assigned instead. A crafted API call naming one is
+refused `P0001` regardless.
+
+⚠️ **The INSERT branch refuses the powered position for ANY name, not
+only the caller's own.** Checking "is this your own name" would reduce
+to the same string join the whole problem is, and a second powered row
+under somebody else's name is not a thing the app has any reason to
+create either.
+
+⚠️ **`portraitWillBeLost()` is now unreachable and was deliberately
+kept.** It warns on a rename, and the form no longer offers one — but
+**A3 restores the field**, and deleting a guard that will be needed again
+in the next step of the same workstream is how it comes back missing.
+
+**Verified in both directions**, all rolled back: every step of the
+chain refused at 1 and at 3; and the regressions still pass — an
+ordinary edit re-submitting the same name and position still saves, an
+Add of a `Kagawad` still inserts, archive and restore still work, direct
+SQL and `service_role` still change a name and a position, and the
+Secretary and Treasurer can still approve.
+
+### ⚠️ The form shows both, and edits neither
+
+Measured against the shipped CSS bundle at 375/768/1280/1440, both
+branches — 84/84 checks, 0 failures:
+
+| | |
+|---|---|
+| Edit | Full Name and Position render as **read-only values**, both visible, both associated with their label by `aria-labelledby`. **No disabled or readonly control exists in the modal at all** |
+| Edit tab order | `committee → contact → display order → Cancel → Update` — name and position are out of it **entirely** |
+| Edit, still editable | committee, contact number, display order — unchanged |
+| Add | name input and position select both present; options are `(blank) / Kagawad / SK Chairperson`, and the hint names all three powered positions |
+| Every width | zero document overflow, zero clipping against a `overflow:hidden` ancestor, zero targets under 24px, modal fits the viewport |
+
+The edit payload now omits **both** `full_name` and `position`; it sends
+`committee`, `contact_number`, `display_order`, `updated_by`.
+
+### ⚠️ What A1 and A1b do NOT fix
+
+⚠️ **The identity problem is NOT solved. It is frozen.** 028 and 029
+close the two write paths that reached it; neither replaces the join.
 
 - **Authorization still resolves through the `full_name` string join.**
-  Renaming an official in one table and not the other still silently
-  removes their position powers. A2–A5 convert the two RLS policies,
-  `can_see_audience()`, `official_id_for_current_user()` and the
-  dashboard's `officialInfo` lookup to a private
+  029 makes the key immovable from the app, which is what stops the
+  escalation — but the key is still a string, and it is still matched
+  rather than referenced. ⚠️ **A rename is now a SQL/service-role
+  operation, and it is still a two-table operation**: change
+  `barangay_officials.full_name` without `profiles.full_name` and that
+  official silently loses their position powers, exactly as *Known
+  fragility* describes. The database no longer lets the form do it; it
+  does not stop a maintainer doing it. A2–A5 convert the two RLS
+  policies, `can_see_audience()`, `official_id_for_current_user()` and
+  the dashboard's `officialInfo` lookup to a private
   **`official_account_links`** table — the approved design, chosen over
   a `profile_id` column because `barangay_officials` is read by `anon`
   with `select('*')` on the public Officials page and a column there
@@ -4274,12 +4386,18 @@ security fix.
 - **The self-archive guard still fails open.** It still compares
   `profiles.full_name` to `NEW.full_name`. Making it fail closed needs
   the link table first, or every official loses the ability to archive
-  anybody.
+  anybody. ⚠️ A1b narrows what that buys an attacker — they can no
+  longer rename themselves into somebody else's name first — but
+  archiving another official is still any official's to do, which is
+  step 2 of the chain and is **untouched by design**: it is a real
+  permission the directory has always granted, and *Officials archive*
+  records why archive exists at all.
 - **`kapitan_status` and `kapitan_availability` UPDATE are still "any
   official"** at the database, gated only by `isKapitan` in React. A1
-  makes that smaller — an official can no longer promote themselves to
-  Punong Barangay — but not closed: any official can still write those
-  two tables directly.
+  and A1b make that smaller — an official can no longer promote
+  themselves to Punong Barangay by rewriting a position, renaming a row,
+  or inserting one — but not closed: any official can still write those
+  two tables directly. A3.
 - **`TRUNCATE` is still granted to `anon` and `authenticated`** on 14
   tables, and RLS does not cover TRUNCATE. Not reachable through
   PostgREST today (no TRUNCATE verb, and no project function runs
@@ -4466,9 +4584,16 @@ derives her initials from. It is no longer displayed as a label.
   active directory row — he silently lost his position permissions and
   his portrait. **The data was corrected in migration 027** once the
   barangay confirmed he is the real Kagawad, but the mechanism that
-  allowed it is still there. The foreign key is what actually fixes it;
-  until then the rename warns, and `officialPhotos.test.js` guards the
-  eleven canonical keys.
+  allowed it is still there. ⚠️ **The approved replacement is a private
+  `official_account_links` table, not a `profile_id` column** — see
+  *MASTER-A steps A1 and A1b*, which records why a column on a table
+  `anon` reads with `select('*')` is the wrong shape. A2–A5 build it.
+  ⚠️ **Migration 029 froze the key rather than replacing it**: the Edit
+  form no longer offers a rename at all, so the 2026-10-01 outage cannot
+  recur through the app — but a rename in SQL still has to touch both
+  tables, and `portraitWillBeLost()` is kept precisely because **A3 gives
+  the field back**. `officialPhotos.test.js` still guards the eleven
+  canonical keys.
 - **The official barangay document forms.** X6 built the whole
   generation pipeline against PROTOTYPE layouts because the barangay has
   not supplied its real clearance, certificate, indigency or residency
@@ -4490,9 +4615,9 @@ derives her initials from. It is no longer displayed as a label.
 - **Source maps ship to production** (~7 MB), so the original JSX is
   publicly reconstructable. `GENERATE_SOURCEMAP=false` in Vercel fixes it.
 - **`public/logo.png` is 984 KB and referenced by nothing.**
-- **Thin automated test coverage.** 784 tests in thirty-five suites: one
+- **Thin automated test coverage.** 795 tests in thirty-five suites: one
   smoke test over `<App />`, which fails without `.env` because
-  `supabaseClient.js` throws at import time, and 783 tests over the
+  `supabaseClient.js` throws at import time, and 794 tests over the
   resident workflow rules, the display labels, the booking window, the
   month grid and its three feature layers, the document-request filter,
   the queue rows' action lists, the ⋮ menu's keyboard and authorization
@@ -4578,12 +4703,34 @@ derives her initials from. It is no longer displayed as a label.
   `stamp_activity_actor` gates who may write one, so logging a
   generation needs a migration plus a trigger change. The business
   transitions on a request are already logged, unchanged.
+- ⚠️ **An official's Full Name is read-only in the Edit form, and that
+  is TEMPORARY.** Migration 029 refuses an API caller's `full_name`
+  change only because the name is still the authorization key the
+  Secretary and Treasurer policies join on. **A3 removes that branch and
+  restores the input** once `official_account_links` carries identity.
+  Correcting a misspelled name meanwhile is SQL maintenance, and must
+  still touch `profiles` and `barangay_officials` together.
+- **Two triggers on `barangay_officials` call one function**, because
+  the Supabase connector gates `DROP TRIGGER`, so
+  `trg_protect_official_record` could not be re-created
+  `BEFORE INSERT OR UPDATE`. `protect_official_record()` branches on
+  `TG_OP`. Consolidating them is one line in the SQL Editor
+  (`DROP TRIGGER trg_protect_official_insert`, then re-create the other
+  for both events) and changes no behaviour. Recorded so a reader does
+  not take the pair for a design.
+- ⚠️ **Archiving another official is still any official's to do**, which
+  is step 2 of the chain migration 029 closes at steps 1 and 3. It is
+  untouched **by design** — it is a real permission the directory has
+  always granted, and the self-archive guard that fails open is listed
+  under *MASTER-A*. On its own it revokes powers rather than granting
+  them; it only mattered as part of the chain.
 - ⚠️ **`kapitan_status` and `kapitan_availability` UPDATE are gated in
   the frontend only.** The policy is `role IN ('admin','official')` with
   no position check; `isKapitan` in React is the only thing restricting
   it to the Punong Barangay. Found in the MASTER-A checkpoint, narrowed
-  but not closed by migration 028 (an official can no longer promote
-  themselves into the position), and scheduled for A3.
+  but not closed by migrations 028 and 029 (an official can no longer
+  promote themselves into the position by rewriting a position, renaming
+  a row, or inserting one), and scheduled for A3.
 - ⚠️ **`TRUNCATE` is granted to `anon` and `authenticated` on 14
   tables, and PostgreSQL RLS does not cover TRUNCATE.** Not reachable
   through PostgREST today — there is no TRUNCATE verb and no project
