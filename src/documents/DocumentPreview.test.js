@@ -1,4 +1,4 @@
-// The preview, the four prototype templates and the SAMPLE watermark,
+// The preview, the six prototype templates and the SAMPLE watermark,
 // rendered.
 //
 // ⚠️ No Supabase mock is needed and none is present: `DocumentPreview`
@@ -81,11 +81,47 @@ describe('prototype mode', () => {
 })
 
 describe('each template', () => {
+  // ⚠️ THE PRINTED TITLE IS NOT ALWAYS THE STORED TYPE, and 'Other' is
+  // why. Five types print their own name; 'Other' is not a barangay
+  // form, so it prints `Prototype Custom Barangay Document` rather than
+  // the name of a real one. The preview's TITLE BAR still says what the
+  // request says -- that is `displayName`, asserted separately below.
+  const PRINTED_TITLES = {
+    'Barangay Clearance': 'Barangay Clearance',
+    'Barangay Certificate': 'Barangay Certificate',
+    'Certificate of Indigency': 'Certificate of Indigency',
+    'Certificate of Residency': 'Certificate of Residency',
+    'Business Clearance': 'Business Clearance',
+    'Other': 'Prototype Custom Barangay Document',
+  }
+
   it('renders its own title for its own type', () => {
+    expect(Object.keys(PRINTED_TITLES).sort()).toEqual([...SUPPORTED_DOCUMENT_TYPES].sort())
     SUPPORTED_DOCUMENT_TYPES.forEach((type) => {
       const { container, unmount } = show({ document_type: type })
-      expect(container.querySelector('.doc-title').textContent)
-        .toBe(DOCUMENT_TEMPLATES[type].displayName)
+      expect(container.querySelector('.doc-title').textContent).toBe(PRINTED_TITLES[type])
+      unmount()
+    })
+  })
+
+  // ⚠️ 'Other' must not print the name of a real barangay form. A
+  // plausible heading would be this system deciding which document the
+  // resident asked for, on the sheet that is handed over.
+  it('does not print a real form name for a request filed as Other', () => {
+    const { container } = show({ document_type: 'Other' })
+    const title = container.querySelector('.doc-title').textContent
+    expect(title).toMatch(/prototype/i)
+    expect(title).not.toMatch(/clearance|certificate|indigency|residency/i)
+  })
+
+  it('keeps the preview title bar on the stored type, for every type', () => {
+    SUPPORTED_DOCUMENT_TYPES.forEach((type) => {
+      expect(DOCUMENT_TEMPLATES[type].displayName).toBe(type)
+      const { container, unmount } = show({ document_type: type })
+      // The bar specifically, not any heading: for five of the six the
+      // printed <h1> carries the same words and would match too.
+      expect(container.querySelector('#doc-preview-title').textContent)
+        .toContain(type)
       unmount()
     })
   })
@@ -165,17 +201,35 @@ describe('each template', () => {
 })
 
 describe('the unsupported case', () => {
-  // `document_type` is free text, so this is reachable.
+  // ⚠️ NO TYPE A RESIDENT CAN CHOOSE REACHES THIS ANY MORE. All six
+  // resolve. But `document_type` is FREE TEXT in the database -- no
+  // CHECK constraint -- so a value outside the six is still reachable
+  // by a crafted API call or a legacy row, and the fallback has to
+  // survive it. These cases use types the form cannot produce, which is
+  // the only honest way left to exercise the path.
   it('says so plainly instead of crashing', () => {
-    expect(() => show({ document_type: 'Business Clearance' })).not.toThrow()
+    expect(() => show({ document_type: 'Certificate of Vibes' })).not.toThrow()
     expect(screen.getByText('Printable template not configured for this document type.'))
       .toBeInTheDocument()
   })
 
   it('renders no document page and disables Print', () => {
-    const { container } = show({ document_type: 'Other' })
+    const { container } = show({ document_type: 'Barangay Permit' })
     expect(container.querySelector('.doc-page')).toBeNull()
     expect(screen.getByRole('button', { name: /print/i })).toBeDisabled()
+  })
+
+  // Run the other direction: the two types this pass added must NOT
+  // land here, or the fix did nothing.
+  it('is not reached by Business Clearance or by Other', () => {
+    ;['Business Clearance', 'Other'].forEach((type) => {
+      const { container, unmount } = show({ document_type: type })
+      expect(screen.queryByText('Printable template not configured for this document type.'))
+        .toBeNull()
+      expect(container.querySelector('.doc-page')).not.toBeNull()
+      expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled()
+      unmount()
+    })
   })
 })
 

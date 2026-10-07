@@ -38,7 +38,7 @@
 // birthday does not get a blank line here; it gets nothing, because
 // the barangay's real form will decide what it needs.
 
-import { SIGNATORY_PLACEHOLDER } from './documentConfig'
+import { SIGNATORY_PLACEHOLDER, UNRECORDED_PLACEHOLDERS } from './documentConfig'
 import { MONTH_NAMES } from '../utils/monthGrid'
 
 // ⚠️ MANILA, NEVER THE BROWSER'S CLOCK. The printed date is a claim
@@ -135,6 +135,19 @@ export const buildDocumentData = (request, {
       name: text(signatory?.name),
       position: text(signatory?.position),
     },
+    // ⚠️ THE PLACEHOLDERS COME THROUGH THE ADAPTER, NOT THROUGH AN
+    // IMPORT IN THE TEMPLATE, and that is the whole architecture
+    // working rather than a detour.
+    //
+    // A template binds `data.unrecorded.businessName` exactly as it
+    // binds `data.resident.fullName`. So on the day the barangay adds a
+    // `business_name` column, THIS FILE is the one that changes -- the
+    // line stops reading `UNRECORDED_PLACEHOLDERS.businessName` and
+    // starts reading `text(row.business_name)` -- and the template,
+    // the registry, the preview and the print pipeline are untouched.
+    // A template that imported the placeholder directly would have to
+    // be rewritten to un-invent it.
+    unrecorded: { ...UNRECORDED_PLACEHOLDERS },
   }
 
   // ⚠️ A MISSING VALUE IS REPORTED, NEVER FILLED IN. "N/A", "UNKNOWN"

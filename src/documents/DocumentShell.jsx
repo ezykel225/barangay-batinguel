@@ -87,14 +87,29 @@ export const DocumentShell = ({ title, reference, issueDate, signatory, children
   </article>
 )
 
-// The detail rows every template lays out the same way, so four
-// templates cannot drift into four presentations of one resident.
+// The detail rows every template lays out the same way, so six
+// templates cannot drift into six presentations of one resident.
+//
+// ⚠️ A ROW MAY DECLARE ITSELF A PLACEHOLDER, and it then looks like
+// one. `[BUSINESS NAME]` set in the same weight as a real stored name
+// is a value a tired reader skims past; a prototype's job is to be
+// impossible to mistake for the thing it stands in for. The class
+// carries it visually and `data-placeholder` carries it in the markup,
+// so a test can assert which fields are real without reading pixels.
+//
+// A row whose value is empty is still dropped entirely -- an absent
+// optional field prints nothing, exactly as before.
 export const DocumentFields = ({ rows }) => (
   <dl className="doc-fields">
     {rows.filter((row) => row && row.value).map((row) => (
       <div className="doc-field" key={row.label}>
         <dt>{row.label}</dt>
-        <dd>{row.value}</dd>
+        <dd
+          className={row.placeholder ? 'doc-field-placeholder' : undefined}
+          data-placeholder={row.placeholder ? 'true' : undefined}
+        >
+          {row.value}
+        </dd>
       </div>
     ))}
   </dl>

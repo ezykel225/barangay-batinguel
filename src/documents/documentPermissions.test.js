@@ -139,7 +139,7 @@ describe('no template touches the database', () => {
   const files = fs.readdirSync(path.join(__dirname, 'templates'))
 
   it('has a template file for each configured type', () => {
-    expect(files.filter((f) => f.endsWith('.jsx'))).toHaveLength(4)
+    expect(files.filter((f) => f.endsWith('.jsx'))).toHaveLength(6)
   })
 
   it('imports no client, and issues no query, in any template', () => {

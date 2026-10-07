@@ -2,9 +2,11 @@
 // the template that prints it.
 //
 // ⚠️ ONE REGISTRY, NOT `if (type === ...)` SCATTERED THROUGH THE
-// DASHBOARD. Adding the barangay's fifth form later is one entry here
-// plus one template file; the dashboard, the permissions and the print
-// pipeline do not change.
+// DASHBOARD. Adding a form is one entry here plus one template file;
+// the dashboard, the permissions and the print pipeline do not change.
+// Demonstrated rather than claimed: `Business Clearance` and `Other`
+// were added exactly that way, and neither `canGenerate`, the ⋮ menu,
+// `rowActions`, the preview nor the print stylesheet was touched.
 //
 // ⚠️ `document_type` IS FREE TEXT IN THE DATABASE -- no CHECK
 // constraint -- so an unrecognised value is not a hypothetical. It is
@@ -14,6 +16,8 @@ import { BarangayClearanceTemplate } from './templates/BarangayClearanceTemplate
 import { BarangayCertificateTemplate } from './templates/BarangayCertificateTemplate'
 import { CertificateOfIndigencyTemplate } from './templates/CertificateOfIndigencyTemplate'
 import { CertificateOfResidencyTemplate } from './templates/CertificateOfResidencyTemplate'
+import { BusinessClearanceTemplate } from './templates/BusinessClearanceTemplate'
+import { CustomDocumentTemplate } from './templates/CustomDocumentTemplate'
 
 // ⚠️ The keys are the EXACT strings the Resident Portal's
 // `DOCUMENT_TYPES` dropdown writes, which are the exact strings the
@@ -52,6 +56,35 @@ export const DOCUMENT_TEMPLATES = Object.freeze({
     prototype: true,
     requiredFields: ['fullName', 'purpose', 'purok'],
   },
+  // ⚠️ `requiredFields` IS WHAT THE SCHEMA CAN SUPPLY, not what a
+  // business clearance conceptually needs. The business name, address
+  // and nature of business are not columns on `document_requests` --
+  // they are not blank, they do not exist -- so requiring them would
+  // disable Print on every Business Clearance forever while telling the
+  // Secretary to correct a field that is not on the form. They print as
+  // bracketed placeholders instead; see `UNRECORDED_PLACEHOLDERS`.
+  'Business Clearance': {
+    Template: BusinessClearanceTemplate,
+    displayName: 'Business Clearance',
+    prototype: true,
+    requiredFields: ['fullName', 'purpose'],
+  },
+  // ⚠️ `Other` IS NOT A BARANGAY FORM, and the template says so rather
+  // than picking one. It is the request form's escape hatch: the
+  // resident writes what they need into `purpose`, and which document
+  // answers it is the Secretary's decision. The entry exists so the
+  // Secretary gets a populated sample to work from, not so the system
+  // decides anything.
+  //
+  // `displayName` stays the stored string, like every other key -- the
+  // preview's title bar says what the request says. The descriptive
+  // title lives on the printed page, which is where a reader needs it.
+  'Other': {
+    Template: CustomDocumentTemplate,
+    displayName: 'Other',
+    prototype: true,
+    requiredFields: ['fullName', 'purpose'],
+  },
 })
 
 // ⚠️ `hasOwnProperty`, not a bare lookup. A request whose
@@ -66,16 +99,24 @@ export const templateFor = (documentType) =>
 
 export const SUPPORTED_DOCUMENT_TYPES = Object.freeze(Object.keys(DOCUMENT_TEMPLATES))
 
-// ⚠️ The two types the resident form offers that are NOT configured,
-// and why, so this is a decision on the record rather than an
-// oversight. Both fall through to the message below.
+// ⚠️ ALL SIX TYPES THE RESIDENT FORM OFFERS NOW RESOLVE, and this
+// message is no longer reachable from any of them.
 //
-//   Business Clearance -- needs a business name, address and nature of
-//     business. `document_requests` stores none of them; the only
-//     fields it has are the resident's own.
-//   Other -- has no layout by definition. The resident types what they
-//     need into `purpose`, and which form answers it is a decision the
-//     Secretary makes, not one a registry can.
+// X6 left `Business Clearance` and `Other` unconfigured on the grounds
+// that the schema cannot supply what they need. That observation still
+// holds exactly -- see the two entries above -- but the conclusion was
+// wrong in one direction: a resident can select both in the request
+// form, and the live table already held an approved Business Clearance
+// at `ready_for_pickup`, so "no template" meant a real approved request
+// with no sample output at all. They are prototypes with visible
+// placeholders now, which is the same answer the other four give to
+// every value the barangay has not supplied.
+//
+// ⚠️ THE MESSAGE STAYS, because `document_type` is FREE TEXT in the
+// database -- no CHECK constraint -- so a value outside the six is
+// still reachable by a crafted API call or a legacy row. It is the
+// fallback for an unrecognised type, not a statement about any type a
+// resident can choose.
 export const UNSUPPORTED_MESSAGE =
   'Printable template not configured for this document type.'
 
