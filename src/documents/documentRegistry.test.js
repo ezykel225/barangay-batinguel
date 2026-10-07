@@ -23,21 +23,26 @@ const RESIDENT_FORM_TYPES = [
 ]
 
 describe('the template registry', () => {
-  it('resolves a template for each of the four configured types', () => {
-    const configured = [
-      'Barangay Clearance',
-      'Barangay Certificate',
-      'Certificate of Indigency',
-      'Certificate of Residency',
-    ]
-    configured.forEach((type) => {
+  it('resolves a template for every type the resident form offers', () => {
+    RESIDENT_FORM_TYPES.forEach((type) => {
       expect(hasTemplate(type)).toBe(true)
       const entry = templateFor(type)
       expect(typeof entry.Template).toBe('function')
       expect(entry.displayName).toBe(type)
       expect(entry.prototype).toBe(true)
     })
-    expect(SUPPORTED_DOCUMENT_TYPES).toEqual(configured)
+    expect(SUPPORTED_DOCUMENT_TYPES).toEqual(RESIDENT_FORM_TYPES)
+  })
+
+  // ⚠️ EVERY ONE OF THE SIX IS STILL A PROTOTYPE. The two added here
+  // did not arrive as finished forms, and the four that were already
+  // here were not promoted by their company. Until Barangay Batinguel
+  // supplies its real forms this must stay true of all six.
+  it('marks all six as prototypes, not just the original four', () => {
+    expect(SUPPORTED_DOCUMENT_TYPES).toHaveLength(6)
+    SUPPORTED_DOCUMENT_TYPES.forEach((type) => {
+      expect(templateFor(type).prototype).toBe(true)
+    })
   })
 
   // ⚠️ Every configured template is a DIFFERENT component. One entry
@@ -48,19 +53,21 @@ describe('the template registry', () => {
     expect(new Set(components).size).toBe(components.length)
   })
 
-  // ⚠️ THE TWO DELIBERATE OMISSIONS. Business Clearance needs a
-  // business name and address the schema does not store; 'Other' has
-  // no layout by definition. Both must fall through, not crash.
-  it('reports Business Clearance and Other as unsupported', () => {
-    expect(hasTemplate('Business Clearance')).toBe(false)
-    expect(hasTemplate('Other')).toBe(false)
-    expect(templateFor('Business Clearance')).toBeNull()
-    expect(templateFor('Other')).toBeNull()
+  // ⚠️ THIS ASSERTION USED TO SAY THE OPPOSITE, and the reversal is
+  // the point of this pass. Business Clearance and Other were
+  // deliberately unconfigured in X6 because the schema cannot supply
+  // what they need -- which is still exactly true, and is why both
+  // print bracketed placeholders rather than values.
+  it('now configures Business Clearance and Other, which X6 left out', () => {
+    ;['Business Clearance', 'Other'].forEach((type) => {
+      expect(hasTemplate(type)).toBe(true)
+      expect(templateFor(type)).not.toBeNull()
+      expect(typeof templateFor(type).Template).toBe('function')
+    })
   })
 
-  it('covers four of the six types the resident form offers, and no type it does not', () => {
-    const configured = RESIDENT_FORM_TYPES.filter(hasTemplate)
-    expect(configured).toHaveLength(4)
+  it('covers all six types the resident form offers, and no type it does not', () => {
+    expect(RESIDENT_FORM_TYPES.filter(hasTemplate)).toHaveLength(6)
     // Nothing is configured that a resident cannot actually request.
     SUPPORTED_DOCUMENT_TYPES.forEach((type) => {
       expect(RESIDENT_FORM_TYPES).toContain(type)
@@ -170,10 +177,14 @@ describe('canGenerate — all three gates', () => {
     expect(canGenerate({ ...ok, status: 'claimed' })).toBe(false)
   })
 
+  // ⚠️ The template gate is unchanged -- what changed is which types
+  // pass it. `document_type` is free text, so an unrecognised value is
+  // still refused; the six a resident can choose are not.
   it('refuses a type with no configured template', () => {
-    expect(canGenerate({ ...ok, documentType: 'Business Clearance' })).toBe(false)
-    expect(canGenerate({ ...ok, documentType: 'Other' })).toBe(false)
     expect(canGenerate({ ...ok, documentType: 'Certificate of Vibes' })).toBe(false)
+    expect(canGenerate({ ...ok, documentType: 'Barangay Permit' })).toBe(false)
+    expect(canGenerate({ ...ok, documentType: '' })).toBe(false)
+    expect(canGenerate({ ...ok, documentType: 'constructor' })).toBe(false)
   })
 
   it('returns a boolean, never a truthy object', () => {
