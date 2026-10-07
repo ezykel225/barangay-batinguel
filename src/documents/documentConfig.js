@@ -80,6 +80,47 @@ export const SIGNATORY_PLACEHOLDER = {
   position: '[POSITION]',
 }
 
+// ─── Values the SCHEMA cannot supply ──────────────────────────────────
+//
+// ⚠️ THIS IS NOT THE SAME THING AS A MISSING VALUE, and conflating the
+// two is the mistake this block exists to prevent.
+//
+//   MISSING  — the column exists and this row is blank. `buildDocumentData`
+//              reports it, `DocumentPreview` refuses to print, and the
+//              message tells the Secretary to correct the REQUEST. That
+//              advice is actionable, because there is a field to correct.
+//
+//   UNRECORDED — `document_requests` has no such column at all, for any
+//              row, ever. A Business Clearance has no business name
+//              because the table stores `full_name`, `contact_number`,
+//              `purok`, `purpose` and `additional_notes` and nothing
+//              else. Routing that through the missing-field path would
+//              permanently disable Print on every Business Clearance
+//              while telling the Secretary to fix a field that does not
+//              exist -- advice nobody can act on.
+//
+// So an unrecorded value prints as a bracketed placeholder in the same
+// convention as the signatory above: visibly not a value, on a sheet
+// that already carries the SAMPLE TEMPLATE watermark.
+//
+// ⚠️ NOTHING HERE IS A GUESS DRESSED AS A PLACEHOLDER. There is no
+// `[PERMIT NO.]`, `[OR NO.]`, `[FEE]`, `[VALID UNTIL]` or
+// `[BUSINESS CLASSIFICATION]`, because printing a bracket for one of
+// those still asserts that Barangay Batinguel's form HAS that field --
+// which nobody has told this project. A placeholder is only for a value
+// the barangay has already told us exists, or that the document plainly
+// cannot be read without.
+export const UNRECORDED_PLACEHOLDERS = Object.freeze({
+  businessName: '[BUSINESS NAME]',
+  businessAddress: '[BUSINESS ADDRESS]',
+  natureOfBusiness: '[NATURE OF BUSINESS]',
+  // 'Other' records no title of its own: the resident picks "Other"
+  // and writes what they need into `purpose`. Which form answers it is
+  // the Secretary's decision, so the title is a placeholder and the
+  // purpose beside it is the real, stored text.
+  documentTitle: '[DOCUMENT TITLE]',
+})
+
 // Printed page geometry. A4 portrait, which is what Philippine
 // barangay offices print on; `@page` in DocumentPrint.css carries the
 // same value so the preview and the paper agree.

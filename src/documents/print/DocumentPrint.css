@@ -185,6 +185,23 @@
   overflow-wrap: anywhere;
 }
 
+/* ⚠️ A PLACEHOLDER MUST NOT READ AS A VALUE. `[BUSINESS NAME]` in the
+   same weight as a stored name is something a reader skims past. The
+   dashed rule and the lighter, letter-spaced type say "nothing is
+   recorded here" at a glance, and `print-color-adjust` keeps that true
+   on paper -- a distinction that only exists on screen is no
+   distinction at all on the sheet somebody is handed. */
+.doc-field dd.doc-field-placeholder {
+  font-weight: 500;
+  font-style: italic;
+  letter-spacing: 0.04em;
+  color: #5f6775;
+  border-bottom-style: dashed;
+  border-bottom-color: #9aa3b0;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
 /* ── Signatory and footer ────────────────────────────────────────── */
 .doc-foot {
   margin-top: 14mm;

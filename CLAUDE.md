@@ -65,7 +65,7 @@ banned below: it silences the one check this project has.
 
 ### Tests
 
-Thirty-five suites, 795 tests:
+Thirty-six suites, 852 tests:
 
 | File | What it covers |
 |---|---|
@@ -96,10 +96,11 @@ Thirty-five suites, 795 tests:
 | `src/pages/Announcements.test.js` | 8 tests over the browse page, the FIRST suite that renders a page component. The load-bearing pair: the card shows an excerpt and `/announcements/:id` still renders the whole 2,159-character notice, from the same row. Also that each card is ONE link with no nested anchor |
 | `src/pages/Events.test.js` | 14 tests over the Calendar \| List switcher, the list card and date selection. The load-bearing one: a card shows a time **only when `event_time` holds one** — it is NULL on every live row — and never digs one out of `location`, which on three legacy rows begins with a time somebody typed. Two more assert no heading level is skipped in either view |
 | `src/pages/EventDetails.test.js` | 8 tests over the detail page's Time row: shown with a time, **gone — label and all — for null, empty, whitespace and a missing column**, with the location left exactly as stored even when it begins with a time. Run **both directions**: with the condition removed, 5 of 8 fail |
-| `src/documents/documentRegistry.test.js` | 20 tests over the document-type → template mapping and the three generation gates. The load-bearing one: `canGenerate` refuses an official who is **not** the Secretary, so printing cannot widen what the queue already allows. Also that `Business Clearance` and `Other` are unsupported **by decision**, and that an inherited property name (`constructor`) does not resolve as a template |
+| `src/documents/documentRegistry.test.js` | 21 tests over the document-type → template mapping and the three generation gates. The load-bearing one: `canGenerate` refuses an official who is **not** the Secretary, so printing cannot widen what the queue already allows. Also that **all six** resident-form types resolve and all six are still marked `prototype`, and that an inherited property name (`constructor`) does not resolve as a template. ⚠️ One assertion here used to say the OPPOSITE — that Business Clearance and Other were unsupported by decision — and the reversal is deliberate; see *Complete prototype coverage* |
 | `src/documents/documentData.test.js` | 24 tests over the normalized shape a template receives: the Manila date (assembled from `MONTH_NAMES`, not from a locale's ordering), the `SAMPLE-` reference, long/accented/suffixed names, and the rule that an absent value is **reported, never filled** — no `N/A`, `UNKNOWN` or `TBD` reaches a field |
-| `src/documents/DocumentPreview.test.js` | 26 tests rendering all four prototype templates. Run **both directions**: flipping `DOCUMENT_TEMPLATE_MODE` to `'official'` fails exactly 3 — the watermark tests — and nothing else, which is what proves the one constant controls it. Also that the indigency template states no income or finding, and the residency one no duration |
+| `src/documents/DocumentPreview.test.js` | 29 tests rendering all **six** prototype templates. Run **both directions**: flipping `DOCUMENT_TEMPLATE_MODE` to `'official'` fails exactly 3 — the watermark tests — and nothing else, which is what proves the one constant controls it. Also that the indigency template states no income or finding, and the residency one no duration |
 | `src/documents/documentPermissions.test.js` | 19 source-reading tests. `canGenerate` could be correct and wired to the wrong flag, so these pin the wiring: the Resident and Nurse dashboards import the generator **not at all**, `isSecretary` is still `position === 'Barangay Secretary'`, there is exactly **one** call site, no template imports Supabase, and nothing reads `residents_registry` |
+| `src/documents/prototypeCoverage.test.js` | 53 tests over the pass that gave **all six** resident-form types a prototype. The load-bearing one **reads `ResidentDashboard.jsx`'s own `DOCUMENT_TYPES` array out of the source** and asserts every entry resolves — so adding a seventh option to the dropdown without adding a template fails in Jest instead of printing "Printable template not configured" to a Secretary holding an approved request. Then: both new sheets carry all three watermark layers; Business Clearance prints its three business values as **bracketed placeholders** marked `data-placeholder`, never as the requester's purok, and never blocks Print over them; `Other` prints a title that matches `/prototype/i` and **no real form name**; the three gates are re-run for both new types across all five statuses and both role flags; and the original four still print exactly their original four field labels with **zero** placeholders. ⚠️ Two scans are scoped to what the sheet **asserts** — the title and the non-free-text fields — because Business Clearance's own prose *denies* having a permit number, and a whole-sheet scan flags the disclaimer for containing the words it exists to disclaim. Certification language (`this is to certify`) is banned over the **whole** sheet, prose included. Run both directions: un-registering Business Clearance fails **28** across 3 suites, printing the requester's purok as the business address fails 3, and dropping the placeholder marking fails 3 |
 | `src/utils/rowActions.test.js` | 42 tests over what each queue row offers. Every document status both directions, including that `claimed` and `declined` offer **nothing** so no ⋮ is rendered at all; that a non-Secretary and a non-Treasurer get an **empty list** rather than disabled items; that Generate Document is gated **only** by the answer `canGenerate` gave and is always the **last** item (the menu focuses its first on open); and that each accessible name reads as English — `Approve document request from Ezequel Bautista`, `Generate Document for Ezequel Bautista`, `Approve reservation on 10 October 2026`. Plus 10 source-reading guards that every key it emits has a handler and an icon in the dashboard, that those handlers are the **existing** ones, and that the processing-set re-entrancy guards survived the loss of the `disabled` attribute |
 | `src/dashboards/officialDirectoryForm.test.js` | 31 tests over the Officials Directory form after migrations 028 and 029. ⚠️ **They do not prove the security property** — that is a database trigger, and only SQL can prove a trigger; the role-impersonation results live in the two migration headers. What they pin is the half Jest can see: the Position `<select>` **and** the Full Name `<input>` render **only** in the Add branch, the Edit branch ships **no** control for either (not a disabled one), both values are still shown and still associated with a label, the edit payload carries neither while an Add carries both, archive/restore are byte-identical, and the Add `<select>` offers **only** the two unpowered positions while the hint still names all three powered ones. Two load-bearing guards run against the SQL: the three powered positions the dashboard gates on are the same three 028's unique index and 029's `powered` array name, and the Full Name prose must still record that it is **temporary** and name `A3` and `official_account_links` — so A3 cannot quietly become permanent. The cross-check `officialAvailability.test.js` runs against migration 026 |
 | `src/utils/officialAvailability.test.js` | 24 tests over per-official consultation hours. The load-bearing one **reads `026_official_availability.sql`** and asserts the four statuses the form offers are exactly the four the CHECK accepts — the same thing `reservationWindow.test.js` does for migration 020 |
@@ -299,7 +300,9 @@ src/
                       are not Barangay Batinguel's official forms.
     documentConfig    DOCUMENT_TEMPLATE_MODE (the one watermark switch),
                       the barangay heading lines, the PLACEHOLDER
-                      signatory, A4 geometry.
+                      signatory, UNRECORDED_PLACEHOLDERS (values no
+                      COLUMN holds -- not the same thing as a missing
+                      one), A4 geometry.
     documentData      One request -> the values a template prints, plus
                       what is MISSING. Pure, no Supabase. The contract
                       that lets a real form replace a sample without
@@ -308,10 +311,13 @@ src/
                       gates (Secretary, status, configured template).
                       Pure.
     DocumentShell     Header, seal, SAMPLE watermark, signatory rule,
-                      footer -- shared by all four templates.
+                      footer -- shared by all six templates.
     DocumentPreview   The Secretary's modal. Takes the request as a
                       PROP and reads nothing.
-    templates/        One file per type. No Supabase, no fetching.
+    templates/        One file per type -- SIX, all six the request
+                      form offers. No Supabase, no fetching. Business
+                      Clearance and Other print bracketed placeholders
+                      for values the schema does not hold.
     print/            The A4 sheet and the @media print block.
 
   supabase/
@@ -3569,26 +3575,28 @@ Read from the live database before any code was written.
 | Signatory data | **none exists anywhere.** No signature column, no stored signatory, nothing that says who signs which document |
 | Reference number | **none.** Only the uuid primary key. Reservations got `BCR-2026-AB12CD` in migration 024; document requests got no equivalent |
 
-### Document types, and the two that are deliberately absent
+### Document types
 
-The resident form offers six. Four have templates:
+The resident form offers six, and **all six have templates** — the last
+two were added later; see *Complete prototype coverage* below.
 
-| Type | Template | Requires |
-|---|---|---|
-| Barangay Clearance | ✅ | name, purpose |
-| Barangay Certificate | ✅ | name, purpose |
-| Certificate of Indigency | ✅ | name, purpose |
-| Certificate of Residency | ✅ | name, purpose, **purok** |
-| Business Clearance | ❌ | — |
-| Other | ❌ | — |
+| Type | Template | Requires | Prints placeholders for |
+|---|---|---|---|
+| Barangay Clearance | ✅ | name, purpose | — |
+| Barangay Certificate | ✅ | name, purpose | — |
+| Certificate of Indigency | ✅ | name, purpose | — |
+| Certificate of Residency | ✅ | name, purpose, **purok** | — |
+| Business Clearance | ✅ | name, purpose | business name, address, nature |
+| Other | ✅ | name, purpose | document title |
 
-⚠️ **The two omissions are decisions, not gaps.** Business Clearance
-needs a business name, address and nature of business, and
-`document_requests` stores none of them — the only fields it has are the
-resident's own. "Other" has no layout by definition: the resident types
-what they need into `purpose`, and which form answers it is the
-Secretary's decision, not a registry's. Both fall through to
-`Printable template not configured for this document type.`
+> ⚠️ **THIS TABLE REVERSED A DECISION.** X6 shipped with Business
+> Clearance and Other deliberately unconfigured, on the grounds that
+> `document_requests` stores nothing about a business and that "Other"
+> has no layout by definition. **Both observations are still exactly
+> true** — which is why those two print bracketed placeholders rather
+> than values. What changed is the conclusion. See *Complete prototype
+> coverage* for what was measured and what the barangay must still
+> confirm.
 
 ⚠️ **Only the residency certificate requires a purok.** A residency
 document with no address is meaningless; the others are merely shorter
@@ -3615,7 +3623,7 @@ DocumentPreview.jsx  — modal, toolbar, window.print()
 | `documentConfig.js` | `DOCUMENT_TEMPLATE_MODE`, the barangay heading lines, the placeholder signatory, A4 geometry |
 | `documentData.js` | the normalized shape, the Manila date, the `SAMPLE-` reference, the missing-field check. **Pure** |
 | `documentRegistry.js` | type → template, `requiredFields`, `GENERATABLE_STATUSES`, `canGenerate`. **Pure** |
-| `DocumentShell.jsx` | everything four templates share |
+| `DocumentShell.jsx` | everything six templates share |
 | `templates/*.jsx` | one layout each, and nothing else |
 | `DocumentPreview.jsx` | the dialog, the toolbar, the blocking warnings |
 | `print/DocumentPrint.css` | the A4 sheet, and `@media print` |
@@ -3674,7 +3682,7 @@ building.
 ### The prototype watermark — one switch
 
 `DOCUMENT_TEMPLATE_MODE = 'prototype'` in `documentConfig.js`. In that
-mode `DocumentShell` renders three things, and **all four templates get
+mode `DocumentShell` renders three things, and **all six templates get
 them at once**: a diagonal `SAMPLE TEMPLATE` across the page, a dashed
 `SAMPLE TEMPLATE / FOR SYSTEM DEVELOPMENT ONLY` banner under the
 heading, and a footer line saying the layout is not an official form.
@@ -3821,8 +3829,13 @@ When the official forms arrive, replacing one is:
    `data.reference`, `data.issueDate`, `data.signatory`;
 4. delete the `<PrototypeProse>` block (the `PROTOTYPE WORDING` label
    goes with it);
-5. once **all four** are replaced, set `DOCUMENT_TEMPLATE_MODE` to
-   `'official'` in `documentConfig.js`;
+5. once **all six** are replaced, set `DOCUMENT_TEMPLATE_MODE` to
+   `'official'` in `documentConfig.js`. ⚠️ **Six, not four** — the X6
+   follow-up added Business Clearance and Other, and flipping the
+   switch after four would leave two prototypes printing with no
+   watermark. Business Clearance also needs its three bracketed
+   placeholders answered, and Other its title placeholder, or the real
+   form still prints `[BUSINESS NAME]`;
 6. re-run the print measurement.
 
 It must NOT require changes to the database, request processing,
@@ -3836,6 +3849,12 @@ scheme, which date belongs on the page, and whether Business Clearance
 needs columns the schema does not have.
 
 ### What was measured, and what was NOT
+
+⚠️ **"Four" below is a record of what X6 measured, and is left alone.**
+There were four templates on the day; there are six now, and the two
+added later were measured in their own pass — see *Complete prototype
+coverage*. A measurement record is not updated to match a later state
+any more than an `activity_log` row is.
 
 The preview, the four templates and the print stylesheet were captured
 from the **real component through Jest** and measured against the
@@ -4114,6 +4133,201 @@ and six modals all use them. Only `.btn-generate` became dead.
 still hashes to its pre-X2 bytes (`bda35a1…`, lines 1000–1165).
 
 ---
+
+## Complete prototype coverage — all six document types (X6 follow-up)
+
+2026-10-07, on `claude/x6-prototype-document-coverage`, built on `main`
+after PR #24 merged. **No migration, no schema change, no RLS change, no
+permission change and no workflow change.** Two templates and one
+registry entry each.
+
+### ⚠️ THIS REVERSES AN X6 DECISION, AND THE REASONING BEHIND IT STILL HOLDS
+
+X6 left `Business Clearance` and `Other` unconfigured, on the record,
+for two reasons:
+
+- Business Clearance needs a business name, address and nature of
+  business, and `document_requests` stores none of them.
+- "Other" has no layout by definition — the resident types what they
+  need into `purpose`, and which form answers it is the Secretary's
+  decision.
+
+⚠️ **Both are still exactly true.** The schema was re-read before any
+code was written and holds `full_name`, `contact_number`, `purok`,
+`purpose` and `additional_notes` — nothing about a business, and no
+document title. What changed is the conclusion, not the facts.
+
+**What settled it**: a resident can select both in the live request
+form, and `document_requests` already held a **`Business Clearance` row
+sitting at `ready_for_pickup`** — a real approved request, in the window
+where a sheet has to come out of a printer, for which the Secretary got
+`Printable template not configured for this document type.` "No template
+at all" was not a safer answer than a watermarked sample with visible
+placeholders; it was the same refusal with less information in it.
+
+### ⚠️ UNRECORDED IS NOT MISSING, and conflating them was the trap
+
+This is the one design decision worth reading twice.
+
+| | |
+|---|---|
+| **Missing** | the column exists and this row is blank. `buildDocumentData` reports it, the preview refuses to print, and the message says *correct the request through the existing workflow*. **That advice is actionable** — there is a field to correct |
+| **Unrecorded** | `document_requests` has no such column **at all, for any row, ever** |
+
+Routing the business values through the missing-field path would have
+**permanently disabled Print on every Business Clearance**, while telling
+the Secretary to go and fix a field that is not on the request form.
+So `requiredFields` for both new types is `['fullName', 'purpose']` —
+what the schema can actually supply — and the unrecorded values print as
+bracketed placeholders in the same convention as the signatory.
+
+⚠️ **A test asserts both halves**: a Business Clearance with all three
+placeholders does **not** raise a blocker and Print stays enabled, and
+the same request with a blank `full_name` still blocks.
+
+### ⚠️ A placeholder is not a free pass to invent a field
+
+`UNRECORDED_PLACEHOLDERS` holds **four** strings — `[BUSINESS NAME]`,
+`[BUSINESS ADDRESS]`, `[NATURE OF BUSINESS]`, `[DOCUMENT TITLE]` — and
+deliberately **no** `[PERMIT NO.]`, `[OR NO.]`, `[FEE]`, `[VALID UNTIL]`
+or `[BUSINESS CLASSIFICATION]`.
+
+A bracket looks cautious while still asserting that Barangay Batinguel's
+real form **has** that field. Nobody has told this project that. A
+placeholder is only for a value the barangay has already indicated
+exists, or one the document plainly cannot be read without. A test scans
+every sheet for those patterns.
+
+### ⚠️ The placeholders come through the adapter, not through an import
+
+A template binds `data.unrecorded.businessName` exactly as it binds
+`data.resident.fullName`. So on the day the barangay adds a
+`business_name` column, **`documentData.js` is the one file that
+changes** — the line stops reading `UNRECORDED_PLACEHOLDERS.businessName`
+and starts reading `text(row.business_name)` — and the template, the
+registry, the preview and the print pipeline are untouched. A template
+that imported the placeholder directly would have to be rewritten to
+un-invent it. That is the X6 layering doing its job rather than being
+claimed.
+
+### Two things the schema cannot tell apart, and the labels that say so
+
+- ⚠️ **`full_name` is the REQUESTER, not an established owner.** The row
+  records who filed the request and nothing about who owns the business,
+  so the label reads **Requested by** and a test asserts the sheet says
+  no `owner`, `proprietor` or `operator` anywhere.
+- ⚠️ **`purok` is the resident's, not the business address.** Two
+  different facts; the schema holds only the first. The label reads
+  **Requester's purok**, Business address stays a placeholder, and a test
+  asserts the placeholder is never replaced by the purok.
+
+### `Other` is not a form, and the template says so
+
+The title is **`Prototype Custom Barangay Document`** — deliberately not
+the name of any real form. Printing this under a plausible heading like
+"Barangay Certification" would be the system deciding which document a
+resident asked for, on the sheet that gets handed over. A test asserts
+the title matches `/prototype/i` and matches none of
+`clearance|certificate|indigency|residency|permit`.
+
+⚠️ **No body text is generated from the purpose.** Turning *"I need
+proof I live here for my scholarship"* into a certification sentence is
+the system writing a barangay document, which is what the Secretary is
+for. The purpose is printed as a field — quoted back, not acted on — and
+a test asserts no sheet contains `this is to certify` or `hereby
+certif`, prose included.
+
+### Nothing about permissions, status or the architecture moved
+
+| | |
+|---|---|
+| `canGenerate` | **untouched.** Same three gates, same one call site. The two new types were added to the registry and nothing else |
+| Secretary-only | unchanged. Re-tested for both new types across all five statuses and both role flags |
+| Window | still `approved` / `ready_for_pickup`. `pending`, `declined` and `claimed` refuse, for all six |
+| Status on generate/print | **still none.** A test reads the preview and both new templates for `supabase`, `logActivity`, `.update(`, `.insert(`, `useEffect` and `fetch(` |
+| Dashboard, ⋮ menu, `rowActions` | **not edited.** The registry was the only thing that had to know |
+| `UNSUPPORTED_MESSAGE` | **kept.** `document_type` is free text with no CHECK, so a value outside the six is still reachable by a crafted API call or a legacy row. It is no longer reachable from anything a resident can choose |
+
+### ⚠️ ALL SIX ARE STILL PROTOTYPES
+
+Adding the last two did not promote the first four. Barangay Batinguel
+has still not supplied any of its forms, every one of the six carries the
+`SAMPLE TEMPLATE` watermark on screen and on paper, and
+`DOCUMENT_TEMPLATE_MODE` is still the single switch. A test asserts
+`prototype: true` on all six.
+
+### What was measured
+
+Real component output captured through Jest and rendered against the
+**shipped CSS bundle** in Chromium — the pattern X2, X3, X4 and X6 used.
+
+| Check | Result |
+|---|---|
+| Sheet geometry, 7 captures x 4 widths | **794x1123** layout px = A4 at 96dpi, every time |
+| Content past the sheet's right or bottom edge | **0px**, every capture, every width |
+| Document-level horizontal overflow | **0** at 375 / 768 / 1280 / 1440 |
+| Printed sheet from window widths 375 / 900 / 1280 | **793.7x1122.5, transform `none`** at all three, both new types |
+| PDF pages | 1 ordinary, **2** for the deliberately extreme case (a 70-character surname, a 66-character purok, a 420-character purpose) rather than clipping |
+| Placeholder vs stored value, computed | placeholder `italic 500 #5f6775 dashed` · stored `normal 600 #111827 solid` |
+| Placeholder count per sheet | Business Clearance **3**, Other **1**, each of the original four **0** |
+| axe-core (WCAG 2.0/2.1 A + AA + best practice), 6 page-states x 2 widths | see below |
+| Jest | 35 suites, **821 tests** |
+| Production build | clean, no ESLint warnings, **224.72 kB** gzipped (+452 B), CSS 24.07 kB (+5 B) |
+
+⚠️ **TWO MEASUREMENT FAILURES WERE MY HARNESS, NOT THE TEMPLATES**, and
+both are worth recording because each looked like a real defect:
+
+- The first run reported the sheet **160px wide at 375** with content
+  **43.9px past its own edge**. My wrapper omitted
+  `.doc-preview-scale`, so `.doc-page` became a direct flex child of
+  `.doc-preview-stage` and was squeezed by the default `flex-shrink`.
+  The real DOM has that wrapper precisely so it cannot happen.
+- It also reported every sheet as "not 794px wide" — because **A4 at
+  96dpi is 793.7px**, and `getBoundingClientRect` below 900px returns
+  the *scaled* preview box by design, not the layout box. The rounded
+  `794x1123` in this file is a report, not a tolerance. The check now
+  reads `offsetWidth` for layout and measures the paper separately
+  under print media.
+
+⚠️ **Two axe findings, both pre-existing harness artifacts.**
+`landmark-one-main` and `region` fire because the capture is a bare
+`.doc-page` fragment with no `<main>` around it. **Confirmed by running
+the identical audit against the untouched `Barangay Clearance` and
+`Certificate of Residency` captures**, which report the same two rules
+with the same `passes=21` — so they belong to the wrapper, not to this
+pass. The same class of artifact X3, X6 and PR #24 each recorded.
+
+⚠️ **The empty seal box in the captured screenshots is also the
+harness.** The Jest render keeps webpack's module path for
+`logo.png`, which a `file://` page cannot resolve. The real bundle
+resolves it; the seal is the project's existing logo asset, unchanged.
+
+### ⚠️ Still NOT authenticated-browser verified
+
+The Official Dashboard is behind `ProtectedRoute` and this environment
+still has **no test account**, so **neither new document was generated
+from a live queue row**. Nothing was done to weaken authentication for a
+screenshot. The sheets above are real component output measured against
+the real CSS bundle; the Secretary clicking *Generate Document* on the
+live `Business Clearance` row at `ready_for_pickup` has not been seen.
+
+### What Barangay Batinguel must still confirm
+
+Unchanged by this pass, and now true of six templates rather than four:
+the real layouts and wording, who signs each document, the real
+numbering scheme, and which date belongs on the page. Specific to the
+two added here:
+
+- whether the barangay's Business Clearance records a business name,
+  address and nature of business — and therefore whether
+  `document_requests` needs those columns, or whether a business
+  clearance is filed some other way entirely;
+- whether it carries a permit number, OR number, fee, validity period or
+  classification — **none of which is printed or placeheld**, because
+  nobody has said they exist;
+- whether "Other" should remain a single catch-all, or whether the
+  request form's list should grow to name the documents residents keep
+  asking for under it.
 
 ## MASTER-A steps A1 and A1b — the directory write path (028, 029)
 
@@ -4596,11 +4810,16 @@ derives her initials from. It is no longer displayed as a label.
   canonical keys.
 - **The official barangay document forms.** X6 built the whole
   generation pipeline against PROTOTYPE layouts because the barangay has
-  not supplied its real clearance, certificate, indigency or residency
-  forms. Blocked on those forms, and on four things only the barangay
-  can settle: who signs each document, the real numbering scheme, which
-  date belongs on the page, and whether Business Clearance needs columns
-  the schema does not have.
+  not supplied its real forms, and the X6 follow-up extended that to all
+  **six** types the request form offers — clearance, certificate,
+  indigency, residency, business clearance and a generic custom
+  document. ⚠️ **All six are still samples**; adding the last two did
+  not promote the first four. Blocked on those forms, and on four things
+  only the barangay can settle: who signs each document, the real
+  numbering scheme, which date belongs on the page, and whether Business
+  Clearance needs columns the schema does not have — which is now a live
+  question rather than a reason to omit the template, since the sheet
+  prints `[BUSINESS NAME]` until it is answered.
 - **019B — the Previous Term Officials roster and its UI.** Migration 019A
   created the tables; both are **empty**, and there is **no frontend**. 019B
   seeds the confirmed roster from SQL and adds the read-only Official Portal
@@ -4615,9 +4834,9 @@ derives her initials from. It is no longer displayed as a label.
 - **Source maps ship to production** (~7 MB), so the original JSX is
   publicly reconstructable. `GENERATE_SOURCEMAP=false` in Vercel fixes it.
 - **`public/logo.png` is 984 KB and referenced by nothing.**
-- **Thin automated test coverage.** 795 tests in thirty-five suites: one
+- **Thin automated test coverage.** 852 tests in thirty-six suites: one
   smoke test over `<App />`, which fails without `.env` because
-  `supabaseClient.js` throws at import time, and 794 tests over the
+  `supabaseClient.js` throws at import time, and 851 tests over the
   resident workflow rules, the display labels, the booking window, the
   month grid and its three feature layers, the document-request filter,
   the queue rows' action lists, the ⋮ menu's keyboard and authorization
@@ -4684,8 +4903,8 @@ derives her initials from. It is no longer displayed as a label.
   moving them into `event_time` is a data correction for the barangay
   to make, not a display function's guess.
 - ⚠️ **The printable documents are PROTOTYPES.** The barangay has not
-  supplied its official forms, so every template under
-  `src/documents/templates/` is a SAMPLE layout carrying a visible
+  supplied its official forms, so **all six** templates under
+  `src/documents/templates/` are SAMPLE layouts carrying a visible
   watermark. They must not be treated as verified Barangay Batinguel
   forms. See *Printable barangay documents (X6)* for the replacement
   procedure.
@@ -4694,10 +4913,20 @@ derives her initials from. It is no longer displayed as a label.
   the printed date is the GENERATION date, both labelled as such. A real
   numbering scheme and the right date are decisions for the barangay's
   own form, not for a prototype.
-- **Business Clearance and "Other" have no printable template**, by
-  decision: the first needs business fields `document_requests` does not
-  store, the second has no layout. Both show
-  `Printable template not configured for this document type.`
+- ⚠️ **Business Clearance prints three bracketed placeholders, and
+  "Other" prints one**, because `document_requests` stores no business
+  name, address or nature of business and no custom document title. Both
+  types DO have prototype templates now — see *Complete prototype
+  coverage* — but a placeholder is not a value, and what the barangay's
+  real Business Clearance actually records is still unknown. Whether
+  those belong as new columns, or whether a business clearance is filed
+  some other way entirely, is the barangay's to settle.
+- **`document_requests` stores nothing about a business.** Its columns
+  are `full_name`, `contact_number`, `purok`, `purpose` and
+  `additional_notes` — the requester's own details. So `full_name` is
+  labelled **Requested by** rather than an owner, and `purok` is
+  labelled as the requester's rather than used as the business address;
+  those are different facts and the schema holds only the first.
 - **`activity_log` records no document generation or print.** Its
   `action` CHECK (migration 016) has no such value and
   `stamp_activity_actor` gates who may write one, so logging a
