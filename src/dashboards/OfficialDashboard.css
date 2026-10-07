@@ -130,6 +130,36 @@
   box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.1);
 }
 
+/* ── A value the form shows but does not edit (migration 028) ────────
+ *
+ * The Edit Official modal displays Position and cannot change it: that
+ * is `protect_official_record()` in the database, not a UI preference.
+ *
+ * ⚠️ Deliberately NOT a disabled `.modal-form-input`. A greyed-out
+ * control still says "this is a control" to everybody and still sits in
+ * the accessibility tree; a plain value says what it is. It is sized to
+ * match the inputs above and below it so the form does not jump, but it
+ * carries no border and no focus ring, because there is nothing to
+ * focus.
+ */
+.modal-form-static {
+  margin: 0;
+  padding: 10px 14px 10px 0;
+  font-size: var(--fs-14);
+  font-weight: 600;
+  color: #1f2937;
+  overflow-wrap: anywhere;
+}
+
+/* The sentence under it saying where the value IS maintained. An
+   unexplained read-only field reads as something broken. */
+.modal-form-hint {
+  margin: 2px 0 0;
+  font-size: var(--fs-12);
+  line-height: 1.45;
+  color: var(--grey-600);
+}
+
 .modal-form-textarea {
   width: 100%;
   padding: 10px 14px;
