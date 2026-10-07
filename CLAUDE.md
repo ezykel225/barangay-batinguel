@@ -65,7 +65,7 @@ banned below: it silences the one check this project has.
 
 ### Tests
 
-Thirty-four suites, 764 tests:
+Thirty-five suites, 784 tests:
 
 | File | What it covers |
 |---|---|
@@ -101,6 +101,7 @@ Thirty-four suites, 764 tests:
 | `src/documents/DocumentPreview.test.js` | 26 tests rendering all four prototype templates. Run **both directions**: flipping `DOCUMENT_TEMPLATE_MODE` to `'official'` fails exactly 3 — the watermark tests — and nothing else, which is what proves the one constant controls it. Also that the indigency template states no income or finding, and the residency one no duration |
 | `src/documents/documentPermissions.test.js` | 19 source-reading tests. `canGenerate` could be correct and wired to the wrong flag, so these pin the wiring: the Resident and Nurse dashboards import the generator **not at all**, `isSecretary` is still `position === 'Barangay Secretary'`, there is exactly **one** call site, no template imports Supabase, and nothing reads `residents_registry` |
 | `src/utils/rowActions.test.js` | 42 tests over what each queue row offers. Every document status both directions, including that `claimed` and `declined` offer **nothing** so no ⋮ is rendered at all; that a non-Secretary and a non-Treasurer get an **empty list** rather than disabled items; that Generate Document is gated **only** by the answer `canGenerate` gave and is always the **last** item (the menu focuses its first on open); and that each accessible name reads as English — `Approve document request from Ezequel Bautista`, `Generate Document for Ezequel Bautista`, `Approve reservation on 10 October 2026`. Plus 10 source-reading guards that every key it emits has a handler and an icon in the dashboard, that those handlers are the **existing** ones, and that the processing-set re-entrancy guards survived the loss of the `disabled` attribute |
+| `src/dashboards/officialDirectoryForm.test.js` | 20 tests over the Officials Directory form after migration 028. ⚠️ **They do not prove the security property** — that is a database trigger, and only SQL can prove a trigger; the role-impersonation results live in 028's header. What they pin is the half Jest can see: the position `<select>` renders **only** in the Add branch, the Edit branch ships **no** control (not a disabled one), the value is still shown with the sentence saying where it IS maintained, `position` is gone from the edit payload but still sent on an Add, archive/restore are byte-identical, and the three positions 028's unique index names are the same three the dashboard gates on — the cross-check `officialAvailability.test.js` runs against migration 026 |
 | `src/utils/officialAvailability.test.js` | 24 tests over per-official consultation hours. The load-bearing one **reads `026_official_availability.sql`** and asserts the four statuses the form offers are exactly the four the CHECK accepts — the same thing `reservationWindow.test.js` does for migration 020 |
 | `src/components/EServicesMenu.test.js` | 15 tests over the E-Services dropdown and the catalogue: the disclosure pattern, Escape and focus restore, that it does **not** use `role="menu"`, and that every service states its access requirement in words |
 | `src/utils/residentTabs.test.js` | 7 tests over `?tab=` resolution — a hint, never authorization |
@@ -319,7 +320,7 @@ src/
 
   assets/images/      11 official portraits, page backgrounds, logo.
 
-supabase-migrations/  21 numbered SQL files. A record, not a runner.
+supabase-migrations/  28 numbered SQL files. A record, not a runner.
 supabase/functions/   Edge Function source (notify-reservation-sms).
 docs/                 SETUP.md, TESTING-WALKTHROUGH.pdf + its generator.
 ```
@@ -452,6 +453,13 @@ Officials who lack a given permission still **see** the data — the action
 buttons are replaced with a "Treasurer only" note. Deliberate, for
 transparency.
 
+⚠️ **`position` is SQL/admin maintenance only since migration 028.** It
+decides who holds those permissions, and until 028 any official could
+rewrite it from the Edit Official form — including their own. See
+*MASTER-A step A1* below. The Edit form now **shows** the position and
+offers no control; Add still sets one, because a new directory row has
+to say what the person does.
+
 ---
 
 ## ⚠️ Known fragility — read before renaming anyone
@@ -482,6 +490,15 @@ can no longer share a name and break the `.single()` lookups. The
 zero-match half remains: an official with no active directory row still
 silently loses their position permissions, which is what the missing
 Kagawad below actually was.
+
+⚠️ **Migration 028 removed a DIFFERENT and worse half**, found in the
+MASTER-A architecture checkpoint: the string join was not only fragile,
+the *other* side of it — `barangay_officials.position` — was writable by
+any official. See *MASTER-A step A1* below. The join itself is
+**unchanged and still the authorization key**; the approved replacement
+is a private `official_account_links` table, **not** a `profile_id`
+column on `barangay_officials`, because that table is read by `anon`
+with `select('*')` on the public Officials page.
 
 ### The missing Kagawad, 2026-09-30
 
@@ -694,7 +711,7 @@ such row.
 
 ## Database notes
 
-**27 migrations**, `001` through `027`, all applied. ⚠️ 027 is a
+**28 migrations**, `001` through `028`, all applied. ⚠️ 027 is a
 DATA CORRECTION, not a schema change — see *The portrait is lost by the
 RENAME* under *Public E-Services (X5)*.
 
@@ -4086,6 +4103,190 @@ still hashes to its pre-X2 bytes (`bda35a1…`, lines 1000–1165).
 
 ---
 
+## MASTER-A step A1 — the position write path (migration 028)
+
+2026-10-07, on `claude/master-a-directory-auth-hardening`, from the
+MASTER-A architecture checkpoint. **A1 only. MASTER-A is NOT finished** —
+see *What A1 does not fix* at the end of this section.
+
+### ⚠️ What was exploitable
+
+`barangay_officials` carries Supabase's default table-wide `GRANT ALL`
+for `authenticated` — all 12 columns, **no column-level grant anywhere**
+— and its UPDATE policy was, and still is:
+
+```
+"Officials can update directory"
+  USING      (EXISTS … profiles.id = auth.uid() AND role = 'official')
+  WITH CHECK (same)
+```
+
+No row restriction, no column restriction. The only trigger on the table,
+`trg_stamp_official_archive`, governs `archived_at`/`archived_by` and
+inspects nothing else. `position` had **no CHECK constraint and no unique
+index**.
+
+So any official could rewrite any row's `position` — and `position` is
+exactly what the Secretary and Treasurer RLS policies read.
+
+### A0 — reproduced, then re-run after the fix
+
+Impersonated **Harold Katada Baroy** (Kagawad) with `SET LOCAL ROLE
+authenticated` and his own JWT claims, inside blocks that always end in
+`RAISE EXCEPTION`, so Postgres undoes every statement — there is no code
+path through them that commits.
+
+| | before 028 | after 028 |
+|---|---|---|
+| Kagawad → `document_requests` UPDATE | rows=0 | rows=0 |
+| Kagawad → own `position` = `Barangay Secretary` | **rows=1 ACCEPTED** | **P0001 REFUSED** |
+| Kagawad → `document_requests` UPDATE again | **rows=1, status → `approved`** | rows=0 |
+| Kagawad → own `position` = `Barangay Treasurer` | **rows=1 ACCEPTED** | **P0001 REFUSED** |
+| Kagawad → `reservations` UPDATE | **rows=1** | rows=0 |
+| Kagawad → demote the REAL Secretary | **rows=1 ACCEPTED** | **P0001 REFUSED** |
+| Secretary → `document_requests` UPDATE | rows=1 | rows=1 (unchanged) |
+| Treasurer → `reservations` UPDATE | rows=1 | rows=1 (unchanged) |
+
+⚠️ **It was reachable through the shipped UI, not only by a crafted API
+call.** The Officials Directory ⋮ menu offers **Edit** on every row
+*including the official's own* — only `Archive` is withheld there — and
+the Edit modal sent `position` as a client value. Four clicks.
+
+⚠️ **`barangay_officials_one_active_per_name` did not help.** It indexes
+`full_name`, not `position`, so a **second active Barangay Secretary**
+was permitted, the incumbent was not displaced, and nothing looked wrong
+in the directory.
+
+The move *was* recorded — `logActivity({action:'edited'})` fires and
+migration 015 stamps the actor truthfully — but only in a log every
+official can read, including the one who did it.
+
+⚠️ **Nothing persisted from any of these runs.** Verified afterwards:
+every row touched reads its original value. Three live counts *did* move
+between the checkpoint and the test (a guest booking at 01:33 and four
+`verified` entries by Hon. Frankie Credo between 00:54 and 01:24) — that
+was the repo owner using the site, not the tests, and the timestamps and
+actor names settle it.
+
+### The guard
+
+`protect_official_record()`, BEFORE UPDATE on `barangay_officials`.
+Rejects an API caller's change to **`position`**, **`created_at`** and
+**`created_by`**.
+
+⚠️ **`IS DISTINCT FROM`, not a blanket refusal.** The Edit modal sends
+every field on every save, so rejecting an unchanged value would break
+ordinary edits that have nothing to do with position. Verified: an edit
+that re-submits the same position still saves.
+
+⚠️ **The trusted-caller test was MEASURED, not copied**, because the two
+existing triggers use two different expressions. Measured in this
+database:
+
+| context | `auth.role()` |
+|---|---|
+| connector / SQL Editor (no JWT) | **NULL** |
+| API, signed in | `'authenticated'` |
+| API, anonymous | `'anon'` |
+| API, service_role key | `'service_role'` |
+
+So the guard trusts `auth.role() IS NULL OR auth.role() = 'service_role'`
+— byte-for-byte what `protect_document_request_status` already uses, and
+the same set `stamp_official_archive` already treats as "not an API
+caller" **on this same table**. Two triggers on one table with two trust
+models would be a trap. Verified in both directions: direct SQL changes a
+position (rows=1) and a `service_role` call does too (rows=1, with
+`rolbypassrls = t`).
+
+⚠️ **`created_at`/`created_by` were protected on evidence, not on
+principle.** No update path in the application writes either: the Edit
+modal sends full_name/committee/contact_number/display_order/updated_by,
+archive sends `archived_at`, restore sends `archived_at` + `display_order`,
+the photo upload sends `photo_url`. `created_by` is written on INSERT
+only, which a BEFORE UPDATE trigger never sees.
+
+**Trigger order:** Postgres fires same-timing triggers alphabetically, so
+`trg_protect_official_record` runs before `trg_stamp_official_archive`
+(`p` < `s`). Immaterial here, and stated so nobody works it out again —
+this guard reads only `position`/`created_at`/`created_by`, the stamp
+trigger writes only `archived_at`/`archived_by`. They share no column.
+(Contrast migration 011, where the order IS load-bearing.)
+
+### One active holder per powered position
+
+`barangay_officials_one_active_per_powered_position`, a partial unique
+index on `position` where `archived_at IS NULL` and the position is one
+of the three that carry permissions.
+
+**Precondition re-verified against the live table immediately before
+creating it**: Punong Barangay = 1, Barangay Secretary = 1, Barangay
+Treasurer = 1.
+
+⚠️ **Only those three.** Kagawad is a seven-seat office and SK
+Chairperson is outside this model; neither is constrained.
+
+⚠️ **Only active rows**, so archiving a Secretary and appointing a
+successor still works, and an archived historical holder never
+conflicts. Verified both: a second *active* Secretary is refused
+`23505`, and an archived row sharing the position is accepted.
+
+⚠️ **This is defence in depth, not the control** — the trigger is. It
+exists so that if the guard is ever removed, a second active Secretary
+fails loudly instead of silently holding the same powers as the real one.
+
+It is also what closes the INSERT path: an official could still *insert*
+a row with `position = 'Barangay Secretary'`, but to gain anything it
+would have to carry their own `full_name`, and
+`one_active_per_name` refuses that.
+
+### The form shows the position and cannot change it
+
+⚠️ **The control is GONE, not disabled.** A disabled `<select>` would be
+wrong twice: it still announces a control that does nothing, and it
+implies the restriction belongs to the form. It does not — it is the
+database, and a crafted API call is refused with the same `P0001`.
+
+The value is still **shown**, with one sentence saying where it is
+maintained. An unexplained read-only field reads as something broken.
+Add still offers the select, because a new row has to say what the
+person does.
+
+Measured against the shipped CSS bundle at 375/768/1280/1440, both
+states: zero document overflow, the modal fits the viewport at every
+width, and on Edit the position is **out of the tab order** entirely
+(full name → committee → contact → display order → Cancel → Update).
+
+⚠️ **No privileged UI was added to replace it**, by decision. A
+Punong-Barangay position-management screen is a feature, not part of a
+security fix.
+
+### ⚠️ What A1 does NOT fix
+
+- **Authorization still resolves through the `full_name` string join.**
+  Renaming an official in one table and not the other still silently
+  removes their position powers. A2–A5 convert the two RLS policies,
+  `can_see_audience()`, `official_id_for_current_user()` and the
+  dashboard's `officialInfo` lookup to a private
+  **`official_account_links`** table — the approved design, chosen over
+  a `profile_id` column because `barangay_officials` is read by `anon`
+  with `select('*')` on the public Officials page and a column there
+  would publish every official's auth identifier.
+- **The self-archive guard still fails open.** It still compares
+  `profiles.full_name` to `NEW.full_name`. Making it fail closed needs
+  the link table first, or every official loses the ability to archive
+  anybody.
+- **`kapitan_status` and `kapitan_availability` UPDATE are still "any
+  official"** at the database, gated only by `isKapitan` in React. A1
+  makes that smaller — an official can no longer promote themselves to
+  Punong Barangay — but not closed: any official can still write those
+  two tables directly.
+- **`TRUNCATE` is still granted to `anon` and `authenticated`** on 14
+  tables, and RLS does not cover TRUNCATE. Not reachable through
+  PostgREST today (no TRUNCATE verb, and no project function runs
+  dynamic SQL), but it is MASTER-B's.
+
+---
+
 ## Health centre
 
 **Medicine stock is a status, not a quantity** — Available / Low stock /
@@ -4289,9 +4490,9 @@ derives her initials from. It is no longer displayed as a label.
 - **Source maps ship to production** (~7 MB), so the original JSX is
   publicly reconstructable. `GENERATE_SOURCEMAP=false` in Vercel fixes it.
 - **`public/logo.png` is 984 KB and referenced by nothing.**
-- **Thin automated test coverage.** 764 tests in thirty-four suites: one
+- **Thin automated test coverage.** 784 tests in thirty-five suites: one
   smoke test over `<App />`, which fails without `.env` because
-  `supabaseClient.js` throws at import time, and 763 tests over the
+  `supabaseClient.js` throws at import time, and 783 tests over the
   resident workflow rules, the display labels, the booking window, the
   month grid and its three feature layers, the document-request filter,
   the queue rows' action lists, the ⋮ menu's keyboard and authorization
@@ -4377,6 +4578,40 @@ derives her initials from. It is no longer displayed as a label.
   `stamp_activity_actor` gates who may write one, so logging a
   generation needs a migration plus a trigger change. The business
   transitions on a request are already logged, unchanged.
+- ⚠️ **`kapitan_status` and `kapitan_availability` UPDATE are gated in
+  the frontend only.** The policy is `role IN ('admin','official')` with
+  no position check; `isKapitan` in React is the only thing restricting
+  it to the Punong Barangay. Found in the MASTER-A checkpoint, narrowed
+  but not closed by migration 028 (an official can no longer promote
+  themselves into the position), and scheduled for A3.
+- ⚠️ **`TRUNCATE` is granted to `anon` and `authenticated` on 14
+  tables, and PostgreSQL RLS does not cover TRUNCATE.** Not reachable
+  through PostgREST today — there is no TRUNCATE verb and no project
+  function runs dynamic SQL (`rls_auto_enable` is an event trigger) —
+  so this is a latent privilege rather than a hole. The same is true of
+  `activity_log` UPDATE/DELETE, `profiles` DELETE and the two queues'
+  DELETE, all granted with no policy behind them. 019A's two-barrier
+  pattern is the remedy; MASTER-B.
+- **22 SECURITY DEFINER functions are callable by `anon` and
+  `authenticated`** per `get_advisors`. Twelve are trigger functions
+  that PostgREST cannot invoke at all, four are deliberate RPCs, and six
+  are identity predicates called from inside RLS policies — those six
+  must not be revoked without first proving, in a rolled-back
+  transaction, that a policy can still call them. MASTER-B.
+- **`btree_gist` is installed in the `public` schema**, which puts
+  **188** of the 218 functions in that schema on the exposed API
+  surface. It is load-bearing — the reservations overlap exclusion
+  constraint needs it for `date WITH =` — so it cannot be dropped, only
+  moved, and moving it touches the one constraint preventing double
+  booking. Low priority, recorded so the advisor warning is not
+  rediscovered.
+- **Source maps and the deployment target.** ⚠️ CLAUDE.md and README say
+  Vercel; there are **two** live targets — Vercel
+  (`barangay-batinguel-e-processing`) **and** Netlify
+  (`ui-working-concept-bautista`), both commenting on every PR. The only
+  deployment artefact in the repo is `public/_redirects`, which is
+  Netlify-only. `GENERATE_SOURCEMAP=false` has to be set in **both**
+  dashboards; measured on a real build from `main`, the map is **7.6 MB**.
 - **No lint script and no typecheck script** — see *Commands* and
   *Tests* above.
 

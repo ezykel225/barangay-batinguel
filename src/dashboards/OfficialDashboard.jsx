@@ -1970,9 +1970,14 @@ const OfficialDashboard = () => {
         // handlers below already guard against.
         const { data: updated, error } = await supabase
           .from('barangay_officials')
+          // ⚠️ `position` is NOT sent. The form no longer offers it and
+          // migration 028 refuses it, so including it would be a field
+          // this payload claims to set and does not. The trigger uses
+          // `IS DISTINCT FROM`, so re-sending the unchanged value would
+          // still save -- that tolerance exists so an ordinary edit is
+          // never broken by it, not as a licence to send it.
           .update({
             full_name: newOfficial.full_name,
-            position: newOfficial.position,
             committee: newOfficial.committee || null,
             contact_number: newOfficial.contact_number || null,
             display_order: requestedOrder,
@@ -4992,21 +4997,57 @@ const OfficialDashboard = () => {
               />
             </div>
 
-            <div className="modal-form-group">
-              <label htmlFor="off-position" className="modal-form-label">Position</label>
-              <select id="off-position"
-                className="modal-form-input"
-                value={newOfficial.position}
-                onChange={(e) => setNewOfficial({ ...newOfficial, position: e.target.value })}
-              >
-                <option value="">Select position</option>
-                <option value="Punong Barangay">Punong Barangay</option>
-                <option value="Barangay Secretary">Barangay Secretary</option>
-                <option value="Barangay Treasurer">Barangay Treasurer</option>
-                <option value="Kagawad">Kagawad</option>
-                <option value="SK Chairperson">SK Chairperson</option>
-              </select>
-            </div>
+            {/* ⚠️ POSITION IS READ-ONLY WHEN EDITING, and the control is
+                GONE rather than disabled, because migration 028 refuses
+                the write at the database.
+
+                Until 028, any official could open this form on their own
+                row, set Position to "Barangay Secretary" and save --
+                reproduced end to end as a Kagawad, who then approved a
+                document request. `position` is what the Secretary and
+                Treasurer RLS policies read, so the form was handing out
+                its own permissions.
+
+                ⚠️ A disabled <select> would be the wrong fix twice over:
+                it would still be in the DOM announcing a control that
+                does nothing, and it would leave the impression that the
+                restriction is the form's. It is not -- it is
+                `protect_official_record()`, and a crafted API call is
+                refused with P0001 exactly the same way.
+
+                The value is still SHOWN, because an official editing a
+                record needs to see whose record it is. Changing one is
+                SQL/admin maintenance; there is deliberately no in-app
+                path, and no privileged UI was added to replace it. */}
+            {editingOfficial ? (
+              <div className="modal-form-group">
+                <span className="modal-form-label" id="off-position-label">Position</span>
+                <p className="modal-form-static" aria-labelledby="off-position-label">
+                  {newOfficial.position || '—'}
+                </p>
+                <p className="modal-form-hint">
+                  Positions decide who may approve document requests and
+                  reservations, so they are maintained directly in the
+                  database rather than from this form.
+                </p>
+              </div>
+            ) : (
+              <div className="modal-form-group">
+                <label htmlFor="off-position" className="modal-form-label">Position</label>
+                <select id="off-position"
+                  className="modal-form-input"
+                  value={newOfficial.position}
+                  onChange={(e) => setNewOfficial({ ...newOfficial, position: e.target.value })}
+                >
+                  <option value="">Select position</option>
+                  <option value="Punong Barangay">Punong Barangay</option>
+                  <option value="Barangay Secretary">Barangay Secretary</option>
+                  <option value="Barangay Treasurer">Barangay Treasurer</option>
+                  <option value="Kagawad">Kagawad</option>
+                  <option value="SK Chairperson">SK Chairperson</option>
+                </select>
+              </div>
+            )}
 
             <div className="modal-form-group">
               <label htmlFor="off-committee-optional" className="modal-form-label">Committee (optional)</label>
