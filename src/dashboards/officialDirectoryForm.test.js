@@ -135,12 +135,17 @@ describe('Edit Official no longer offers an editable Full Name', () => {
     expect(NAME_BLOCK).toContain('aria-labelledby="off-full-name-label"')
   })
 
-  // ⚠️ The reason has to stay written down, or A3 will not know to
+  // ⚠️ The reason has to stay written down, or A5 will not know to
   // undo it and the field will be read-only forever.
+  //
+  // ⚠️ It says A5, not A3, and the correction is deliberate. A3
+  // (migration 031) moved the DATABASE off the name join; the
+  // dashboard's own `officialInfo` lookup is still name-based, so the
+  // field cannot come back until A5 repoints that too.
   it('records that this is TEMPORARY and names what restores it', () => {
     const prose = MODAL.slice(MODAL.indexOf('FULL NAME IS READ-ONLY'), MODAL.indexOf('off-full-name-label'))
     expect(prose).toMatch(/TEMPORARY/i)
-    expect(prose).toContain('A3')
+    expect(prose).toContain('A5')
     expect(prose).toContain('official_account_links')
   })
 })
