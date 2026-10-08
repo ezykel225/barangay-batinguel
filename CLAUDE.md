@@ -326,7 +326,7 @@ src/
 
   assets/images/      11 official portraits, page backgrounds, logo.
 
-supabase-migrations/  29 numbered SQL files. A record, not a runner.
+supabase-migrations/  30 numbered SQL files. A record, not a runner.
 supabase/functions/   Edge Function source (notify-reservation-sms).
 docs/                 SETUP.md, TESTING-WALKTHROUGH.pdf + its generator.
 ```
@@ -513,10 +513,16 @@ and the INSERT path that got round 028 by taking somebody else's name.
 See *MASTER-A steps A1 and A1b* below.
 
 ⚠️ **The join itself is unchanged and still the authorization key** —
-what changed is that the app can no longer move it. The approved
-replacement is a private `official_account_links` table, **not** a
-`profile_id` column on `barangay_officials`, because that table is read
-by `anon` with `select('*')` on the public Officials page.
+what changed is that the app can no longer move it. The replacement is a
+private `official_account_links` table, **not** a `profile_id` column on
+`barangay_officials`, because that table is read by `anon` with
+`select('*')` on the public Officials page.
+
+⚠️ **That table now EXISTS and is populated — migration 030, MASTER-A
+A2 — and it changes nothing yet.** It holds all 11 links and **nothing
+reads it**; `full_name` is still what every position permission resolves
+through. **A3 is the cutover.** Until then this whole section still
+applies exactly as written: always update both tables together.
 
 ### The missing Kagawad, 2026-09-30
 
@@ -729,11 +735,11 @@ such row.
 
 ## Database notes
 
-**29 migrations**, `001` through `029`, all applied. ⚠️ 027 is a
+**30 migrations**, `001` through `030`, all applied. ⚠️ 027 is a
 DATA CORRECTION, not a schema change — see *The portrait is lost by the
 RENAME* under *Public E-Services (X5)*.
 
-**20 tables, RLS enabled on every one.**
+**21 tables, RLS enabled on every one.**
 
 | Table | Holds |
 |---|---|
@@ -757,6 +763,7 @@ RENAME* under *Public E-Services (X5)*.
 | `official_availability` | Weekly consultation hours per elected official. Migration 026. **Empty** — only an official can enter their own |
 | `notifications` | In-app notifications. **Client-read-only** — written only by triggers; see *Notifications* |
 | `notification_reads` | Who has seen which notification. Insert and select only |
+| `official_account_links` | ⚠️ **PRIVATE.** One-to-one `barangay_officials` ↔ `profiles` mapping. Migration 030. **11 rows.** `anon` and `authenticated` hold NO privilege on it and it has ZERO policies — see *MASTER-A step A2*. Nothing reads it yet; A3 is the cutover |
 
 What each migration *changed* stays in that migration's own header, not
 here — this section says what exists now, the headers say how it got
@@ -3088,8 +3095,16 @@ of the barangay's own text is two places for it to drift.
 024's header says `DROP TRIGGER` cannot be sent through the connector —
 it is treated as a destructive statement and the call times out waiting
 for a confirmation that never arrives. Measured again here, it is
-broader: **plain `DELETE`, `DROP FUNCTION` and `REVOKE` behave the same
+broader: **plain `DELETE`, `DROP FUNCTION` and `REVOKE` behaved the same
 way.** In the SQL Editor they are all fine.
+
+⚠️ **RE-MEASURED IN A2, AND THE LIST HAS SHRUNK.** Migration 030's
+three `REVOKE` statements applied through the connector without
+complaint. `DELETE` still gates: two 60-second timeouts, including one
+where the statement was wrapped in `EXECUTE format('delete from ...')`
+— so the scan reads the whole payload, not just the top-level
+statement, and dynamic SQL is not a way round it. Treat the gated set
+as something to measure per session rather than a fixed list.
 
 Consequence recorded in 026's header: one dead helper function,
 `tmp_cleanup_probe_row`, could not be dropped from here. It has been
@@ -4597,6 +4612,9 @@ close the two write paths that reached it; neither replaces the join.
   a `profile_id` column because `barangay_officials` is read by `anon`
   with `select('*')` on the public Officials page and a column there
   would publish every official's auth identifier.
+  ✅ **A2 has since created and backfilled that table** (migration 030,
+  11 links) — see *MASTER-A step A2*. It is **inert**: nothing reads it,
+  and everything in this bullet is still true until **A3**.
 - **The self-archive guard still fails open.** It still compares
   `profiles.full_name` to `NEW.full_name`. Making it fail closed needs
   the link table first, or every official loses the ability to archive
@@ -4616,6 +4634,263 @@ close the two write paths that reached it; neither replaces the join.
   tables, and RLS does not cover TRUNCATE. Not reachable through
   PostgREST today (no TRUNCATE verb, and no project function runs
   dynamic SQL), but it is MASTER-B's.
+
+---
+
+## MASTER-A step A2 — the private identity mapping (migration 030)
+
+2026-10-07, on `claude/master-a-official-account-links`, built on `main`
+after PR #25 and PR #26 merged. **A2 only. MASTER-A is NOT finished** —
+A3 is the authorization cutover and has not started.
+
+⚠️ **A2 IS DELIBERATELY INERT.** It creates the permanent identity
+mapping, backfills it and proves it. It changes **no policy, no
+function, no frontend and no permission**.
+`profiles.full_name = barangay_officials.full_name` is **STILL what
+resolves every position-specific permission** after this migration, byte
+for byte as before.
+
+That is the design, not an omission: the mapping is created and proven
+in one step and authorization is switched in another, so a mistake in
+either is diagnosable on its own.
+
+### ⚠️ A separate table, not a column — and the reason is measured
+
+The obvious design is `barangay_officials.profile_id uuid`. It was
+rejected at the architecture checkpoint for one reason:
+
+> `barangay_officials` is read by `anon` with `select('*')` on the
+> public Officials page.
+
+A `profile_id` column there would **publish every official's auth
+identifier** to anybody who loads the public site — the same class of
+mistake as putting `exception_reason` into `get_reservation_slots`.
+Narrowing the React select is not a defence: the publishable key ships
+inside the bundle, so `anon` can ask for the column directly whatever
+the client requests.
+
+A separate table can be made unreadable by every application role. A
+column on a publicly-read table cannot. ⚠️ **Do not add `profile_id` to
+`barangay_officials` later either.**
+
+### Reconciliation — measured live, before the table existed
+
+The brief's expectation was 11/11/11. **That was not assumed**; all six
+ambiguity classes were queried as row-level lookups, because counts
+agreeing does not prove no ambiguity.
+
+| | |
+|---|---|
+| official profiles | **11** |
+| official profiles with a blank name | 0 |
+| active directory rows | **11** |
+| archived directory rows | 0 |
+| exact one-to-one matches | **11** |
+| distinct profiles matched / distinct officials matched | 11 / 11 |
+
+| Ambiguity class | Found |
+|---|---|
+| official profile matching **no** active directory row | **0** |
+| active directory row matching **no** official profile | **0** |
+| one profile matching **>1** active row | **0** |
+| one active row matching **>1** profile | **0** |
+| duplicate names among official profiles | **0** |
+| duplicate names among active directory rows | **0** |
+
+All empty, so the backfill ran. **Had any been non-empty the migration
+would have aborted and left the table empty** — it does not insert "the
+ones that matched".
+
+### The table
+
+```sql
+official_id uuid PRIMARY KEY REFERENCES barangay_officials(id) ON DELETE RESTRICT
+profile_id  uuid NOT NULL UNIQUE REFERENCES profiles(id)      ON DELETE RESTRICT
+linked_at   timestamptz NOT NULL DEFAULT now()
+linked_by   text NOT NULL
+```
+
+⚠️ **The PK and the UNIQUE together are what make it one-to-one in the
+database** rather than by convention: one directory record cannot be
+claimed by two accounts, and one account cannot hold two directory
+records. A3 depends on that — a lookup that can return two rows is not
+an identity. Verified: a duplicate `profile_id` and a duplicate
+`official_id` are each refused `23505`.
+
+⚠️ **`ON DELETE RESTRICT` on both sides has a consequence worth
+stating.** `profiles.id` is `REFERENCES auth.users(id) ON DELETE
+CASCADE`, so deleting an auth user currently deletes their profile
+silently. With a link in place that cascade is **blocked** (`23503`).
+That is wanted: this project's rule is that nothing is ever deleted —
+there is no DELETE policy on `profiles` at all, and officials are
+archived rather than removed. An account that evaporates and takes an
+official's identity with it is exactly what the missing Kagawad of
+2026-09-30 was. Unlinking is a deliberate act, and RESTRICT makes it one.
+
+### ⚠️ Private: two barriers, not one (019A's pattern)
+
+Supabase grants full DML on a new public table to `anon` and
+`authenticated` by default — **measured on this very table**: it was
+created with `anon=arwdDxtm` and `authenticated=arwdDxtm`. Absent
+policies alone would therefore have been the *only* thing stopping a
+read.
+
+| Barrier | Mechanism | After |
+|---|---|---|
+| **Privilege** | `REVOKE ALL` from `anon`, `authenticated` and `PUBLIC` | ACL is `postgres` + `service_role` **only** |
+| **RLS** | enabled, **zero policies**, and no policy is to be added | `relrowsecurity = true`, `policy_count = 0` |
+
+⚠️ **THIS INCLUDES ORDINARY OFFICIALS.** An official has no business
+reading the whole mapping: it is a list of which auth account belongs to
+which named person — PII with no in-app consumer. Verified as a real
+Kagawad **who holds a link of his own**: SELECT refused.
+
+⚠️ **There is deliberately no RPC that returns the mapping**, and A3
+must not add one. A3's lookups are `SECURITY DEFINER` functions that
+answer **one question about the caller**, never functions that return
+the table.
+
+⚠️ **Every client refusal is `42501` — the privilege layer, before RLS
+is consulted.** That is the stronger result: RLS alone would have
+returned an empty set, which is indistinguishable from "there are no
+rows".
+
+| | |
+|---|---|
+| anon SELECT / INSERT | **42501** |
+| resident SELECT / INSERT | **42501** |
+| nurse SELECT | **42501** |
+| ordinary official SELECT / INSERT / UPDATE / DELETE | **42501** |
+
+The official's INSERT attempt was the interesting one: he tried to claim
+the **Secretary's** directory row for his own profile. Refused at the
+privilege layer before any constraint was reached.
+
+### The backfill used the name join exactly once, and fails closed
+
+⚠️ **This is the only place in the project where it is acceptable to
+derive identity from a string**, and only because every derivation is
+checked first and the whole statement aborts on any doubt. After it ran
+the link is authoritative and the name is not.
+
+**No fuzzy matching, no normalisation, no abbreviation guessing, no
+spelling correction, no silent omission.** Lower-casing to "force a
+match" is how `Alexis Tan` and `Alexis Theress P. Tan` would be declared
+the same person — and `Catherine Lacson Tan` vs `Alexis Theress P. Tan`
+is the live case where that reasoning links two **different** people who
+share a surname and an office.
+
+Result: **11 links created**, all carrying
+`linked_by = 'migration-030 backfill'`.
+
+| Structural check | Result |
+|---|---|
+| link count = official profile count | 11 = 11 |
+| links pointing at a missing profile | 0 |
+| links to a profile whose role ≠ `official` | 0 |
+| links pointing at a missing directory row | 0 |
+| duplicate `profile_id` / duplicate `official_id` | 0 / 0 |
+| links still agreeing with the name join they came from | 11 |
+
+### ⚠️ A link is an identity fact, not a visibility state
+
+Archiving an official **does not** delete their link, and restoring
+returns the **same** link. `archived_at` says whether a record is in the
+current directory; it says nothing about who that record *is*. Tying the
+mapping lifecycle to `archived_at` would mean an official loses their
+identity on archive and is re-identified on restore — the implicit
+re-identification the Previous Term tables exist to refuse.
+
+Verified in a rolled-back block on a real linked official: archived →
+link survives → restored → the row is **byte-identical**, `linked_at`
+included (`2026-10-07 16:09:18.024668+00` either side).
+
+There is deliberately **no trigger** on `barangay_officials` touching
+this table, and nothing in 030 reads `archived_at`.
+
+### Proof that A2 is inert
+
+Every function body, policy expression and view definition in `public`
+was searched for the table name. **One hit, and it is a comment**:
+
+```
+protect_official_record(), line 39:
+  -- Remove in A3 once official_account_links carries identity.
+```
+
+So nothing executable reads it. The five functions that decide
+authorization were hashed and are unchanged: `protect_official_record`,
+`stamp_official_archive`, `can_see_audience`,
+`official_id_for_current_user`, `is_official`.
+
+**No frontend file was touched.** The only file this phase adds is
+`supabase-migrations/030_official_account_links.sql`; the production
+bundle hashes identically to `main`, and the Jest suite is unchanged at
+36 suites / 852 tests. ⚠️ No frontend test was added — there is no
+frontend behaviour to test, and padding the count would misrepresent
+what this phase did.
+
+### A1/A1b re-verified, because A2 must not weaken 028/029
+
+Impersonated, rolled back, with the positive controls included so an
+over-block would show up too:
+
+| | |
+|---|---|
+| 028 official changes own `position` | **REFUSED P0001** |
+| 029 official changes own `full_name` | **REFUSED P0001** |
+| 029 client INSERT `Punong Barangay` / `Barangay Secretary` / `Barangay Treasurer` | **REFUSED P0001** ×3 |
+| 029 client INSERT `Kagawad` | **ACCEPTED** — not over-blocked |
+| ordinary edit (committee) | rows=1 |
+| the real Secretary writes `document_requests` | rows=1 |
+| the real Treasurer writes `reservations` | rows=1 |
+
+The Edit Official form still ships **no control** for Full Name or
+Position, and Add still offers only `Kagawad` / `SK Chairperson`.
+
+### ⚠️ What A2 does NOT do
+
+- **It does not switch authorization.** `full_name` is still the active
+  key. A3 converts the two RLS policies, `can_see_audience()`,
+  `official_id_for_current_user()` and the dashboard's `officialInfo`
+  lookup.
+- **It does not restore Full Name editing.** A1b's restriction stays,
+  because the name is still load-bearing. **A3 is what earns that field
+  back** — and `portraitWillBeLost()` is still kept for exactly that.
+- **It does not touch the kapitan tables**, the self-archive guard, or
+  any position permission.
+- **It does not fix the two-table rename.** A rename in SQL still has to
+  touch `profiles` and `barangay_officials` together until A3 lands.
+
+### ⚠️ One behavioural test could NOT be run, and is not claimed
+
+`ON DELETE RESTRICT` is verified **from the catalog** on both sides
+(`confdeltype = 'r'`). The behavioural delete was **not executed**: the
+connector gates `DELETE` in any form, including inside
+`EXECUTE format(...)` — two 60-second timeouts. To exercise it, paste
+this into the SQL Editor; it rolls itself back:
+
+```sql
+begin;
+  -- expect 23503 twice: the link holds both parents
+  delete from barangay_officials
+   where id = (select official_id from official_account_links limit 1);
+  delete from profiles
+   where id = (select profile_id  from official_account_links limit 1);
+rollback;
+```
+
+### Nothing persisted from testing
+
+Re-read after every aborted block: **11 links**, all 11 carrying the
+backfill provenance, **0** rows with a test `linked_by`, 11 directory
+rows, 11 active, 0 archived, **0** `A2 Probe%` rows, 11 official
+profiles, **0** policies.
+
+⚠️ **One `get_advisors` finding is new, and it is the intended design**:
+`rls_enabled_no_policy` (INFO) on `official_account_links`. A table with
+RLS on and no policy is exactly what a private table looks like. Every
+other advisor finding pre-dates A2.
 
 ---
 
@@ -4808,6 +5083,12 @@ derives her initials from. It is no longer displayed as a label.
   tables, and `portraitWillBeLost()` is kept precisely because **A3 gives
   the field back**. `officialPhotos.test.js` still guards the eleven
   canonical keys.
+  ⚠️ **A2 built the table — migration 030, 11 links — and the key is
+  still `full_name`.** `official_account_links` exists, is private, and
+  is read by **nothing**. A2 deliberately changed no policy and no
+  frontend; **A3 is where authorization actually moves onto it**, and
+  only then does a two-table rename stop being able to strip an
+  official's permissions.
 - **The official barangay document forms.** X6 built the whole
   generation pipeline against PROTOTYPE layouts because the barangay has
   not supplied its real forms, and the X6 follow-up extended that to all
@@ -4937,8 +5218,10 @@ derives her initials from. It is no longer displayed as a label.
   change only because the name is still the authorization key the
   Secretary and Treasurer policies join on. **A3 removes that branch and
   restores the input** once `official_account_links` carries identity.
-  Correcting a misspelled name meanwhile is SQL maintenance, and must
-  still touch `profiles` and `barangay_officials` together.
+  ⚠️ **That table exists as of migration 030 and does NOT yet carry
+  identity** — A2 created and proved it, A3 switches authorization onto
+  it. Correcting a misspelled name meanwhile is SQL maintenance, and
+  must still touch `profiles` and `barangay_officials` together.
 - **Two triggers on `barangay_officials` call one function**, because
   the Supabase connector gates `DROP TRIGGER`, so
   `trg_protect_official_record` could not be re-created
@@ -4968,8 +5251,9 @@ derives her initials from. It is no longer displayed as a label.
   `activity_log` UPDATE/DELETE, `profiles` DELETE and the two queues'
   DELETE, all granted with no policy behind them. 019A's two-barrier
   pattern is the remedy; MASTER-B.
-- **22 SECURITY DEFINER functions are callable by `anon` and
-  `authenticated`** per `get_advisors`. Twelve are trigger functions
+- **23 SECURITY DEFINER functions are callable by `anon` and
+  `authenticated`** per `get_advisors` (22 until migration 028 added
+  `protect_official_record`). Thirteen are trigger functions
   that PostgREST cannot invoke at all, four are deliberate RPCs, and six
   are identity predicates called from inside RLS policies — those six
   must not be revoked without first proving, in a rolled-back
