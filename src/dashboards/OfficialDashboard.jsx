@@ -5027,11 +5027,17 @@ const OfficialDashboard = () => {
                 their own profile name as Secretary, and then approve a
                 document request. Three steps, all through this form.
 
-                ⚠️ A3 RESTORES THIS FIELD. Once `official_account_links`
-                carries identity, a name is just a name again — drop the
-                `full_name` branch from `protect_official_record()` and
-                put the input back. The `position` rule stays, because
-                that one is about permissions rather than identity.
+                ⚠️ A5 RESTORES THIS FIELD, NOT A3. Migration 031 (A3)
+                moved every DATABASE permission onto
+                `official_account_links`, so the name no longer decides
+                anything in SQL — but the lookup a few hundred lines
+                above this still resolves `officialInfo` BY NAME, so a
+                rename would still break what this dashboard renders.
+                A5 points that lookup at the stable official id, then
+                drops the `full_name` branch from
+                `protect_official_record()`, then puts the input back.
+                The `position` rule stays, because that one is about
+                permissions rather than identity.
 
                 Add still edits it: a new row has to have a name. */}
             {editingOfficial ? (
