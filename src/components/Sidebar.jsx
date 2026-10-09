@@ -99,16 +99,36 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderActio
       if (role === 'resident') setProfilePhoto(profile.photo_url || null)
 
       if (role === 'official') {
-        // Active records only, and maybeSingle() rather than single():
-        // an official whose directory record has been archived is no
-        // longer serving, so their position must stop resolving here too.
-        // They fall back to the generic label below rather than erroring.
-        const { data: official } = await supabase
-          .from('barangay_officials')
-          .select('position, committee, photo_url')
-          .eq('full_name', profile.full_name)
-          .is('archived_at', null)
-          .maybeSingle()
+        // ⚠️ BY STABLE ID SINCE A5, NOT BY NAME.
+        //
+        // This was `.eq('full_name', profile.full_name)` — the same
+        // string join migrations 031 and 032 removed from the database
+        // and A5 removed from the dashboard. It only sets a label and a
+        // photo, so it was never an authorization path; but it IS a
+        // resolution of "which directory row is the signed-in official",
+        // and leaving one of those behind would mean a rename still
+        // silently changed what an official sees in their own drawer.
+        //
+        // `official_id_for_current_user()` already requires the caller's
+        // own linked row to be ACTIVE, which is exactly what the old
+        // `.is('archived_at', null)` filter wanted: an archived official
+        // is no longer serving, so their position must stop resolving
+        // here too. They fall back to the generic label below, as before.
+        //
+        // ⚠️ Fails closed and never falls back to the name. The client
+        // holds no privilege on `official_account_links` (030) and must
+        // not: the helper answers one question about the caller.
+        const { data: officialId } = await supabase
+          .rpc('official_id_for_current_user')
+
+        const { data: official } = officialId
+          ? await supabase
+            .from('barangay_officials')
+            .select('position, committee, photo_url')
+            .eq('id', officialId)
+            .is('archived_at', null)
+            .maybeSingle()
+          : { data: null }
 
         if (official) {
           const pos = official.committee

@@ -23,6 +23,7 @@ const migration = (file) => fs.readFileSync(
   path.join(__dirname, '..', '..', 'supabase-migrations', file), 'utf8')
 const MIGRATION = migration('028_protect_official_position.sql')
 const MIGRATION_029 = migration('029_protect_official_identity_fields.sql')
+const MIGRATION_033 = migration('033_restore_official_name_editing.sql')
 
 // The Add/Edit modal, sliced from its heading to its buttons.
 const MODAL = OFFICIAL.slice(
@@ -32,15 +33,17 @@ const MODAL = OFFICIAL.slice(
 
 // The EDIT branch of a read-only field group: between that group's
 // `{editingOfficial ? (` and its `) : (`. Anchored on the group's own
-// label id rather than on order or indentation, because there are now
-// two such groups and reformatting the JSX must not silently empty one.
+// label id rather than on order or indentation.
+//
+// ⚠️ THERE IS ONLY ONE SUCH GROUP SINCE A5. Full Name had one too while
+// migration 029 held; migration 033 handed that field back, so Position
+// is the only field this form shows and refuses to edit.
 const editBranchFor = (labelId) => {
   const at = MODAL.lastIndexOf('{editingOfficial ? (', MODAL.indexOf(`id="${labelId}"`))
   expect(at).toBeGreaterThan(-1)
   return MODAL.slice(at, MODAL.indexOf(') : (', at))
 }
 const POSITION_BLOCK = editBranchFor('off-position-label')
-const NAME_BLOCK = editBranchFor('off-full-name-label')
 
 const editPayload = () => {
   const at = OFFICIAL.indexOf('.update({', OFFICIAL.indexOf("if (editingOfficial) {"))
@@ -98,55 +101,91 @@ describe('Edit Official no longer offers an editable Position', () => {
   })
 })
 
-// ─── A1b: Full Name is read-only too, TEMPORARILY ────────────────────
+// ─── A5: Full Name is editable again — migration 033 ────────────────
 //
-// ⚠️ Not because names should be un-editable, but because a name is
-// still an authorization key. Measured before migration 029: a Kagawad
-// could rename their own row, archive the real Secretary, insert a new
-// row under their own profile name as Secretary, and then approve a
-// document request. Three steps, all through this form.
-describe('Edit Official no longer offers an editable Full Name', () => {
-  it('renders the name input only when ADDING', () => {
-    const input = MODAL.indexOf('<input id="off-full-name"')
-    expect(input).toBeGreaterThan(-1)
-    // It sits after the name ternary's `) : (`, i.e. in the add branch.
-    expect(input).toBeGreaterThan(MODAL.indexOf(') : (', MODAL.indexOf('off-full-name-label')))
+// ⚠️ THIS DESCRIBE BLOCK IS THE INVERSE OF THE ONE IT REPLACES, and the
+// reversal is the point of the phase rather than a change of mind. Its
+// predecessor asserted that the Edit branch shipped NO name control,
+// because a name was an authorization key: measured before migration
+// 029, a Kagawad could rename their own row, archive the real
+// Secretary, insert a new row under their own profile name as
+// Secretary, and then approve a document request.
+//
+// Three migrations and one frontend cutover later a name decides
+// nothing: 031 moved every database permission onto the private
+// `official_account_links` mapping, 032 moved the self-archive guard,
+// and A5 moved this dashboard's own `officialInfo` and
+// `isOwnOfficialRecord` — proven with 029's guard still active, and
+// only then did 033 remove it. `officialIdentity.test.js` holds that
+// half.
+describe('Edit Official offers an editable Full Name again', () => {
+  it('renders one name input, for Add and for Edit alike', () => {
+    expect(MODAL).toContain('<input id="off-full-name"')
+    // ⚠️ NOT inside an `editingOfficial` ternary any more. The old
+    // version asserted the input sat after a `) : (` — i.e. in the add
+    // branch only — and that is exactly what must no longer be true.
+    const nameAt = MODAL.indexOf('<input id="off-full-name"')
+    const nameGroupAt = MODAL.lastIndexOf('<div className="modal-form-group">', nameAt)
+    expect(MODAL.slice(nameGroupAt, nameAt)).not.toContain('editingOfficial')
   })
 
   it('has exactly one name input in the whole dashboard', () => {
     expect(OFFICIAL.match(/<input id="off-full-name"/g)).toHaveLength(1)
   })
 
-  it('does not ship a disabled name control instead', () => {
-    expect(NAME_BLOCK).not.toMatch(/<input/)
-    expect(NAME_BLOCK).not.toMatch(/disabled/)
-    expect(NAME_BLOCK).not.toMatch(/readOnly/)
+  it('is a real control, bound to the form state', () => {
+    const at = MODAL.indexOf('<input id="off-full-name"')
+    const input = MODAL.slice(at, MODAL.indexOf('/>', at))
+    expect(input).toContain('value={newOfficial.full_name}')
+    expect(input).toContain('full_name: e.target.value')
+    expect(input).not.toContain('disabled')
+    expect(input).not.toContain('readOnly')
   })
 
-  it('still SHOWS the name when editing, and says where it is maintained', () => {
-    expect(NAME_BLOCK).toContain('newOfficial.full_name')
-    expect(NAME_BLOCK).toContain('modal-form-static')
-    expect(NAME_BLOCK).toContain('modal-form-hint')
-    expect(NAME_BLOCK.toLowerCase()).toContain('database')
+  it('is labelled by a real <label htmlFor>, not an aria-labelledby span', () => {
+    expect(MODAL).toContain('<label htmlFor="off-full-name" className="modal-form-label">Full Name</label>')
+    expect(MODAL).not.toContain('id="off-full-name-label"')
   })
 
-  it('associates the shown name with its label', () => {
-    expect(NAME_BLOCK).toContain('id="off-full-name-label"')
-    expect(NAME_BLOCK).toContain('aria-labelledby="off-full-name-label"')
+  // The value an Edit starts from is still the stored directory name.
+  it('opens an edit with the existing directory name', () => {
+    const openEdit = OFFICIAL.slice(OFFICIAL.indexOf('const handleEditOfficial'),
+      OFFICIAL.indexOf('const handleEditOfficial') + 600)
+    expect(openEdit).toContain('full_name: official.full_name')
   })
 
-  // ⚠️ The reason has to stay written down, or A5 will not know to
-  // undo it and the field will be read-only forever.
-  //
-  // ⚠️ It says A5, not A3, and the correction is deliberate. A3
-  // (migration 031) moved the DATABASE off the name join; the
-  // dashboard's own `officialInfo` lookup is still name-based, so the
-  // field cannot come back until A5 repoints that too.
-  it('records that this is TEMPORARY and names what restores it', () => {
-    const prose = MODAL.slice(MODAL.indexOf('FULL NAME IS READ-ONLY'), MODAL.indexOf('off-full-name-label'))
-    expect(prose).toMatch(/TEMPORARY/i)
-    expect(prose).toContain('A5')
-    expect(prose).toContain('official_account_links')
+  it('still requires a name before saving', () => {
+    expect(OFFICIAL).toContain('if (!newOfficial.full_name || !newOfficial.position)')
+  })
+
+  // ⚠️ THE PORTRAIT GUARD IS REACHABLE AGAIN, which is the one real
+  // consequence of handing the field back. It was kept across 029, 031
+  // and 032 for exactly this moment.
+  it('warns before a rename that would lose a bundled portrait', () => {
+    const SAVE = OFFICIAL.slice(OFFICIAL.indexOf('const handleAddOfficial'),
+      OFFICIAL.indexOf('const handleEditOfficial'))
+    expect(SAVE).toContain('portraitWillBeLost(')
+    expect(SAVE).toContain('editingOfficial.full_name')
+    expect(SAVE).toContain('newOfficial.full_name')
+    expect(SAVE).toContain('editingOfficial.photo_url')
+    // It WARNS: a confirm the official can decline, not a refusal.
+    expect(SAVE).toContain("confirmLabel: 'Rename anyway'")
+    expect(SAVE).toContain("cancelLabel: 'Keep the name'")
+    expect(SAVE).toContain('if (!proceedWithRename) return')
+  })
+
+  // The other direction: the comment that said it could never fire is
+  // gone, so a reader cannot conclude the guard is still dead code.
+  it('no longer claims the portrait guard is unreachable', () => {
+    expect(OFFICIAL).not.toContain('UNREACHABLE WHILE MIGRATION 029 HOLDS')
+  })
+
+  // ⚠️ Position lost its only explanation when the shared hint went
+  // with the name block. A read-only field with no reason beside it
+  // reads as something broken.
+  it('still says why Position cannot be edited', () => {
+    expect(POSITION_BLOCK).toContain('modal-form-hint')
+    expect(POSITION_BLOCK.toLowerCase()).toContain('database')
   })
 })
 
@@ -188,10 +227,22 @@ describe('the payloads', () => {
     expect(editPayload()).not.toContain('position:')
   })
 
-  // ⚠️ `full_name` is gone from the edit payload too (029), and the
-  // comment has to say it comes back at A3.
-  it('does not send full_name on an edit', () => {
-    expect(editPayload()).not.toContain('full_name:')
+  // ⚠️ INVERTED AT A5. 029 took `full_name` out of this payload; 033
+  // put it back, and the asymmetry with `position` directly above is
+  // the whole of MASTER-A in one object: a name is description, so the
+  // form owns it; a position is what the powered permissions read, so
+  // the database owns it.
+  it('sends full_name on an edit again', () => {
+    expect(editPayload()).toContain('full_name: newOfficial.full_name')
+  })
+
+  // ⚠️ And it does NOT write the account's own name. Identity is the
+  // private mapping, so the two names are separate facts and this form
+  // is not in the business of keeping them in step.
+  it('does not write profiles.full_name when the directory name changes', () => {
+    const SAVE = OFFICIAL.slice(OFFICIAL.indexOf('const handleAddOfficial'),
+      OFFICIAL.indexOf('const handleEditOfficial'))
+    expect(SAVE).not.toContain("from('profiles')")
   })
 
   // Everything the form legitimately edits still goes.
@@ -282,9 +333,14 @@ describe('the migration says what it does and does not fix', () => {
     expect(MIGRATION).toContain('NEW.created_by IS DISTINCT FROM OLD.created_by')
   })
 
-  // ⚠️ A1 is a hotfix, not the end of MASTER-A. The header has to keep
-  // saying so, or the next reader assumes the identity work is done.
-  it('records that full_name is STILL the authorization key', () => {
+  // ⚠️ A1 was a hotfix, not the end of MASTER-A, and 028's header had
+  // to say so. It still says so, in the present tense of ITS OWN DAY —
+  // which is now historical: 031 moved authorization onto the mapping.
+  // The sentence is deliberately NOT edited. A migration header is a
+  // record of what was true when it ran, the same reason the five
+  // `activity_log` rows from 2026-10-01 still carry a name that was
+  // later corrected. This test pins the record, not the present.
+  it("028's header still records what was true on ITS day", () => {
     expect(MIGRATION).toContain('official_account_links')
     expect(MIGRATION).toMatch(/still resolves through the `full_name` string join/i)
   })
@@ -298,5 +354,69 @@ describe('the migration says what it does and does not fix', () => {
     expect(MIGRATION).not.toContain('CREATE POLICY')
     expect(MIGRATION).not.toContain('DROP POLICY')
     expect(MIGRATION).not.toContain('CREATE TABLE')
+  })
+})
+
+// ─── migration 033 removed ONE branch, and only that one ─────────────
+describe('migration 033 narrows protect_official_record and nothing else', () => {
+  it('still refuses a position change for an API caller', () => {
+    expect(MIGRATION_033).toContain('NEW.position IS DISTINCT FROM OLD.position')
+  })
+
+  it('still refuses an API INSERT naming a powered position', () => {
+    expect(MIGRATION_033).toContain("IF TG_OP = 'INSERT' THEN")
+    expect(MIGRATION_033).toContain('NEW.position = ANY (powered)')
+    ;['Punong Barangay', 'Barangay Secretary', 'Barangay Treasurer']
+      .forEach((p) => expect(MIGRATION_033).toContain(`'${p}'`))
+  })
+
+  it('still pins the creation columns', () => {
+    expect(MIGRATION_033).toContain('NEW.created_at IS DISTINCT FROM OLD.created_at')
+    expect(MIGRATION_033).toContain('NEW.created_by IS DISTINCT FROM OLD.created_by')
+  })
+
+  it('keeps the same trusted-caller test', () => {
+    expect(MIGRATION_033).toContain("auth.role() IS NULL OR auth.role() = 'service_role'")
+  })
+
+  // ⚠️ THE LOAD-BEARING ONE, and it is scoped to the function body.
+  // The header above it explains the removal at length and necessarily
+  // quotes `full_name` while doing so — the same trap
+  // `prototypeCoverage.test.js` records, where a whole-file scan flags
+  // the disclaimer for containing the words it exists to disclaim.
+  it('no longer refuses a full_name change', () => {
+    const body = MIGRATION_033.slice(
+      MIGRATION_033.indexOf('AS $function$'),
+      MIGRATION_033.indexOf('$function$;'),
+    )
+    expect(body.length).toBeGreaterThan(400)
+    expect(body).not.toContain('NEW.full_name IS DISTINCT FROM OLD.full_name')
+  })
+
+  // ⚠️ Matched against the UNWRAPPED prose. A migration header is hard
+  // wrapped at ~70 columns with a `-- ` on every line, so a phrase that
+  // reads as one sentence can carry a newline and a comment marker in
+  // the middle of it. The first version of this test looked for
+  // "no longer authorization data" against the raw file and failed on
+  // text that says exactly that — which step produced the result,
+  // again.
+  const prose = (sql) => sql
+    .split('\n')
+    .map((line) => line.replace(/^\s*--\s?/, ''))
+    .join(' ')
+    .replace(/\s+/g, ' ')
+
+  it('and says a name is description now, not authorization data', () => {
+    expect(prose(MIGRATION_033)).toMatch(/no longer authorization data/i)
+  })
+
+  // ⚠️ It must not quietly start writing the account's own name.
+  it('does not synchronise profiles.full_name', () => {
+    const body = MIGRATION_033.slice(
+      MIGRATION_033.indexOf('AS $function$'),
+      MIGRATION_033.indexOf('$function$;'),
+    )
+    expect(body).not.toContain('public.profiles')
+    expect(prose(MIGRATION_033)).toMatch(/DOES NOT SYNCHRONISE THE TWO NAMES/i)
   })
 })
