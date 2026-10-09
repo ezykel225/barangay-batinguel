@@ -490,9 +490,12 @@ step A5*.
 ✅ **An official's login is no longer linked to their directory record
 by their name, anywhere.** Migrations 030–033 replaced the string join
 with the private `official_account_links` mapping: the database since
-A3, the self-archive guard since A4, and the **frontend** since A5. The
-history below is kept because every protection in this area was built
-against it and reads as over-engineering without it.
+A3, the self-archive guard since A4, and the **frontend** since A5.
+✅ **A6 reconciled all five and found zero runtime name-identity joins
+in the database or the application** — see *MASTER-A step A6*, which
+carries the final matrices. The history below is kept because every
+protection in this area was built against it and reads as
+over-engineering without it.
 
 ⚠️ **One thing is still name-keyed and it is the portrait map.**
 `officialPhotos` keys on `barangay_officials.full_name`, so a rename
@@ -5572,6 +5575,8 @@ exactly what makes `auth.role() IS NULL` the trusted-maintenance test.
 
 2026-10-09, on `claude/master-a-frontend-identity-cutover`. **A5 only.
 MASTER-A A1–A5 is now complete; MASTER-B is NOT started.**
+✅ **A6 verified it** — see *MASTER-A step A6* for the
+reconciliation that declares MASTER-A complete.
 
 ✅ **Nothing name-based decides identity anywhere any more — database or
 frontend.** A3 moved every database permission onto
@@ -5840,6 +5845,320 @@ dashboard still naming the official's position correctly afterwards.
 
 ---
 
+## ✅ MASTER-A step A6 — the final reconciliation. MASTER-A IS COMPLETE
+
+2026-10-09, on `claude/master-a-final-reconciliation`. **A6 added no
+migration, no policy, no function and no application code.** It is a
+verification phase: its product is the matrices below and this record.
+
+✅ **A1–A5 reconcile. MASTER-A is COMPLETE.** Every position-specific
+permission in this system resolves through one chain, and no part of it
+is a name:
+
+```
+auth account      auth.uid()  =  profiles.id
+      ↓
+identity          official_account_links.profile_id   (UNIQUE)
+      ↓           official_account_links.official_id  (PRIMARY KEY)
+      ↓
+directory row     barangay_officials.id
+      ↓
+permission        barangay_officials.position   (archived_at IS NULL)
+```
+
+The PK and the UNIQUE together are what make that one-to-one **in the
+database** rather than by convention, and both foreign keys are
+`ON DELETE RESTRICT`. There is **no `profile_id` column on
+`barangay_officials`** and none is to be added — `anon` reads that table
+with `select('*')` on the public Officials page, so a column there would
+publish every official's auth identifier.
+
+### ⚠️ A6 was verified against PR #30, not against `main`
+
+The brief said A5 had been merged. **It had not** — `main` was at
+`01e277b` (the A4 merge) with 32 migration files and no `033`, and PR
+#30 was `state=open merged=false`. But **migration 033 was already
+applied to the live database**, so `main`'s code and the database it
+talks to were a phase apart: the repo still resolved identity by name
+while the database had already stopped protecting the name.
+
+A6 therefore branched from PR #30's head (`41650ae`). Verifying "A1–A5
+together" against `main` would have measured A1–A4 against an A5
+database, and §7's frontend checks would have failed on code that PR #30
+has already replaced. ⚠️ **The reconciliation below is of the A5 branch.
+It becomes a statement about `main` the moment PR #30 merges, and not
+before.**
+
+### Runtime name-identity search: ZERO category A
+
+Every occurrence of `profiles.full_name` and
+`barangay_officials.full_name` in the live database and in `src/` was
+classified. **Category A — authorization or identity — is empty on both
+sides.**
+
+**Database.** Seven function bodies contain the string; **six in
+executable code, one in a comment only** (`protect_official_record()`,
+where migration 033 left a note in place of the branch it removed).
+**None of the six compares one `full_name` to another** — the scan
+stripped `--` comments first and then looked for a name-to-name
+comparison, because a comment that documents a removal reads exactly
+like the thing it removed:
+
+| Function | Class |
+|---|---|
+| `protect_official_record()` | **comment only** — 033's note |
+| `compose_full_name()` | B — rebuilds the name from its parts |
+| `prevent_role_self_change()` | B — re-opens verification on a self-rename |
+| `handle_new_resident_signup()` | B — writes a new resident's name |
+| `stamp_activity_actor()` | E — `actor_name` from the caller's own profile |
+| `create_court_reservation()` | C — stores the booker's name |
+| `track_court_reservation()` | B — masks the name in SQL |
+
+Zero policies in `public` mention `full_name`. The four authorization
+policies all call `current_official_holds_position()`:
+`document_requests`, `reservations`, `kapitan_status`,
+`kapitan_availability`.
+
+**Frontend.** Three patterns were searched across all non-test source: a
+name used as a **query key** (`.eq`/`.ilike`/`.in`/`.match`/`.filter`), a
+`full_name` compared to a `full_name`, and anything compared **to** a
+`full_name`. The last two return **nothing at all**. The first returns
+**two hits and both are comments** — in `OfficialDashboard.jsx` and
+`Sidebar.jsx`, each quoting the `.eq('full_name', profile.full_name)`
+it documents removing.
+
+Everything that remains is B/C/D/E: a name rendered, a name typed into a
+form, a name handed to `PersonAvatar` / `officialPhotos`, or a name in
+an audit subject or a toast. Two worth naming because they look
+identity-shaped and are not:
+
+- **`punongBarangayName`** is found **by position**, for the compact
+  status element — not by name, and from a list already filtered to
+  active officials.
+- **`findRegistryMatch`** compares a resident's name to the Voter
+  Reference List. That is deliberate name matching, it is **not official
+  identity**, and *The voter list match is a signal, never a decision*
+  governs it: absence from that list causes nothing.
+
+### The final powered-position matrix
+
+Every probe ran as the real account with its own JWT claims, inside a
+block that always ends in `RAISE EXCEPTION`. Each individual probe is
+wrapped so a trigger's `P0001` is **recorded rather than aborting the
+block** — otherwise the first refusal ends the run and the rest of the
+matrix is never measured.
+
+| caller | `document_requests` | `reservations` | `kapitan_status` | `kapitan_availability` |
+|---|---|---|---|---|
+| **Punong Barangay** | 0 | 0 | **1** | **5** |
+| **Barangay Secretary** | **1** | 0 | 0 | 0 |
+| **Barangay Treasurer** | 0 | **1** | 0 | 0 |
+| Kagawad | 0 | 0 | 0 | 0 |
+| SK Chairperson | 0 | 0 | 0 | 0 |
+| resident | 0 | 0 | 0 | 0 |
+| nurse | 0 | 0 | 0 | 0 |
+| `anon` | 0 | 0 | 0 | 0 |
+
+`current_official_holds_position()` agreed on every row: each powered
+holder true for their own position and **false for the other two**,
+every unpowered caller false for all three.
+
+⚠️ **Each powered position succeeds on exactly one surface and nowhere
+else.** The Secretary cannot touch reservations, the Treasurer cannot
+touch documents, and neither can write the Punong Barangay's status —
+which is the half of migration 031 that closed a real gap, where the old
+`role IN ('admin','official')` expression had returned **true** for all
+three alike.
+
+### Unlinked and archived: every powered position fails closed
+
+With each powered official's link repointed at an unrelated resident
+profile (names, directory rows and link count untouched), and then with
+their own directory row archived:
+
+| | `document_requests` | `reservations` | `kapitan_status` | `kapitan_availability` | holds own position | helper |
+|---|---|---|---|---|---|---|
+| Punong, unlinked | 0 | 0 | 0 | 0 | false | NULL |
+| Punong, archived | 0 | 0 | 0 | 0 | false | NULL |
+| Secretary, unlinked | 0 | 0 | 0 | 0 | false | NULL |
+| Secretary, archived | 0 | 0 | 0 | 0 | false | NULL |
+| Treasurer, unlinked | 0 | 0 | 0 | 0 | false | NULL |
+| Treasurer, archived | 0 | 0 | 0 | 0 | false | NULL |
+
+**Six cases, 24 write attempts, zero rows.** No link means no powers,
+and an archived directory row means no powers — which is what 018
+requires of position powers and what 022's read-time audience
+resolution requires of the queue.
+
+### Name independence, proven in both directions
+
+The exact input that caused the 2026-10-01 outage, run again:
+
+| | result |
+|---|---|
+| baseline: the Secretary's helper id | `2f21e1b6…` |
+| she renames **her own directory row over the API** | **rows=1 — allowed** (033) |
+| her helper id after that rename | **`2f21e1b6…` — the SAME** |
+| still holds Secretary / can still process documents | true / rows=1 |
+| her **profile** name changed instead (trusted SQL) | helper unchanged, rows=1 |
+| a **Kagawad given her exact name** | helper = **his own** id, Secretary **false**, rows=0 |
+| the real Secretary **during** that collision | helper unchanged, Secretary true, rows=1 |
+
+⚠️ **Read the last two rows together.** Under the old name join, one
+rename handed the attacker the Secretary's approval rights *and*
+stripped them from the real Secretary. Under the mapping the rename
+moves nothing in either direction: the attacker gains nothing and the
+incumbent loses nothing.
+
+### The directory write path, all four phases at once
+
+| | |
+|---|---|
+| own `position` change over the API | **`P0001`** — 028 |
+| `created_at` / `created_by` change | **`P0001`** — 028 |
+| client INSERT `Punong Barangay` | **`P0001`** — 029 |
+| client INSERT `Barangay Secretary` | **`P0001`** — 029 |
+| client INSERT `Barangay Treasurer` | **`P0001`** — 029 |
+| client INSERT `Kagawad` | **rows=1** — not over-blocked |
+| own `full_name` change over the API | **rows=1** — 033 restored it |
+| **self-archive, with that row renamed in the same block** | **`P0001`** — 032 |
+| archive **another** official | rows=1 — the existing business rule |
+| restore that official | rows=1 |
+| the link row across archive → restore | **byte-identical**, `linked_at` included |
+| an **unlinked** official archiving another | **`P0001`** |
+| an **unlinked** official archiving their own row | **`P0001`** |
+| a **linked** official SELECTing the mapping | **`42501`** |
+
+⚠️ **The self-archive row is the load-bearing one**, and it is why these
+two were measured in one block rather than two. The row was renamed
+through the app *first* — which 033 now permits — and the guard still
+refused. That rename is the precise input that made the old guard fail
+open in A4, so the new guard was re-attacked with the one write that
+used to disarm it, now that the write is allowed again.
+
+### Frontend identity regression
+
+Verified from source, every claim separately:
+
+| | |
+|---|---|
+| dashboard calls `official_id_for_current_user()` | yes |
+| `officialInfo` fetched by `.eq('id', officialId)` | yes |
+| `Sidebar` calls the helper; has no name identity join | yes / absent |
+| `isOwnOfficialRecord` compares **ids**, guarded on `officialInfo?.id` | yes |
+| `isSecretary` / `isTreasurer` / `isKapitan` from the id-resolved row | all three |
+| both failure modes surfaced (`'unlinked'`, `'error'`) | yes |
+| any fallback to a name | **none** |
+| dashboard reads `official_account_links` directly | **no** |
+| Full Name inputs in the Edit modal | **1**, editable |
+| Edit payload | sends `full_name`; **omits** `position` |
+| `position` in a payload at all | **only** in the Add `.insert(` — required there |
+| `portraitWillBeLost` still wired | yes |
+
+⚠️ **One of my own checks flagged a defect that was not one.** A grep
+for `position: newOfficial.position` reported the Edit payload sending a
+position. It does not: that line occurs **once**, in the `.insert(`
+branch, where a new directory row has to say what the person does. The
+check was too loose to tell Add from Edit — the project's own rule about
+asking which step produced the result, and the second time in two phases
+that a scan of mine matched something that only *looked* like the thing
+it was hunting.
+
+### Live-state integrity
+
+| | |
+|---|---|
+| official profiles / directory rows / links | **11 / 11 / 11** |
+| active / archived | **11 / 0** |
+| links carrying the migration-030 backfill provenance | **11** |
+| links whose profile is still `role = 'official'` | **11** |
+| probe rows in `barangay_officials` | **0** |
+| probe changes in `profiles` | **0** |
+| powered holders | Punong Barangay = Hon. Frankie Credo · Barangay Secretary = Alexis Theress P. Tan · Barangay Treasurer = Adelina Fabillar Remata |
+| the Kagawad's name after the collision probe | `Harold Katada Baroy` — restored |
+
+⚠️ **`activity_log` holds 6 rows on `official`, and that is correct.**
+A4's own record says "0 `activity_log` rows on `official`", which I read
+as a table total; it is A4's count of rows **its testing created**. All
+six are historical — the five 2026-10-01 Lastimoso rows this file quotes
+verbatim under *The portrait is lost by the RENAME*, plus Cabrera's
+`added` row from 2026-09-30. The newest is eight days old, and A6's
+probes write no log rows at all: `logActivity` is a frontend call, and
+every SQL block rolled back. A4's record is left as written.
+
+### Advisors — classified, and nothing in category A
+
+| Finding | Level | Class |
+|---|---|---|
+| `rls_enabled_no_policy` on `official_account_links` | INFO | **B — intentional.** RLS on with zero policies is exactly what a private table looks like; the privilege layer is the control and every client read is `42501` |
+| `extension_in_public` — `btree_gist` | WARN | **C — MASTER-B.** Load-bearing for the reservations overlap constraint, so it can only be moved, not dropped |
+| SECURITY DEFINER executable by `anon` — 24 functions | WARN | **C — MASTER-B** |
+| SECURITY DEFINER executable by `authenticated` — 24 functions | WARN | **C — MASTER-B** |
+| `auth_leaked_password_protection` disabled | WARN | **D — platform.** Pro-only on this project |
+
+**Category A — a MASTER-A defect — is empty.** No finding is new: 033
+replaced a function already on the SECURITY DEFINER list, so the count
+is unchanged at 24, and `tmp_cleanup_probe_row` is absent from it
+because migration 026's cleanup left it `SECURITY INVOKER` — it still
+exists, still needs one line in the SQL Editor, and is still a known
+gap.
+
+⚠️ **Seven of the 24 are identity predicates called from inside RLS
+policies**, and MASTER-B must not revoke EXECUTE on them without first
+proving in a rolled-back transaction that a policy can still call them —
+a policy is evaluated as the **querying** role, so revoking `anon` and
+`authenticated` breaks the policy rather than hardening it.
+
+### Verified
+
+| Check | Result |
+|---|---|
+| Jest | **37 suites, 887 tests** — the A5 baseline, unchanged |
+| Focused identity/security suites | 6 suites, **177 tests** |
+| Production build | clean, no ESLint warnings, **224.99 kB** gzipped, `main.1805a56d.js` — **byte-identical to A5**, because A6 changed no code |
+| `git diff --check` | clean |
+
+⚠️ **No authenticated page was loaded in a browser.** The dashboards are
+behind `ProtectedRoute` and this environment still has **no test
+account**. Nothing was done to weaken authentication for a screenshot.
+A6's frontend result is a **source** reconciliation; the database result
+is role impersonation against the live database. What remains unseen is
+the same thing every phase since X2 has left unseen: a signed-in
+official on a live page.
+
+### ⚠️ Two business-rule questions, reported and NOT decided
+
+Neither is an unfinished security implementation. Both need the
+barangay.
+
+1. **Should every official be able to archive another official's
+   record?** The `barangay_officials` UPDATE policy is still
+   `profiles.role = 'official'` with no row restriction — unchanged
+   since migration 018, and deliberately untouched by A4, A5 and A6.
+   A4's guard answers *"not your own record"* and nothing else.
+   Narrowing it to the Punong Barangay or the Secretary would be
+   inventing a permission model inside a verification phase. ⚠️ On its
+   own, archiving **reduces** privileges; it mattered as step 2 of
+   A1b's three-step chain, and steps 1 and 3 are closed.
+2. **Should renaming a directory record also rename the account
+   profile?** It does not, deliberately. `profiles.full_name` and
+   `barangay_officials.full_name` are two descriptive values on two
+   records, and **nothing reads them as one identity**. A test asserts
+   the dashboard does not write the profile name. The one real
+   consequence of a one-sided rename is the **portrait**, which
+   `portraitWillBeLost()` warns about before the save.
+
+### MASTER-B is NOT started
+
+Carried forward unchanged, all recorded under *Known gaps*: the eight
+remaining dead `admin` policy disjuncts; `TRUNCATE` granted to `anon`
+and `authenticated` on 14 tables, plus `activity_log` UPDATE/DELETE,
+`profiles` DELETE and the two queues' DELETE, all granted with no policy
+behind them; the SECURITY DEFINER execute surface; `tmp_cleanup_probe_row`;
+and `btree_gist` in `public`.
+
+---
+
 ## Health centre
 
 **Medicine stock is a status, not a quantity** — Available / Low stock /
@@ -6044,9 +6363,13 @@ derives her initials from. It is no longer displayed as a label.
   a Full Name input again. **Nothing name-based decides identity
   anywhere — database or frontend.** What remains name-keyed is the
   portrait map, and `portraitWillBeLost()` warns before a rename costs
-  one. ⚠️ **MASTER-A A1–A5 is complete; MASTER-B is not started** — the
-  eight dead `admin` disjuncts, the `TRUNCATE` grants and the SECURITY
-  DEFINER audit are still outstanding.
+  one. ✅ **MASTER-A is COMPLETE** — A6 reconciled A1–A5 and found no
+  defect: zero runtime name-identity joins, every powered position
+  succeeding on exactly its own surface and failing closed when unlinked
+  or archived, and a rename granting and stripping nothing.
+  ⚠️ **MASTER-B is not started** — the eight dead `admin` disjuncts,
+  the `TRUNCATE` grants and the SECURITY DEFINER audit are still
+  outstanding.
 - **The official barangay document forms.** X6 built the whole
   generation pipeline against PROTOTYPE layouts because the barangay has
   not supplied its real forms, and the X6 follow-up extended that to all
