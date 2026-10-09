@@ -326,7 +326,7 @@ src/
 
   assets/images/      11 official portraits, page backgrounds, logo.
 
-supabase-migrations/  31 numbered SQL files. A record, not a runner.
+supabase-migrations/  32 numbered SQL files. A record, not a runner.
 supabase/functions/   Edge Function source (notify-reservation-sms).
 docs/                 SETUP.md, TESTING-WALKTHROUGH.pdf + its generator.
 ```
@@ -534,12 +534,15 @@ their position powers.** Measured both directions in 031's header — the
 rename that caused the 2026-10-01 outage now changes nothing, and a
 Kagawad who takes the Secretary's name gains nothing.
 
-⚠️ **Two reasons to still update both tables together.** The first is
-display: the **frontend** `officialInfo` lookup is still name-based
-until A5, so a one-sided rename still breaks what the dashboard renders
-for that official — `isSecretary`, `isTreasurer`, `isKapitan` all come
-from it. The second is `stamp_official_archive()`, whose self-archive
-guard still compares the two names and still fails open; that is A4.
+⚠️ **One reason remains to update both tables together**, and it is
+display, not security: the **frontend** `officialInfo` lookup is still
+name-based until A5, so a one-sided rename still breaks what the
+dashboard renders for that official — `isSecretary`, `isTreasurer`,
+`isKapitan` all come from it. ✅ **The second reason has gone**:
+`stamp_official_archive()`'s self-archive guard compared the two names
+and failed open, and **migration 032 (A4) closed it** — it resolves the
+caller through `official_account_links` and refuses outright when there
+is no link.
 ⚠️ **And the app cannot rename anyone at all** — 029 refuses it, so this
 is now purely a SQL-maintenance rule.
 
@@ -605,13 +608,28 @@ the state and the timestamp, so the two can never disagree.
   order needs a temporary value that a non-deferrable partial unique index
   makes impossible.
 
-⚠️ **The self-archive guard is not a security boundary.** An official may
-not archive their own record — blocked in the UI, and again in the
-trigger. But the trigger compares `profiles.full_name` to the row's
-`full_name`, the same string join documented above, so it **fails open**
-on a mismatch. That is accepted: archiving yourself only *reduces* your
-own privileges, so it is a foot-gun rather than an escalation path. Treat
-it as mistake prevention and do not build anything on top of it.
+✅ **The self-archive guard FAILS CLOSED since migration 032 (MASTER-A
+A4).** An official may not archive their own record — blocked in the UI,
+and again in the trigger. The trigger used to compare
+`profiles.full_name` to the row's `full_name`, so it **failed open** on
+a mismatch; that was reproduced (one trusted-SQL rename of his own
+directory row, and a Kagawad archived himself with `archived_by`
+recording him as the archiver) and closed. `stamp_official_archive()`
+now resolves the caller through `official_account_links` and **refuses
+the archive entirely when the caller holds no link** — an unlinked
+account can archive nobody, because absence of identity is not evidence
+of difference.
+
+⚠️ **Archiving ANOTHER official is unchanged and is still any official's
+to do.** The UPDATE policy is still `profiles.role = 'official'` with no
+row restriction. Whether that should be narrowed to the Punong Barangay
+or the Secretary is a business rule the barangay owns; A4 deliberately
+did not decide it. The guard's job is "not your own record".
+
+⚠️ **It is still not an escalation boundary**, and that reasoning has
+not changed: archiving yourself only *reduces* your own privileges. What
+changed is that it is now a guard a rename cannot switch off — see
+*MASTER-A step A4*.
 
 ⚠️ **Archived rows are not immutable in the database.** `archived_at` and
 `archived_by` are protected by the trigger, but the other historical
@@ -759,7 +777,7 @@ such row.
 
 ## Database notes
 
-**31 migrations**, `001` through `031`, all applied. ⚠️ 027 is a
+**32 migrations**, `001` through `032`, all applied. ⚠️ 027 is a
 DATA CORRECTION, not a schema change — see *The portrait is lost by the
 RENAME* under *Public E-Services (X5)*.
 
@@ -4661,15 +4679,18 @@ close the two write paths that reached it; neither replaces the join.
   ✅ **A2 has since created and backfilled that table** (migration 030,
   11 links) — see *MASTER-A step A2*. It is **inert**: nothing reads it,
   and everything in this bullet is still true until **A3**.
-- **The self-archive guard still fails open.** It still compares
-  `profiles.full_name` to `NEW.full_name`. Making it fail closed needs
-  the link table first, or every official loses the ability to archive
-  anybody. ⚠️ A1b narrows what that buys an attacker — they can no
-  longer rename themselves into somebody else's name first — but
-  archiving another official is still any official's to do, which is
-  step 2 of the chain and is **untouched by design**: it is a real
-  permission the directory has always granted, and *Officials archive*
-  records why archive exists at all.
+- ~~**The self-archive guard still fails open.**~~ ✅ **CLOSED by
+  migration 032 (A4).** It compared `profiles.full_name` to
+  `NEW.full_name`; it now resolves the caller through
+  `official_account_links` and fails closed when there is no link. The
+  worry recorded here — "or every official loses the ability to archive
+  anybody" — is exactly why the guard does **not** route through
+  `official_id_for_current_user()`, whose active-only filter would have
+  done that to an archived official; see *MASTER-A step A4*.
+  ⚠️ **Archiving another official is still any official's to do**, which
+  is step 2 of the chain and is **untouched by design** in A4 as well: it
+  is a real permission the directory has always granted, and *Officials
+  archive* records why archive exists at all.
 - **`kapitan_status` and `kapitan_availability` UPDATE are still "any
   official"** at the database, gated only by `isKapitan` in React. A1
   and A1b make that smaller — an official can no longer promote
@@ -4909,10 +4930,10 @@ settled the first and the fourth; the second and third are still open.**
   ⚠️ **A3 did not earn the field back either**, because the frontend
   lookup is still name-based; **A5** is what restores it, and
   `portraitWillBeLost()` is still kept for exactly that.
-- **It does not touch the kapitan tables**, the self-archive guard, or
-  any position permission. ⚠️ **A3 closed the kapitan tables** (database
-  position enforcement, migration 031); the **self-archive guard is
-  still untouched and still fails open** — that is A4.
+- ~~**It does not touch the kapitan tables**, the self-archive guard, or
+  any position permission.~~ ✅ **Both are now settled.** A3 closed the
+  kapitan tables (database position enforcement, migration 031) and
+  **A4 made the self-archive guard fail closed** (migration 032).
 - ~~**It does not fix the two-table rename.**~~ ✅ **A3 did, for
   permissions.** A one-sided rename no longer strips an official's
   position powers. It still breaks the dashboard's own name-based lookup
@@ -5155,10 +5176,10 @@ over-block would show up: own `position` `P0001`, own `full_name`
 - **Full Name is still read-only**, and 029's `full_name` branch is
   still active, for the reason above. `portraitWillBeLost()` is still
   kept. **A5.**
-- **`stamp_official_archive()` is untouched.** Its self-archive guard
-  still compares the two names and still **fails open** on a mismatch,
-  accepted today because archiving yourself only reduces your own
-  privileges. **A4.**
+- ~~**`stamp_official_archive()` is untouched.**~~ ✅ **A4 rewrote it**
+  — migration 032. Its self-archive guard compared the two names and
+  **failed open** on a mismatch, which was reproduced and then closed
+  through `official_account_links`. See *MASTER-A step A4*.
 - **`position` stays permanently protected** — 028's rule is about
   permissions, not identity, and nothing here changes it.
 - The other eight dead `admin` disjuncts and the `TRUNCATE` grants are
@@ -5166,12 +5187,13 @@ over-block would show up: own `position` `P0001`, own `full_name`
 
 ### Remaining runtime `full_name` occurrences, classified
 
-Zero policies. Eight function bodies, and none of them is an
-authorization identity join any more:
+Zero policies. Eight function bodies at the time, and none of them was
+an authorization identity join any more. ✅ **Seven after A4** —
+`stamp_official_archive()` left this list when migration 032 took the
+name out of the self-archive guard:
 
 | Function | Class | Why it is safe |
 |---|---|---|
-| `stamp_official_archive()` | **A — identity, deferred** | the self-archive guard; fails open, reduces only the caller's own privileges. **A4** |
 | `protect_official_record()` | **A — write guard, deferred** | refuses an API caller's `full_name` *change*; it compares NEW to OLD and grants nothing. Kept for the frontend's sake. **A5** |
 | `compose_full_name()` | B — data | rebuilds `full_name` from the name parts |
 | `prevent_role_self_change()` | B — data | drops a verified account back to `pending` when its owner renames themselves |
@@ -5213,6 +5235,266 @@ the comment said A3 would restore the Full Name field, and A3 has now
 landed without doing so. The guard's purpose — that the reason must stay
 written down, or the field is read-only forever — is unchanged, and it
 now names the phase that will actually undo it.
+
+---
+
+## MASTER-A step A4 — the self-archive guard fails closed (migration 032)
+
+2026-10-09, on `claude/master-a-self-archive-hardening`. **A4 only.
+MASTER-A is NOT finished** — A5 is the frontend identity cutover and the
+Full Name field.
+
+✅ **The last runtime identity join A3 left behind is gone.** Migration
+031 moved every position permission onto `official_account_links` and
+said so explicitly: `stamp_official_archive()`'s self-archive guard was
+left comparing `profiles.full_name` to the row's `full_name`, because
+making it fail closed needed its own step with its own failure mode.
+This is that step.
+
+### ⚠️ It was reproduced before it was changed
+
+The caller is the real Kagawad, with his own JWT claims, inside blocks
+that always end in `RAISE EXCEPTION`:
+
+| | |
+|---|---|
+| names agree → archive his OWN row | `P0001` refused |
+| names agree → archive ANOTHER official | rows=1, allowed |
+| **one trusted-SQL rename of his own directory row**, then archive his OWN row | **rows=1 ACCEPTED** — `archived_at` stamped and **`archived_by` recording him as the archiver of his own record** |
+
+One `UPDATE` to one column turned the guard off. ⚠️ **The rename has to
+come from SQL or `service_role` since 029 — it does not have to come
+from an attacker.** A maintainer correcting a spelling in one table and
+not the other is the documented, already-observed mistake; it is what
+cost this project an official's permissions and his portrait on
+2026-10-01 (migration 027).
+
+### The guard now
+
+```
+auth.uid() → official_account_links.profile_id
+           → official_account_links.official_id
+           → compared against the row being archived
+```
+
+⚠️ **It resolves the mapping directly and does NOT call
+`official_id_for_current_user()`, and that is the design decision of
+this migration.** That helper requires the caller's own linked row to be
+**active**, which is right for every one of its callers —
+`official_availability` asks "which schedule may you publish", and an
+archived official has none. This guard asks "is this row **me**?", which
+is an **identity** question, not a visibility one. Routing it through the
+active-only helper would make an official whose own record is already
+archived resolve to `NULL`, and under the fail-closed rule `NULL` means
+refuse — silently removing a permission the directory grants today. That
+is 030's own principle applied: **a link is an identity fact, not a
+visibility state.**
+
+⚠️ **The join on `barangay_officials` is not an active filter.** It
+requires the linked row to **exist**. The foreign key already guarantees
+that, so it cannot change the answer today; it is there so the function
+stays correct on its own terms if the constraint is ever relaxed, and so
+a reader can see that existence is checked and activeness deliberately
+is not.
+
+⚠️ **`SECURITY DEFINER` is required, not stylistic.**
+`official_account_links` is private, so a trigger running as the caller
+could not read the mapping at all, and granting the caller SELECT to fix
+that would publish which auth account belongs to which named person. The
+only thing that leaves the function is an exception message naming
+nobody.
+
+⚠️ **No `full_name` fallback anywhere** — not as a second chance when
+the link is missing, not as a tie-break. A fallback is how the old
+behaviour comes back while the function *looks* link-based.
+
+⚠️ **It compares against both `OLD.id` and `NEW.id`.** `id` is the
+primary key and no trigger pins it, so checking the row as it stands
+**and** as it is being written means neither a stale nor a rewritten id
+walks past. They are the same value on every call the application makes.
+
+### ⚠️ Fail closed: an unlinked official can archive NOBODY
+
+With the Kagawad's link repointed at an unrelated resident profile —
+both names, his directory row and the link count untouched:
+
+| | |
+|---|---|
+| unlinked → archive his OWN row | `P0001` *"Your account is not linked to a directory record…"* |
+| unlinked → archive ANOTHER row | `P0001`, the same refusal |
+| the resident now **holding** his link | rows=0 — the UPDATE policy still requires `role = 'official'` |
+
+**An unlinked account must not be read as "definitely not this row, so
+go ahead."** That is exactly the inference the old string comparison
+made. Absence of identity is not evidence of difference.
+
+By the time the trigger runs, the UPDATE policy has already established
+`profiles.role = 'official'` — it is the only permissive UPDATE policy
+on the table — so reaching it with no link means precisely "an official
+whose account is not linked". If that policy is ever widened, a caller
+with no link is still refused, which is the safe direction.
+
+⚠️ **The consequence to know** is the one 031 already introduced:
+appointing an official is a **two-row** operation in SQL — the directory
+row, and the link. Without the link they now cannot archive anybody
+either.
+
+### The matrix
+
+| caller | archive OWN row | archive ANOTHER | `archived_by` |
+|---|---|---|---|
+| Punong Barangay | **refused** | rows=1 | his uid |
+| Barangay Secretary | **refused** | rows=1 | her uid |
+| Barangay Treasurer | **refused** | rows=1 | her uid |
+| Kagawad | **refused** | rows=1 | his uid |
+| resident / nurse / anon | n/a | rows=0 | — |
+
+⚠️ The resident, nurse and `anon` rows are 0 because the **UPDATE policy**
+filters them out, so the trigger never fires for them. RLS is the control
+there; the guard is about *which* official, not *whether* an official.
+
+### ⚠️ Names decide nothing now — in both directions
+
+| | |
+|---|---|
+| his directory row renamed one-sidedly → self-archive | **refused** (the exact input that used to fail open) |
+| his **profile** renamed instead, through the name parts so `compose_full_name` rebuilt it → self-archive | **refused**; archiving another official still rows=1 |
+| **name collision**: another official's active row given HIS name, his own row renamed away → archive the row **wearing his name** | **rows=1** — it is not his row |
+| the same collision → archive HIS OWN row | **refused** |
+
+⚠️ **The collision case is the half a fail-open test does not show.**
+Under the old guard the first of those two would have been **refused** —
+a false positive blocking a legitimate archive of somebody else's
+record, because their row happened to carry the caller's name. Identity
+now follows the link in both directions: it stops saying yes to the
+wrong person **and** stops saying no to the right one.
+
+### Archive, restore and the link
+
+| | |
+|---|---|
+| the Secretary archives the Kagawad's row | rows=1, `archived_by` = **her** uid, server-stamped |
+| a client then rewrites both stamps on that already-archived row | the UPDATE is permitted by RLS (rows=1) and the trigger **holds the stored values** — `archived_by` still hers, `archived_at` still 2026, not the `2000-01-01` sent. **Unchanged** |
+| the archived official **restores his own row** | rows=1, `archived_by` cleared |
+| he restores **another** archived row | rows=1 |
+| the link row after archive → restore | **byte-identical**, `linked_at` included; 11 links throughout |
+
+⚠️ **Restore is not an archive transition**, so the self-archive guard
+cannot reach it. An official may still restore a record — including
+their own, if somebody else archived it — exactly as before.
+
+### ⚠️ What A4 does NOT do
+
+- ⚠️ **It does not decide who may archive other officials.** The UPDATE
+  policy is still `profiles.role = 'official'` with no row restriction,
+  so any official may still archive any other official's record. That is
+  a business rule the barangay owns, it has been the directory's
+  behaviour since migration 018, and narrowing it to the Punong Barangay
+  or the Secretary would be inventing a permission model inside a
+  security fix.
+- **It does not touch** the function's other two jobs (holding the
+  stamps on an already-archived row, clearing `archived_by` on restore),
+  the DELETE policy, the SELECT split, the INSERT policy, or
+  `protect_official_record()`.
+- ⚠️ **Full Name is still read-only** and 029's `full_name` branch is
+  still active. A4 removed the last place a name decided **identity**;
+  the frontend `officialInfo` lookup still resolves an official to their
+  row **by name**. **A5** repoints it, then drops the branch, then
+  restores the input. `portraitWillBeLost()` is still kept.
+- **No frontend change**, and none was needed — see below.
+
+**Trigger order is unchanged and still immaterial here.**
+`trg_protect_official_record` (p) still runs before
+`trg_stamp_official_archive` (s), and they share no column.
+
+### Remaining runtime name-based identity, after A4
+
+**Zero policies, zero views, and ZERO runtime authorization identity
+joins anywhere.** Seven function bodies still mention `full_name`, down
+from eight:
+
+| Function | Class | Why it is safe |
+|---|---|---|
+| `protect_official_record()` | **A — write guard, deferred to A5** | refuses an API caller's `full_name` **change**; compares NEW to OLD on one row and grants nothing |
+| `compose_full_name()` | B — data | rebuilds `full_name` from the name parts |
+| `prevent_role_self_change()` | B — data | re-opens verification on a self-rename |
+| `handle_new_resident_signup()` | B — data | writes a new resident's name |
+| `stamp_activity_actor()` | B — display | `actor_name` from the caller's own profile |
+| `create_court_reservation()` | B — data | stores the booker's name |
+| `track_court_reservation()` | B — display | masks the name in SQL |
+
+⚠️ **One stale comment is knowingly left.**
+`protect_official_record()`'s body still reads *"Remove in A3 once
+official_account_links carries identity."* A3 landed and did not remove
+it, and nor does A4. Correcting it means a `CREATE OR REPLACE` of an
+A1/A1b security function for a comment, inside a phase not otherwise
+touching it. **A5 removes the branch and the comment together.**
+
+### ⚠️ One frontend rough edge, found by reading the caller and left for A5
+
+`handleArchiveOfficial` matches the trigger's message with
+`/archive their own/i` to turn it into a readable toast. Migration 032
+**keeps that exact phrase**, so that path is unaffected — verified by
+reading the regex against the new string.
+
+The **new fail-closed message does not match it**, so an unlinked
+official would see the generic `Failed to archive official!` instead of
+the sentence naming the cause. That state **cannot occur on the live
+data** — all 11 officials are linked — and it only arises if a 12th
+directory row and account are created without a link. The refusal still
+happens and the real reason is in the error the client received; only
+the toast is vague. One `else if` fixes it, in the same handler A5 is
+already going to edit.
+
+⚠️ **And note what `isOwnOfficialRecord` still is**: a frontend
+comparison of `userProfile.full_name` to `official.full_name`. It is a
+UI courtesy that produces the clear message before the round trip; the
+database is now the thing that decides, and it no longer agrees to be
+fooled by a rename.
+
+### What was verified
+
+| Check | Result |
+|---|---|
+| Fail-open reproduced before the change | yes — rows=1, `archived_by` = the subject's own uid |
+| Role-impersonation matrix, 17 cases | as above, all rolled back |
+| A3 regression | the whole 031 matrix re-run, identical |
+| Jest | 36 suites, **852 tests** — the baseline, unchanged |
+| Production build | clean, no ESLint warnings, 224.87 kB gzipped, bundle hash identical to `main` |
+| `git diff --check` | clean |
+| Advisors | **no new finding** — `stamp_official_archive` was already SECURITY DEFINER and already on the list, so the count stays at 24 |
+| Live state | 11 links, 11 rows, 11 active, 0 archived, **0 probe residue** in either table, every name restored, 0 `activity_log` rows on `official` |
+
+⚠️ **No authenticated page was loaded in a browser.** The dashboards are
+behind `ProtectedRoute` and this environment still has no test account.
+A4 changes no component, so there is nothing new to render — but an
+official clicking Archive on the live directory through the rewritten
+trigger has not been seen.
+
+### ⚠️ TEST-HARNESS NOTE — `auth.role()` comes from the JWT claims
+
+**This is about the SQL test harness, not about application behaviour.**
+
+Role impersonation in these tests sets `request.jwt.claims`, and
+`auth.role()` reads **that**, not the Postgres role. So inside an
+impersonation block, `set_config('role', 'postgres', true)` alone does
+**not** restore the trusted-caller path that every `protect_*` trigger
+tests for — the claims must be cleared as well:
+
+```sql
+PERFORM set_config('request.jwt.claims', '', true);
+PERFORM set_config('role', 'postgres', true);
+```
+
+Found in A3, where a trusted-SQL rename in the middle of a test block
+was refused by 029's own guard because the previous caller's claims were
+still set. It reads as the migration being broken; it is the harness
+still wearing somebody's identity. The project's own rule — *always ask
+which step produced the result*.
+
+The application never sets either value; PostgREST sets the claims from
+the caller's token, and a direct connection sets neither, which is
+exactly what makes `auth.role() IS NULL` the trusted-maintenance test.
 
 ---
 
@@ -5410,9 +5692,12 @@ derives her initials from. It is no longer displayed as a label.
   is therefore **in place at the database**: every position permission
   resolves through `official_account_links`, the name join is gone from
   all four authorization paths, and an unlinked official fails closed.
-  ⚠️ **What is still outstanding is not the schema** — it is the
-  frontend `officialInfo` lookup (A5) and `stamp_official_archive()`'s
-  self-archive guard (A4), both still name-based.
+  ✅ **A4 (migration 032) took the name out of the last runtime identity
+  check**, `stamp_official_archive()`'s self-archive guard, which now
+  resolves through the mapping and fails closed.
+  ⚠️ **What is still outstanding is not the database at all** — it is the
+  frontend `officialInfo` lookup, still name-based until **A5**, which is
+  also what earns the Full Name field back.
 - **The official barangay document forms.** X6 built the whole
   generation pipeline against PROTOTYPE layouts because the barangay has
   not supplied its real forms, and the X6 follow-up extended that to all
@@ -5560,10 +5845,12 @@ derives her initials from. It is no longer displayed as a label.
   not take the pair for a design.
 - ⚠️ **Archiving another official is still any official's to do**, which
   is step 2 of the chain migration 029 closes at steps 1 and 3. It is
-  untouched **by design** — it is a real permission the directory has
-  always granted, and the self-archive guard that fails open is listed
-  under *MASTER-A*. On its own it revokes powers rather than granting
-  them; it only mattered as part of the chain.
+  untouched **by design** through A4 as well — it is a real permission
+  the directory has always granted, and narrowing it to one position is a
+  business rule the barangay owns, not something to settle inside a
+  security fix. On its own it revokes powers rather than granting them;
+  it only mattered as part of the chain. ✅ **The self-archive half is no
+  longer fail-open** — migration 032.
 - ~~⚠️ **`kapitan_status` and `kapitan_availability` UPDATE are gated in
   the frontend only.**~~ ✅ **CLOSED by migration 031 (A3).** The policy
   was `role IN ('admin','official')` with no position check, so **any**
@@ -5585,13 +5872,16 @@ derives her initials from. It is no longer displayed as a label.
   `activity_log` UPDATE/DELETE, `profiles` DELETE and the two queues'
   DELETE, all granted with no policy behind them. 019A's two-barrier
   pattern is the remedy; MASTER-B.
-- **23 SECURITY DEFINER functions are callable by `anon` and
+- **24 SECURITY DEFINER functions are callable by `anon` and
   `authenticated`** per `get_advisors` (22 until migration 028 added
-  `protect_official_record`). Thirteen are trigger functions
-  that PostgREST cannot invoke at all, four are deliberate RPCs, and six
-  are identity predicates called from inside RLS policies — those six
-  must not be revoked without first proving, in a rolled-back
-  transaction, that a policy can still call them. MASTER-B.
+  `protect_official_record`, 24 since 031 added
+  `current_official_holds_position`; 032 added none — it replaced a
+  function that was already on the list). Thirteen are trigger functions
+  that PostgREST cannot invoke at all, four are deliberate RPCs, and
+  **seven** are identity predicates called from inside RLS policies —
+  those seven must not be revoked without first proving, in a rolled-back
+  transaction, that a policy can still call them, because a policy is
+  evaluated as the querying role. MASTER-B.
 - **`btree_gist` is installed in the `public` schema**, which puts
   **188** of the 218 functions in that schema on the exposed API
   surface. It is load-bearing — the reservations overlap exclusion
