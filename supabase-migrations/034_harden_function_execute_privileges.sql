@@ -1,0 +1,228 @@
+-- =============================================================================
+-- 034_harden_function_execute_privileges.sql
+-- MASTER-B step B1 - reduce the client-executable SECURITY DEFINER surface
+-- =============================================================================
+--
+-- STATUS: APPLIED 2026-10-11 via the Supabase connector.
+--
+-- WHAT THIS DOES
+--   Revokes EXECUTE from PUBLIC, anon and authenticated on fourteen functions
+--   that NO client has any reason to call directly:
+--     - twelve BEFORE/AFTER trigger functions on public tables (and auth.users)
+--     - one event-trigger function
+--     - one dead test helper left by the 026/027 verification runs
+--   postgres and service_role keep EXECUTE. No function body, no policy, no
+--   trigger, no grant on any table and no application code is touched.
+--
+-- WHAT THIS DELIBERATELY DOES NOT DO
+--   - It does not touch the SEVEN identity predicates called from inside RLS
+--     policy expressions (can_see_audience, current_official_holds_position,
+--     is_official, notification_is_visible, official_id_for_current_user,
+--     official_is_active, term_is_confirmed). A policy is evaluated as the
+--     QUERYING role, so revoking anon/authenticated EXECUTE on those would
+--     break the policy rather than harden it. Narrowing them needs its own
+--     phase with a policy-still-works proof; it is NOT attempted here.
+--   - It does not touch the FOUR deliberate RPCs the application calls
+--     (create_court_reservation, get_reservation_slots,
+--     get_reservation_slots_range, track_court_reservation).
+--   - It does not change one table privilege, one TRUNCATE grant, one RLS
+--     policy or btree_gist's schema. Those are later MASTER-B steps.
+--
+-- =============================================================================
+-- WHY REVOKING FROM PUBLIC IS THE LOAD-BEARING HALF
+-- =============================================================================
+--
+-- Every one of these fourteen functions carried a bare `=X/postgres` entry in
+-- its ACL, which is PUBLIC EXECUTE. Revoking from anon and authenticated alone
+-- would have changed NOTHING measurable: PUBLIC grants EXECUTE to every role in
+-- the cluster, so has_function_privilege('anon', ...) would still have returned
+-- true. Measured before this migration:
+--
+--   enforce_reservation_window()  acl: =X/postgres | postgres=X/postgres
+--                                      | anon=X/postgres | authenticated=X/...
+--
+-- The two functions that already had EXECUTE revoked before B1 -
+-- stamp_official_availability() and stamp_reservation_reference() - carry no
+-- PUBLIC entry at all:
+--
+--   stamp_official_availability() acl: postgres=X/postgres | service_role=X/...
+--
+-- That pair is this database's own worked precedent, and it is what B1 was
+-- measured against. See the proof below.
+--
+-- =============================================================================
+-- THE PROOF: A TRIGGER DOES NOT CONSULT THE CALLER'S EXECUTE PRIVILEGE
+-- =============================================================================
+--
+-- PostgreSQL checks EXECUTE on a trigger function at CREATE TRIGGER time, not
+-- at fire time. That is the whole basis of this migration, so it was MEASURED
+-- rather than asserted - in both directions and for both client roles, against
+-- the two functions that were already revoked, in rolled-back blocks:
+--
+--   authenticated EXECUTE on stamp_official_availability()        false
+--     -> an official INSERTs official_availability over the API:  rows=1
+--        updated_by stamped by the trigger = the caller's own uid: true
+--   anon EXECUTE on stamp_reservation_reference()                 false
+--     -> anon calls create_court_reservation():  reference BCR-2026-AMTKAE
+--        i.e. the trigger fired and stamped it
+--   authenticated calling stamp_official_availability() DIRECTLY  42501
+--   anon calling stamp_reservation_reference() DIRECTLY           42501
+--
+-- Read the pair together. The revoke stops the direct call and does not stop
+-- the trigger. That is the property B1 depends on, and it was already true in
+-- this database for two functions before B1 touched anything.
+--
+-- It was then proven DECISIVELY by building the exact situation this migration
+-- creates - a SECURITY DEFINER trigger function with EXECUTE revoked from
+-- PUBLIC, anon and authenticated - and inserting as `authenticated`:
+--
+--   authenticated EXECUTE on the trigger function : false
+--   INSERT as authenticated                       : accepted, trigger FIRED
+--   DIRECT call as authenticated                  : 42501 refused
+--
+-- WHY supabase_auth_admin WAS NOT GIVEN A COMPENSATING GRANT
+--   handle_new_resident_signup() is fired by the auth.users INSERT that GoTrue
+--   performs as `supabase_auth_admin`, and this migration takes that role's
+--   PUBLIC-derived EXECUTE away - measured afterwards as false. Granting it back
+--   "to be safe" was considered and rejected: the mechanism above does not
+--   branch on which role inserts, so the grant would be dead weight that a later
+--   reader could mistake for evidence that trigger firing DOES need EXECUTE.
+--   What could not be done from here is impersonate that role - this connection
+--   is `postgres`, not a superuser and not a member of supabase_auth_admin - so
+--   the signup INSERT was exercised as the owner instead. A real signup through
+--   the live Auth API was therefore the one thing left to click, and it has
+--   been: see MANUAL VERIFICATION ON THE PR PREVIEW below. It PASSED, which
+--   confirms the grant was correctly withheld.
+--
+-- =============================================================================
+-- HOW EACH FUNCTION WAS CLASSIFIED (catalog, not documentation)
+-- =============================================================================
+--
+-- 26 SECURITY DEFINER functions exist in `public`. Every one was checked for a
+-- table trigger, an event trigger, a reference inside any RLS policy expression
+-- (public AND storage), a CHECK constraint, a column default, a view and an
+-- index - and separately for callers among the other public functions and for
+-- `.rpc(` calls in the application source.
+--
+--   TRIGGER-ONLY        14   table triggers only; zero policy/constraint/
+--                            default/view/index references; zero function
+--                            callers; zero .rpc( calls. TWO were already
+--                            revoked, so TWELVE are revoked here.
+--   EVENT-TRIGGER-ONLY   1   rls_auto_enable(), attached to event trigger
+--                            `ensure_rls` on CREATE TABLE. Revoked here.
+--   POLICY-REQUIRED      7   referenced inside an RLS policy. UNTOUCHED.
+--   CLIENT-RPC           4   called by the application. UNTOUCHED.
+--                       --
+--                       26
+--
+-- Nothing was classified by its name. The three functions whose names read like
+-- a trigger but are NOT trigger-only - official_id_for_current_user(),
+-- official_is_active(), notification_is_visible() - are in POLICY-REQUIRED and
+-- are left alone, and official_id_for_current_user() is ALSO called by the
+-- frontend through .rpc() since MASTER-A A5, so it keeps `authenticated`
+-- EXECUTE for two independent reasons.
+--
+-- The application calls exactly FIVE functions through .rpc(): the four RPCs
+-- above plus official_id_for_current_user(). Every other occurrence of one of
+-- these names in src/ is a `//` comment documenting the trigger - checked line
+-- by line, because a comment that names a function reads exactly like a call to
+-- it. None of the fourteen functions revoked here appears in any call.
+--
+-- =============================================================================
+-- tmp_cleanup_probe_row() - REVOKED HERE, THEN DROPPED IN THE SQL EDITOR
+-- =============================================================================
+--
+-- The dead helper left by migration 026's verification. Re-inspected for B1:
+-- still present, SECURITY INVOKER, owner postgres, zero triggers, zero event
+-- triggers, zero policy references, zero function callers, zero hard catalog
+-- dependents, absent from every .rpc( call, and a body that raises immediately
+-- and deletes nothing. It is genuinely a leftover and dropping it is correct.
+--
+-- The connector gates DROP FUNCTION - re-measured for B1, one more 60-second
+-- timeout, and the function was verified afterwards to be untouched. So this
+-- migration did what it COULD do from here and removed the client's ability to
+-- call it, leaving one line for the SQL Editor.
+--
+-- RESOLVED 2026-10-11. The repo owner ran it in the SQL Editor:
+--
+--   DROP FUNCTION public.tmp_cleanup_probe_row();   -- "Success. No rows returned."
+--
+-- Confirmed afterwards from the catalog: zero functions of that name in ANY
+-- schema, and zero fallout - no trigger or event trigger left pointing at a
+-- missing function, and zero policies, functions, constraints or views
+-- referencing the name. The SECURITY DEFINER total is STILL 26, because the
+-- helper was SECURITY INVOKER and was never in that set; the advisors are
+-- unchanged at 11 + 11.
+--
+-- ⚠️ SO THE LAST REVOKE IN THIS FILE IS NOW COMMENTED OUT, and that is
+-- deliberate. It really did run on 2026-10-11 and the header above is its
+-- record - but the function no longer exists, so re-running this file verbatim
+-- would now fail with 42883 on that line alone. ⚠️ No migration file has EVER
+-- created tmp_cleanup_probe_row (checked: it appears only in 026's header, in
+-- this header, and in that one statement) - it was made ad hoc during 026's
+-- verification run. A fresh database replayed from these 34 files therefore
+-- never has the function, which is also why a new migration carrying the DROP
+-- would be wrong: it would be a numbered file whose statement either errors or
+-- no-ops on every database except the one it was already run on by hand.
+--
+-- =============================================================================
+-- VERIFICATION AFTER APPLYING (all rolled back; see CLAUDE.md for the matrices)
+-- =============================================================================
+--
+--   Direct EXECUTE, each of the fourteen, as anon / authenticated /
+--     an ordinary official                                       42501
+--   has_function_privilege(anon|authenticated, ...)              false x14
+--   postgres and service_role EXECUTE                            still true
+--   The trigger each one backs STILL FIRES, exercised through the real
+--     table operation rather than inferred - see CLAUDE.md
+--   MASTER-A A1/A1b/A3/A4/A5 regression matrix                    unchanged
+--
+-- MANUAL VERIFICATION ON THE PR PREVIEW, 2026-10-11 - the one gap this
+-- migration could not close from here:
+--
+--   A brand-new resident account was created through the deploy preview and
+--   signed in to the Resident Portal, which exercises handle_new_resident_signup
+--   through GoTrue's own inserting role - the role this connection cannot
+--   impersonate (`postgres` here is not a superuser and not a member of
+--   supabase_auth_admin), and the role whose PUBLIC-derived EXECUTE on that
+--   function this migration removes.
+--
+--   PASSED. The profile row was created and rendered as "Awaiting review" with
+--   the pending-verification message. Inspected afterwards: role=resident,
+--   verification_status=pending, system_id NULL, no official_account_links row,
+--   no directory row sharing the name, and zero document requests,
+--   reservations, activity_log rows or notifications - an ordinary unverified
+--   resident, the lowest-privilege state in the system. The account was created
+--   at 10:46 UTC, AFTER this migration applied, so the revoke was in force.
+--
+--   That is the decisive confirmation that trigger firing does not consult the
+--   inserting role's EXECUTE privilege, measured on the real signup path
+--   rather than on the equivalent mechanism.
+--
+-- =============================================================================
+
+-- --- twelve table-trigger functions -----------------------------------------
+revoke execute on function public.enforce_reservation_window()       from public, anon, authenticated;
+revoke execute on function public.handle_new_resident_signup()       from public, anon, authenticated;
+revoke execute on function public.notify_document_request()          from public, anon, authenticated;
+revoke execute on function public.notify_reservation()               from public, anon, authenticated;
+revoke execute on function public.notify_verification()              from public, anon, authenticated;
+revoke execute on function public.prevent_role_self_change()         from public, anon, authenticated;
+revoke execute on function public.protect_document_request_status()  from public, anon, authenticated;
+revoke execute on function public.protect_official_record()          from public, anon, authenticated;
+revoke execute on function public.protect_reservation_status()       from public, anon, authenticated;
+revoke execute on function public.stamp_activity_actor()             from public, anon, authenticated;
+revoke execute on function public.stamp_notification_read()          from public, anon, authenticated;
+revoke execute on function public.stamp_official_archive()           from public, anon, authenticated;
+
+-- --- one event-trigger function ---------------------------------------------
+-- Fired by the DDL executor on CREATE TABLE. Neither anon nor authenticated
+-- holds CREATE on schema public (measured: both false), so neither can reach it
+-- through DDL either; this removes the direct call.
+revoke execute on function public.rls_auto_enable()                  from public, anon, authenticated;
+
+-- --- one dead helper --------------------------------------------------------
+-- Ran on 2026-10-11 as part of this migration. Commented out the same day,
+-- because the function was then DROPPED in the SQL Editor and this line would
+-- now raise 42883. See the tmp_cleanup_probe_row section in the header.
+-- revoke execute on function public.tmp_cleanup_probe_row()         from public, anon, authenticated;
