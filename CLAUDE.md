@@ -5873,7 +5873,7 @@ database** rather than by convention, and both foreign keys are
 with `select('*')` on the public Officials page, so a column there would
 publish every official's auth identifier.
 
-### ⚠️ A6 was verified against PR #30, not against `main`
+### ✅ A6 was verified against PR #30's branch, and `main` has since caught up
 
 The brief said A5 had been merged. **It had not** — `main` was at
 `01e277b` (the A4 merge) with 32 migration files and no `033`, and PR
@@ -5884,10 +5884,19 @@ while the database had already stopped protecting the name.
 
 A6 therefore branched from PR #30's head (`41650ae`). Verifying "A1–A5
 together" against `main` would have measured A1–A4 against an A5
-database, and §7's frontend checks would have failed on code that PR #30
-has already replaced. ⚠️ **The reconciliation below is of the A5 branch.
-It becomes a statement about `main` the moment PR #30 merges, and not
-before.**
+database, and the frontend checks would have failed on code that PR #30
+had already replaced.
+
+✅ **PR #30 merged on 2026-10-11 as `9f3bb53`, so the reconciliation
+below IS now a statement about `main`.** Re-verified after the merge
+rather than assumed: `main` carries **33** migration files including
+`033`; the A5 frontend is there (the RPC call, `.eq('id', officialId)`,
+the id-based `isOwnOfficialRecord`, both `identityProblem` states, the
+`Sidebar` helper and `officialIdentity.test.js`); the only commit `main`
+held that this branch did not was the **merge commit itself**, which
+carries no content A5 had not already brought; and the A6 branch's whole
+diff against `main` is **one commit touching only `CLAUDE.md`**. PR #31
+was retargeted from PR #30's branch to `main` once that was true.
 
 ### Runtime name-identity search: ZERO category A
 
@@ -6093,7 +6102,7 @@ every SQL block rolled back. A4's record is left as written.
 | `rls_enabled_no_policy` on `official_account_links` | INFO | **B — intentional.** RLS on with zero policies is exactly what a private table looks like; the privilege layer is the control and every client read is `42501` |
 | `extension_in_public` — `btree_gist` | WARN | **C — MASTER-B.** Load-bearing for the reservations overlap constraint, so it can only be moved, not dropped |
 | SECURITY DEFINER executable by `anon` — 24 functions | WARN | **C — MASTER-B** |
-| SECURITY DEFINER executable by `authenticated` — 24 functions | WARN | **C — MASTER-B** |
+| SECURITY DEFINER executable by `authenticated` — 24 functions | WARN | **C — MASTER-B** — the **same 24**, not another 24; see below |
 | `auth_leaked_password_protection` disabled | WARN | **D — platform.** Pro-only on this project |
 
 **Category A — a MASTER-A defect — is empty.** No finding is new: 033
@@ -6108,6 +6117,34 @@ policies**, and MASTER-B must not revoke EXECUTE on them without first
 proving in a rolled-back transaction that a policy can still call them —
 a policy is evaluated as the **querying** role, so revoking `anon` and
 `authenticated` breaks the policy rather than hardening it.
+
+#### ✅ The two SECURITY DEFINER lints are ONE set of 24, and two functions already show the remedy
+
+Read off the catalog rather than off the lint headlines, because two
+counts of 24 invite being added up:
+
+| | |
+|---|---|
+| SECURITY DEFINER functions in `public` | **26** |
+| executable by `anon` | **24** |
+| executable by `authenticated` | **24** |
+| executable by **both** | **24** |
+| executable by exactly one of the two | **0** |
+
+So the exposed surface is **24 functions, not 48** — the two lints
+report the same set from two angles, which is why the advisor total has
+never moved when only one of them was discussed.
+
+✅ **And two of the 26 already have EXECUTE revoked**:
+`stamp_official_availability` and `stamp_reservation_reference`, whose
+ACL is `postgres` + `service_role` only. Both are trigger functions, so
+nothing calls them over PostgREST and nothing broke. ⚠️ **That is the
+worked precedent MASTER-B needs, in this same database**: the remedy is
+applicable, it has been applied twice, and the reason it cannot simply
+be repeated across the rest is the seven RLS-called predicates above —
+plus the four deliberate RPCs, which `anon` is *supposed* to reach.
+Thirteen of the 24 are trigger functions PostgREST cannot invoke at all,
+and those are where MASTER-B should start.
 
 ### Verified
 
@@ -6550,13 +6587,26 @@ derives her initials from. It is no longer displayed as a label.
 - **24 SECURITY DEFINER functions are callable by `anon` and
   `authenticated`** per `get_advisors` (22 until migration 028 added
   `protect_official_record`, 24 since 031 added
-  `current_official_holds_position`; 032 added none — it replaced a
-  function that was already on the list). Thirteen are trigger functions
-  that PostgREST cannot invoke at all, four are deliberate RPCs, and
-  **seven** are identity predicates called from inside RLS policies —
-  those seven must not be revoked without first proving, in a rolled-back
-  transaction, that a policy can still call them, because a policy is
-  evaluated as the querying role. MASTER-B.
+  `current_official_holds_position`; 032 and 033 added none — each
+  replaced a function already on the list). Thirteen are trigger
+  functions that PostgREST cannot invoke at all, four are deliberate
+  RPCs, and **seven** are identity predicates called from inside RLS
+  policies — those seven must not be revoked without first proving, in a
+  rolled-back transaction, that a policy can still call them, because a
+  policy is evaluated as the querying role. MASTER-B.
+  ⚠️ **It is ONE set of 24, not two.** The advisor reports two lints,
+  `anon_security_definer_function_executable` and
+  `authenticated_security_definer_function_executable`, each counting
+  24 — and A6 read the catalog to settle it: **26** SECURITY DEFINER
+  functions exist in `public`, 24 are executable by `anon`, 24 by
+  `authenticated`, **24 by both, and 0 by exactly one of the two**. The
+  exposed surface is 24 functions, not 48.
+  ✅ **Two of the 26 already have EXECUTE revoked** —
+  `stamp_official_availability` and `stamp_reservation_reference`, ACL
+  `postgres` + `service_role` only. Both are trigger functions, so
+  nothing calls them over PostgREST. That is MASTER-B's worked precedent
+  in this same database, and the thirteen trigger functions still on the
+  list are where it should start.
 - **`btree_gist` is installed in the `public` schema**, which puts
   **188** of the 218 functions in that schema on the exposed API
   surface. It is load-bearing — the reservations overlap exclusion
