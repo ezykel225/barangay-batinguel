@@ -90,8 +90,9 @@
 --   What could not be done from here is impersonate that role - this connection
 --   is `postgres`, not a superuser and not a member of supabase_auth_admin - so
 --   the signup INSERT was exercised as the owner instead. A real signup through
---   the live Auth API is the one thing worth clicking before trusting this in
---   production: create a resident account and confirm the profile row appears.
+--   the live Auth API was therefore the one thing left to click, and it has
+--   been: see MANUAL VERIFICATION ON THE PR PREVIEW below. It PASSED, which
+--   confirms the grant was correctly withheld.
 --
 -- =============================================================================
 -- HOW EACH FUNCTION WAS CLASSIFIED (catalog, not documentation)
