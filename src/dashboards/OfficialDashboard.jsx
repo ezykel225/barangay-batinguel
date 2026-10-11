@@ -540,6 +540,15 @@ const OfficialDashboard = () => {
   // Logged-in user info from profiles + barangay_officials
   const [userProfile, setUserProfile] = useState(null)
   const [officialInfo, setOfficialInfo] = useState(null)
+  // ⚠️ Why `officialInfo` is null, when it is — A5.
+  // `'unlinked'` means `official_id_for_current_user()` returned NULL:
+  // an `official` account with no active linked directory row.
+  // `'error'` means the lookup itself failed. Both withhold every
+  // position-specific control, because identity is not something to
+  // guess at; the distinction exists so a surface that needs a row can
+  // say which of the two it is instead of showing a form that saves
+  // nothing.
+  const [identityProblem, setIdentityProblem] = useState(null)
   // ⚠️ The signed-in official's OWN consultation hours, and nobody
   // else's. Migration 026's policies are what enforce that -- this
   // state is only what the form shows.
@@ -674,34 +683,94 @@ const OfficialDashboard = () => {
     fetchMyAvailability(officialInfo?.id)
   }, [officialInfo, fetchMyAvailability])
 
+  // ⚠️ WHO AM I — RESOLVED BY STABLE ID SINCE A5, NOT BY NAME.
+  //
+  // This lookup used to be `.eq('full_name', profile.full_name)`: the
+  // same string join migrations 031 and 032 took out of the database.
+  // It was the last place in the running system where an official's
+  // identity depended on two tables spelling their name identically, and
+  // it is why the Full Name field had to stay read-only through A3 and
+  // A4 even after the database had stopped caring.
+  //
+  // It now asks the database who the caller is:
+  //
+  //   official_id_for_current_user()  — SECURITY DEFINER, reads the
+  //                                     private official_account_links
+  //                                     mapping, returns ONE uuid or
+  //                                     NULL, and never returns the
+  //                                     mapping itself
+  //   → barangay_officials by PRIMARY KEY
+  //
+  // ⚠️ THE CLIENT NEVER TOUCHES `official_account_links`. It holds no
+  // privilege on it at all (migration 030) — every read is `42501` —
+  // and the helper is the only interface, by design: it answers one
+  // question about the caller rather than handing over a list of which
+  // auth account belongs to which named person.
+  //
+  // ⚠️ The helper's semantics fit this use EXACTLY, which is why A5 does
+  // not invent a second interface. It already requires the caller's own
+  // linked row to be ACTIVE, and that is what this lookup wanted too: an
+  // archived official is no longer serving, so their position must stop
+  // resolving here. (Contrast migration 032's archive guard, which asks
+  // an identity question and therefore had to read the mapping directly
+  // — the active filter would have been wrong there.)
+  //
+  // ⚠️ IT FAILS CLOSED, AND THERE IS NO NAME FALLBACK. A NULL helper
+  // result or an RPC error leaves `officialInfo` null, so every
+  // position-specific control is withheld. Falling back to the name
+  // would re-introduce exactly what this change removes, invisibly — the
+  // portal would look id-based while still being name-based for whoever
+  // happened to be unlinked.
   const fetchUserInfo = async (userId) => {
-    // Get profile (name, role)
+    // The profile is still read for the greeting and the avatar. It is
+    // display data now: nothing below compares its name to anything.
     const { data: profile } = await supabase
       .from('profiles')
       .select('full_name, role')
       .eq('id', userId)
       .single()
 
-    if (profile) {
-      setUserProfile(profile)
+    if (profile) setUserProfile(profile)
 
-      // Get position/committee/avatar from barangay_officials.
-      //
-      // Archived rows are excluded on purpose: an official whose directory
-      // record has been archived is no longer serving, so their position
-      // permissions must stop resolving here as well as in the database.
-      // maybeSingle() rather than single(): an official with no ACTIVE row
-      // is now an expected state (theirs may be archived), and single()
-      // treats zero rows as an error.
-      const { data: official } = await supabase
-        .from('barangay_officials')
-        .select('id, position, committee, photo_url')
-        .eq('full_name', profile.full_name)
-        .is('archived_at', null)
-        .maybeSingle()
+    const { data: officialId, error: identityError } = await supabase
+      .rpc('official_id_for_current_user')
 
-      if (official) setOfficialInfo(official)
+    if (identityError) {
+      console.error('Official identity lookup failed:', identityError)
+      setOfficialInfo(null)
+      setIdentityProblem('error')
+      return
     }
+
+    if (!officialId) {
+      // An `official` account with no active linked directory row. Not an
+      // error and not a crash — the portal still loads everything the
+      // database lets any official see, and the surfaces that genuinely
+      // need a directory row say so in words.
+      setOfficialInfo(null)
+      setIdentityProblem('unlinked')
+      return
+    }
+
+    // By PRIMARY KEY. `.is('archived_at', null)` is defence in depth on
+    // top of the helper rather than instead of it — the helper already
+    // guarantees it, so this cannot change the answer today.
+    const { data: official, error: rowError } = await supabase
+      .from('barangay_officials')
+      .select('id, position, committee, photo_url')
+      .eq('id', officialId)
+      .is('archived_at', null)
+      .maybeSingle()
+
+    if (rowError || !official) {
+      if (rowError) console.error('Directory row lookup failed:', rowError)
+      setOfficialInfo(null)
+      setIdentityProblem(rowError ? 'error' : 'unlinked')
+      return
+    }
+
+    setOfficialInfo(official)
+    setIdentityProblem(null)
   }
 
   const handleAvatarChange = async (e) => {
@@ -1939,11 +2008,14 @@ const OfficialDashboard = () => {
       if (!proceed) return
     }
 
-    // ⚠️ UNREACHABLE WHILE MIGRATION 029 HOLDS, AND DELIBERATELY KEPT.
-    // The Edit form no longer offers Full Name, so `newOfficial.full_name`
-    // always equals `editingOfficial.full_name` here and this never
-    // fires. It is exactly what A3 needs back the moment name editing
-    // is restored, and deleting it now would mean writing it again.
+    // ✅ REACHABLE AGAIN SINCE A5 (migration 033), AND THIS IS WHY IT
+    // WAS KEPT. Through 029, 031 and 032 the Edit form offered no name
+    // input, so `newOfficial.full_name` always equalled
+    // `editingOfficial.full_name` and this branch could not fire. It
+    // was kept across three migrations rather than deleted, because
+    // deleting a guard that will be needed again in the next step of
+    // the same workstream is how it comes back missing — which is
+    // exactly how the portrait was lost in the first place.
     //
     // ⚠️ A RENAME UNLINKS THE PORTRAIT, and this is the only moment
     // anybody can do something about it. `officialPhotos` is keyed on
@@ -1996,16 +2068,24 @@ const OfficialDashboard = () => {
         // handlers below already guard against.
         const { data: updated, error } = await supabase
           .from('barangay_officials')
-          // ⚠️ Neither `position` (028) nor `full_name` (029) is sent.
-          // The form offers neither and the database refuses both, so
-          // including them would be fields this payload claims to set
-          // and does not. Both triggers use `IS DISTINCT FROM`, so
-          // re-sending an unchanged value would still save -- that
-          // tolerance exists so an ordinary edit is never broken by it,
-          // not as a licence to send it.
+          // ⚠️ `full_name` IS SENT AGAIN (A5, migration 033) and
+          // `position` IS STILL NOT (028).
           //
-          // ⚠️ `full_name` goes back in at A3, with the input.
+          // The asymmetry is the whole of MASTER-A in one payload: a
+          // name is description, so the form owns it; a position is
+          // what the three powered permissions read, so the database
+          // owns it and refuses an API caller outright. Sending
+          // `position` here would be a field this payload claims to set
+          // and does not — the trigger uses `IS DISTINCT FROM`, so an
+          // unchanged value would still save, but that tolerance exists
+          // so an ordinary edit is never broken by it, not as a licence
+          // to send it.
+          //
+          // ⚠️ `profiles.full_name` is deliberately NOT written here.
+          // Identity is the private mapping; the two names are separate
+          // facts and keeping them in step is not this form's job.
           .update({
+            full_name: newOfficial.full_name,
             committee: newOfficial.committee || null,
             contact_number: newOfficial.contact_number || null,
             display_order: requestedOrder,
@@ -2109,10 +2189,20 @@ const OfficialDashboard = () => {
   // archived, so an active official cannot be deleted in one step.
 
   // True when this row is the signed-in official's own directory record.
-  // The link is full_name string equality, which is the only link that
-  // exists (there is no foreign key -- see CLAUDE.md "Known fragility").
+  //
+  // ⚠️ BY STABLE ID SINCE A5. It compared `userProfile.full_name` to
+  // `official.full_name`, so a one-sided rename switched it off — the
+  // same fail-open migration 032 reproduced and closed in the database.
+  // Both halves now agree and both follow the private mapping:
+  // `officialInfo.id` came from `official_id_for_current_user()`, and the
+  // row's own id is the primary key.
+  //
+  // ⚠️ It requires `officialInfo.id`, so an unlinked official gets
+  // `false` on every row. That is the safe direction: the database
+  // refuses them the archive outright (032), and the handler below now
+  // says why.
   const isOwnOfficialRecord = (official) =>
-    Boolean(userProfile?.full_name) && official?.full_name === userProfile.full_name
+    Boolean(officialInfo?.id) && official?.id === officialInfo.id
 
   const handleArchiveOfficial = async (reason) => {
     const official = archivingOfficial
@@ -2148,6 +2238,15 @@ const OfficialDashboard = () => {
         // rather than a generic failure.
         if (/archive their own/i.test(error.message)) {
           toast.error('You cannot archive your own record — another authorized official must archive it.')
+        } else if (/not linked to a directory record/i.test(error.message)) {
+          // ⚠️ Migration 032's FAIL-CLOSED refusal: an `official`
+          // account with no link in the private mapping may archive
+          // nobody. A4 recorded this falling through to the generic
+          // toast and left it there, because A5 was already going to
+          // edit this handler. The database's own sentence names a
+          // table, so it is not passed through -- this says the same
+          // thing in the words the rest of the portal uses.
+          toast.error('Your official account is not linked to an active directory identity. Please contact the system administrator.')
         } else {
           toast.error('Failed to archive official!')
         }
@@ -4718,18 +4817,27 @@ const OfficialDashboard = () => {
               </div>
 
               {!officialInfo?.id ? (
-                /* ⚠️ The orphaned-official case, said in words rather
+                /* ⚠️ The unlinked-official case, said in words rather
                    than shown as a form that silently saves nothing.
-                   An official whose `profiles.full_name` no longer
-                   matches an active `barangay_officials.full_name` has
-                   no directory row to attach hours to -- the project's
-                   documented string-join fragility, and there is at
-                   least one such account in the live data right now. */
+                   Migration 026's policies resolve "own hours" through
+                   `official_id_for_current_user()`, so an account that
+                   helper cannot resolve has no row to attach hours to.
+
+                   ⚠️ THE CAUSE CHANGED AT A5 AND SO DID THIS SENTENCE.
+                   It used to say the two names were not identical, which
+                   was true while identity was a string join and is now
+                   simply wrong -- the link is a row in a private table,
+                   and a mismatched name causes nothing. Leaving the old
+                   wording would send an official off to compare
+                   spellings that no longer matter. */
                 <p className="dashboard-empty">
-                  Your account is not linked to an active record in the Officials
-                  Directory, so consultation hours cannot be saved yet. This
-                  happens when the name on your account and the name in the
-                  directory are not identical. Ask another official to check both.
+                  {identityProblem === 'error'
+                    ? 'Your official record could not be loaded just now, so '
+                      + 'consultation hours cannot be saved. Reload the page, and '
+                      + 'if it keeps happening tell the system administrator.'
+                    : 'Your official account is not linked to an active directory '
+                      + 'identity, so consultation hours cannot be saved yet. '
+                      + 'Please contact the system administrator.'}
                 </p>
               ) : (
                 <>
@@ -5014,56 +5122,57 @@ const OfficialDashboard = () => {
           <div className="modal" role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="offdlg-3-title">
             <h3 id="offdlg-3-title">{editingOfficial ? 'Edit Official' : 'Add Official'}</h3>
 
-            {/* ⚠️ FULL NAME IS READ-ONLY WHEN EDITING, AND THAT IS
-                TEMPORARY — see migration 029.
+            {/* ✅ FULL NAME IS EDITABLE AGAIN — MASTER-A A5,
+                migration 033. One control for Add and Edit, as it was
+                before 029 and as every other descriptive field is.
 
-                It is not a view that display names should be
-                un-editable. It is that a display name is currently an
-                AUTHORIZATION KEY: the Secretary and Treasurer policies
-                still join `profiles.full_name` to
-                `barangay_officials.full_name`, so renaming a row moves
-                a permission. Measured: a Kagawad could rename their own
-                row, archive the real Secretary, insert a new row under
-                their own profile name as Secretary, and then approve a
-                document request. Three steps, all through this form.
+                ⚠️ IT WAS NEVER A VIEW THAT DISPLAY NAMES SHOULD BE
+                UN-EDITABLE. It was that a display name WAS an
+                authorization key: the Secretary and Treasurer policies
+                joined `profiles.full_name` to
+                `barangay_officials.full_name`, so renaming a row moved
+                a permission. Measured before 029: a Kagawad could
+                rename their own row, archive the real Secretary, insert
+                a new row under their own profile name as Secretary, and
+                then approve a document request. Three steps, all
+                through this form.
 
-                ⚠️ A5 RESTORES THIS FIELD, NOT A3. Migration 031 (A3)
-                moved every DATABASE permission onto
-                `official_account_links`, so the name no longer decides
-                anything in SQL — but the lookup a few hundred lines
-                above this still resolves `officialInfo` BY NAME, so a
-                rename would still break what this dashboard renders.
-                A5 points that lookup at the stable official id, then
-                drops the `full_name` branch from
-                `protect_official_record()`, then puts the input back.
-                The `position` rule stays, because that one is about
-                permissions rather than identity.
+                That is gone, in three steps and in this order:
 
-                Add still edits it: a new row has to have a name. */}
-            {editingOfficial ? (
-              <div className="modal-form-group">
-                <span className="modal-form-label" id="off-full-name-label">Full Name</span>
-                <p className="modal-form-static" aria-labelledby="off-full-name-label">
-                  {newOfficial.full_name || '—'}
-                </p>
-                <p className="modal-form-hint">
-                  Names and positions are what link an official's account to
-                  their permissions, so both are corrected directly in the
-                  database rather than from this form.
-                </p>
-              </div>
-            ) : (
-              <div className="modal-form-group">
-                <label htmlFor="off-full-name" className="modal-form-label">Full Name</label>
-                <input id="off-full-name"
-                  type="text"
-                  className="modal-form-input"
-                  placeholder="e.g. Hon. Frankie Credo"
-                  value={newOfficial.full_name}
-                  onChange={(e) => setNewOfficial({ ...newOfficial, full_name: e.target.value })}
-                />
-              </div>
-            )}
+                  031 (A3)  every database permission moved onto the
+                            private `official_account_links` mapping
+                  032 (A4)  the self-archive guard followed, and fails
+                            closed without a link
+                  A5        `officialInfo` and `isOwnOfficialRecord` in
+                            THIS file stopped resolving by name, proven
+                            while 029's guard was still active, and only
+                            THEN did migration 033 remove it
+
+                ⚠️ A NAME IS DESCRIPTION NOW. `profiles.full_name` and
+                `barangay_officials.full_name` no longer need to be equal
+                for anything, and editing this one does NOT write the
+                other — the mapping exists precisely so identity and
+                display name are separate facts.
+
+                ⚠️ POSITION STAYS READ-ONLY, PERMANENTLY. See the block
+                below: that one is about permissions, not identity, and
+                has no removal phase.
+
+                ⚠️ A RENAME CAN STILL COST A PORTRAIT, which is the one
+                real consequence of handing this field back.
+                `portraitWillBeLost()` in `handleAddOfficial` was kept
+                through 029/031/032 for this moment and warns before the
+                save. It warns; it does not block. */}
+            <div className="modal-form-group">
+              <label htmlFor="off-full-name" className="modal-form-label">Full Name</label>
+              <input id="off-full-name"
+                type="text"
+                className="modal-form-input"
+                placeholder="e.g. Hon. Frankie Credo"
+                value={newOfficial.full_name}
+                onChange={(e) => setNewOfficial({ ...newOfficial, full_name: e.target.value })}
+              />
+            </div>
 
             {/* ⚠️ POSITION IS READ-ONLY WHEN EDITING, and the control is
                 GONE rather than disabled, because migration 028 refuses
@@ -5092,6 +5201,21 @@ const OfficialDashboard = () => {
                 <span className="modal-form-label" id="off-position-label">Position</span>
                 <p className="modal-form-static" aria-labelledby="off-position-label">
                   {newOfficial.position || '—'}
+                </p>
+                {/* ⚠️ A READ-ONLY FIELD NEEDS A REASON BESIDE IT, and
+                    A5 is why this sentence exists. The explanation used
+                    to live under Full Name and covered both — "names and
+                    positions are what link an official's account to
+                    their permissions". Half of that stopped being true
+                    at 033, and restoring the name input took the whole
+                    hint with it, leaving Position read-only with nothing
+                    saying why. An unexplained read-only field reads as
+                    something broken. This one names only what is still
+                    the case. */}
+                <p className="modal-form-hint">
+                  A position decides who may approve document requests and
+                  court reservations, so it is assigned directly in the
+                  database rather than from this form.
                 </p>
               </div>
             ) : (
