@@ -329,7 +329,7 @@ src/
 
   assets/images/      11 official portraits, page backgrounds, logo.
 
-supabase-migrations/  33 numbered SQL files. A record, not a runner.
+supabase-migrations/  34 numbered SQL files. A record, not a runner.
 supabase/functions/   Edge Function source (notify-reservation-sms).
 docs/                 SETUP.md, TESTING-WALKTHROUGH.pdf + its generator.
 ```
@@ -809,7 +809,7 @@ such row.
 
 ## Database notes
 
-**33 migrations**, `001` through `033`, all applied. ⚠️ 027 is a
+**34 migrations**, `001` through `034`, all applied. ⚠️ 027 is a
 DATA CORRECTION, not a schema change — see *The portrait is lost by the
 RENAME* under *Public E-Services (X5)*.
 
@@ -6101,8 +6101,8 @@ every SQL block rolled back. A4's record is left as written.
 |---|---|---|
 | `rls_enabled_no_policy` on `official_account_links` | INFO | **B — intentional.** RLS on with zero policies is exactly what a private table looks like; the privilege layer is the control and every client read is `42501` |
 | `extension_in_public` — `btree_gist` | WARN | **C — MASTER-B.** Load-bearing for the reservations overlap constraint, so it can only be moved, not dropped |
-| SECURITY DEFINER executable by `anon` — 24 functions | WARN | **C — MASTER-B** |
-| SECURITY DEFINER executable by `authenticated` — 24 functions | WARN | **C — MASTER-B** — the **same 24**, not another 24; see below |
+| SECURITY DEFINER executable by `anon` — 24 functions | WARN | **C — MASTER-B.** ✅ **B1 took this to 11** — migration 034; see *MASTER-B step B1* |
+| SECURITY DEFINER executable by `authenticated` — 24 functions | WARN | **C — MASTER-B** — the **same 24**, not another 24; see below. ✅ **B1 took this to 11 as well**, the same 11 |
 | `auth_leaked_password_protection` disabled | WARN | **D — platform.** Pro-only on this project |
 
 **Category A — a MASTER-A defect — is empty.** No finding is new: 033
@@ -6145,6 +6145,10 @@ be repeated across the rest is the seven RLS-called predicates above —
 plus the four deliberate RPCs, which `anon` is *supposed* to reach.
 Thirteen of the 24 are trigger functions PostgREST cannot invoke at all,
 and those are where MASTER-B should start.
+✅ **B1 started exactly there** — migration 034 revoked the twelve
+remaining table-trigger functions, the one event-trigger function and the
+dead helper, and both lints now report **11**: the seven policy predicates
+and the four RPCs, untouched by design. See *MASTER-B step B1*.
 
 ### Verified
 
@@ -6187,12 +6191,324 @@ barangay.
 
 ### MASTER-B is NOT started
 
+> ✅ **SUPERSEDED IN PART by B1, 2026-10-11.** Migration 034 closed the
+> SECURITY DEFINER execute surface for every function no client has any
+> reason to call, and `tmp_cleanup_probe_row`'s client EXECUTE with it.
+> **Everything else in this paragraph is still outstanding** — the dead
+> `admin` disjuncts, the table grants and `btree_gist`. See *MASTER-B step
+> B1*.
+
 Carried forward unchanged, all recorded under *Known gaps*: the eight
 remaining dead `admin` policy disjuncts; `TRUNCATE` granted to `anon`
 and `authenticated` on 14 tables, plus `activity_log` UPDATE/DELETE,
 `profiles` DELETE and the two queues' DELETE, all granted with no policy
 behind them; the SECURITY DEFINER execute surface; `tmp_cleanup_probe_row`;
 and `btree_gist` in `public`.
+
+---
+
+## MASTER-B step B1 — the SECURITY DEFINER execute surface (migration 034)
+
+2026-10-11, on `claude/master-b1-function-execute-hardening`, built on
+`main` after PR #31 merged. **B1 only. MASTER-B is NOT finished** — the
+table grants, the dead `admin` policy disjuncts and `btree_gist` are all
+still outstanding and all still recorded under *Known gaps*.
+
+✅ **The client-executable SECURITY DEFINER surface went from 24
+functions to 11**, and the eleven are the ones that have to be. No
+function body, no RLS policy, no trigger, no table privilege and **no
+application code** was touched: the whole migration is fourteen `REVOKE`
+statements.
+
+| | before 034 | after |
+|---|---|---|
+| SECURITY DEFINER functions in `public` | 26 | 26 |
+| executable by `anon` | **24** | **11** |
+| executable by `authenticated` | **24** | **11** |
+| `anon_security_definer_function_executable` | 24 findings | **11** |
+| `authenticated_security_definer_function_executable` | 24 findings | **11** |
+
+### ⚠️ Revoking from PUBLIC is the load-bearing half, not from anon and authenticated
+
+Every one of the fourteen carried a bare `=X/postgres` entry in its ACL,
+which is **PUBLIC EXECUTE**. So revoking from `anon` and `authenticated`
+alone would have changed **nothing measurable** — PUBLIC grants EXECUTE
+to every role in the cluster, and `has_function_privilege('anon', …)`
+would still have answered `true`. Measured before:
+
+```
+enforce_reservation_window()   =X/postgres | postgres=X | anon=X | authenticated=X | service_role=X
+stamp_official_availability()  postgres=X/postgres | service_role=X/postgres
+```
+
+The second line is one of the two functions that already had EXECUTE
+revoked before B1, and it has **no PUBLIC entry at all**. That difference
+is the whole remedy, and reading the ACL rather than the lint is what
+found it.
+
+### ⚠️ A trigger does not consult the caller's EXECUTE privilege — measured, not assumed
+
+The entire migration rests on one PostgreSQL fact, so it was **measured
+in both directions and for both client roles** rather than taken from
+documentation. First against the two functions that were already revoked:
+
+| | |
+|---|---|
+| `authenticated` EXECUTE on `stamp_official_availability()` | **false** |
+| yet an official INSERTs `official_availability` over the API | rows=1, `updated_by` stamped **with the caller's own uid** |
+| `anon` EXECUTE on `stamp_reservation_reference()` | **false** |
+| yet `anon` calls `create_court_reservation()` | reference **`BCR-2026-AMTKAE`** — the trigger fired and stamped it |
+| either role calling either function **directly** | **42501** |
+
+Then decisively, by building the exact situation 034 creates — a
+SECURITY DEFINER trigger function with EXECUTE revoked from PUBLIC,
+`anon` and `authenticated` — and inserting as `authenticated`:
+
+```
+authenticated EXECUTE on the trigger function : false
+INSERT as authenticated                       : accepted, trigger FIRED
+DIRECT call as authenticated                  : 42501 refused
+```
+
+**The revoke stops the direct call and does not stop the trigger.** That
+pair is the property B1 depends on, and this database had already been
+relying on it for two functions before B1 touched anything.
+
+⚠️ **This is why `supabase_auth_admin` was NOT given a compensating
+grant.** It performs the `auth.users` INSERT that fires
+`handle_new_resident_signup()`, and 034 takes its PUBLIC-derived EXECUTE
+away — measured afterwards as `false`. This connection is `postgres`,
+which is **not a superuser here and not a member of
+`supabase_auth_admin`**, so GoTrue's own inserting role could not be
+impersonated and the signup INSERT was exercised as the owner instead.
+Granting EXECUTE back "to be safe" was considered and rejected: the
+mechanism above does not branch on which role inserts, so the grant would
+be dead weight that a later reader could mistake for evidence that
+trigger firing *does* need EXECUTE. What is verified is stated plainly
+under *What was NOT verified* below.
+
+### How each of the 26 was classified — from the catalog, never from the name
+
+Every function was checked for a table trigger, an event trigger, a
+reference inside **any** RLS policy expression (`public` **and**
+`storage`), a CHECK constraint, a column default, a view and an index —
+and separately for callers among the other `public` functions and for
+`.rpc(` calls in the application source.
+
+| Class | Count | Decision |
+|---|---|---|
+| TRIGGER-ONLY | **14** | revoked (12 here; 2 already were) |
+| EVENT-TRIGGER-ONLY | **1** | revoked |
+| POLICY-REQUIRED | **7** | **untouched** |
+| CLIENT-RPC | **4** | **untouched** |
+
+The twelve revoked here: `enforce_reservation_window`,
+`handle_new_resident_signup`, `notify_document_request`,
+`notify_reservation`, `notify_verification`, `prevent_role_self_change`,
+`protect_document_request_status`, `protect_official_record` (two
+triggers, one function), `protect_reservation_status`,
+`stamp_activity_actor`, `stamp_notification_read`,
+`stamp_official_archive`. Plus `rls_auto_enable()`, and
+`tmp_cleanup_probe_row()` which is not SECURITY DEFINER and so was never
+in the 24 at all.
+
+⚠️ **Three names read like triggers and are not.**
+`official_id_for_current_user()`, `official_is_active()` and
+`notification_is_visible()` are POLICY-REQUIRED and were left alone.
+`official_id_for_current_user()` is **dual-purpose** — called from three
+`official_availability` policies **and** by the frontend through `.rpc()`
+since MASTER-A A5 — so it keeps `authenticated` EXECUTE for two
+independent reasons.
+
+⚠️ **`is_official(uuid)` is referenced by ELEVEN policies, three of them
+in `storage`** (`Officials can delete any ID`, `Officials can delete
+official photos`, `Officials can view any ID for verification`). A scan
+limited to `public` would have under-counted it. It stays.
+
+### ⚠️ The seven must not be revoked, and the reason is not caution
+
+An RLS policy is evaluated as the **querying** role. Revoking `anon` and
+`authenticated` EXECUTE on a predicate a policy calls therefore breaks
+the policy rather than hardening it — the opposite of the intended
+effect, and it would present as a government queue silently returning
+zero rows. They are `can_see_audience`,
+`current_official_holds_position`, `is_official`,
+`notification_is_visible`, `official_id_for_current_user`,
+`official_is_active` and `term_is_confirmed`.
+
+All seven were re-exercised **through their policies** after 034, not by
+calling them:
+
+| | |
+|---|---|
+| Treasurer → `reservations` UPDATE | rows=1 |
+| Punong Barangay → `kapitan_status` / `kapitan_availability` UPDATE | rows=1 / rows=5 |
+| Kagawad → `kapitan_status` UPDATE | rows=0 |
+| Secretary → sees the secretary queue | 5 rows · Kagawad: **0** |
+| Kagawad → marks a secretary-audience notification read | **P0001 refused** |
+| Secretary → marks the same kind read | rows=1, forged `user_id` **overwritten** |
+| `anon` → members of a **draft** term / **confirmed** / back to draft | 0 / 1 / **0** |
+| `anon` → `residents_registry` | 0 rows · an official: 5 |
+| an official → writes **another** official's hours | **42501 refused** |
+
+### The four RPCs, and which role needs each
+
+| RPC | Needed by | Why |
+|---|---|---|
+| `create_court_reservation` | `anon` **and** `authenticated` | a walk-in has no account (008), and 024 made creation an RPC because `.insert().select()` is `INSERT … RETURNING` and a guest holds no SELECT on `reservations` |
+| `get_reservation_slots` | `anon` | the public availability grid |
+| `get_reservation_slots_range` | `anon` | the public availability calendar, a month per call |
+| `track_court_reservation` | `anon` | the public tracking page |
+
+The application calls exactly **five** functions through `.rpc(`: those
+four plus `official_id_for_current_user()`. ⚠️ **Every other occurrence
+of one of these names in `src/` is a `//` comment**, and each was read
+line by line rather than counted — a comment naming a function reads
+exactly like a call to it, which is the same trap that produced two false
+findings in A5 and A6.
+
+### ⚠️ The direct-call matrix
+
+`anon`, a resident and an ordinary official × the fourteen revoked
+functions, each call attempted for real:
+
+| | |
+|---|---|
+| 48 direct calls refused `42501 insufficient_privilege` | **48** |
+| anything else | **0** |
+| `anon` / `authenticated` EXECUTE, all 16 checked | **0 / 16** |
+| `postgres` / `service_role` EXECUTE, all 16 | **16 / 16** |
+
+(Sixteen rather than fourteen because the matrix also re-checked the two
+functions that were already revoked, as its own control.)
+
+### Every trigger domain still fires
+
+Exercised through the **real table operation**, never inferred, all
+rolled back:
+
+| Trigger function | Exercised by | Result |
+|---|---|---|
+| `enforce_reservation_window` | `anon` books a daytime slot with no reason; and 5:00 PM for 5h | **refused** both — window guard and the 4-hour cap |
+| `stamp_reservation_reference` | a resident books legitimately | reference `BCR-2026-ZT0NWH` |
+| `notify_reservation` | the same booking | 1 Treasurer notification |
+| `protect_reservation_status` | resident writes `resident_viewed_at` / rewrites `purpose` / cancels own pending / self-approves | rows=1 · **refused** · rows=1 · **refused** |
+| `notify_document_request` | a verified resident files a request | 1 Secretary notification, and the resident's own outcome notification on approval |
+| `protect_document_request_status` | resident writes `resident_viewed_at` / self-approves | rows=1 · **refused** |
+| `stamp_activity_actor` | an official logs an entry with a **forged** actor | forgery discarded, `actor_id` = the caller |
+| `stamp_notification_read` | a resident, then the Secretary, marks one read with a **forged** `user_id` | overwritten with theirs, both times |
+| `handle_new_resident_signup` | an `auth.users` INSERT | profile created, `role=resident`, `status=pending`; metadata claiming `role=official` creates **0** rows |
+| `prevent_role_self_change` | resident sets own role / self-verifies / renames a verified account | **refused** · **refused** · dropped back to `pending` |
+| `notify_verification` | an official verifies the account | 1 notification to the owner |
+| `protect_official_record` | own `position` / `created_at` / powered-position INSERT / `Kagawad` INSERT | **refused** ×3 · **accepted** |
+| `stamp_official_archive` | self-archive **after renaming that row through the app** / archiving another | **refused** · rows=1 with `archived_by` = the caller |
+| `rls_auto_enable` | `CREATE TABLE` | RLS auto-enabled = true |
+
+⚠️ **Read the `stamp_official_archive` row carefully.** The row was
+renamed first — which migration 033 now permits — and the guard still
+refused. That rename is the precise input that made the **old** guard
+fail open in A4, so B1 re-attacked the new guard with the one write that
+used to disarm it, now that the write is allowed again.
+
+### MASTER-A is unweakened
+
+The whole regression matrix re-run after 034, with the positive controls
+included so an over-block would show up too:
+
+| | |
+|---|---|
+| 028 own `position` / `created_at` | **P0001** ×2 |
+| 029 INSERT `Barangay Secretary` / `Punong Barangay` | **P0001** ×2 |
+| 029 INSERT `Kagawad` (positive control) | **accepted** |
+| 033 own `full_name` change | **rows=1** |
+| 032 self-archive | **P0001** |
+| 018 archive another official | rows=1 |
+| 030 a linked official SELECTs the mapping | **42501** |
+| 031 Secretary / Treasurer / Punong hold SEC·TRE·PUN | `t,f,f` · `f,t,f` · `f,f,t` |
+| 031 Kagawad | `f,f,f` |
+| A5 `official_id_for_current_user()` | his own row id |
+
+### ⚠️ Four results were my harness, not defects
+
+The project's own rule, for the fifth phase running — *always ask which
+step produced the result*:
+
+- **A `DROP TABLE` in my own cleanup gated the whole call.** The
+  connector scans the entire payload, so one destructive statement timed
+  out a block whose other statements then never ran. The `CREATE TABLE`
+  it was cleaning up is undone by the aborting `RAISE` anyway — DDL is
+  transactional. Residue re-checked afterwards: zero.
+- **`42501 permission denied for table official_account_links`** —
+  because I read the mapping while still impersonating `authenticated`.
+  That refusal is the privacy property working. The fix is to hoist every
+  mapping read above the impersonation; ⚠️ **the error's own hint offers
+  `GRANT SELECT ON public.official_account_links TO authenticated`, which
+  is exactly what must never be done.**
+- **"Kagawad marks an invisible notification read: NOT REFUSED"** — my
+  probe was `INSERT … SELECT`, and the inner SELECT was itself
+  RLS-filtered to **zero** rows for him. Nothing was inserted, so nothing
+  was refused. Re-run with a literal id captured as `postgres`: refused.
+- **"Secretary marks the same one read: 23505 duplicate key"** — she had
+  already marked that notification read in real use, so the primary key
+  refused a second mark. A notification generated by the trigger inside
+  the block gave the clean positive control.
+
+### What was verified
+
+| Check | Result |
+|---|---|
+| Classification of all 26, from the catalog | 14 / 1 / 7 / 4 |
+| Direct-call matrix | 48 refused `42501`, 0 anything else |
+| Trigger domains still firing | all 14, through real table operations |
+| The seven predicates, through their policies | all pass, both directions |
+| MASTER-A A1/A1b/A3/A4/A5 regression | unchanged |
+| `.rpc(` reconciliation | 5 functions called; none of them revoked |
+| Advisors | 24 → **11** on both lints; **no new finding** |
+| Live state | 11 links / 11 rows / 11 active / 0 archived, powered holders unchanged, **zero probe residue** in any table |
+| Jest | **37 suites, 887 tests** — the A5/A6 baseline, unchanged |
+| Production build | clean, no ESLint warnings, **224.99 kB** gzipped, `main.1805a56d.js` — **byte-identical to A5 and A6**, because B1 changes no application code |
+| `git diff --check` | clean |
+
+⚠️ **No test was added, and the count is deliberately unchanged.** B1
+changes no frontend behaviour and no frontend file, so there is nothing
+for Jest to assert; the proof of this phase is role impersonation against
+the live database. Padding the count would misrepresent what B1 did.
+
+### ⚠️ What was NOT verified
+
+- **No authenticated page was loaded in a browser.** The dashboards are
+  behind `ProtectedRoute` and this environment still has **no test
+  account**. Nothing was done to weaken authentication for a screenshot.
+- ⚠️ **The `auth.users` INSERT was not executed as GoTrue's own role.**
+  `postgres` here is not a superuser and not a member of
+  `supabase_auth_admin`, so that role could not be assumed. What is
+  verified is that the signup trigger still fires and still creates the
+  profile, and — separately and decisively — that trigger firing does not
+  consult the inserting role's EXECUTE privilege. What is **not**
+  verified is a real GoTrue signup through the live Auth API. That is the
+  one thing worth clicking on the deploy preview before this is trusted
+  in production: **create a resident account and confirm the profile row
+  appears.**
+- **`DROP FUNCTION public.tmp_cleanup_probe_row();`** still needs one
+  line in the SQL Editor. Its client EXECUTE is gone, which is what B1
+  could do from here.
+
+### ⚠️ What B1 does NOT do
+
+- **It does not touch one table privilege.** `TRUNCATE` on 14 tables,
+  `activity_log` UPDATE/DELETE, `profiles` DELETE and the two queues'
+  DELETE are all still granted with no policy behind them. B2.
+- **It does not remove the eight remaining dead `admin` policy
+  disjuncts**, and none had to change for B1 to be correct — checked
+  rather than assumed.
+- **It does not move `btree_gist` out of `public`.**
+- **It does not narrow the seven policy predicates or the four RPCs**,
+  for the reasons above. The two `get_reservation_slots*` RPCs and all
+  seven predicates still carry a bare **PUBLIC** grant alongside their
+  explicit `anon` and `authenticated` ones; dropping PUBLIC from those
+  nine is a candidate for a later step, and for the seven it needs the
+  policy-still-works proof in a rolled-back transaction first. Recorded,
+  not attempted.
 
 ---
 
@@ -6481,6 +6797,15 @@ derives her initials from. It is no longer displayed as a label.
 - **One dead database function**, `tmp_cleanup_probe_row`, left by
   migration 026's verification because this connector gates
   `DROP FUNCTION`. Neutralised; needs one line in the SQL Editor.
+  ✅ **No client can call it any more** — migration 034 revoked its
+  EXECUTE from PUBLIC, `anon` and `authenticated`, which is what B1 could
+  do from here; re-inspected first and every dependency check was clean
+  (SECURITY INVOKER, zero triggers, zero event triggers, zero policy
+  references, zero function callers, zero catalog dependents, absent from
+  every `.rpc(` call, and a body that raises immediately). ⚠️ **The drop
+  itself still gates** — re-measured in B1, one more 60-second timeout,
+  with the function verified untouched afterwards. One line finishes it:
+  `DROP FUNCTION public.tmp_cleanup_probe_row();`
 - **No public waste-schedule route.** The collection schedule is a
   section of the Home page and nothing else. Home now carries a derived
   *Next collection* summary with the full weekly grid behind a
@@ -6584,29 +6909,32 @@ derives her initials from. It is no longer displayed as a label.
   `activity_log` UPDATE/DELETE, `profiles` DELETE and the two queues'
   DELETE, all granted with no policy behind them. 019A's two-barrier
   pattern is the remedy; MASTER-B.
-- **24 SECURITY DEFINER functions are callable by `anon` and
-  `authenticated`** per `get_advisors` (22 until migration 028 added
-  `protect_official_record`, 24 since 031 added
-  `current_official_holds_position`; 032 and 033 added none — each
-  replaced a function already on the list). Thirteen are trigger
-  functions that PostgREST cannot invoke at all, four are deliberate
-  RPCs, and **seven** are identity predicates called from inside RLS
-  policies — those seven must not be revoked without first proving, in a
-  rolled-back transaction, that a policy can still call them, because a
-  policy is evaluated as the querying role. MASTER-B.
-  ⚠️ **It is ONE set of 24, not two.** The advisor reports two lints,
+- ✅ ~~**24 SECURITY DEFINER functions are callable by `anon` and
+  `authenticated`.**~~ **ELEVEN since migration 034 (MASTER-B B1)**, and the
+  eleven are the ones that have to be: the **seven** identity predicates
+  called from inside RLS policy expressions, and the **four** RPCs the
+  application calls. Both advisor lints report 11, down from 24.
+  ⚠️ **The seven are not a leftover and must not be revoked.** An RLS
+  policy is evaluated as the **querying** role, so revoking `anon` and
+  `authenticated` EXECUTE on a predicate a policy calls breaks the policy
+  rather than hardening it. Narrowing them at all needs a proof, in a
+  rolled-back transaction, that every policy that calls them still works.
+  ⚠️ **It is ONE set, not two.** The advisor reports two lints,
   `anon_security_definer_function_executable` and
-  `authenticated_security_definer_function_executable`, each counting
-  24 — and A6 read the catalog to settle it: **26** SECURITY DEFINER
-  functions exist in `public`, 24 are executable by `anon`, 24 by
-  `authenticated`, **24 by both, and 0 by exactly one of the two**. The
-  exposed surface is 24 functions, not 48.
-  ✅ **Two of the 26 already have EXECUTE revoked** —
-  `stamp_official_availability` and `stamp_reservation_reference`, ACL
-  `postgres` + `service_role` only. Both are trigger functions, so
-  nothing calls them over PostgREST. That is MASTER-B's worked precedent
-  in this same database, and the thirteen trigger functions still on the
-  list are where it should start.
+  `authenticated_security_definer_function_executable`, each counting the
+  same functions — A6 read the catalog to settle it: **26** SECURITY
+  DEFINER functions exist in `public`, and the number executable by
+  `anon`, by `authenticated` and by **both** was the same number, with
+  **0** executable by exactly one of the two. So the exposed surface was
+  24 functions and not 48, and it is now 11 and not 22.
+  ✅ **Fifteen of the 26 are now client-unreachable**: the fourteen
+  trigger functions (`stamp_official_availability` and
+  `stamp_reservation_reference` were already revoked before B1 and were
+  its worked precedent; 034 did the other twelve) and
+  `rls_auto_enable()`, the event-trigger function. Every one of them
+  reads `postgres=X/postgres | service_role=X/postgres` and nothing else.
+  See *MASTER-B step B1* for the classification and the proof that a
+  trigger still fires for a caller holding no EXECUTE on it.
 - **`btree_gist` is installed in the `public` schema**, which puts
   **188** of the 218 functions in that schema on the exposed API
   surface. It is load-bearing — the reservations overlap exclusion
