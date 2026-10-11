@@ -3216,6 +3216,9 @@ Consequence recorded in 026's header: one dead helper function,
 neutralised (SECURITY INVOKER, a body that deletes nothing and raises)
 and needs one line in the SQL Editor:
 `DROP FUNCTION public.tmp_cleanup_probe_row();`
+✅ **That line was run on 2026-10-11** and the function is gone — see
+*MASTER-B step B1*. The gating itself is unchanged and was re-measured
+there: `DROP FUNCTION` still times out through the connector.
 
 ### What was measured, and what was not
 
@@ -6110,7 +6113,8 @@ replaced a function already on the SECURITY DEFINER list, so the count
 is unchanged at 24, and `tmp_cleanup_probe_row` is absent from it
 because migration 026's cleanup left it `SECURITY INVOKER` — it still
 exists, still needs one line in the SQL Editor, and is still a known
-gap.
+gap. ✅ **Dropped on 2026-10-11** — B1; the SECURITY DEFINER total was
+unaffected, exactly because it was never in that set.
 
 ⚠️ **Seven of the 24 are identity predicates called from inside RLS
 policies**, and MASTER-B must not revoke EXECUTE on them without first
@@ -6310,7 +6314,8 @@ triggers, one function), `protect_reservation_status`,
 `stamp_activity_actor`, `stamp_notification_read`,
 `stamp_official_archive`. Plus `rls_auto_enable()`, and
 `tmp_cleanup_probe_row()` which is not SECURITY DEFINER and so was never
-in the 24 at all.
+in the 24 at all. ✅ **That last one has since been dropped outright** —
+see *The dead helper is gone* below.
 
 ⚠️ **Three names read like triggers and are not.**
 `official_id_for_current_user()`, `official_is_active()` and
@@ -6474,24 +6479,59 @@ changes no frontend behaviour and no frontend file, so there is nothing
 for Jest to assert; the proof of this phase is role impersonation against
 the live database. Padding the count would misrepresent what B1 did.
 
-### ⚠️ What was NOT verified
+### ✅ The real signup path, verified manually on the PR preview
 
-- **No authenticated page was loaded in a browser.** The dashboards are
-  behind `ProtectedRoute` and this environment still has **no test
-  account**. Nothing was done to weaken authentication for a screenshot.
-- ⚠️ **The `auth.users` INSERT was not executed as GoTrue's own role.**
-  `postgres` here is not a superuser and not a member of
-  `supabase_auth_admin`, so that role could not be assumed. What is
-  verified is that the signup trigger still fires and still creates the
-  profile, and — separately and decisively — that trigger firing does not
-  consult the inserting role's EXECUTE privilege. What is **not**
-  verified is a real GoTrue signup through the live Auth API. That is the
-  one thing worth clicking on the deploy preview before this is trusted
-  in production: **create a resident account and confirm the profile row
-  appears.**
-- **`DROP FUNCTION public.tmp_cleanup_probe_row();`** still needs one
-  line in the SQL Editor. Its client EXECUTE is gone, which is what B1
-  could do from here.
+⚠️ **This was B1's one open gap, and it is closed.** The `auth.users`
+INSERT that fires `handle_new_resident_signup()` is performed by GoTrue as
+`supabase_auth_admin` — a role this connection cannot assume (`postgres`
+here is not a superuser and not a member of it) and the role whose
+PUBLIC-derived EXECUTE on that function migration 034 removes. So from
+this environment the trigger could only be exercised as the owner, and
+privilege-independence could only be proven on the equivalent mechanism.
+
+**The repo owner created a brand-new resident account through the PR #32
+deploy preview and signed in to the Resident Portal. PASSED.** The profile
+row was created and rendered as *Awaiting review* with the
+pending-verification message.
+
+Inspected afterwards, and it is the correct lowest-privilege state:
+
+| | |
+|---|---|
+| `role` / `verification_status` | `resident` / `pending` |
+| `system_id` | NULL, as on every resident account |
+| `official_account_links` row | **none** |
+| directory rows sharing the name | **0** |
+| document requests · reservations · `activity_log` rows · notifications | 0 · 0 · 0 · 0 |
+| created | 10:46 UTC — **after** 034 applied, so the revoke was in force |
+
+⚠️ **The account was left in place as manual test data**, not deleted: it
+is an ordinary unverified resident, it holds no privilege the portal does
+not give every new signup, and deleting a `profiles` row is something this
+project does not do at all — there is no DELETE policy on that table. It
+will appear in the Residents tab's Requests group until an official
+decides it, which is exactly where a real pending signup belongs.
+
+### ✅ The dead helper is gone
+
+`DROP FUNCTION public.tmp_cleanup_probe_row();` was run in the SQL Editor
+on 2026-10-11 and returned *Success. No rows returned.* Confirmed from the
+catalog: zero functions of that name in any schema, zero dependency
+fallout, the SECURITY DEFINER total **still 26** (it was SECURITY INVOKER),
+and the advisors unchanged at 11 + 11. See *Known gaps* for why this got no
+migration of its own.
+
+### ⚠️ What is still NOT verified
+
+- **No authenticated page was loaded in a browser from here.** The
+  dashboards are behind `ProtectedRoute` and this environment still has
+  **no test account**. Nothing was done to weaken authentication for a
+  screenshot. The signup path above was verified by the repo owner on the
+  deploy preview, not by this session.
+- **No official-side dashboard surface was exercised live.** B1 changes no
+  component, so there is nothing new to render — but the Secretary
+  approving on the live queue through the revoked-trigger path has still
+  not been seen from here.
 
 ### ⚠️ What B1 does NOT do
 
@@ -6794,18 +6834,21 @@ derives her initials from. It is no longer displayed as a label.
 - **Friday's two clinic rows are stored 24-hour** (`08:00`) while every
   other row is a display string (`8:00 AM`). `clinicHours.toMinutes`
   accepts both, so nothing breaks — which is why nobody noticed.
-- **One dead database function**, `tmp_cleanup_probe_row`, left by
+- ✅ ~~**One dead database function**, `tmp_cleanup_probe_row`, left by
   migration 026's verification because this connector gates
-  `DROP FUNCTION`. Neutralised; needs one line in the SQL Editor.
-  ✅ **No client can call it any more** — migration 034 revoked its
-  EXECUTE from PUBLIC, `anon` and `authenticated`, which is what B1 could
-  do from here; re-inspected first and every dependency check was clean
-  (SECURITY INVOKER, zero triggers, zero event triggers, zero policy
-  references, zero function callers, zero catalog dependents, absent from
-  every `.rpc(` call, and a body that raises immediately). ⚠️ **The drop
-  itself still gates** — re-measured in B1, one more 60-second timeout,
-  with the function verified untouched afterwards. One line finishes it:
-  `DROP FUNCTION public.tmp_cleanup_probe_row();`
+  `DROP FUNCTION`.~~ **GONE, 2026-10-11.** B1 revoked its client EXECUTE
+  (migration 034, after every dependency check came back clean) and the repo
+  owner then ran `DROP FUNCTION public.tmp_cleanup_probe_row();` in the SQL
+  Editor. Confirmed from the catalog: **zero** functions of that name in any
+  schema, and zero fallout — no trigger or event trigger left pointing at a
+  missing function, and no policy, function, constraint or view referencing
+  the name. ⚠️ **The SECURITY DEFINER total is still 26**, because the
+  helper was SECURITY INVOKER and was never in that set.
+  ⚠️ **No migration file ever created it** — it was made ad hoc during
+  026's verification run, so a fresh database replayed from these files
+  never has it, which is why the drop got **no** migration of its own and
+  why one would have been wrong. 034's own last `REVOKE` is commented out
+  for the same reason: it really ran, and it would now raise `42883`.
 - **No public waste-schedule route.** The collection schedule is a
   section of the Home page and nothing else. Home now carries a derived
   *Next collection* summary with the full weekly grid behind a

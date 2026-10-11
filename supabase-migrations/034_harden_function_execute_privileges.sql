@@ -128,7 +128,7 @@
 -- it. None of the fourteen functions revoked here appears in any call.
 --
 -- =============================================================================
--- tmp_cleanup_probe_row() - REVOKED HERE, STILL NEEDS ONE LINE IN THE EDITOR
+-- tmp_cleanup_probe_row() - REVOKED HERE, THEN DROPPED IN THE SQL EDITOR
 -- =============================================================================
 --
 -- The dead helper left by migration 026's verification. Re-inspected for B1:
@@ -137,12 +137,32 @@
 -- dependents, absent from every .rpc( call, and a body that raises immediately
 -- and deletes nothing. It is genuinely a leftover and dropping it is correct.
 --
--- The connector still gates DROP FUNCTION - re-measured for B1, one more
--- 60-second timeout, and the function was verified afterwards to be untouched.
--- So this migration does what it CAN do from here and removes the client's
--- ability to call it. One line in the SQL Editor finishes it:
+-- The connector gates DROP FUNCTION - re-measured for B1, one more 60-second
+-- timeout, and the function was verified afterwards to be untouched. So this
+-- migration did what it COULD do from here and removed the client's ability to
+-- call it, leaving one line for the SQL Editor.
 --
---   DROP FUNCTION public.tmp_cleanup_probe_row();
+-- RESOLVED 2026-10-11. The repo owner ran it in the SQL Editor:
+--
+--   DROP FUNCTION public.tmp_cleanup_probe_row();   -- "Success. No rows returned."
+--
+-- Confirmed afterwards from the catalog: zero functions of that name in ANY
+-- schema, and zero fallout - no trigger or event trigger left pointing at a
+-- missing function, and zero policies, functions, constraints or views
+-- referencing the name. The SECURITY DEFINER total is STILL 26, because the
+-- helper was SECURITY INVOKER and was never in that set; the advisors are
+-- unchanged at 11 + 11.
+--
+-- ⚠️ SO THE LAST REVOKE IN THIS FILE IS NOW COMMENTED OUT, and that is
+-- deliberate. It really did run on 2026-10-11 and the header above is its
+-- record - but the function no longer exists, so re-running this file verbatim
+-- would now fail with 42883 on that line alone. ⚠️ No migration file has EVER
+-- created tmp_cleanup_probe_row (checked: it appears only in 026's header, in
+-- this header, and in that one statement) - it was made ad hoc during 026's
+-- verification run. A fresh database replayed from these 34 files therefore
+-- never has the function, which is also why a new migration carrying the DROP
+-- would be wrong: it would be a numbered file whose statement either errors or
+-- no-ops on every database except the one it was already run on by hand.
 --
 -- =============================================================================
 -- VERIFICATION AFTER APPLYING (all rolled back; see CLAUDE.md for the matrices)
@@ -155,6 +175,28 @@
 --   The trigger each one backs STILL FIRES, exercised through the real
 --     table operation rather than inferred - see CLAUDE.md
 --   MASTER-A A1/A1b/A3/A4/A5 regression matrix                    unchanged
+--
+-- MANUAL VERIFICATION ON THE PR PREVIEW, 2026-10-11 - the one gap this
+-- migration could not close from here:
+--
+--   A brand-new resident account was created through the deploy preview and
+--   signed in to the Resident Portal, which exercises handle_new_resident_signup
+--   through GoTrue's own inserting role - the role this connection cannot
+--   impersonate (`postgres` here is not a superuser and not a member of
+--   supabase_auth_admin), and the role whose PUBLIC-derived EXECUTE on that
+--   function this migration removes.
+--
+--   PASSED. The profile row was created and rendered as "Awaiting review" with
+--   the pending-verification message. Inspected afterwards: role=resident,
+--   verification_status=pending, system_id NULL, no official_account_links row,
+--   no directory row sharing the name, and zero document requests,
+--   reservations, activity_log rows or notifications - an ordinary unverified
+--   resident, the lowest-privilege state in the system. The account was created
+--   at 10:46 UTC, AFTER this migration applied, so the revoke was in force.
+--
+--   That is the decisive confirmation that trigger firing does not consult the
+--   inserting role's EXECUTE privilege, measured on the real signup path
+--   rather than on the equivalent mechanism.
 --
 -- =============================================================================
 
@@ -179,4 +221,7 @@ revoke execute on function public.stamp_official_archive()           from public
 revoke execute on function public.rls_auto_enable()                  from public, anon, authenticated;
 
 -- --- one dead helper --------------------------------------------------------
-revoke execute on function public.tmp_cleanup_probe_row()            from public, anon, authenticated;
+-- Ran on 2026-10-11 as part of this migration. Commented out the same day,
+-- because the function was then DROPPED in the SQL Editor and this line would
+-- now raise 42883. See the tmp_cleanup_probe_row section in the header.
+-- revoke execute on function public.tmp_cleanup_probe_row()         from public, anon, authenticated;
