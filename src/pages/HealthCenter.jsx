@@ -62,13 +62,22 @@ const healthTips = [
 // that now decides what a week looks like. Two copies of a weekday
 // order is two places for Sunday to end up in the wrong half.
 
-// How many upcoming health events the public card shows. Fewer are
-// shown when fewer are upcoming -- see the empty state below; a past
-// event is never used to pad the row out to three.
+// How many upcoming health events the card shows BEFORE the reader asks
+// for the rest. Fewer are shown when fewer are upcoming -- see the empty
+// state below; a past event is never used to pad the row out to three.
+//
+// ⚠️ This is a DISPLAY limit and nothing else. The query fetches every
+// row and `upcomingEvents` filters the whole upcoming list into state;
+// only the render slices. Pushing this back into the query or into the
+// helper call is the defect this card was just fixed for -- there would
+// be no fourth event left for "View All" to reveal.
 const HEALTH_EVENT_LIMIT = 3
 
 const HealthCenter = () => {
+  // The full upcoming list, already filtered and ordered. What is on
+  // screen is a slice of it -- see `visibleHealthEvents`.
   const [healthEvents, setHealthEvents] = useState([])
+  const [showAllHealthEvents, setShowAllHealthEvents] = useState(false)
   const [loadingNurse, setLoadingNurse] = useState(true)
   const [eventsLoading, setEventsLoading] = useState(true)
   const [nurseStatus, setNurseStatus] = useState('unavailable')
@@ -179,7 +188,12 @@ const HealthCenter = () => {
       // and the Manila date is what "today" means. The Home page and
       // the Nurse's own Upcoming Health Events card call the same
       // function, so the three surfaces cannot drift into three answers.
-      if (!error) setHealthEvents(upcomingEvents(data || [], { limit: HEALTH_EVENT_LIMIT }))
+      //
+      // ⚠️ NO `limit` here either. State holds every upcoming event, in
+      // order, because "View All Health Events" has to have something
+      // to reveal -- and a second query for the rest would give this
+      // card two answers for what is upcoming.
+      if (!error) setHealthEvents(upcomingEvents(data || []))
     } catch (err) {
       console.error('Error fetching health events:', err)
     } finally {
@@ -208,6 +222,23 @@ const HealthCenter = () => {
     fetchHealthEvents()
     fetchMedicines()
   }, [fetchNurseAvailability, fetchWeekSchedule, fetchHealthEvents, fetchMedicines])
+
+  // ⚠️ The slice is the ONLY thing the toggle changes. `healthEvents` is
+  // already filtered to upcoming and ordered earliest-first by the
+  // shared helper, so both states read the same list from the same
+  // place: collapsed is its first three, expanded is all of it. There is
+  // no second sort and no second filter, so the two cannot disagree
+  // about which event comes first.
+  const visibleHealthEvents = useMemo(
+    () => (showAllHealthEvents ? healthEvents : healthEvents.slice(0, HEALTH_EVENT_LIMIT)),
+    [healthEvents, showAllHealthEvents],
+  )
+
+  // ⚠️ Strictly MORE than the limit. At exactly three there is nothing
+  // to reveal, and a control that expands a list into itself is worse
+  // than no control -- the same reasoning the medicine groups follow
+  // when a filter leaves nothing to disclose.
+  const canShowAllHealthEvents = healthEvents.length > HEALTH_EVENT_LIMIT
 
   const filteredMedicines = useMemo(
     () => filterMedicines(medicines, {
@@ -728,6 +759,24 @@ const HealthCenter = () => {
             <div className="health-bakuna-card">
               <div className="health-card-header">
                 <h3>💉 Bakuna & Health Events</h3>
+                {canShowAllHealthEvents && (
+                  // ⚠️ A real <button>, not a link styled as one: it
+                  // reveals the rest of this section in place and there
+                  // is no route to go to. `aria-expanded` carries the
+                  // state, and `aria-controls` names the grid it
+                  // governs -- which is always rendered when this
+                  // button is, because more than three upcoming events
+                  // means there are events.
+                  <button
+                    type="button"
+                    className="bakuna-toggle"
+                    onClick={() => setShowAllHealthEvents((shown) => !shown)}
+                    aria-expanded={showAllHealthEvents}
+                    aria-controls="bakuna-events-grid"
+                  >
+                    {showAllHealthEvents ? 'Show Less' : 'View All Health Events'}
+                  </button>
+                )}
               </div>
 
               {eventsLoading ? (
@@ -743,8 +792,8 @@ const HealthCenter = () => {
                   No upcoming health events at the moment.
                 </p>
               ) : (
-                <div className="bakuna-grid">
-                  {healthEvents.map((event) => {
+                <div className="bakuna-grid" id="bakuna-events-grid">
+                  {visibleHealthEvents.map((event) => {
                     // ⚠️ Derived from `event_date`, not from the stored
                     // `event_month`/`event_day` copies -- see
                     // `eventCardDate`. Without the year a correctly

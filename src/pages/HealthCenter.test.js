@@ -14,7 +14,7 @@
 // it never runs. Navbar and Footer are stubbed; they have their own
 // suites.
 
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, within, fireEvent } from '@testing-library/react'
 import fs from 'fs'
 import path from 'path'
 import HealthCenter from './HealthCenter'
@@ -105,6 +105,15 @@ const bakunaCard = () =>
 
 const cardTitles = () =>
   Array.from(bakunaCard().querySelectorAll('.bakuna-card-body h4')).map((h) => h.textContent)
+
+// The View All / Show Less control, scoped to this card -- the page has
+// other buttons (the medicine category disclosures) and a page-wide
+// query would be ambiguous.
+const toggle = () => within(bakunaCard()).queryByRole('button')
+const viewAllButton = () =>
+  within(bakunaCard()).queryByRole('button', { name: /view all health events/i })
+const showLessButton = () =>
+  within(bakunaCard()).queryByRole('button', { name: /show less/i })
 
 const settle = async () => {
   // The three fetches resolve on microtasks; one findByText against a
@@ -291,6 +300,208 @@ describe('Health Center -> Bakuna & Health Events', () => {
   })
 })
 
+// ─── View All Health Events / Show Less ──────────────────────────────
+//
+// The upcoming filter above is correct and, on its own, left a public
+// reader with no way to see a fourth upcoming session. The control
+// reveals the rest of the SAME filtered, ordered list in place -- no
+// route, no second query, no second date rule.
+describe('Health Center -> View All Health Events', () => {
+  const five = () => [
+    row('p1', 'Old One', past(2, '11-05')),
+    row('p2', 'Old Two', past(1, '02-02')),
+    row('u3', 'Third Session', future(1, '05-01')),
+    row('u1', 'First Session', future(1, '03-01')),
+    row('u5', 'Fifth Session', future(1, '09-01')),
+    row('u2', 'Second Session', future(1, '04-01')),
+    row('u4', 'Fourth Session', future(1, '07-01')),
+  ]
+
+  // ─── A. two upcoming ───────────────────────────────────────────────
+  test('two upcoming: both shown and NO View All control', async () => {
+    await renderPage([
+      row('p1', 'Old One', past(2, '11-05')),
+      row('u1', 'Upcoming One', future(1, '03-15')),
+      row('u2', 'Upcoming Two', future(1, '03-20')),
+    ])
+    await settle()
+
+    expect(cardTitles()).toEqual(['Upcoming One', 'Upcoming Two'])
+    expect(viewAllButton()).toBeNull()
+    expect(toggle()).toBeNull()
+  })
+
+  test('one upcoming: shown, and no control', async () => {
+    await renderPage([row('u1', 'Only One', future(1, '03-15'))])
+    await settle()
+    expect(cardTitles()).toEqual(['Only One'])
+    expect(toggle()).toBeNull()
+  })
+
+  // ─── B. exactly three ──────────────────────────────────────────────
+  test('exactly three upcoming: all three shown and NO control', async () => {
+    await renderPage([
+      row('p1', 'Old One', past(2, '11-05')),
+      row('u1', 'First Session', future(1, '03-01')),
+      row('u2', 'Second Session', future(1, '04-01')),
+      row('u3', 'Third Session', future(1, '05-01')),
+    ])
+    await settle()
+
+    expect(cardTitles()).toEqual(['First Session', 'Second Session', 'Third Session'])
+    // ⚠️ The load-bearing boundary. At exactly three there is nothing
+    // to reveal, and a control that expands a list into itself is worse
+    // than no control at all.
+    expect(toggle()).toBeNull()
+  })
+
+  // ─── C. five upcoming, collapsed ───────────────────────────────────
+  test('five upcoming: first three visible, control offered, four and five hidden', async () => {
+    await renderPage(five())
+    await settle()
+
+    expect(cardTitles()).toEqual(['First Session', 'Second Session', 'Third Session'])
+    expect(viewAllButton()).not.toBeNull()
+    expect(within(bakunaCard()).queryByText('Fourth Session')).toBeNull()
+    expect(within(bakunaCard()).queryByText('Fifth Session')).toBeNull()
+  })
+
+  // ─── D. expanding ──────────────────────────────────────────────────
+  test('clicking View All Health Events reveals all five and the control becomes Show Less', async () => {
+    await renderPage(five())
+    await settle()
+
+    fireEvent.click(viewAllButton())
+
+    expect(cardTitles()).toEqual([
+      'First Session', 'Second Session', 'Third Session',
+      'Fourth Session', 'Fifth Session',
+    ])
+    expect(showLessButton()).not.toBeNull()
+    expect(viewAllButton()).toBeNull()
+  })
+
+  // ─── E. collapsing again ───────────────────────────────────────────
+  test('clicking Show Less returns to three and the control becomes View All Health Events', async () => {
+    await renderPage(five())
+    await settle()
+
+    fireEvent.click(viewAllButton())
+    expect(cardTitles()).toHaveLength(5)
+
+    fireEvent.click(showLessButton())
+
+    expect(cardTitles()).toEqual(['First Session', 'Second Session', 'Third Session'])
+    expect(viewAllButton()).not.toBeNull()
+    expect(showLessButton()).toBeNull()
+  })
+
+  // ─── F. past events in BOTH states ─────────────────────────────────
+  test('past events stay hidden collapsed AND expanded', async () => {
+    await renderPage(five())
+    await settle()
+
+    // collapsed
+    expect(within(bakunaCard()).queryByText('Old One')).toBeNull()
+    expect(within(bakunaCard()).queryByText('Old Two')).toBeNull()
+
+    fireEvent.click(viewAllButton())
+
+    // ⚠️ Expanded means "all UPCOMING", never "all rows". Expanding a
+    // filtered list into the unfiltered one is the defect this card was
+    // just fixed for, arriving by a different door.
+    expect(cardTitles()).toHaveLength(5)
+    expect(within(bakunaCard()).queryByText('Old One')).toBeNull()
+    expect(within(bakunaCard()).queryByText('Old Two')).toBeNull()
+  })
+
+  // ─── G. zero upcoming ──────────────────────────────────────────────
+  test('zero upcoming: empty state and no control, even with past rows present', async () => {
+    await renderPage([
+      row('p1', 'Old One', past(2, '11-05')),
+      row('p2', 'Old Two', past(2, '11-12')),
+      row('p3', 'Old Three', past(1, '01-01')),
+      row('p4', 'Old Four', past(1, '02-01')),
+    ])
+    await settle()
+
+    expect(
+      within(bakunaCard()).getByText(/no upcoming health events at the moment/i),
+    ).toBeInTheDocument()
+    expect(toggle()).toBeNull()
+    // Four past rows were available and not one was revealed.
+    expect(bakunaCard().querySelectorAll('.bakuna-card')).toHaveLength(0)
+  })
+
+  // ─── Ordering survives the toggle ──────────────────────────────────
+  test('expanded stays chronological, earliest first', async () => {
+    // ⚠️ The fixtures are deliberately NOT in date order, so a render
+    // that echoed the array rather than the helper's sort would fail.
+    await renderPage(five())
+    await settle()
+    fireEvent.click(viewAllButton())
+
+    const years = Array.from(bakunaCard().querySelectorAll('.bakuna-card-date'))
+      .map((tile) => `${tile.querySelector('.month').textContent}`)
+    expect(years).toEqual(['MAR', 'APR', 'MAY', 'JUL', 'SEP'])
+  })
+
+  test('collapsing shows the first three of that same ordered list', async () => {
+    await renderPage(five())
+    await settle()
+    fireEvent.click(viewAllButton())
+    fireEvent.click(showLessButton())
+
+    const months = Array.from(bakunaCard().querySelectorAll('.bakuna-card-date'))
+      .map((tile) => tile.querySelector('.month').textContent)
+    expect(months).toEqual(['MAR', 'APR', 'MAY'])
+  })
+
+  // ─── Accessibility ─────────────────────────────────────────────────
+  test('the control is a real button and reports its state with aria-expanded', async () => {
+    await renderPage(five())
+    await settle()
+
+    const btn = viewAllButton()
+    expect(btn.tagName).toBe('BUTTON')
+    // type="button" so it cannot submit a form it is ever placed inside.
+    expect(btn).toHaveAttribute('type', 'button')
+    expect(btn).toHaveAttribute('aria-expanded', 'false')
+
+    fireEvent.click(btn)
+    expect(showLessButton()).toHaveAttribute('aria-expanded', 'true')
+
+    fireEvent.click(showLessButton())
+    expect(viewAllButton()).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  test('aria-controls names an element that actually exists', async () => {
+    await renderPage(five())
+    await settle()
+
+    const id = viewAllButton().getAttribute('aria-controls')
+    expect(id).toBeTruthy()
+    // ⚠️ An aria-controls pointing at nothing is worse than none --
+    // the same check Navbar.test.js makes of the public menu button.
+    const target = document.getElementById(id)
+    expect(target).not.toBeNull()
+    expect(target).toBe(bakunaCard().querySelector('.bakuna-grid'))
+  })
+
+  test('the control is reachable by keyboard and toggles on Enter', async () => {
+    await renderPage(five())
+    await settle()
+
+    const btn = viewAllButton()
+    btn.focus()
+    expect(document.activeElement).toBe(btn)
+    // A real button fires click on Enter, which is the whole reason it
+    // is a button rather than a styled span.
+    fireEvent.click(btn)
+    expect(cardTitles()).toHaveLength(5)
+  })
+})
+
 // ─── Source-reading guards ───────────────────────────────────────────
 //
 // The behaviour above could be right while being wired to a second,
@@ -338,5 +549,25 @@ describe('Health Center source wiring', () => {
   test('the card does not read event_month/event_day for display', () => {
     expect(code).not.toMatch(/\{\s*event\.event_month\s*\}/)
     expect(code).not.toMatch(/\{\s*event\.event_day\s*\}/)
+  })
+
+  test('the limit is applied to the RENDER, never to the helper call', () => {
+    // ⚠️ The regression guard for this extension. Passing the limit to
+    // `upcomingEvents` would put only three events in state, and
+    // "View All" would have nothing left to reveal -- the original
+    // defect arriving by a different door.
+    expect(code).toMatch(/upcomingEvents\(\s*data\s*\|\|\s*\[\]\s*\)/)
+    expect(code).not.toMatch(/upcomingEvents\([^)]*limit/)
+    expect(code).toMatch(/slice\(0,\s*HEALTH_EVENT_LIMIT\)/)
+  })
+
+  test('the control renders only when there are MORE than the limit', () => {
+    expect(code).toMatch(/healthEvents\.length\s*>\s*HEALTH_EVENT_LIMIT/)
+    // Not >=, which would offer the control at exactly three.
+    expect(code).not.toMatch(/healthEvents\.length\s*>=\s*HEALTH_EVENT_LIMIT/)
+  })
+
+  test('there is still exactly ONE health_events query', () => {
+    expect(code.match(/from\('health_events'\)/g)).toHaveLength(1)
   })
 })

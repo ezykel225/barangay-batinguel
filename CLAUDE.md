@@ -65,7 +65,7 @@ banned below: it silences the one check this project has.
 
 ### Tests
 
-Thirty-eight suites, 914 tests:
+Thirty-eight suites, 930 tests:
 
 | File | What it covers |
 |---|---|
@@ -95,7 +95,7 @@ Thirty-eight suites, 914 tests:
 | `src/utils/homeSections.test.js` | 19 tests over the Home page's two summaries: the announcement excerpt (a very-long-body regression guard, the word boundary, the unbreakable token) and `nextCollection`, whose load-bearing one is that it returns **null rather than a guess** when no row carries a weekday name, and counts the rows it left out |
 | `src/pages/Announcements.test.js` | 8 tests over the browse page, the FIRST suite that renders a page component. The load-bearing pair: the card shows an excerpt and `/announcements/:id` still renders the whole 2,159-character notice, from the same row. Also that each card is ONE link with no nested anchor |
 | `src/pages/Events.test.js` | 14 tests over the Calendar \| List switcher, the list card and date selection. The load-bearing one: a card shows a time **only when `event_time` holds one** — it is NULL on every live row — and never digs one out of `location`, which on three legacy rows begins with a time somebody typed. Two more assert no heading level is skipped in either view |
-| `src/pages/HealthCenter.test.js` | 17 tests over the public **Bakuna & Health Events** card — the suite for the one regression a browser smoke test found and no unit test had. 12 render the real page with Supabase mocked: past rows excluded, today counted as upcoming, the three **earliest** upcoming shown when more exist, exactly two shown when only two are upcoming **with three past rows available and none used to pad the row out**, the empty state when nothing is upcoming, the year on every tile, and that the month and day come from `event_date` while the fixture's deliberately wrong `XXX`/`99` copies do not appear. The load-bearing guard asserts the query carries **no `.limit(`** — the defect itself. Then 5 source-reading guards that the wiring is the shared helper and not a second local copy of the date rule. Run **both directions**: with the fix reverted, **14 of 17 fail**; the three that pass do so honestly — one fixture has a single row that `.limit(3)` cannot drop, and two are forward-looking wiring guards |
+| `src/pages/HealthCenter.test.js` | 33 tests over the public **Bakuna & Health Events** card — the suite for the one regression a browser smoke test found and no unit test had. 12 render the real page with Supabase mocked: past rows excluded, today counted as upcoming, the three **earliest** upcoming shown when more exist, exactly two shown when only two are upcoming **with three past rows available and none used to pad the row out**, the empty state when nothing is upcoming, the year on every tile, and that the month and day come from `event_date` while the fixture's deliberately wrong `XXX`/`99` copies do not appear. The load-bearing guard asserts the query carries **no `.limit(`** — the defect itself. Then 8 source-reading guards that the wiring is the shared helper and not a second local copy of the date rule. Run **both directions**: with the fix reverted, **14 of 17 fail**; the three that pass do so honestly — one fixture has a single row that `.limit(3)` cannot drop, and two are forward-looking wiring guards. **16 more cover View All Health Events / Show Less**: the control is absent at 0, 1, 2 **and exactly 3** upcoming (nothing to reveal), present at 5 with events four and five hidden, reveals all five on click and becomes *Show Less*, returns to three on the second click, keeps past events hidden in **both** states, and keeps the order earliest-first across the toggle — asserted by the MONTH on each tile, from fixtures deliberately out of date order so a render echoing the array would fail. Plus the control is a real `<button type="button">`, `aria-expanded` tracks false→true→false, and `aria-controls` is asserted to name an element that **exists** and is the grid. Run both directions: reverting the extension fails **10 of the 16**, and the six that pass are the 0/1/2/3 boundary cases, which correctly show no control either way |
 | `src/pages/EventDetails.test.js` | 8 tests over the detail page's Time row: shown with a time, **gone — label and all — for null, empty, whitespace and a missing column**, with the location left exactly as stored even when it begins with a time. Run **both directions**: with the condition removed, 5 of 8 fail |
 | `src/documents/documentRegistry.test.js` | 21 tests over the document-type → template mapping and the three generation gates. The load-bearing one: `canGenerate` refuses an official who is **not** the Secretary, so printing cannot widen what the queue already allows. Also that **all six** resident-form types resolve and all six are still marked `prototype`, and that an inherited property name (`constructor`) does not resolve as a template. ⚠️ One assertion here used to say the OPPOSITE — that Business Clearance and Other were unsupported by decision — and the reversal is deliberate; see *Complete prototype coverage* |
 | `src/documents/documentData.test.js` | 24 tests over the normalized shape a template receives: the Manila date (assembled from `MONTH_NAMES`, not from a locale's ordering), the `SAMPLE-` reference, long/accented/suffixed names, and the rule that an absent value is **reported, never filled** — no `N/A`, `UNKNOWN` or `TBD` reaches a field |
@@ -2172,6 +2172,84 @@ the database could not give us would assert something no column holds.
 The tile gained one element and kept its three existing ones; the year
 reuses `--fs-12` rather than introducing a step in the type scale, at
 `rgba(255,255,255,0.85)` on the existing `#0f766e`, measured **4.9:1**.
+
+#### View All Health Events / Show Less — the same PR, because the filter created the need
+
+⚠️ **Filtering to three upcoming events is correct and, on its own,
+left a public reader with no way to reach a fourth.** That is a defect
+the fix itself introduced, so it is fixed in the same PR rather than
+filed as a follow-up.
+
+| | |
+|---|---|
+| default | up to **3** upcoming, as above — past events still excluded |
+| more than 3 upcoming | a **`View All Health Events`** button in the card header |
+| clicked | every upcoming event, **in place** — no route, no second page, no second query |
+| the control then reads | **`Show Less`**, returning to the first three |
+| 0, 1, 2 **or exactly 3** upcoming | **no control at all** |
+
+⚠️ **Strictly MORE than three, not three or more.** At exactly three
+there is nothing to reveal, and a control that expands a list into
+itself is worse than no control — the same reasoning the medicine
+groups follow when a filter has left nothing to disclose.
+
+⚠️ **THE LIMIT MOVED TO THE RENDER, AND THE QUERY DID NOT CHANGE BACK.**
+`upcomingEvents(data || [])` is called with **no `limit`**, so state
+holds the whole upcoming list; `visibleHealthEvents` is
+`showAll ? healthEvents : healthEvents.slice(0, HEALTH_EVENT_LIMIT)`.
+Putting the limit back into the query — or back into the helper call —
+would leave three events in state and nothing for *View All* to reveal:
+**the original defect arriving by a different door.** Three
+source-reading guards hold that line: the helper call carries no
+`limit`, the slice exists, and there is still exactly **one**
+`from('health_events')` query.
+
+⚠️ **One list, one order, one filter.** Collapsed and expanded read the
+same array from the same place, so they cannot disagree about which
+event comes first — the helper has already filtered to upcoming and
+sorted earliest-first. A test asserts the order across the toggle from
+fixtures deliberately **out** of date order, so a render that echoed the
+array rather than the helper's sort would fail.
+
+⚠️ **A real `<button type="button">`**, not a link styled as one: it
+reveals content in place and there is no route to go to.
+`aria-expanded` carries the state and `aria-controls` names the grid —
+and a test asserts that id resolves to an element that **exists**, which
+is the same check `Navbar.test.js` makes of the public menu button.
+
+The control reuses `.health-card-header a`'s existing teal, size and
+weight rather than introducing a second treatment for the same job in
+the same row — but as a `<button>` it needs the browser defaults reset
+(background, border, system font), and ⚠️ **its padding is a TARGET,
+not decoration**: a bare 13px line is ~18px tall, under WCAG 2.2
+SC 2.5.8's 24px, which is exactly the defect X3 found on the footer
+buttons and the post-X5 pass found again on the mobile drawer.
+**Measured 32px tall** in both states at every width.
+
+**Measured in Chromium against the shipped CSS bundle**, real component
+output captured through Jest (5 upcoming, with a 54-character
+unbreakable title), collapsed and expanded at 320/375/414/768/834/
+1024/1280/1440 — **48 checks, 0 failures**:
+
+| | |
+|---|---|
+| document-level horizontal overflow | **0 at every width, both states** |
+| cards past the grid's own right edge | **0** |
+| ≤768px | 1 column — 3 rows collapsed, **5 rows expanded**, stacked |
+| ≥834px | 3 columns — 1 row collapsed, **2 rows expanded** (3 + 2) |
+| the control | 146x32 collapsed, 80x32 expanded — above the 24px minimum everywhere |
+| `aria-expanded` | `false` collapsed, `true` expanded |
+
+The extra cards wrap into new rows because `.bakuna-grid` is a fixed
+three-column grid at `minmax(0, 1fr)` — already the safe form, per
+X2's bare-`1fr` finding — so the row count changes and the width cannot.
+**No new media query was needed.**
+
+⚠️ **The label is exactly `View All Health Events`**, following the
+Home page's *View All Announcements* / *View All Events* wording. A
+count in the label (*"View All Health Events (5)"*) was written first
+and **removed**: it is a wording decision nobody asked for, and X1's
+conventions are the repo owner's. One line to add if wanted.
 
 #### ⚠️ `updated_at` was deliberately NOT added
 
@@ -7615,7 +7693,7 @@ derives her initials from. It is no longer displayed as a label.
 - **Source maps ship to production** (~7 MB), so the original JSX is
   publicly reconstructable. `GENERATE_SOURCEMAP=false` in Vercel fixes it.
 - **`public/logo.png` is 984 KB and referenced by nothing.**
-- **Thin automated test coverage.** 914 tests in thirty-eight suites:
+- **Thin automated test coverage.** 930 tests in thirty-eight suites:
   one smoke test over `<App />`, which fails without `.env` because
   `supabaseClient.js` throws at import time, and 886 tests over the
   resident workflow rules, the display labels, the booking window, the
