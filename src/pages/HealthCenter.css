@@ -424,6 +424,39 @@
   text-decoration: underline;
 }
 
+/* The View All Health Events / Show Less control.
+   ⚠️ A real <button>, so it needs the button defaults reset -- browsers
+   give it a grey background, a border and a centred system font that
+   none of the other header controls have. It then reuses the SAME teal,
+   size and weight as `.health-card-header a` above rather than
+   introducing a second treatment for the same job in the same row.
+   ⚠️ The padding is a TARGET, not decoration. The header's links are
+   bare text, and a bare 13px line is ~18px tall -- under WCAG 2.2
+   SC 2.5.8's 24px minimum, which is exactly the defect X3 found on the
+   footer buttons and the post-X5 pass found again on the mobile drawer.
+   6px vertical takes it to 30px; the negative right margin keeps the
+   text optically aligned with the card edge despite that padding. */
+.bakuna-toggle {
+  appearance: none;
+  background: none;
+  border: none;
+  font: inherit;
+  font-size: var(--fs-13);
+  font-weight: 500;
+  color: #0f766e;
+  cursor: pointer;
+  padding: 6px 8px;
+  margin: -6px -8px -6px 0;
+  min-height: 24px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+.bakuna-toggle:hover {
+  text-decoration: underline;
+  background-color: #f0fdfa;
+}
+
 .bakuna-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -458,6 +491,21 @@
   font-size: var(--fs-28);
   font-weight: 700;
   line-height: 1;
+}
+
+/* The year, so a correctly sorted list does not read as shuffled.
+   Deliberately the smallest element in the tile -- it disambiguates the
+   date, it is not the headline -- and it reuses the .month size rather
+   than introducing a step in the type scale. The 0.85 alpha on white
+   keeps it legible on #0f766e while sitting visibly below the day:
+   measured 4.9:1 against that background, comfortably past AA for the
+   600 weight it carries. */
+.bakuna-card-date .year {
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  margin-top: 3px;
+  letter-spacing: 0.02em;
 }
 
 .bakuna-card-body {

@@ -65,7 +65,7 @@ banned below: it silences the one check this project has.
 
 ### Tests
 
-Thirty-seven suites, 887 tests:
+Thirty-eight suites, 930 tests:
 
 | File | What it covers |
 |---|---|
@@ -81,7 +81,7 @@ Thirty-seven suites, 887 tests:
 | `src/components/NotificationBell.test.js` | 24 tests over the bell: the unread count in the accessible name **as words**, Escape and focus restore, click-outside closing *without* stealing focus back, mark-read-then-navigate ordering, and that unread is carried by a class **and** the spoken word "New" rather than by colour |
 | `src/components/useModalA11y.test.js` | 9 tests over Escape, focus entry and focus restoration for the seventeen hand-rolled modals. Run **both directions**: with the hook stubbed, 4 of 9 fail. Includes the case where the opener is removed by the save the modal performed — focusing a detached node silently sends focus to `<body>` |
 | `src/components/Navbar.test.js` | 6 tests over the public mobile menu button, which had **no accessible name at all** before X3: the name changes with state, `aria-expanded` tracks it, and `aria-controls` points at an id that exists |
-| `src/utils/eventCalendar.test.js` | 24 tests over event placement and the upcoming split. The load-bearing one: the homepage filters **then** limits, plus 6 over `eventTimeLabel`: the `HH:MM:SS` a `time` column really returns, and that anything which is not a time — a location beginning with one included — yields `''` rather than being printed |
+| `src/utils/eventCalendar.test.js` | 39 tests over event placement and the upcoming split. The load-bearing one: the homepage filters **then** limits, plus 6 over `eventTimeLabel`: the `HH:MM:SS` a `time` column really returns, and that anything which is not a time — a location beginning with one included — yields `''` rather than being printed. **10 more over `eventCardDate`**, added with the Health Center fix: the month, day and year all derive from `event_date`, the stored `event_month`/`event_day` copies are **ignored** when `event_date` is usable and are the fallback **only** when it is not, the year comes back **empty rather than guessed**, `2026-02-30` is refused rather than slid into March, and a source guard that the helper constructs **no `Date`** |
 | `src/utils/documentFilter.test.js` | 16 tests over `filterDocumentRequests` — the status narrowing, the five searched fields, and that an unknown status yields nothing rather than everything |
 | `src/utils/reservationWindow.test.js` | 46 tests over the 5–10 PM window, the per-slot and per-kind durations, the noon-spanning exception and the office-hours exception — deliberately mirroring the SQL cases in migration 020's header, so client and database are asserted to agree rather than each checked alone. The load-bearing one is that an exception is read from `exception_reason` and never from the hour |
 
@@ -95,6 +95,7 @@ Thirty-seven suites, 887 tests:
 | `src/utils/homeSections.test.js` | 19 tests over the Home page's two summaries: the announcement excerpt (a very-long-body regression guard, the word boundary, the unbreakable token) and `nextCollection`, whose load-bearing one is that it returns **null rather than a guess** when no row carries a weekday name, and counts the rows it left out |
 | `src/pages/Announcements.test.js` | 8 tests over the browse page, the FIRST suite that renders a page component. The load-bearing pair: the card shows an excerpt and `/announcements/:id` still renders the whole 2,159-character notice, from the same row. Also that each card is ONE link with no nested anchor |
 | `src/pages/Events.test.js` | 14 tests over the Calendar \| List switcher, the list card and date selection. The load-bearing one: a card shows a time **only when `event_time` holds one** — it is NULL on every live row — and never digs one out of `location`, which on three legacy rows begins with a time somebody typed. Two more assert no heading level is skipped in either view |
+| `src/pages/HealthCenter.test.js` | 33 tests over the public **Bakuna & Health Events** card — the suite for the one regression a browser smoke test found and no unit test had. 12 render the real page with Supabase mocked: past rows excluded, today counted as upcoming, the three **earliest** upcoming shown when more exist, exactly two shown when only two are upcoming **with three past rows available and none used to pad the row out**, the empty state when nothing is upcoming, the year on every tile, and that the month and day come from `event_date` while the fixture's deliberately wrong `XXX`/`99` copies do not appear. The load-bearing guard asserts the query carries **no `.limit(`** — the defect itself. Then 8 source-reading guards that the wiring is the shared helper and not a second local copy of the date rule. Run **both directions**: with the fix reverted, **14 of 17 fail**; the three that pass do so honestly — one fixture has a single row that `.limit(3)` cannot drop, and two are forward-looking wiring guards. **16 more cover View All Health Events / Show Less**: the control is absent at 0, 1, 2 **and exactly 3** upcoming (nothing to reveal), present at 5 with events four and five hidden, reveals all five on click and becomes *Show Less*, returns to three on the second click, keeps past events hidden in **both** states, and keeps the order earliest-first across the toggle — asserted by the MONTH on each tile, from fixtures deliberately out of date order so a render echoing the array would fail. Plus the control is a real `<button type="button">`, `aria-expanded` tracks false→true→false, and `aria-controls` is asserted to name an element that **exists** and is the grid. Run both directions: reverting the extension fails **10 of the 16**, and the six that pass are the 0/1/2/3 boundary cases, which correctly show no control either way |
 | `src/pages/EventDetails.test.js` | 8 tests over the detail page's Time row: shown with a time, **gone — label and all — for null, empty, whitespace and a missing column**, with the location left exactly as stored even when it begins with a time. Run **both directions**: with the condition removed, 5 of 8 fail |
 | `src/documents/documentRegistry.test.js` | 21 tests over the document-type → template mapping and the three generation gates. The load-bearing one: `canGenerate` refuses an official who is **not** the Secretary, so printing cannot widen what the queue already allows. Also that **all six** resident-form types resolve and all six are still marked `prototype`, and that an inherited property name (`constructor`) does not resolve as a template. ⚠️ One assertion here used to say the OPPOSITE — that Business Clearance and Other were unsupported by decision — and the reversal is deliberate; see *Complete prototype coverage* |
 | `src/documents/documentData.test.js` | 24 tests over the normalized shape a template receives: the Manila date (assembled from `MONTH_NAMES`, not from a locale's ordering), the `SAMPLE-` reference, long/accented/suffixed names, and the rule that an absent value is **reported, never filled** — no `N/A`, `UNKNOWN` or `TBD` reaches a field |
@@ -278,7 +279,11 @@ src/
     reservationCalendar Court occupancy for the calendar: which statuses
                       hold a slot, and how a day is toned. Pure.
     eventCalendar     Event placement, and `upcomingEvents`, which
-                      filters before it limits. Pure.
+                      filters before it limits. Also `eventCardDate`,
+                      the public card's date -- month, day AND YEAR,
+                      all derived from `event_date`, never from the
+                      denormalised `event_month`/`event_day` copies.
+                      Pure.
     reservationWindow The covered court's booking window: the start-time
                       list, the 5-10 PM rule, the per-kind duration caps,
                       what hours a booking occupies (coveredHours, which
@@ -2055,6 +2060,226 @@ genuinely upcoming one last, under a heading promising the opposite.
 afterwards. Limiting in SQL first would hand four rows to a filter with
 nothing upcoming left in them. Today counts as upcoming — an event this
 afternoon has not happened yet.
+
+### ✅ The public Health Center had the SAME defect, and it was missed twice
+
+2026-10-14, on `claude/fix-public-health-events-upcoming`, built on
+`main` after PR #34 merged. **Application fix only — no migration, no
+RLS change, no table privilege change, no schema change, and migration
+036 untouched.**
+
+⚠️ **This is the identical defect to the Home one above, on a different
+table, and the fix above did not reach it.** `HealthCenter.jsx` read:
+
+```js
+.from('health_events').select('*')
+.order('event_date', { ascending: true })
+.limit(3)                                  // ← in SQL, before any filter
+```
+
+No date filter anywhere. So the three **oldest** rows in the table won
+the three slots. Measured on the live table on the day it was found:
+
+| | |
+|---|---|
+| the table held | `2024-11-05` Childhood Immunization · `2024-11-12` Dengue Awareness Seminar · `2026-10-15` Community Health Checkup · `2026-10-20` Free Blood Pressure and Health Screening |
+| the old query returned | the first **three** of those — both 2024 rows, plus 15 Oct 2026 |
+| so the public page never showed | `2026-10-20`, which was **row four** and was dropped by SQL |
+
+**The nurse had just published that event and it was publicly readable
+the whole time.** `anon` saw all four rows (`USING true`, untouched);
+the Nurse Portal showed it because the nurse's own fetch carries **no
+`.limit()`**. Only the public card could not see it.
+
+#### ⚠️ It was PRE-EXISTING and NOT caused by migration 036
+
+Found during the B3 deploy-preview smoke test, which is the only reason
+it surfaced at all. Established from git rather than asserted: the
+`.limit(3)` line was last touched in **`efa11aa`, 2026-08-11** — two
+months before B3 and before MASTER-A began — it is **byte-identical on
+`main`** before B3, B3's commit touched **two files** (`CLAUDE.md` and
+its migration), and `git diff main...HEAD -- src/` for PR #34 is
+**empty**. B3 changed only the INSERT and UPDATE policies on this table;
+the SELECT policy is still `"Health events are viewable by everyone"
+USING (true)`. **Nothing about 036 was changed to fix this.**
+
+#### The fix: the shared helper, on a third surface
+
+The query drops `.limit(3)` and the page calls the same
+`upcomingEvents()` the Home page and the Nurse's own *Upcoming Health
+Events* card already use — so three surfaces now share **one**
+definition of upcoming rather than three. The `ORDER BY` stays: it costs
+nothing, it makes the response deterministic, and the helper sorts
+again anyway.
+
+⚠️ **No date rule is duplicated in the page**, and a source-reading test
+asserts it: `HealthCenter.jsx` contains no `manilaToday()` call, no
+`event_date >=` comparison of its own and no `new Date(event_date)`.
+The helper owns all three.
+
+**Measured on live data, before and after:**
+
+| | |
+|---|---|
+| Manila date at the time | `2026-10-14` |
+| old flow showed | 05 Nov 2024 · 12 Nov 2024 · 15 Oct 2026 |
+| **new flow shows** | **15 Oct 2026 Community Health Checkup · 20 Oct 2026 Free Blood Pressure and Health Screening** |
+| the two 2024 rows | correctly hidden |
+
+#### ⚠️ A past event never pads the row out to three
+
+Up to three **upcoming** events; two when two are upcoming, one when
+one is, and the empty state when none is. **Historical events are not
+used to fill the card**, and that is the decision rather than an
+oversight: a card under a heading promising a session asserts the
+session is still to come. **Accuracy outranks a full row.**
+
+The empty state reads **`No upcoming health events at the moment.`**,
+not the old `No health events yet.` — the list is filtered, so an empty
+card means nothing is scheduled ahead, which is a different fact from
+an empty table. A test asserts the new wording is present **and** the
+old wording gone.
+
+⚠️ **The consequence to know**: once the last upcoming event passes,
+this card goes to its empty state rather than showing the most recent
+past session. That is intended. Whether the barangay would rather see
+recent past events there is a product question nobody has asked, and it
+is not decided here.
+
+#### ⚠️ The card shows the YEAR, and that is why the bug hid
+
+The tile rendered `event_month` and `event_day` and nothing else, so it
+printed `NOV 05`, `NOV 12`, `OCT 15` — and the two NOV rows are
+**2024**. A correctly sorted list therefore read as though it were
+shuffled, which is exactly how a missing upcoming filter goes unnoticed
+for two months. The year is what makes the ordering legible.
+
+⚠️ **`eventCardDate` derives the month, day AND year from
+`event_date`**, never from the stored copies. Mixing them — a month from
+`event_month` beside a year from `event_date` — could print a date that
+exists in neither. Same derivation as the two dashboards'
+`displayPartsFor` write path: `parseDateKey` splits the characters and
+**no `Date` is constructed**, so the day cannot shift by a timezone. A
+test asserts that, and another asserts the fixture's deliberately wrong
+`XXX` / `99` copies never reach the screen.
+
+⚠️ **The stored copies are the fallback ONLY when `event_date` cannot be
+parsed** — the one case where they are all there is — and then the year
+comes back **empty rather than guessed**, and the caller renders the
+element only when it is non-empty. Inventing a year for a row whose date
+the database could not give us would assert something no column holds.
+
+The tile gained one element and kept its three existing ones; the year
+reuses `--fs-12` rather than introducing a step in the type scale, at
+`rgba(255,255,255,0.85)` on the existing `#0f766e`, measured **4.9:1**.
+
+#### View All Health Events / Show Less — the same PR, because the filter created the need
+
+⚠️ **Filtering to three upcoming events is correct and, on its own,
+left a public reader with no way to reach a fourth.** That is a defect
+the fix itself introduced, so it is fixed in the same PR rather than
+filed as a follow-up.
+
+| | |
+|---|---|
+| default | up to **3** upcoming, as above — past events still excluded |
+| more than 3 upcoming | a **`View All Health Events`** button in the card header |
+| clicked | every upcoming event, **in place** — no route, no second page, no second query |
+| the control then reads | **`Show Less`**, returning to the first three |
+| 0, 1, 2 **or exactly 3** upcoming | **no control at all** |
+
+⚠️ **Strictly MORE than three, not three or more.** At exactly three
+there is nothing to reveal, and a control that expands a list into
+itself is worse than no control — the same reasoning the medicine
+groups follow when a filter has left nothing to disclose.
+
+⚠️ **THE LIMIT MOVED TO THE RENDER, AND THE QUERY DID NOT CHANGE BACK.**
+`upcomingEvents(data || [])` is called with **no `limit`**, so state
+holds the whole upcoming list; `visibleHealthEvents` is
+`showAll ? healthEvents : healthEvents.slice(0, HEALTH_EVENT_LIMIT)`.
+Putting the limit back into the query — or back into the helper call —
+would leave three events in state and nothing for *View All* to reveal:
+**the original defect arriving by a different door.** Three
+source-reading guards hold that line: the helper call carries no
+`limit`, the slice exists, and there is still exactly **one**
+`from('health_events')` query.
+
+⚠️ **One list, one order, one filter.** Collapsed and expanded read the
+same array from the same place, so they cannot disagree about which
+event comes first — the helper has already filtered to upcoming and
+sorted earliest-first. A test asserts the order across the toggle from
+fixtures deliberately **out** of date order, so a render that echoed the
+array rather than the helper's sort would fail.
+
+⚠️ **A real `<button type="button">`**, not a link styled as one: it
+reveals content in place and there is no route to go to.
+`aria-expanded` carries the state and `aria-controls` names the grid —
+and a test asserts that id resolves to an element that **exists**, which
+is the same check `Navbar.test.js` makes of the public menu button.
+
+The control reuses `.health-card-header a`'s existing teal, size and
+weight rather than introducing a second treatment for the same job in
+the same row — but as a `<button>` it needs the browser defaults reset
+(background, border, system font), and ⚠️ **its padding is a TARGET,
+not decoration**: a bare 13px line is ~18px tall, under WCAG 2.2
+SC 2.5.8's 24px, which is exactly the defect X3 found on the footer
+buttons and the post-X5 pass found again on the mobile drawer.
+**Measured 32px tall** in both states at every width.
+
+**Measured in Chromium against the shipped CSS bundle**, real component
+output captured through Jest (5 upcoming, with a 54-character
+unbreakable title), collapsed and expanded at 320/375/414/768/834/
+1024/1280/1440 — **48 checks, 0 failures**:
+
+| | |
+|---|---|
+| document-level horizontal overflow | **0 at every width, both states** |
+| cards past the grid's own right edge | **0** |
+| ≤768px | 1 column — 3 rows collapsed, **5 rows expanded**, stacked |
+| ≥834px | 3 columns — 1 row collapsed, **2 rows expanded** (3 + 2) |
+| the control | 146x32 collapsed, 80x32 expanded — above the 24px minimum everywhere |
+| `aria-expanded` | `false` collapsed, `true` expanded |
+
+The extra cards wrap into new rows because `.bakuna-grid` is a fixed
+three-column grid at `minmax(0, 1fr)` — already the safe form, per
+X2's bare-`1fr` finding — so the row count changes and the width cannot.
+**No new media query was needed.**
+
+⚠️ **The label is exactly `View All Health Events`**, following the
+Home page's *View All Announcements* / *View All Events* wording. A
+count in the label (*"View All Health Events (5)"*) was written first
+and **removed**: it is a wording decision nobody asked for, and X1's
+conventions are the repo owner's. One line to add if wanted.
+
+#### ⚠️ `updated_at` was deliberately NOT added
+
+The investigation found that `health_events` has **no `updated_at`
+column**, so there is no way to tell from a row when it was last
+edited — the audit trail is the only record. That is a real
+auditability gap and it is recorded under *Known gaps*; it is a schema
+change, it is not required for a display fix, and combining the two
+would have put a migration in an application-only PR.
+
+#### What was verified, and what was not
+
+| Check | Result |
+|---|---|
+| Live data, old flow vs new | as the table above; the two 2024 rows hidden, both October 2026 events shown |
+| `anon` SELECT on the new event | visible the whole time — RLS was never the cause |
+| Nurse write path, post-036 | list loads (4 rows) · **Add** `rows=1` · **Edit** `rows=1` with correct readback · an official writing `health_events` `rows=0`, the negative control |
+| `NurseDashboard.jsx` | **not touched** — `git status` on `src/dashboards/` is empty |
+| Jest | 37 suites / 887 tests → **38 suites / 914 tests** (+1 suite, +27 tests) |
+| New suite, both directions | with the fix reverted, **14 of 17 fail** |
+| Production build | clean, no ESLint warnings, **225.09 kB** gzipped (+100 B), CSS 24.13 kB (+28 B) |
+| `git diff --check` | clean |
+| Live state after testing | 4 rows, **zero probe residue**, the nurse's event untouched, `health_events` policies unchanged |
+
+⚠️ **No authenticated page was loaded in a browser from here**, and the
+public page was not loaded either — this container's browser cannot
+reach Supabase, so the before/after sets above are the **database**
+queries the page now issues, plus the real component rendered through
+Jest against mocked data. The repo owner's own smoke test is what found
+the defect and is what should confirm the fix.
 
 ### Edit Event and Edit Health Event — no migration needed
 
@@ -7468,7 +7693,7 @@ derives her initials from. It is no longer displayed as a label.
 - **Source maps ship to production** (~7 MB), so the original JSX is
   publicly reconstructable. `GENERATE_SOURCEMAP=false` in Vercel fixes it.
 - **`public/logo.png` is 984 KB and referenced by nothing.**
-- **Thin automated test coverage.** 887 tests in thirty-seven suites:
+- **Thin automated test coverage.** 930 tests in thirty-eight suites:
   one smoke test over `<App />`, which fails without `.env` because
   `supabaseClient.js` throws at import time, and 886 tests over the
   resident workflow rules, the display labels, the booking window, the
@@ -7540,6 +7765,21 @@ derives her initials from. It is no longer displayed as a label.
   `nextCollection` can only answer "which weekday is soonest", and a row
   whose `day_of_week` is not a weekday name is excluded from the summary
   and counted in a note rather than placed on some day anyway.
+- ⚠️ **`health_events` has no `updated_at` column**, so there is no way
+  to tell from a row when it was last edited — only `created_at`. Found
+  while investigating the public Health Center defect, when the question
+  "did the nurse's edit persist?" could not be answered from the row at
+  all; the `activity_log` entries (`added` / `edited` on `health_event`,
+  migration 017) were the only record, and they are written by the
+  frontend rather than by a trigger. ⚠️ **Deliberately NOT added with
+  the display fix** — it is a schema change and would have put a
+  migration in an application-only PR. Read from the catalog rather
+  than assumed, because the shape is not uniform: `events` has
+  `created_at` and no `updated_at` either, `document_requests` and
+  `reservations` have **both**, and ⚠️ **`announcements` has
+  NEITHER** — it carries `date_posted` instead, which is the date the
+  notice is *about*, not when the row was written. So three of the five
+  content tables cannot say when they last changed.
 - **`events.event_time` is NULL on every row**, and three legacy rows
   carry their time inside `location` instead
   (`"2:00 PM - Main Covered Court"`). Both the list card and the detail

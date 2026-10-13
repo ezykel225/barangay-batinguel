@@ -17,12 +17,15 @@
 import {
   buildEventCalendar,
   describeEventDay,
+  eventCardDate,
   eventTimeLabel,
   eventsOnDate,
   pastEvents,
   upcomingEvents,
 } from './eventCalendar'
 import { buildMonthGrid } from './monthGrid'
+import fs from 'fs'
+import path from 'path'
 
 const ev = (id, date, overrides = {}) => ({
   id,
@@ -259,5 +262,92 @@ describe('eventTimeLabel', () => {
   it('still reads a display string somebody typed by hand', () => {
     expect(eventTimeLabel('2:00 PM')).toBe('2:00 PM')
     expect(eventTimeLabel('8:30 am')).toBe('8:30 AM')
+  })
+})
+
+
+describe('eventCardDate', () => {
+  // The public Health Center card printed `event_month`/`event_day`
+  // alone, so it showed "NOV 05" and "OCT 15" with no year -- and on
+  // the live table the two NOV rows are 2024. A correctly sorted list
+  // read as shuffled, which is how the missing upcoming filter hid.
+
+  it('derives the month, day and year from event_date', () => {
+    expect(eventCardDate({ event_date: '2026-10-20' }))
+      .toEqual({ month: 'OCT', day: '20', year: '2026' })
+    expect(eventCardDate({ event_date: '2024-11-05' }))
+      .toEqual({ month: 'NOV', day: '05', year: '2024' })
+  })
+
+  it('pads a single-digit day, so the tile does not jump width', () => {
+    expect(eventCardDate({ event_date: '2026-03-07' }).day).toBe('07')
+  })
+
+  it('names every month the same way the write path does', () => {
+    // ⚠️ Same derivation as the two dashboards' `displayPartsFor`:
+    // MONTH_NAMES, first three letters, uppercased. If these drift, a
+    // card and the column it was written from disagree.
+    const months = Array.from({ length: 12 }, (_, i) =>
+      eventCardDate({ event_date: `2026-${String(i + 1).padStart(2, '0')}-01` }).month)
+    expect(months).toEqual([
+      'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
+      'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC',
+    ])
+  })
+
+  it('IGNORES the stored display copies when event_date is usable', () => {
+    // ⚠️ The load-bearing one. `event_month`/`event_day` are
+    // denormalised copies; mixing them with a year taken from
+    // `event_date` could print a date that exists in neither.
+    expect(eventCardDate({
+      event_date: '2026-10-20',
+      event_month: 'XXX',
+      event_day: '99',
+    })).toEqual({ month: 'OCT', day: '20', year: '2026' })
+  })
+
+  it('falls back to the stored copies ONLY when event_date is unusable', () => {
+    // The one case where they are all there is.
+    expect(eventCardDate({ event_date: null, event_month: 'NOV', event_day: '05' }))
+      .toEqual({ month: 'NOV', day: '05', year: '' })
+    expect(eventCardDate({ event_date: 'not a date', event_month: 'JAN', event_day: '01' }))
+      .toEqual({ month: 'JAN', day: '01', year: '' })
+  })
+
+  it('returns an EMPTY year rather than guessing one', () => {
+    // Inventing a year for a row whose date the database could not give
+    // us would assert something no column holds -- and the caller
+    // renders the element only when the year is non-empty.
+    expect(eventCardDate({ event_date: null, event_month: 'NOV', event_day: '05' }).year).toBe('')
+    expect(eventCardDate({}).year).toBe('')
+    expect(eventCardDate(null).year).toBe('')
+  })
+
+  it('survives a missing row and a row with nothing on it', () => {
+    expect(eventCardDate(null)).toEqual({ month: '', day: '', year: '' })
+    expect(eventCardDate(undefined)).toEqual({ month: '', day: '', year: '' })
+    expect(eventCardDate({})).toEqual({ month: '', day: '', year: '' })
+  })
+
+  it('refuses a date the month does not have, rather than sliding it', () => {
+    // `parseDateKey`'s rule: 2026-02-30 is not a date. With no usable
+    // date the stored copies are shown and the year stays empty.
+    expect(eventCardDate({ event_date: '2026-02-30', event_month: 'FEB', event_day: '30' }))
+      .toEqual({ month: 'FEB', day: '30', year: '' })
+  })
+
+  it('tolerates a timestamp, reading the date part only', () => {
+    expect(eventCardDate({ event_date: '2026-10-20T00:00:00+08:00' }))
+      .toEqual({ month: 'OCT', day: '20', year: '2026' })
+  })
+
+  it('constructs no Date from a date string', () => {
+    // ⚠️ The module's own rule, and the reason the day cannot shift by a
+    // timezone. `new Date('2026-10-20')` is UTC midnight and reads back
+    // as the 19th west of UTC.
+    const source = fs.readFileSync(path.join(__dirname, 'eventCalendar.js'), 'utf8')
+    const body = source.slice(source.indexOf('export const eventCardDate'))
+    expect(body).not.toMatch(/new Date\(/)
+    expect(body).toContain('parseDateKey')
   })
 })
