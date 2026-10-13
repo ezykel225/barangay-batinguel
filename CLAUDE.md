@@ -329,7 +329,7 @@ src/
 
   assets/images/      11 official portraits, page backgrounds, logo.
 
-supabase-migrations/  35 numbered SQL files. A record, not a runner.
+supabase-migrations/  36 numbered SQL files. A record, not a runner.
 supabase/functions/   Edge Function source (notify-reservation-sms).
 docs/                 SETUP.md, TESTING-WALKTHROUGH.pdf + its generator.
 ```
@@ -429,19 +429,31 @@ Three roles, stored in `profiles.role`:
 | `nurse` | Manually by devs (service_role) | `/nurse` dashboard |
 | `resident` | Self-signup at `/signup` | `/` (Home) — **not** the dashboard |
 
-There is no admin role — that was considered and dropped. But **ten old
-policies across six tables still reference it**, as
-`profiles.role = ANY (ARRAY['admin', ...])`: `announcements` (INSERT,
-UPDATE), `events` (INSERT, UPDATE), `health_events` (INSERT, UPDATE),
-`nurse_availability` (INSERT, UPDATE), `kapitan_status` (UPDATE) and
-`kapitan_availability` (UPDATE).
+**Three roles, and the database permits no fourth.** `profiles_role_check`
+is `CHECK (role = ANY (ARRAY['official','nurse','resident']))`, so a role
+outside those three is not a storable value — measured in trusted SQL,
+where `update profiles set role = 'admin'` is refused `23514` by that
+constraint even for a maintainer.
 
-The condition is dead — no row has `role = 'admin'`, so it never matches
-and the `'official'`/`'nurse'` half does all the work. Harmless, but
-worth knowing before someone assumes the role exists, and worth having
-the full list if anyone ever cleans them up: an earlier version of this
-file said "two policies on two tables", which would have left eight
-behind while looking finished.
+✅ **There is no admin role, and since migration 036 no policy mentions
+one.** The condition had been dead for a long time; B3 removed it. The
+history is kept because the count moved twice and both corrections
+matter:
+
+| | |
+|---|---|
+| an early version of this file | said "two policies on two tables" — which would have left **eight** behind while looking finished |
+| corrected to | **ten** policies across six tables: `announcements` (INSERT, UPDATE), `events` (INSERT, UPDATE), `health_events` (INSERT, UPDATE), `nurse_availability` (INSERT, UPDATE), `kapitan_status` (UPDATE), `kapitan_availability` (UPDATE) |
+| migration 031 (A3) | rewrote the two kapitan policies onto `current_official_holds_position('Punong Barangay')`, and their `admin` half went with that rewrite — leaving **eight** |
+| ✅ migration 036 (B3) | removed all **eight**, across the four remaining tables. **Zero policies in any schema now mention `admin`** |
+
+⚠️ **One policy NAME still contains the word and has no admin branch in
+it:** `reservations` :: *"Admin and official can view reservations"*,
+whose expression already read `profiles.role = 'official'` before B3
+touched anything. ⚠️ **None of the eight was renamed either** — all
+nine keep their historical names, deliberately; see *MASTER-B step B3*.
+So a reader who greps for `admin` finds **nine names and zero
+branches**, and that is the finished state rather than a half-done one.
 
 Residents deliberately land on Home after login, not their dashboard —
 they're citizens browsing a public site who happen to have an account,
@@ -809,7 +821,7 @@ such row.
 
 ## Database notes
 
-**35 migrations**, `001` through `035`, all applied. ⚠️ 027 is a
+**36 migrations**, `001` through `036`, all applied. ⚠️ 027 is a
 DATA CORRECTION, not a schema change — see *The portrait is lost by the
 RENAME* under *Public E-Services (X5)*.
 
@@ -5256,7 +5268,8 @@ over-block would show up: own `position` `P0001`, own `full_name`
 - **`position` stays permanently protected** — 028's rule is about
   permissions, not identity, and nothing here changes it.
 - The other eight dead `admin` disjuncts and the `TRUNCATE` grants are
-  **MASTER-B's**.
+  **MASTER-B's**. ✅ **Both are done** — the grants in migration 035 (B2)
+  and the eight disjuncts in migration 036 (B3).
 
 ### Remaining runtime `full_name` occurrences, classified
 
@@ -5841,7 +5854,9 @@ dashboard still naming the official's position correctly afterwards.
   disjuncts, the `TRUNCATE` grants on 14 tables, `activity_log`'s
   ungoverned UPDATE/DELETE privileges, the 24 SECURITY DEFINER functions
   and `btree_gist` in `public` are all still outstanding, and all still
-  recorded under *Known gaps*.
+  recorded under *Known gaps*. ✅ **B1 (034), B2 (035) and B3 (036) have
+  since closed the first four**; `btree_gist` remains. ⚠️ The TRUNCATE
+  count was **16** tables, not 14 — see *MASTER-B step B2*.
 - **It does not decide who may archive another official.** Still any
   official, untouched through A4 and A5 alike — a business rule the
   barangay owns.
@@ -6199,13 +6214,14 @@ barangay.
 
 ### MASTER-B is NOT started
 
-> ✅ **SUPERSEDED IN PART by B1 AND B2, 2026-10-11.** Migration 034 closed
+> ✅ **SUPERSEDED by B1, B2 AND B3.** Migration 034 (2026-10-11) closed
 > the SECURITY DEFINER execute surface for every function no client has any
 > reason to call, and `tmp_cleanup_probe_row`'s client EXECUTE with it.
 > Migration 035 then closed the table grants — TRUNCATE on all sixteen
 > tables that held it, `activity_log` UPDATE/DELETE, `profiles` DELETE and
-> both queues' DELETE. **What is still outstanding is the dead `admin`
-> disjuncts (B3) and `btree_gist`.** See *MASTER-B step B1* and *step B2*.
+> both queues' DELETE. Migration 036 (2026-10-13) removed the eight dead
+> `admin` policy branches. **`btree_gist` in `public` is the only MASTER-B
+> item still outstanding.** See *step B1*, *step B2* and *step B3*.
 
 Carried forward unchanged, all recorded under *Known gaps*: the eight
 remaining dead `admin` policy disjuncts; `TRUNCATE` granted to `anon`
@@ -6213,6 +6229,10 @@ and `authenticated` on 14 tables, plus `activity_log` UPDATE/DELETE,
 `profiles` DELETE and the two queues' DELETE, all granted with no policy
 behind them; the SECURITY DEFINER execute surface; `tmp_cleanup_probe_row`;
 and `btree_gist` in `public`.
+✅ **All but the last are now closed** — 034, the SQL Editor drop, 035 and
+036. A6's list is left as written: it is what was outstanding on A6's own
+day, and ⚠️ its "14 tables" was the historical figure B2 later measured as
+**16**.
 
 ---
 
@@ -6222,6 +6242,8 @@ and `btree_gist` in `public`.
 `main` after PR #31 merged. **B1 only. MASTER-B is NOT finished** — the
 table grants, the dead `admin` policy disjuncts and `btree_gist` are all
 still outstanding and all still recorded under *Known gaps*.
+✅ **The first two have since landed** — migration 035 (B2) and migration
+036 (B3). `btree_gist` is the only item left.
 
 ✅ **The client-executable SECURITY DEFINER surface went from 24
 functions to 11**, and the eleven are the ones that have to be. No
@@ -6547,7 +6569,7 @@ migration of its own.
   to be **16** rather than 14; see *MASTER-B step B2*.
 - **It does not remove the eight remaining dead `admin` policy
   disjuncts**, and none had to change for B1 to be correct — checked
-  rather than assumed.
+  rather than assumed. ✅ **B3 removed all eight** — migration 036.
 - **It does not move `btree_gist` out of `public`.**
 - **It does not narrow the seven policy predicates or the four RPCs**,
   for the reasons above. The two `get_reservation_slots*` RPCs and all
@@ -6564,6 +6586,8 @@ migration of its own.
 2026-10-11, on `claude/master-b2-table-privilege-hardening`, built on `main`
 after PR #32 merged. **B2 only. MASTER-B is NOT finished** — the dead
 `admin` policy disjuncts are B3 and `btree_gist` is still deferred.
+✅ **B3 has since landed** (migration 036), so `btree_gist` is the only
+MASTER-B item still outstanding.
 
 ✅ **Twenty-two `REVOKE` statements. No RLS policy, no function, no trigger,
 no B1 EXECUTE grant and no application code was touched** — the production
@@ -6838,13 +6862,368 @@ impersonation and the catalog. Padding the count would misrepresent the phase.
 
 - **It does not remove the eight dead `admin` policy disjuncts.** B3. No
   privilege removed here touched a policy dependency, so nothing forced the
-  scope open.
+  scope open. ✅ **B3 removed them** — migration 036, and it confirmed the
+  other direction too: no policy B3 rewrote depended on a privilege B2 had
+  removed.
 - **It does not move `btree_gist`** out of `public`.
 - **It does not change one thing B1 settled** — no SECURITY DEFINER EXECUTE
   grant was touched, and 034's behaviour is intact.
 - **It does not revoke SELECT, INSERT or UPDATE anywhere a policy backs
   them**, and it does not touch `barangay_officials` DELETE or the
   REFERENCES / TRIGGER grants. See *Deferred* above.
+
+---
+
+## MASTER-B step B3 — the dead `admin` policy branches (migration 036)
+
+2026-10-13, on `claude/master-b3-dead-admin-policy-cleanup`, built on
+`main` after PR #33 merged. **B3 only. MASTER-B is NOT finished** —
+`btree_gist` in `public` is still outstanding, and is now the only item.
+
+✅ **Eight RLS policies across four tables stopped testing for a role this
+system does not have. Zero policies in any schema mention `admin` now.**
+The whole migration is **eight `ALTER POLICY` statements** — no policy
+renamed, dropped or recreated, no command or role targeting changed, no
+table privilege, no function, no trigger, no SECURITY DEFINER EXECUTE
+grant and **no application file** touched.
+
+| | before 036 | after |
+|---|---|---|
+| policies whose expression mentions `admin` | **8** | **0** |
+| policy **names** containing "Admin" | 9 | **9** — unchanged, deliberately |
+| total RLS policies, all schemas | 75 | **75** |
+| functions changed | — | **0** |
+
+### The eight, and the one that only looks like a ninth
+
+All eight read `profiles.role = ANY (ARRAY['admin', '<real role>'])` and
+now read `profiles.role = '<real role>'`. All eight are `TO public`,
+which is preserved.
+
+| Table | Policy | Cmd | Clause | Now requires |
+|---|---|---|---|---|
+| `announcements` | Admin and official can insert announcements | INSERT | WITH CHECK | `role = 'official'` |
+| `announcements` | Admin and official can update announcements | UPDATE | USING | `role = 'official'` |
+| `events` | Admin and official can insert events | INSERT | WITH CHECK | `role = 'official'` |
+| `events` | Admin and official can update events | UPDATE | USING | `role = 'official'` |
+| `health_events` | Admin and nurse can insert health events | INSERT | WITH CHECK | `role = 'nurse'` |
+| `health_events` | Admin and nurse can update health events | UPDATE | USING | `role = 'nurse'` |
+| `nurse_availability` | Admin and nurse can insert availability | INSERT | WITH CHECK | `role = 'nurse'` |
+| `nurse_availability` | Admin and nurse can update availability | UPDATE | USING | `role = 'nurse'` |
+
+⚠️ **A NINTH POLICY CARRIES THE NAME AND NOT THE BRANCH**, and it was not
+touched at all: `reservations` :: *"Admin and official can view
+reservations"* (SELECT) already read `profiles.role = 'official'` before
+B3 started. There was no dead branch in it to remove. Recorded because a
+reader who greps for `admin` finds **nine names and zero branches**, and
+that is the finished state rather than a half-done one.
+
+⚠️ **The count was eight, not ten, and not "approximately".** The
+historical audit said ten across six tables; **migration 031 (A3) had
+already taken two of them** when it rewrote both kapitan UPDATE policies
+onto `current_official_holds_position('Punong Barangay')`. Read from the
+live catalog before anything was altered: eight. 031's header is left as
+written — it records what was true on its own day.
+
+### ⚠️ `admin` is dead BY CONSTRAINT, not merely by absence of data
+
+"There are currently zero admin rows" is not sufficient on its own: a
+role with no holders today can still be part of a product's
+authorization model, and removing its branch would then be a permission
+change disguised as a cleanup. So this was established **six ways**.
+
+**1. The CHECK constraint forbids the value — the decisive one.**
+
+```
+profiles_role_check :: CHECK (role = ANY (ARRAY['official','nurse','resident']))
+```
+
+Measured in **trusted SQL**, with RLS and `prevent_role_self_change`'s
+API-caller branch both out of the way so that only the constraint could
+refuse it:
+
+```
+update profiles set role = 'admin'  ->  23514
+    new row for relation "profiles" violates check constraint "profiles_role_check"
+```
+
+⚠️ **The constraint was NOT dropped, relaxed or recreated to get a live
+admin caller.** The brief anticipated exactly this case and said to
+report it as additional evidence instead, which is the stronger result
+anyway: a branch that cannot be reached by any storable value is dead in
+a way that no amount of row-counting establishes.
+
+**2. No live holder.** 28 profiles: `official` 11, `nurse` 1,
+`resident` 16, `admin` **0**. `profiles.role` is plain `text` with **no
+default** and there is no enum type behind it, so the CHECK is the whole
+vocabulary.
+
+**3. Signup cannot create one.** `handle_new_resident_signup()` fires
+only when the signup metadata says `role = 'resident'`, and then writes
+the literal `'resident'`.
+
+**4. No client self-promotion.** The `profiles` INSERT policy is
+`WITH CHECK ((auth.uid() = id) AND (role = 'resident'))`, and
+`prevent_role_self_change()` raises on **any** role change by an API
+caller — measured as that resident over the API:
+`P0001 "You cannot change your own account role."` ⚠️ And the one UPDATE
+policy an official holds on `profiles` is
+`USING (is_official(auth.uid()) AND role = 'resident')` with **no
+`WITH CHECK`**, so USING governs the new row too and an official cannot
+move a row off `resident` either.
+
+**5. No route expects one.** `ProtectedRoute` dispatches official /
+nurse / resident and sends **everything else to `/login`**; `Login.jsx`'s
+post-auth ternary has an official arm, a nurse arm, and treats the rest
+as a resident. Every role comparison in the whole frontend — **25 of
+them** — names one of exactly those three values. There is no admin
+surface to reach even if the value could be stored.
+
+**6. Nothing else in the database uses it.** Searched `public`, `auth`
+and `storage` function bodies, view definitions, CHECK constraints,
+column defaults and index definitions, and `pg_roles`. There is also no
+**database** role named `admin` — a separate namespace from
+`profiles.role`, and empty too.
+
+⚠️ **TWO HITS CAME BACK AND BOTH ARE SUBSTRING COINCIDENCES**, which is
+why the scan was read rather than counted:
+
+- `reservations_activity_type_check` contains **`'Badminton'`**;
+- `protect_reservation_status()` contains the **comment**
+  `-- migrations and admin tasks. Neither is restricted here.`, which is
+  about a direct database connection, not about a role.
+
+The same `Badminton` appears in `Reservation.jsx`'s activity list. A
+grep for `admin` that trusts its own hit count reports a role where there
+is a sport and a comment.
+
+### ⚠️ Why the rewrite is semantically identical — and why that needed proving
+
+`role = ANY (ARRAY['admin','official'])` and `role = 'official'` are
+**not** equivalent in general. They differ on exactly one input,
+`role = 'admin'`. Check 1 above is the entire reason they are equivalent
+here: that input cannot occur.
+
+Proven over every storable value **and over NULL**, so the equality holds
+in three-valued logic rather than only on the happy path:
+
+| `role` | official-pair old | new | nurse-pair old | new |
+|---|---|---|---|---|
+| `'official'` | true | true | false | false |
+| `'nurse'` | false | false | true | true |
+| `'resident'` | false | false | false | false |
+| `NULL` | NULL | NULL | NULL | NULL |
+
+And row-for-row across all **28** live profiles: **0 rows** where the old
+and new expressions disagree, for either pair.
+
+### ⚠️ `ALTER POLICY`, and the clause placement it preserves
+
+Same two reasons migration 031 gave: the connector gates destructive
+statements and `DROP POLICY` is not worth discovering at 60 seconds a
+try, and a drop-and-recreate has a **window** — between the two
+statements the table has no policy of that name, so a failed CREATE
+would leave the Official Portal unable to post an announcement with
+nothing obviously wrong.
+
+⚠️ **The placement matters and was measured before the migration was
+written.** The four UPDATE policies carry a `USING` expression and a
+**NULL** `WITH CHECK` (so USING governs the new row too); the four INSERT
+policies carry a `WITH CHECK` and a **NULL** `USING`. Naming only the one
+clause that exists leaves the other NULL — verified in a rolled-back
+block:
+
+```
+UPDATE policy : using changed, with_check stayed <NULL>, roles stayed public
+INSERT policy : with_check changed, using stayed <NULL>
+```
+
+A DROP + CREATE would have had to restate that from scratch, and **adding
+a `WITH CHECK` to an UPDATE policy that did not have one is a semantic
+change dressed up as tidying**.
+
+### ⚠️ The names are deliberately NOT changed
+
+All eight are still called *"Admin and ... can ..."*. Renaming them would
+be a bigger diff than the fix, and the names are **referenced**:
+`OfficialDashboard.jsx` carries a comment naming *"Admin and official can
+update announcements"* as the policy that already permits an edit.
+Leaving the name correct keeps that comment true. Nothing in the
+application reads a policy name at runtime. A rename is available later
+as a cosmetic change of its own; it is not part of removing a dead
+branch.
+
+### The semantic matrix — identical before and after, all 56 cells
+
+Eight operations × seven callers, each probe attempted **for real** as
+that account with its own JWT claims, inside a block that always ends in
+`RAISE EXCEPTION`.
+
+```
+ caller          | annINS annUPD | evtINS evtUPD | hevINS hevUPD | navINS navUPD
+ ----------------+---------------+---------------+---------------+---------------
+ Punong Barangay |      1      1 |      1      1 |  42501      0 |  42501      0
+ Secretary       |      1      1 |      1      1 |  42501      0 |  42501      0
+ Treasurer       |      1      1 |      1      1 |  42501      0 |  42501      0
+ Kagawad         |      1      1 |      1      1 |  42501      0 |  42501      0
+ nurse           |  42501      0 |  42501      0 |      1      1 |      1      1
+ resident        |  42501      0 |  42501      0 |  42501      0 |  42501      0
+ anon            |  42501      0 |  42501      0 |  42501      0 |  42501      0
+```
+
+⚠️ **A blocked INSERT RAISES where a blocked UPDATE returns zero rows** —
+two shapes of the same refusal, which is why the harness records both. A
+probe that expected only one of them would have read half this matrix as
+a crash.
+
+So: announcements and events are **any official's**, health events and
+clinic hours are **the nurse's**, and residents and anonymous visitors
+write none of the four. Exactly as before, which is the whole claim.
+
+### MASTER-A, B1 and B2 all re-verified unweakened
+
+| | |
+|---|---|
+| 028 own `position` / own `created_at` | **P0001** ×2 |
+| 029 client INSERT of a powered position | **P0001** |
+| 029 client INSERT of `Kagawad` (positive control) | **accepted** rows=1 |
+| 033 own `full_name` change | rows=1 |
+| 032 self-archive, **after renaming that row through the app** | **P0001** |
+| 018 archive another official | rows=1 |
+| 030 a linked official reads the mapping | **42501** |
+| 031 Secretary / Treasurer / Punong hold SEC·TRE·PUN | `t,f,f` · `f,t,f` · `f,f,t` |
+| 031 Kagawad | `f,f,f` |
+| 031 Secretary → `document_requests` · Treasurer → `reservations` | rows=1 · rows=1 |
+| 031 Punong → `kapitan_status` · `kapitan_availability` | rows=1 · rows=1 |
+| 031 Kagawad → either kapitan table (negative control) | rows=0 · rows=0 |
+| A5 `official_id_for_current_user()` | his own row id |
+| 022 `can_see_audience('secretary')` as a Kagawad | false |
+| **034/B1 direct calls to the 15 revoked functions** | **15/15 refused `42501`** |
+| **035/B2 TRUNCATE for `anon` / `authenticated`** | **0 / 0** |
+| 035/B2 `activity_log` UPD+DEL, `profiles` DEL, both queues' DEL, `kapitan_*` INS | all **false** |
+| SECURITY DEFINER functions / client-executable | 26 / **11** — B1 intact |
+| md5 of the five authorization function bodies | unchanged; **036 ran zero `CREATE OR REPLACE FUNCTION`** |
+
+### ⚠️ Three of my own results were the harness, not the code
+
+The project's own rule, for the sixth phase running — *always ask which
+step produced the result*. All three looked like regressions:
+
+- **"Punong Barangay holds SEC/TRE/PUN = false/false/false."** Two steps
+  earlier in the same block, the *"archive ANOTHER official"* probe had
+  selected its target as "the first active row that is not the
+  Kagawad's" — which is **Hon. Frankie Credo's own row**. Archiving it
+  revokes his position powers, because
+  `current_official_holds_position()` requires `archived_at IS NULL`.
+  That is migration 018's rule and 031's predicate **working**. Re-run
+  with his row left active: `false/false/**true**`, and both kapitan
+  writes `rows=1`.
+- **"Secretary → `document_requests` = rows=0."** The probe selected a
+  row `where status = 'pending'`, and there are **zero** pending
+  document requests (3 approved, 3 claimed, 3 ready_for_pickup). So
+  `doc_id` was NULL and `where id = NULL` matched nothing. It was an
+  empty WHERE clause, not a refused policy. Re-run against an `approved`
+  row: **rows=1**.
+- **A 60-second connector timeout** on the re-run block. No lock and
+  nothing stuck — `pg_stat_activity` showed every other backend idle.
+  The cause was two **unqualified** `UPDATE`s (`set status = status`
+  with no `WHERE`), which the destructive-statement scan gates. Adding
+  `WHERE id = ...` went straight through. ⚠️ Consistent with X5's note
+  that the gated set is **measured per session rather than fixed** — and
+  the fix is a narrower statement, not a way around the guard.
+
+⚠️ **And one label of mine was simply wrong arithmetic**: a verification
+query was labelled "expect 76" policies and the catalog answered 75. The
+census per table reconciles to 75 **before and after**, and `ALTER
+POLICY` cannot create or drop a policy at all — so the label was my own
+bad hand-count, not a change. Recorded because a number that disagrees
+with a label is exactly the shape of a real finding.
+
+### Nothing persisted
+
+Every probe ran inside a block ending in `RAISE EXCEPTION`, and the live
+state was re-read afterwards:
+
+| | |
+|---|---|
+| profiles by role | `official` 11 · `nurse` 1 · `resident` 16 · **`admin` 0** |
+| `profiles_role_check` | intact, **not weakened** |
+| directory rows / active / archived | 11 / 11 / 0 |
+| links, all carrying the 030 backfill provenance | 11 / 11 |
+| powered holders | Punong Barangay = Hon. Frankie Credo · Secretary = Alexis Theress P. Tan · Treasurer = Adelina Fabillar Remata |
+| probe residue in `barangay_officials` / `announcements` / `events` / `health_events` / `nurse_availability` | **0 / 0 / 0 / 0 / 0** |
+| `document_requests` · `reservations` by status | unchanged |
+
+### ⚠️ Advisors are unchanged, and that is the expected result
+
+`rls_enabled_no_policy` 1 · `extension_in_public` 1 ·
+`anon_security_definer_function_executable` **11** ·
+`authenticated_security_definer_function_executable` **11** ·
+`auth_leaked_password_protection` 1 — **identical to the post-B2 state.
+No new finding, none resolved, none changed.**
+
+As with B2, that is not a null result: **Supabase has no lint for a dead
+disjunct inside a policy expression.** Eight policies testing for a
+non-existent role produced zero advisor findings before 036 and zero
+after. ⚠️ **Advisor count is the wrong instrument for this phase** — the
+catalog is, and it moved from 8 admin-bearing policies to 0.
+
+### What was verified
+
+| Check | Result |
+|---|---|
+| Live policy inventory, every schema, before any change | 75 policies; **8** with an admin branch, across 4 tables |
+| `admin` is unreachable | six independent checks, the CHECK constraint decisive |
+| Expression equivalence | all 3 storable values + NULL; 0 of 28 live rows disagree |
+| `ALTER POLICY` clause-placement dry run | rolled back; using/with_check/roles all preserved |
+| Semantic matrix, 8 operations × 7 callers | **56/56 cells identical** before and after |
+| MASTER-A + B1 + B2 regression | unchanged; B1 15/15, B2 0/0 |
+| Runtime `admin` search, `src/` and elsewhere | 31 hits in `src/`, **0 role checks**; 1 outside, a CSS-class mention in a fonts README |
+| Jest | **37 suites, 887 tests** — the baseline, unchanged |
+| Production build | clean, no ESLint warnings, **224.99 kB** gzipped, `main.1805a56d.js` — **byte-identical** to B1 and B2 |
+| `git diff --check` | clean |
+
+⚠️ **No test was added and the count is deliberately unchanged.** B3
+changes no frontend file, so there is nothing for Jest to assert; the
+proof of this phase is role impersonation and the policy catalog. Padding
+the count would misrepresent what B3 did.
+
+### ⚠️ What was NOT verified
+
+- **No authenticated page was loaded in a browser from here.** The
+  dashboards are behind `ProtectedRoute` and this environment still has
+  **no test account**. Nothing was done to weaken authentication for a
+  screenshot. What that leaves unseen for B3 specifically: an official
+  adding or editing an **announcement** or an **event**, and the nurse
+  adding or editing a **health event** or her **clinic hours**, on a live
+  page through the rewritten policies. Each is covered by the matrix
+  above as a real database write by the real role, but not by a click.
+- **The `admin` caller itself could not be impersonated**, because the
+  CHECK constraint makes the role unstorable. That is the evidence, not a
+  gap — and weakening the constraint to manufacture one was ruled out.
+
+### ⚠️ What B3 does NOT do
+
+- **It does not rename any policy.** Nine names still contain "Admin".
+  Cosmetic, referenced by a source comment, and out of scope.
+- **It does not move `btree_gist`** out of `public`. It is load-bearing
+  for the reservations overlap exclusion constraint (`date WITH =`), so
+  it can only be moved, not dropped, and moving it touches the one
+  constraint preventing double booking. **The only MASTER-B item left.**
+- **It does not change one thing B1 or B2 settled** — no SECURITY
+  DEFINER EXECUTE grant and no table privilege was touched, and both were
+  re-measured intact.
+- **It does not simplify any unrelated boolean logic.** The only change
+  to any expression is the removal of the dead array element. Every other
+  policy in the database is byte-identical.
+- **It does not narrow anything for `official`, `nurse` or `resident`,
+  and does not broaden anything for anyone** — the 56-cell matrix is the
+  evidence.
+- **It does not introduce an admin role**, does not add a `profiles.role`
+  value, and does not touch `profiles_role_check`.
+- **It does not decide who may archive another official**, which is still
+  any official's to do — the business rule the barangay owns, carried
+  forward untouched since A4.
 
 ---
 
@@ -7056,12 +7435,13 @@ derives her initials from. It is no longer displayed as a label.
   defect: zero runtime name-identity joins, every powered position
   succeeding on exactly its own surface and failing closed when unlinked
   or archived, and a rename granting and stripping nothing.
-  ⚠️ ~~**MASTER-B is not started**~~ — **B1 and B2 have landed.** The
+  ⚠️ ~~**MASTER-B is not started**~~ — **B1, B2 and B3 have landed.** The
   SECURITY DEFINER execute surface closed in migration 034 (24 → 11
-  client-executable) and the table grants in migration 035 (TRUNCATE on
+  client-executable), the table grants in migration 035 (TRUNCATE on
   sixteen tables → zero, plus `activity_log` UPDATE/DELETE, `profiles`
-  DELETE and both queues' DELETE). **The eight dead `admin` disjuncts are
-  B3, and `btree_gist` is still deferred.**
+  DELETE and both queues' DELETE), and the eight dead `admin` policy
+  branches in migration 036. **`btree_gist` is the only MASTER-B item
+  still deferred.**
 - **The official barangay document forms.** X6 built the whole
   generation pipeline against PROTOTYPE layouts because the barangay has
   not supplied its real forms, and the X6 follow-up extended that to all
@@ -7243,6 +7623,11 @@ derives her initials from. It is no longer displayed as a label.
   other eight dead `admin` disjuncts are deliberately left** — they are
   MASTER-B's, and a security cutover is the wrong place to touch
   policies it is not otherwise changing.
+  ✅ **Those eight are CLOSED by migration 036 (MASTER-B B3)**, which was
+  that separate phase. Zero policies in any schema mention `admin` now,
+  and ⚠️ **no caller's permissions changed** — the eight branches were
+  dead by CHECK constraint, not merely by absence of data. See *MASTER-B
+  step B3*.
 - ✅ ~~**`TRUNCATE` is granted to `anon` and `authenticated` on 14
   tables, and PostgreSQL RLS does not cover TRUNCATE.**~~ **CLOSED by
   migration 035 (MASTER-B B2).** ⚠️ **It was SIXTEEN tables, not 14** —
@@ -7285,13 +7670,34 @@ derives her initials from. It is no longer displayed as a label.
   reads `postgres=X/postgres | service_role=X/postgres` and nothing else.
   See *MASTER-B step B1* for the classification and the proof that a
   trigger still fires for a caller holding no EXECUTE on it.
+- ✅ ~~**Eight RLS policies still test for a `role = 'admin'` that this
+  system does not have.**~~ **CLOSED by migration 036 (MASTER-B B3).**
+  `announcements` (INSERT, UPDATE), `events` (INSERT, UPDATE),
+  `health_events` (INSERT, UPDATE) and `nurse_availability` (INSERT,
+  UPDATE) each read `profiles.role = ANY (ARRAY['admin', ...])` and now
+  read the single real role. ⚠️ **It was eight, not the ten the
+  historical audit named** — migration 031 had already taken the two
+  kapitan policies when it rewrote them onto
+  `current_official_holds_position('Punong Barangay')`.
+  ⚠️ **The branch was dead by CONSTRAINT, not just by absence of data**:
+  `profiles_role_check` permits only `official`, `nurse` and `resident`,
+  so `admin` is not a storable value — `update profiles set role='admin'`
+  is refused `23514` even in trusted SQL. The constraint was **not**
+  weakened to manufacture an admin caller for testing; the refusal is the
+  evidence. Measured identical for all seven real callers across all
+  eight operations, before and after. ⚠️ **Nine policy NAMES still
+  contain "Admin"** and none was renamed — one of the nine
+  (`reservations` :: *"Admin and official can view reservations"*) never
+  had a branch to remove. See *MASTER-B step B3*.
 - **`btree_gist` is installed in the `public` schema**, which puts
   **188** of the 218 functions in that schema on the exposed API
   surface. It is load-bearing — the reservations overlap exclusion
   constraint needs it for `date WITH =` — so it cannot be dropped, only
   moved, and moving it touches the one constraint preventing double
   booking. Low priority, recorded so the advisor warning is not
-  rediscovered.
+  rediscovered. ⚠️ **Since migration 036 this is the ONLY MASTER-B item
+  still outstanding** — B1 closed the function execute surface, B2 the
+  table grants and B3 the dead `admin` policy branches.
 - **Source maps and the deployment target.** ⚠️ CLAUDE.md and README say
   Vercel; there are **two** live targets — Vercel
   (`barangay-batinguel-e-processing`) **and** Netlify
