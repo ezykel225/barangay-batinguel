@@ -329,7 +329,7 @@ src/
 
   assets/images/      11 official portraits, page backgrounds, logo.
 
-supabase-migrations/  34 numbered SQL files. A record, not a runner.
+supabase-migrations/  35 numbered SQL files. A record, not a runner.
 supabase/functions/   Edge Function source (notify-reservation-sms).
 docs/                 SETUP.md, TESTING-WALKTHROUGH.pdf + its generator.
 ```
@@ -809,7 +809,7 @@ such row.
 
 ## Database notes
 
-**34 migrations**, `001` through `034`, all applied. ⚠️ 027 is a
+**35 migrations**, `001` through `035`, all applied. ⚠️ 027 is a
 DATA CORRECTION, not a schema change — see *The portrait is lost by the
 RENAME* under *Public E-Services (X5)*.
 
@@ -896,7 +896,9 @@ the relevant role in SQL):
   SECURITY DEFINER is required, not stylistic — the mapping is
   unreadable by every client, so an inline `EXISTS` would see nothing and
   granting SELECT to fix that would publish the whole table.
-- **`activity_log`** has no UPDATE or DELETE policy on purpose, and
+- **`activity_log`** has no UPDATE or DELETE policy on purpose — and
+  ✅ **since migration 035 no client UPDATE or DELETE privilege either**, so
+  the append-only model now holds at both layers — and
   since migration 015 its contents cannot be forged either. The
   `stamp_activity_actor` trigger takes `actor_id` and `actor_name` from
   the caller's own token and profile and discards whatever the client
@@ -4768,6 +4770,8 @@ open; each carries its own ✅ where a later phase closed it.
   tables, and RLS does not cover TRUNCATE. Not reachable through
   PostgREST today (no TRUNCATE verb, and no project function runs
   dynamic SQL), but it is MASTER-B's.
+  ✅ **CLOSED by migration 035 (B2)**, which also corrected the count — it
+  was **16** tables, not 14. Both client roles now hold TRUNCATE on zero.
 
 ---
 
@@ -6195,12 +6199,13 @@ barangay.
 
 ### MASTER-B is NOT started
 
-> ✅ **SUPERSEDED IN PART by B1, 2026-10-11.** Migration 034 closed the
-> SECURITY DEFINER execute surface for every function no client has any
+> ✅ **SUPERSEDED IN PART by B1 AND B2, 2026-10-11.** Migration 034 closed
+> the SECURITY DEFINER execute surface for every function no client has any
 > reason to call, and `tmp_cleanup_probe_row`'s client EXECUTE with it.
-> **Everything else in this paragraph is still outstanding** — the dead
-> `admin` disjuncts, the table grants and `btree_gist`. See *MASTER-B step
-> B1*.
+> Migration 035 then closed the table grants — TRUNCATE on all sixteen
+> tables that held it, `activity_log` UPDATE/DELETE, `profiles` DELETE and
+> both queues' DELETE. **What is still outstanding is the dead `admin`
+> disjuncts (B3) and `btree_gist`.** See *MASTER-B step B1* and *step B2*.
 
 Carried forward unchanged, all recorded under *Known gaps*: the eight
 remaining dead `admin` policy disjuncts; `TRUNCATE` granted to `anon`
@@ -6538,6 +6543,8 @@ migration of its own.
 - **It does not touch one table privilege.** `TRUNCATE` on 14 tables,
   `activity_log` UPDATE/DELETE, `profiles` DELETE and the two queues'
   DELETE are all still granted with no policy behind them. B2.
+  ✅ **B2 did them all** — migration 035, and the TRUNCATE count turned out
+  to be **16** rather than 14; see *MASTER-B step B2*.
 - **It does not remove the eight remaining dead `admin` policy
   disjuncts**, and none had to change for B1 to be correct — checked
   rather than assumed.
@@ -6549,6 +6556,295 @@ migration of its own.
   nine is a candidate for a later step, and for the seven it needs the
   policy-still-works proof in a rolled-back transaction first. Recorded,
   not attempted.
+
+---
+
+## MASTER-B step B2 — table privilege hardening (migration 035)
+
+2026-10-11, on `claude/master-b2-table-privilege-hardening`, built on `main`
+after PR #32 merged. **B2 only. MASTER-B is NOT finished** — the dead
+`admin` policy disjuncts are B3 and `btree_gist` is still deferred.
+
+✅ **Twenty-two `REVOKE` statements. No RLS policy, no function, no trigger,
+no B1 EXECUTE grant and no application code was touched** — the production
+bundle hashes identically to `main`.
+
+| Privilege | before 035 | after |
+|---|---|---|
+| tables with `TRUNCATE` for `anon` | **15** | **0** |
+| tables with `TRUNCATE` for `authenticated` | **16** | **0** |
+| tables with `TRUNCATE` for `service_role` | 21 | 21 |
+| `activity_log` UPDATE / DELETE (both roles) | granted | **revoked** |
+| `profiles` DELETE (both roles) | granted | **revoked** |
+| `document_requests` DELETE (both roles) | granted | **revoked** |
+| `reservations` DELETE (both roles) | granted | **revoked** |
+| `kapitan_status` INSERT + DELETE (both roles) | granted | **revoked** |
+| `kapitan_availability` INSERT + DELETE (both roles) | granted | **revoked** |
+
+### ⚠️ TABLE PRIVILEGES AND RLS ARE TWO SEPARATE LAYERS
+
+Every privilege removed here was one the role **held** while RLS happened to
+filter the rows away. That is not the same as being safe, and "RLS already
+blocks it" is not a reason to leave it:
+
+- **RLS filters rows; it does not raise.** A privilege with no policy behind
+  it is a loaded gun with the safety on — the safety being a policy somebody
+  could widen later, by accident, in a phase that is not thinking about
+  DELETE at all.
+- ⚠️ **TRUNCATE is worse, because PostgreSQL RLS DOES NOT COVER TRUNCATE AT
+  ALL.** There is no row filtering to fall back on. The only thing stopping a
+  client emptying sixteen tables was that PostgREST exposes no TRUNCATE verb
+  and no project function runs dynamic SQL — an accident of the transport,
+  not a control in this database.
+
+### ⚠️ PUBLIC holds nothing on any table — the exact opposite of B1
+
+B1's load-bearing finding was that every **function** carried a bare
+`=X/postgres` ACL entry, i.e. PUBLIC EXECUTE, so revoking from `anon` and
+`authenticated` alone would have changed nothing measurable. The reflex is to
+assume the same of tables. **Measured, and it is not the case:**
+
+```
+select count(*) from information_schema.role_table_grants
+ where table_schema = 'public' and grantee = 'PUBLIC';   -->  0
+```
+
+Supabase's default table grants go to `anon`, `authenticated` and
+`service_role` **by name**, never through PUBLIC. So every statement in 035
+names the roles that actually hold the privilege, and a `FROM PUBLIC` clause
+would be a no-op the file does not pretend to need. ⚠️ **Do not carry B1's
+PUBLIC reasoning across to tables — check each layer separately.**
+
+### ⚠️ The historical count was wrong: SIXTEEN tables, not 14
+
+The audit recorded "approximately 14 tables" with TRUNCATE. Read from the
+catalog it is **sixteen**, and the two roles differ:
+
+| | |
+|---|---|
+| `anon` holds TRUNCATE on | **15** tables |
+| `authenticated` holds TRUNCATE on | **16** tables |
+| union | **16** |
+
+The sixteenth is `official_availability`, where migration 026 granted
+`authenticated` full DML so an official can publish their own hours but gave
+`anon` SELECT only. Its revoke therefore names `authenticated` alone —
+revoking from a role that never held it would be noise in the record.
+
+### How every privilege was classified
+
+21 tables; all seven privilege types read from the catalog for PUBLIC /
+`anon` / `authenticated` / `service_role`, then reconciled against:
+
+- every `.select(` / `.insert(` / `.update(` / `.delete(` / `.upsert(` in
+  `src/`, comment-stripped and attributed to its own `.from('<table>')`;
+- every RLS policy on every table **including `cmd='ALL'`**, which also
+  covers DELETE;
+- every function body in `public`, `auth` and `storage`;
+- foreign keys pointing into the affected tables.
+
+⚠️ **The frontend calls `.delete()` at exactly EIGHT sites, on eight
+tables**: `health_events`, `nurse_availability`, `medicine_stock`,
+`medical_programs`, `residents_registry`, `waste_schedule`, `announcements`,
+`events`. All eight are policy-backed — six by an explicit DELETE policy,
+three more by a `FOR ALL` policy — and **all eight keep DELETE**. Nothing
+else in the application deletes anything.
+
+No function in `public`, `auth` or `storage` deletes from `activity_log`,
+`profiles`, `document_requests` or `reservations`; none updates
+`activity_log`; and **not one function in any of those schemas so much as
+mentions TRUNCATE**.
+
+### The four named targets, and what backs them
+
+| Table | Policies it actually has | Verdict |
+|---|---|---|
+| `activity_log` | INSERT, SELECT — **nothing else, ever** | UPDATE + DELETE revoked |
+| `profiles` | INSERT, SELECT ×3, UPDATE ×2 | DELETE revoked |
+| `document_requests` | INSERT, SELECT ×2, UPDATE ×2 | DELETE revoked |
+| `reservations` | INSERT ×2, SELECT ×2, UPDATE ×2 | DELETE revoked |
+
+None of the four has a DELETE policy **or** a `FOR ALL` policy. "Nothing is
+ever deleted" is already this project's stated rule for `profiles`; the two
+queues move through statuses (`pending → approved → ready_for_pickup →
+claimed`, and `pending → approved`/`declined`/`cancelled`) and never through
+a row removal.
+
+⚠️ **INSERT is KEPT on all three, and on `reservations` that is deliberate
+even though the booking form uses the `create_court_reservation` RPC.**
+Migration 008's two INSERT policies — *Anyone can request a reservation*
+(`anon`) and *Signed-in users can request a reservation* (`authenticated`) —
+are live, and `profiles` has *Users can insert their own resident profile*.
+Revoking INSERT would be a behaviour change dressed up as a privilege
+cleanup.
+
+### Two extra findings B2 made on its own
+
+`kapitan_status` and `kapitan_availability` carry **SELECT and UPDATE
+policies and nothing else** — migration 031's header says so in as many
+words — while both roles held INSERT, DELETE and TRUNCATE. The frontend
+reads `kapitan_status` and UPDATEs it (the Punong Barangay's own control) and
+only reads `kapitan_availability`; both tables are maintained in SQL, where a
+direct connection is the table owner and bypasses privileges and RLS alike.
+So INSERT and DELETE went, and **SELECT stays** (both are on the public
+Officials page) and **UPDATE stays** (031 narrowed it to
+`current_official_holds_position('Punong Barangay')`, which is the control
+and is untouched).
+
+### Deferred, with reasons — reported and not taken
+
+- ⚠️ **`barangay_officials` DELETE.** There IS a deliberate DELETE policy,
+  *Officials can delete archived directory records*, which matches only rows
+  already archived — migration 018's design, so an active official can never
+  be deleted in one step. No UI calls it. Revoking the privilege would make a
+  policy the barangay deliberately wrote unreachable, which is a design
+  decision and not a privilege cleanup.
+- **REFERENCES and TRIGGER on all 16 tables, both roles.** Default grants,
+  never used. Exploiting either needs CREATE on schema `public` to make the
+  referencing table or the trigger, and B1 measured CREATE as **false** for
+  both `anon` and `authenticated`. Latent, and not functionally testable
+  without creating objects, so it fails this phase's own bar for inclusion.
+
+### The denial matrix — and the half the connector would not let me run
+
+| Attempted as `anon` **and** as an authenticated resident | Result |
+|---|---|
+| `UPDATE activity_log` | **42501** ×2 |
+| `INSERT kapitan_status` | **42501** ×2 |
+| `INSERT kapitan_availability` | **42501** ×2 |
+
+⚠️ **The TRUNCATE and DELETE denials were NOT executed, and are not claimed
+as executed.** The connector gates those statement classes — the first
+attempt (16 tables × 2 roles plus seven DELETEs, all inside a rolled-back
+block) hit a 60-second timeout, and A2 already recorded that wrapping them in
+`EXECUTE format(...)` does not get past the scan either, because it reads the
+whole payload. ⚠️ **Deliberately not worked around**: building the statement
+from concatenated fragments to hide the keyword would be defeating a
+destructive-statement guard, which is not a thing to do to make a report look
+complete. Live state was re-read afterwards and all 19 tables were intact —
+the gated call never executed at all.
+
+What stands in its place is the catalog, which is **what PostgreSQL itself
+consults**, and the check happens before execution:
+
+```
+tables where anon holds TRUNCATE           0   (was 15)
+tables where authenticated holds TRUNCATE  0   (was 16)
+profiles / document_requests / reservations DELETE, both roles   false
+activity_log UPDATE + DELETE, both roles                         false
+kapitan_status + kapitan_availability INSERT + DELETE            false
+service_role TRUNCATE                                            21 (unchanged)
+```
+
+To exercise the refusals behaviourally, paste this into the SQL Editor; it
+rolls itself back:
+
+```sql
+begin;
+  set local role authenticated;
+  set local request.jwt.claims = '{"sub":"<any resident uuid>","role":"authenticated"}';
+  -- expect 42501 on each
+  truncate table public.profiles;
+  delete from public.activity_log where true;
+  delete from public.profiles where true;
+  delete from public.document_requests where true;
+  delete from public.reservations where true;
+rollback;
+```
+
+### Positive workflow regression — the real operations, not the policies
+
+Exercised as the real roles, all rolled back:
+
+| | |
+|---|---|
+| signup: `auth.users` INSERT → profile row | rows=1, `role=resident`, `status=pending` |
+| resident UPDATEs their own profile | rows=1 |
+| official verifies the account | rows=1, owner notification 1 |
+| `activity_log` INSERT with a **forged** actor | accepted, `actor_id` = the caller, name stamped from their profile |
+| official SELECTs `activity_log` | 63 rows visible |
+| Punong Barangay UPDATEs `kapitan_status` / `kapitan_availability` | rows=1 / rows=5 |
+| Kagawad UPDATEs `kapitan_status` | **rows=0** |
+| verified resident files a document request | accepted; Secretary queue notification 1 |
+| resident writes `resident_viewed_at` | rows=1 |
+| Secretary approve → mark ready → mark claimed | rows=1 · rows=1 · rows=1 |
+| guest booking through the RPC | reference `BCR-2026-XMHPAF` |
+| `anon` tracking lookup | 1 row |
+| Treasurer queue notification, then Treasurer approve | 1 · rows=1 |
+| resident cancels their own pending booking | rows=1 |
+| `enforce_reservation_window` on a daytime start with no reason | **P0001 refused** |
+| `stamp_official_availability` | `updated_by` = the caller |
+| `stamp_notification_read` with a forged `user_id` | overwritten with the caller's |
+| `rls_auto_enable` on `CREATE TABLE` | RLS auto-enabled = true |
+
+### MASTER-A and B1 are unweakened
+
+| | |
+|---|---|
+| 028 own `position` / `created_at` | **P0001** ×2 |
+| 029 INSERT a powered position | **P0001** |
+| 029 INSERT `Kagawad` (positive control) | **accepted** |
+| 033 own `full_name` change | rows=1 |
+| 032 self-archive after renaming that row | **P0001** |
+| 018 archive another official | rows=1 |
+| 030 a linked official reads the mapping | **42501** |
+| 031 Secretary / Treasurer / Punong / Kagawad hold SEC·TRE·PUN | `t,f,f` · `f,t,f` · `f,f,t` · `f,f,f` |
+| 033/A5 `official_id_for_current_user()` | his own row id |
+| 022 `can_see_audience('secretary')` as a Kagawad | false |
+| **034/B1 direct calls to the 15 revoked functions** | **15/15 refused `42501`** |
+
+### ⚠️ Advisors are unchanged, and that is the expected result
+
+`rls_enabled_no_policy` 1 · `extension_in_public` 1 ·
+`anon_security_definer_function_executable` **11** ·
+`authenticated_security_definer_function_executable` **11** ·
+`auth_leaked_password_protection` 1 — **identical to the post-B1 state. No
+new finding, none resolved, none changed.**
+
+That is not a null result, it is the point: **Supabase's security advisors
+have no lint for excess table privileges at all.** Sixteen tables that
+`anon` could have truncated produced zero advisor findings before 035 and
+zero after. ⚠️ **So advisor count is the wrong instrument for this phase** —
+the catalog is, and it moved from 15/16 to 0/0.
+
+### What was verified
+
+| Check | Result |
+|---|---|
+| Full before/after privilege matrix, 21 tables × 4 grantees × 7 privileges | read from the catalog, not from this file |
+| Denials actually executed | 6/6 refused `42501` |
+| Denials proven from the catalog (TRUNCATE + DELETE, connector-gated) | 0/0 for both roles; `service_role` 21 |
+| Positive workflow regression | 18 operations, all as expected |
+| MASTER-A + B1 regression | unchanged; B1 15/15 |
+| Advisors | unchanged, and explained above |
+| Live state | 11 links / 11 rows / 11 active / 0 archived, powered holders unchanged, **zero probe residue** |
+| Jest | **37 suites, 887 tests** — the baseline, unchanged |
+| Production build | clean, no ESLint warnings, **224.99 kB** gzipped, `main.1805a56d.js` — **byte-identical** to B1 |
+| `git diff --check` | clean |
+
+⚠️ **No test was added and the count is deliberately unchanged.** B2 changes
+no frontend file, so there is nothing for Jest to assert; the proof is role
+impersonation and the catalog. Padding the count would misrepresent the phase.
+
+### ⚠️ What was NOT verified
+
+- **No authenticated page was loaded in a browser from here.** The dashboards
+  are behind `ProtectedRoute` and this environment still has no test account.
+  Nothing was done to weaken authentication for a screenshot.
+- **The TRUNCATE and DELETE refusals were not executed**, per the connector
+  gate above — proven from the catalog and left as a SQL Editor block.
+
+### ⚠️ What B2 does NOT do
+
+- **It does not remove the eight dead `admin` policy disjuncts.** B3. No
+  privilege removed here touched a policy dependency, so nothing forced the
+  scope open.
+- **It does not move `btree_gist`** out of `public`.
+- **It does not change one thing B1 settled** — no SECURITY DEFINER EXECUTE
+  grant was touched, and 034's behaviour is intact.
+- **It does not revoke SELECT, INSERT or UPDATE anywhere a policy backs
+  them**, and it does not touch `barangay_officials` DELETE or the
+  REFERENCES / TRIGGER grants. See *Deferred* above.
 
 ---
 
@@ -6760,9 +7056,12 @@ derives her initials from. It is no longer displayed as a label.
   defect: zero runtime name-identity joins, every powered position
   succeeding on exactly its own surface and failing closed when unlinked
   or archived, and a rename granting and stripping nothing.
-  ⚠️ **MASTER-B is not started** — the eight dead `admin` disjuncts,
-  the `TRUNCATE` grants and the SECURITY DEFINER audit are still
-  outstanding.
+  ⚠️ ~~**MASTER-B is not started**~~ — **B1 and B2 have landed.** The
+  SECURITY DEFINER execute surface closed in migration 034 (24 → 11
+  client-executable) and the table grants in migration 035 (TRUNCATE on
+  sixteen tables → zero, plus `activity_log` UPDATE/DELETE, `profiles`
+  DELETE and both queues' DELETE). **The eight dead `admin` disjuncts are
+  B3, and `btree_gist` is still deferred.**
 - **The official barangay document forms.** X6 built the whole
   generation pipeline against PROTOTYPE layouts because the barangay has
   not supplied its real forms, and the X6 follow-up extended that to all
@@ -6944,14 +7243,22 @@ derives her initials from. It is no longer displayed as a label.
   other eight dead `admin` disjuncts are deliberately left** — they are
   MASTER-B's, and a security cutover is the wrong place to touch
   policies it is not otherwise changing.
-- ⚠️ **`TRUNCATE` is granted to `anon` and `authenticated` on 14
-  tables, and PostgreSQL RLS does not cover TRUNCATE.** Not reachable
-  through PostgREST today — there is no TRUNCATE verb and no project
-  function runs dynamic SQL (`rls_auto_enable` is an event trigger) —
-  so this is a latent privilege rather than a hole. The same is true of
-  `activity_log` UPDATE/DELETE, `profiles` DELETE and the two queues'
-  DELETE, all granted with no policy behind them. 019A's two-barrier
-  pattern is the remedy; MASTER-B.
+- ✅ ~~**`TRUNCATE` is granted to `anon` and `authenticated` on 14
+  tables, and PostgreSQL RLS does not cover TRUNCATE.**~~ **CLOSED by
+  migration 035 (MASTER-B B2).** ⚠️ **It was SIXTEEN tables, not 14** —
+  `anon` held TRUNCATE on 15 and `authenticated` on 16, the extra one being
+  `official_availability`, where 026 gave `authenticated` full DML and
+  `anon` SELECT only. Both roles now hold TRUNCATE on **zero** tables;
+  `service_role` keeps it on all 21. `activity_log` UPDATE/DELETE,
+  `profiles` DELETE and both queues' DELETE went with it, plus
+  `kapitan_status` and `kapitan_availability` INSERT/DELETE, which B2 found
+  by reconciling the whole matrix rather than from the historical list.
+  019A's two-barrier pattern is now the shape of all seven. See *MASTER-B
+  step B2*.
+  ⚠️ **What is deliberately left**: `barangay_officials` DELETE, because a
+  real DELETE policy backs it (archived rows only, migration 018), and
+  REFERENCES / TRIGGER on 16 tables, which need CREATE on schema `public`
+  to exploit and both client roles have none.
 - ✅ ~~**24 SECURITY DEFINER functions are callable by `anon` and
   `authenticated`.**~~ **ELEVEN since migration 034 (MASTER-B B1)**, and the
   eleven are the ones that have to be: the **seven** identity predicates
