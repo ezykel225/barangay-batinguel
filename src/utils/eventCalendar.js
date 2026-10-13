@@ -17,7 +17,7 @@
 // would inherit the hazard. Everything here reads `event_date` through
 // `toDateKey`, which never constructs a Date at all.
 
-import { groupByDateKey, toDateKey } from './monthGrid'
+import { MONTH_NAMES, groupByDateKey, parseDateKey, toDateKey } from './monthGrid'
 import { formatTime, toMinutes } from './clinicHours'
 import { manilaToday } from './displayLabels'
 
@@ -130,4 +130,44 @@ export const eventTimeLabel = (value) => {
   // about what counts as a time.
   if (toMinutes(trimmed) === null) return ''
   return formatTime(trimmed)
+}
+
+
+// ─── The date a public event card prints, YEAR INCLUDED ───────────────
+//
+// ⚠️ Derived from `event_date`, never from `event_month`/`event_day`.
+// Those two are the denormalised display copies this file's own header
+// warns about, and a card that took its month from one source and its
+// year from another could print a date that exists in neither.
+//
+// The public Health Center card printed the stored copies alone, so it
+// showed "NOV 05" and "OCT 15" with no year. On the live table the two
+// NOV rows are **2024** and the OCT one is 2026, so a correctly sorted
+// list read as though it were out of order -- which is how the missing
+// upcoming filter went unnoticed. The year is what makes the ordering
+// legible.
+//
+// Same derivation as the two dashboards' `displayPartsFor` write path:
+// `parseDateKey` splits the characters and no `Date` is constructed, so
+// the day cannot shift by a timezone.
+//
+// ⚠️ The stored copies are the fallback ONLY when `event_date` cannot be
+// parsed -- the one case where they are all there is -- and then the
+// year comes back EMPTY rather than guessed. Inventing a year for a row
+// whose date the database could not give us would assert something no
+// column holds.
+export const eventCardDate = (event) => {
+  const parsed = parseDateKey(event?.event_date)
+  if (parsed) {
+    return {
+      month: MONTH_NAMES[parsed.month].slice(0, 3).toUpperCase(),
+      day: String(parsed.day).padStart(2, '0'),
+      year: String(parsed.year),
+    }
+  }
+  return {
+    month: event?.event_month || '',
+    day: event?.event_day || '',
+    year: '',
+  }
 }

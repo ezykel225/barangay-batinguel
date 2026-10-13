@@ -26,6 +26,7 @@ import {
 import {
   formatTime, isOnScheduledBreak, manilaWeekday,
 } from '../utils/clinicHours'
+import { eventCardDate, upcomingEvents } from '../utils/eventCalendar'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import './HealthCenter.css'
@@ -60,6 +61,11 @@ const healthTips = [
 // ⚠️ DAY_ORDER moved to utils/clinicSchedule.js, which is the module
 // that now decides what a week looks like. Two copies of a weekday
 // order is two places for Sunday to end up in the wrong half.
+
+// How many upcoming health events the public card shows. Fewer are
+// shown when fewer are upcoming -- see the empty state below; a past
+// event is never used to pad the row out to three.
+const HEALTH_EVENT_LIMIT = 3
 
 const HealthCenter = () => {
   const [healthEvents, setHealthEvents] = useState([])
@@ -147,14 +153,33 @@ const HealthCenter = () => {
   }, [])
 
 
+  // ⚠️ NO `.limit()` IN THE QUERY, and that is the whole fix.
+  //
+  // This read was `.order('event_date', { ascending: true }).limit(3)`
+  // with no date filter at all -- so the three oldest rows in the table
+  // won the three slots and a genuinely upcoming event never reached
+  // the page. Measured on the live table: the two 2024 rows plus the
+  // 15 October 2026 one filled it, and the 20 October 2026 event the
+  // nurse had just published was row four and was dropped by SQL.
+  //
+  // It is the same defect `upcomingEvents` was written for on the Home
+  // page -- *filter, THEN limit*. Limiting in SQL first hands four rows
+  // to a filter with nothing upcoming left in them.
+  //
+  // The ORDER stays: it costs nothing, it makes the response
+  // deterministic, and `upcomingEvents` sorts again anyway.
   const fetchHealthEvents = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('health_events')
         .select('*')
         .order('event_date', { ascending: true })
-        .limit(3)
-      if (!error) setHealthEvents(data || [])
+      // ⚠️ The shared helper is the project's one definition of
+      // "upcoming" -- today counts, a row with no usable date does not,
+      // and the Manila date is what "today" means. The Home page and
+      // the Nurse's own Upcoming Health Events card call the same
+      // function, so the three surfaces cannot drift into three answers.
+      if (!error) setHealthEvents(upcomingEvents(data || [], { limit: HEALTH_EVENT_LIMIT }))
     } catch (err) {
       console.error('Error fetching health events:', err)
     } finally {
@@ -708,22 +733,39 @@ const HealthCenter = () => {
               {eventsLoading ? (
                 <p style={{ fontSize: '13px', color: '#5f6775' }}>Loading events...</p>
               ) : healthEvents.length === 0 ? (
-                <p style={{ fontSize: '13px', color: '#5f6775' }}>No health events yet.</p>
+                // ⚠️ "No UPCOMING health events" -- the list is filtered,
+                // so an empty card means nothing is scheduled ahead, not
+                // that the table is empty. Past events are deliberately
+                // not shown here to keep three cards on screen: a card
+                // under this heading asserts the session is still to
+                // come, and accuracy outranks a full row.
+                <p style={{ fontSize: '13px', color: '#5f6775' }}>
+                  No upcoming health events at the moment.
+                </p>
               ) : (
                 <div className="bakuna-grid">
-                  {healthEvents.map((event) => (
-                    <div key={event.id} className="bakuna-card">
-                      <div className="bakuna-card-date">
-                        <div className="month">{event.event_month}</div>
-                        <div className="day">{event.event_day}</div>
+                  {healthEvents.map((event) => {
+                    // ⚠️ Derived from `event_date`, not from the stored
+                    // `event_month`/`event_day` copies -- see
+                    // `eventCardDate`. Without the year a correctly
+                    // sorted list reads as though it were shuffled,
+                    // which is exactly how the missing filter above hid.
+                    const cardDate = eventCardDate(event)
+                    return (
+                      <div key={event.id} className="bakuna-card">
+                        <div className="bakuna-card-date">
+                          <div className="month">{cardDate.month}</div>
+                          <div className="day">{cardDate.day}</div>
+                          {cardDate.year && <div className="year">{cardDate.year}</div>}
+                        </div>
+                        <div className="bakuna-card-body">
+                          <h4>{event.title}</h4>
+                          <p>{event.description}</p>
+                          <span className="bakuna-target">{event.target_audience}</span>
+                        </div>
                       </div>
-                      <div className="bakuna-card-body">
-                        <h4>{event.title}</h4>
-                        <p>{event.description}</p>
-                        <span className="bakuna-target">{event.target_audience}</span>
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>
