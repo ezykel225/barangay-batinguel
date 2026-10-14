@@ -1,0 +1,194 @@
+-- =============================================================================
+-- 037  Move the btree_gist extension out of `public` into `extensions`
+-- =============================================================================
+-- MASTER-B step B4.  APPLIED 2026-10-14 through the Supabase connector.
+--
+-- This migration is ONE STATEMENT.  It relocates an extension and changes
+-- nothing else: no table, no policy, no privilege, no function, no trigger, no
+-- constraint and no application file.  In particular the reservation overlap
+-- exclusion constraint is NOT dropped, NOT recreated and NOT redefined -- it
+-- is the thing this migration exists to leave untouched while moving the
+-- extension underneath it.
+--
+-- It closes the last outstanding Supabase advisor finding,
+-- `extension_in_public`, which was the only MASTER-B item left after B1 (034),
+-- B2 (035) and B3 (036).
+--
+-- -----------------------------------------------------------------------------
+-- WHAT WAS MEASURED FIRST -- read from the catalog, not from CLAUDE.md
+-- -----------------------------------------------------------------------------
+--   extname             btree_gist
+--   extversion          1.7                (unchanged by this migration)
+--   schema BEFORE       public
+--   schema AFTER        extensions
+--   extowner            supabase_admin     (unchanged by this migration)
+--   extrelocatable      TRUE  <-- the precondition.  Had this been false the
+--                       phase would have stopped here and reported that the
+--                       advisor cannot be resolved by relocation.  There was
+--                       to be no object-by-object move and no reinstall.
+--   member objects      264
+--
+-- btree_gist was the ONLY extension in `public`.  The other four relocatable
+-- extensions on this project already live in `extensions`
+-- (pg_stat_statements, pgcrypto, uuid-ossp), which is why `extensions` is the
+-- target rather than a new schema of this migration's own invention:
+--
+--   extensions schema   exists, owned by `postgres`
+--   its ACL             postgres=UC | anon=U | authenticated=U
+--                       | service_role=U | dashboard_user=UC
+--   so clients hold     USAGE and *NOT* CREATE
+--
+-- ⚠️ The move therefore needs NO new grant.  `anon` and `authenticated`
+-- already had USAGE on `extensions` before this migration, and still cannot
+-- CREATE in it.  Nothing was granted, and nothing had to be.
+--
+-- -----------------------------------------------------------------------------
+-- THE ONE APPLICATION OBJECT THAT DEPENDS ON IT
+-- -----------------------------------------------------------------------------
+-- Every object depending on any of btree_gist's 264 member objects was
+-- enumerated from pg_depend, excluding the extension's own members.  The
+-- result is 180 pg_amop rows + 434 pg_amproc rows -- btree_gist's internal
+-- operator and support-function links -- and exactly ONE application object:
+--
+--   index  reservations_no_overlapping_slots
+--
+-- which backs the only exclusion constraint in the database:
+--
+--   EXCLUDE USING gist (
+--       preferred_date WITH =,
+--       int4range(slot_hour, (slot_hour + GREATEST(COALESCE(duration_hours, 1), 1))) WITH &&
+--   ) WHERE (status = ANY (ARRAY['pending'::text, 'approved'::text])
+--            AND slot_hour IS NOT NULL)
+--
+--   table            public.reservations
+--   backing index    reservations_no_overlapping_slots  (USING gist)
+--   deferrable       NO        deferred  NO        validated  YES
+--
+-- There is no other gist index anywhere in the database, and no function body
+-- in `public`, `auth` or `storage` names btree_gist or any of its opclasses.
+--
+-- -----------------------------------------------------------------------------
+-- ⚠️ WHY btree_gist IS NEEDED AT ALL -- proven per index column
+-- -----------------------------------------------------------------------------
+-- The constraint needs two different kinds of operator in ONE gist index, and
+-- only one of the two comes from core PostgreSQL.  Read off pg_index.indclass:
+--
+--   col 1  preferred_date (date)  WITH =   ->  opclass gist_date_ops
+--                                              family  gist_date_ops
+--                                              ⚠️ SUPPLIED BY btree_gist
+--   col 2  int4range(...)         WITH &&  ->  opclass range_ops
+--                                              family  range_ops
+--                                              supplied by pg_catalog (core)
+--
+-- Core GiST has NO opclass for `date`, so without btree_gist the scalar
+-- equality half of this constraint cannot exist in a gist index at all.  The
+-- overlap half (&&) is core range_ops and owes btree_gist nothing.
+--
+-- So: btree_gist supplies "same date", core supplies "overlapping hours", and
+-- together they are what makes "two bookings may not hold the same hour on
+-- the same date" a database guarantee rather than a frontend check.
+--
+-- -----------------------------------------------------------------------------
+-- ⚠️ WHY A SCHEMA MOVE DOES NOT BREAK THE INDEX
+-- -----------------------------------------------------------------------------
+-- An index records its operator classes by OID in pg_index.indclass, not by
+-- name and not by search_path.  Moving the opclass to another schema changes
+-- its pg_opclass.opcnamespace and nothing the index resolves through, which is
+-- why the constraint survives intact and did not need recreating.  Measured
+-- in the dry run: after the move the opclass reports schema `extensions`, the
+-- constraint is still present and validated, the index is still
+-- valid/ready/live, and pg_get_constraintdef() is byte-identical.
+--
+-- A FUTURE `CREATE INDEX ... USING gist (<date column>)` also keeps working:
+-- default-opclass lookup is by type + access method, not by search_path.
+--
+-- -----------------------------------------------------------------------------
+-- ⚠️ REPLAY ORDER, AND WHY MIGRATION 010 IS NOT EDITED
+-- -----------------------------------------------------------------------------
+-- Migration 010 line 72 reads
+--     CREATE EXTENSION IF NOT EXISTS btree_gist;
+-- with no schema qualification, so on a FRESH database replayed from these
+-- files the extension is created in `public` again -- and then this migration
+-- moves it.  Replaying 001..037 in order therefore ends in the right state,
+-- which is the whole reason this is a separate numbered file rather than an
+-- edit to 010.
+--
+-- 010 is NOT rewritten.  A migration header is a historical record: on 010's
+-- day the extension did go into `public`, and changing that line would make
+-- the file disagree with the database it actually produced, and with the ten
+-- later headers that record `btree_gist in public` as an open advisory.  Those
+-- ten are left exactly as written for the same reason.
+--
+-- -----------------------------------------------------------------------------
+-- DRY RUN -- done before this file existed, inside an aborted transaction
+-- -----------------------------------------------------------------------------
+-- The ALTER was executed, then verified, then rolled back, and btree_gist was
+-- re-read afterwards to confirm it was back in `public`:
+--
+--   schema BEFORE alter                      public
+--   ALTER EXTENSION ... SET SCHEMA extensions SUCCEEDED
+--   schema AFTER alter                       extensions
+--   gist_date_ops opclass schema             extensions
+--   constraint present / validated           1 / t
+--   index valid / ready / live               t / t / t
+--   pg_get_constraintdef()                   byte-identical
+--   post-alter OVERLAP probe                 REFUSED 23P01 on
+--                                            reservations_no_overlapping_slots
+--   post-alter NON-OVERLAP probe             ACCEPTED
+--   after ROLLBACK                           schema public again, opclass
+--                                            public again, 27 reservations,
+--                                            0 probe rows
+--
+-- ⚠️ The ALTER succeeded as `postgres`, which is NOT a superuser here and is
+-- NOT a member of `supabase_admin` (the extension's owner) -- checked before
+-- attempting it, because `ALTER EXTENSION ... SET SCHEMA` normally requires
+-- extension ownership and a refusal was the expected outcome.  It was
+-- permitted, so PostgreSQL itself confirmed the operation is supported on this
+-- project, which was the precondition for writing this file.  The ownership
+-- check is recorded here so a reader does not conclude it was overlooked.
+--
+-- -----------------------------------------------------------------------------
+-- RESERVATION BEHAVIOUR -- identical before and after, 7 scenarios
+-- -----------------------------------------------------------------------------
+-- Derived from the constraint above, not from prose.  A seed row holds
+-- int4range(17,19) on one date as `approved`; each probe is an INSERT in its
+-- own trapped sub-transaction, and the whole block aborts, so no reservation
+-- is created.  BEFORE and AFTER the relocation, all seven agree:
+--
+--   A  non-overlapping, same date   5PM seed, 7PM/2h [19,21)   ACCEPTED
+--   B  OVERLAPPING, same date                6PM/2h [18,20)    REFUSED 23P01
+--   C  exact duplicate interval              5PM/2h [17,19)    REFUSED 23P01
+--   D  adjacent, touches upper bound         7PM/1h [19,20)    ACCEPTED
+--   E  same interval, NEXT date              5PM/2h [17,19)    ACCEPTED
+--   F  `cancelled`, overlaps the seed        5PM/2h [17,19)    ACCEPTED
+--   G  `declined`,  overlaps the seed        6PM/1h [18,19)    ACCEPTED
+--
+--   SQLSTATE raised          23P01  (exclusion_violation)
+--   constraint named         reservations_no_overlapping_slots
+--
+-- ⚠️ D is not a bug and is not a judgement call made here: `int4range` is
+-- HALF-OPEN, so [17,19) and [19,20) do not overlap and a booking may start
+-- exactly when the previous one ends.  That is the stored semantics, measured
+-- rather than assumed, and it is unchanged by this migration.
+--
+-- ⚠️ F and G are the constraint's WHERE predicate doing its job: only
+-- `pending` and `approved` hold an hour, so a cancelled or declined booking
+-- releases its slot.  This matches the two public slot RPCs and the booking
+-- form, and it is why the predicate must never be widened casually.
+--
+-- -----------------------------------------------------------------------------
+-- WHAT THIS MIGRATION DELIBERATELY DOES NOT DO
+-- -----------------------------------------------------------------------------
+--   * no DROP EXTENSION and no CREATE EXTENSION -- a drop would have taken the
+--     exclusion constraint with it (CASCADE) or refused (RESTRICT), and a
+--     reinstall-plus-recreate would have rebuilt the one constraint that
+--     prevents double booking for the sake of an advisor row;
+--   * no DROP/ADD of the exclusion constraint, and no change to its
+--     expression, predicate, deferrability or validation state;
+--   * no change to `reservations` columns, data, policies or triggers;
+--   * no new schema -- `extensions` already existed and is the convention;
+--   * no new grant to any role;
+--   * no application code change.
+-- =============================================================================
+
+alter extension btree_gist set schema extensions;

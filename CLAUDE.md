@@ -334,7 +334,7 @@ src/
 
   assets/images/      11 official portraits, page backgrounds, logo.
 
-supabase-migrations/  36 numbered SQL files. A record, not a runner.
+supabase-migrations/  37 numbered SQL files. A record, not a runner.
 supabase/functions/   Edge Function source (notify-reservation-sms).
 docs/                 SETUP.md, TESTING-WALKTHROUGH.pdf + its generator.
 ```
@@ -826,7 +826,7 @@ such row.
 
 ## Database notes
 
-**36 migrations**, `001` through `036`, all applied. ⚠️ 027 is a
+**37 migrations**, `001` through `037`, all applied. ⚠️ 027 is a
 DATA CORRECTION, not a schema change — see *The portrait is lost by the
 RENAME* under *Public E-Services (X5)*.
 
@@ -6347,7 +6347,7 @@ every SQL block rolled back. A4's record is left as written.
 | Finding | Level | Class |
 |---|---|---|
 | `rls_enabled_no_policy` on `official_account_links` | INFO | **B — intentional.** RLS on with zero policies is exactly what a private table looks like; the privilege layer is the control and every client read is `42501` |
-| `extension_in_public` — `btree_gist` | WARN | **C — MASTER-B.** Load-bearing for the reservations overlap constraint, so it can only be moved, not dropped |
+| `extension_in_public` — `btree_gist` | WARN | **C — MASTER-B.** Load-bearing for the reservations overlap constraint, so it can only be moved, not dropped. ✅ **B4 moved it to `extensions` — migration 037 — and this finding is GONE** |
 | SECURITY DEFINER executable by `anon` — 24 functions | WARN | **C — MASTER-B.** ✅ **B1 took this to 11** — migration 034; see *MASTER-B step B1* |
 | SECURITY DEFINER executable by `authenticated` — 24 functions | WARN | **C — MASTER-B** — the **same 24**, not another 24; see below. ✅ **B1 took this to 11 as well**, the same 11 |
 | `auth_leaked_password_protection` disabled | WARN | **D — platform.** Pro-only on this project |
@@ -6445,8 +6445,9 @@ barangay.
 > Migration 035 then closed the table grants — TRUNCATE on all sixteen
 > tables that held it, `activity_log` UPDATE/DELETE, `profiles` DELETE and
 > both queues' DELETE. Migration 036 (2026-10-13) removed the eight dead
-> `admin` policy branches. **`btree_gist` in `public` is the only MASTER-B
-> item still outstanding.** See *step B1*, *step B2* and *step B3*.
+> `admin` policy branches. ✅ **And migration 037 (2026-10-14) moved
+> `btree_gist` out of `public` into `extensions`, which was the last item.**
+> **MASTER-B IS COMPLETE.** See *step B1*, *step B2*, *step B3* and *step B4*.
 
 Carried forward unchanged, all recorded under *Known gaps*: the eight
 remaining dead `admin` policy disjuncts; `TRUNCATE` granted to `anon`
@@ -6454,8 +6455,8 @@ and `authenticated` on 14 tables, plus `activity_log` UPDATE/DELETE,
 `profiles` DELETE and the two queues' DELETE, all granted with no policy
 behind them; the SECURITY DEFINER execute surface; `tmp_cleanup_probe_row`;
 and `btree_gist` in `public`.
-✅ **All but the last are now closed** — 034, the SQL Editor drop, 035 and
-036. A6's list is left as written: it is what was outstanding on A6's own
+✅ **All of them are now closed** — 034, the SQL Editor drop, 035, 036 and
+**037**. A6's list is left as written: it is what was outstanding on A6's own
 day, and ⚠️ its "14 tables" was the historical figure B2 later measured as
 **16**.
 
@@ -6468,7 +6469,7 @@ day, and ⚠️ its "14 tables" was the historical figure B2 later measured as
 table grants, the dead `admin` policy disjuncts and `btree_gist` are all
 still outstanding and all still recorded under *Known gaps*.
 ✅ **The first two have since landed** — migration 035 (B2) and migration
-036 (B3). `btree_gist` is the only item left.
+036 (B3), and `btree_gist` in migration 037 (B4). Nothing is left.
 
 ✅ **The client-executable SECURITY DEFINER surface went from 24
 functions to 11**, and the eleven are the ones that have to be. No
@@ -6795,7 +6796,8 @@ migration of its own.
 - **It does not remove the eight remaining dead `admin` policy
   disjuncts**, and none had to change for B1 to be correct — checked
   rather than assumed. ✅ **B3 removed all eight** — migration 036.
-- **It does not move `btree_gist` out of `public`.**
+- **It does not move `btree_gist` out of `public`.** ✅ **B4 did** —
+  migration 037.
 - **It does not narrow the seven policy predicates or the four RPCs**,
   for the reasons above. The two `get_reservation_slots*` RPCs and all
   seven predicates still carry a bare **PUBLIC** grant alongside their
@@ -6811,8 +6813,8 @@ migration of its own.
 2026-10-11, on `claude/master-b2-table-privilege-hardening`, built on `main`
 after PR #32 merged. **B2 only. MASTER-B is NOT finished** — the dead
 `admin` policy disjuncts are B3 and `btree_gist` is still deferred.
-✅ **B3 has since landed** (migration 036), so `btree_gist` is the only
-MASTER-B item still outstanding.
+✅ **B3 has since landed** (migration 036) and **B4** (migration 037)
+moved `btree_gist`, so **no MASTER-B item is outstanding**.
 
 ✅ **Twenty-two `REVOKE` statements. No RLS policy, no function, no trigger,
 no B1 EXECUTE grant and no application code was touched** — the production
@@ -7090,7 +7092,8 @@ impersonation and the catalog. Padding the count would misrepresent the phase.
   scope open. ✅ **B3 removed them** — migration 036, and it confirmed the
   other direction too: no policy B3 rewrote depended on a privilege B2 had
   removed.
-- **It does not move `btree_gist`** out of `public`.
+- **It does not move `btree_gist`** out of `public`. ✅ **B4 did** —
+  migration 037.
 - **It does not change one thing B1 settled** — no SECURITY DEFINER EXECUTE
   grant was touched, and 034's behaviour is intact.
 - **It does not revoke SELECT, INSERT or UPDATE anywhere a policy backs
@@ -7104,6 +7107,7 @@ impersonation and the catalog. Padding the count would misrepresent the phase.
 2026-10-13, on `claude/master-b3-dead-admin-policy-cleanup`, built on
 `main` after PR #33 merged. **B3 only. MASTER-B is NOT finished** —
 `btree_gist` in `public` is still outstanding, and is now the only item.
+✅ **B4 closed it** — migration 037, 2026-10-14. **MASTER-B is COMPLETE.**
 
 ✅ **Eight RLS policies across four tables stopped testing for a role this
 system does not have. Zero policies in any schema mention `admin` now.**
@@ -7435,6 +7439,8 @@ the count would misrepresent what B3 did.
   for the reservations overlap exclusion constraint (`date WITH =`), so
   it can only be moved, not dropped, and moving it touches the one
   constraint preventing double booking. **The only MASTER-B item left.**
+  ✅ **B4 moved it in migration 037**, and the constraint was never
+  dropped or recreated — see *MASTER-B step B4*.
 - **It does not change one thing B1 or B2 settled** — no SECURITY
   DEFINER EXECUTE grant and no table privilege was touched, and both were
   re-measured intact.
@@ -7449,6 +7455,326 @@ the count would misrepresent what B3 did.
 - **It does not decide who may archive another official**, which is still
   any official's to do — the business rule the barangay owns, carried
   forward untouched since A4.
+
+---
+
+## ✅ MASTER-B step B4 — btree_gist leaves `public`. MASTER-B IS COMPLETE (migration 037)
+
+2026-10-14, on `claude/master-b4-btree-gist-relocation`, built on `main`
+after PR #35 merged (`20088e7`). **B4 only — and B4 was the last item.**
+
+✅ **`btree_gist` moved from `public` to `extensions`, and the reservation
+overlap exclusion constraint was never dropped, never recreated and never
+redefined.** The whole migration is **one statement**:
+
+```sql
+alter extension btree_gist set schema extensions;
+```
+
+| | before 037 | after |
+|---|---|---|
+| `btree_gist` schema | **`public`** | **`extensions`** |
+| `extversion` | 1.7 | **1.7** — unchanged |
+| `extowner` | `supabase_admin` | **`supabase_admin`** — unchanged |
+| member objects | 264 | **264** |
+| copies of the extension | 1 | **1** — no duplicate |
+| extensions in `public` | **1** | **0** |
+| `gist_date_ops` opclass schema | `public` | **`extensions`** |
+| `extension_in_public` advisor finding | 1 | **GONE** |
+
+### ⚠️ Relocatable was the precondition, and it was checked FIRST
+
+`pg_extension.extrelocatable` is **`true`** for btree_gist. Had it been
+false the phase would have stopped there and reported that the advisor
+cannot be resolved by relocation — there was to be no object-by-object
+move, no `DROP EXTENSION`, and no reinstall. (For contrast, `plpgsql` and
+`supabase_vault` on this project are **not** relocatable.)
+
+⚠️ **btree_gist was the ONLY extension in `public`.** The other three
+relocatable ones already lived in `extensions` — `pg_stat_statements`,
+`pgcrypto`, `uuid-ossp` — which is why `extensions` is the target rather
+than a schema this migration invented.
+
+| target schema check | |
+|---|---|
+| exists | yes, owned by `postgres` |
+| ACL | `postgres=UC \| anon=U \| authenticated=U \| service_role=U \| dashboard_user=UC` |
+| clients hold | **USAGE, and NOT CREATE** |
+| new grants needed | **none** — `anon` and `authenticated` already had USAGE |
+
+### The dependency map — one application object, enumerated not assumed
+
+Every object depending on any of btree_gist's 264 member objects was read
+out of `pg_depend`, excluding the extension's own members:
+
+| Dependent catalog | Count | What it is |
+|---|---|---|
+| `pg_amop` | 180 | btree_gist's own operator links |
+| `pg_amproc` | 434 | btree_gist's own support-function links |
+| **`pg_class`** | **1** | **`index reservations_no_overlapping_slots`** |
+
+⚠️ **That one index is the entire application surface.** There is no other
+GiST index anywhere in the database, and **no function body** in `public`,
+`auth` or `storage` names btree_gist or any of its opclasses.
+
+The constraint it backs, read with `pg_get_constraintdef()`:
+
+```sql
+EXCLUDE USING gist (
+    preferred_date WITH =,
+    int4range(slot_hour, (slot_hour + GREATEST(COALESCE(duration_hours, 1), 1))) WITH &&
+) WHERE (status = ANY (ARRAY['pending'::text, 'approved'::text])
+         AND slot_hour IS NOT NULL)
+```
+
+| | |
+|---|---|
+| table | `public.reservations` |
+| constraint | `reservations_no_overlapping_slots` (`contype = 'x'`) |
+| backing index | `reservations_no_overlapping_slots`, `USING gist` |
+| deferrable / deferred | **no / no** |
+| validated | **yes** |
+
+### ⚠️ Which half of it needs btree_gist — proven per index column
+
+Read off `pg_index.indclass`, because this is exactly the thing not to
+guess at:
+
+| Column | Operator | Opclass | Opfamily | Supplied by |
+|---|---|---|---|---|
+| `preferred_date` (`date`) | `=` | `gist_date_ops` | `gist_date_ops` | ⚠️ **btree_gist** |
+| `int4range(slot_hour, …)` | `&&` | `range_ops` | `range_ops` | `pg_catalog` (core) |
+
+**Core GiST has no opclass for `date`**, so without btree_gist the scalar
+equality half of this constraint cannot exist in a GiST index at all. The
+overlap half is core `range_ops` and owes btree_gist nothing. So
+btree_gist supplies *"same date"*, core supplies *"overlapping hours"*,
+and together they make *"two bookings may not hold the same hour on the
+same date"* a **database** guarantee rather than a form check.
+
+### ⚠️ Why a schema move cannot break the index
+
+An index records its operator classes **by OID** in `pg_index.indclass` —
+not by name, and not through `search_path`. Moving the opclass changes
+`pg_opclass.opcnamespace` and nothing the index resolves through. That is
+why the constraint survived intact and did **not** need recreating, and
+why a future `CREATE INDEX … USING gist (<date column>)` still works:
+default-opclass lookup is by type + access method, not by search path.
+
+### The dry run came first, inside an aborted transaction
+
+| | |
+|---|---|
+| schema before the ALTER | `public` |
+| `ALTER EXTENSION … SET SCHEMA extensions` | **SUCCEEDED** |
+| schema after | `extensions` |
+| `gist_date_ops` opclass schema | `extensions` |
+| constraint present / validated | 1 / `t` |
+| index valid / ready / live | `t` / `t` / `t` |
+| `pg_get_constraintdef()` | **byte-identical** |
+| post-ALTER overlap probe | **REFUSED `23P01`** on `reservations_no_overlapping_slots` |
+| post-ALTER non-overlap probe | ACCEPTED |
+| after `ROLLBACK` | back in `public`, opclass back in `public`, 27 reservations, 0 probe rows |
+
+⚠️ **The ALTER was expected to be REFUSED, and was not.** `ALTER EXTENSION
+… SET SCHEMA` requires ownership of the extension, and this connection is
+`postgres`, which on this project is **not** a superuser (`rolsuper = f`)
+and **not** a member of `supabase_admin` — the extension's owner. Both
+were checked before attempting it, precisely because a refusal was the
+likely outcome and the brief said to stop on one. It was permitted, so
+PostgreSQL itself confirmed the operation is supported here, which was the
+precondition for writing the file at all. Recorded so a later reader does
+not think the ownership question was overlooked.
+
+### The reservation behaviour matrix — identical before and after
+
+Derived from the constraint above rather than from prose. A seed row holds
+`int4range(17,19)` on one date as `approved`; each probe is an INSERT in
+its own trapped sub-transaction, and the whole block aborts, so no
+reservation is ever created.
+
+| | Scenario | BEFORE 037 | AFTER 037 |
+|---|---|---|---|
+| A | non-overlapping, same date — 7 PM/2h `[19,21)` | ACCEPTED | **ACCEPTED** |
+| B | **OVERLAPPING**, same date — 6 PM/2h `[18,20)` | REFUSED `23P01` | **REFUSED `23P01`** |
+| C | exact duplicate interval — 5 PM/2h `[17,19)` | REFUSED `23P01` | **REFUSED `23P01`** |
+| D | adjacent, touches upper bound — 7 PM/1h `[19,20)` | ACCEPTED | **ACCEPTED** |
+| E | same interval, next date | ACCEPTED | **ACCEPTED** |
+| F | `cancelled`, overlaps the seed | ACCEPTED | **ACCEPTED** |
+| G | `declined`, overlaps the seed | ACCEPTED | **ACCEPTED** |
+
+Both refusals name the same constraint, `reservations_no_overlapping_slots`,
+with SQLSTATE **`23P01`** (`exclusion_violation`), before and after.
+
+⚠️ **D is the stored semantics, measured rather than assumed.**
+`int4range` is **half-open**, so `[17,19)` and `[19,20)` do not overlap and
+a booking may start exactly when the previous one ends. Unchanged by 037.
+
+⚠️ **F and G are the WHERE predicate doing its job.** Only `pending` and
+`approved` hold an hour, so a cancelled or declined booking releases its
+slot — the same definition as both public slot RPCs and the booking form.
+
+### ⚠️ An exclusion constraint has no trusted-caller bypass, and a trigger does
+
+Two extra probes — a daytime start with no reason, and an ordinary 5 PM/5h
+booking — came back **ACCEPTED** through the connector and looked like a
+regression in migrations 020/021. They are not.
+`enforce_reservation_window()` opens with
+
+```sql
+IF auth.role() IS NULL OR auth.role() = 'service_role' THEN RETURN NEW;
+```
+
+the documented trusted-connection bypass, and the connector sets no JWT
+claims. Re-run as a real signed-in resident through
+`create_court_reservation`, both are **REFUSED `P0001`**.
+
+⚠️ **The contrast is the useful part**: A–G still refused overlaps *through
+that same bypassing connection*, because a **constraint** is not a trigger
+and has no bypass to offer. The overlap guarantee holds for the SQL Editor,
+`service_role` and a crafted API call alike — which is exactly why it is a
+constraint and not a trigger. The project's own rule, for the seventh phase
+running: *always ask which step produced the result*.
+
+### Application regression — the supported workflows, as the real roles
+
+| | |
+|---|---|
+| GUEST (`anon`) → `create_court_reservation` | reference **`BCR-2026-TRSF05`** |
+| reference stamped by `stamp_reservation_reference` (B1) | same value read back from the row |
+| `anon` tracking, correct reference + contact | **1 row** |
+| `anon` tracking, correct reference + **wrong** contact | **0 rows** — still no oracle |
+| `anon` books an **overlapping** slot through the RPC | **REFUSED `23P01`** on the constraint |
+| resident, daytime start with no reason | **REFUSED `P0001`** (020) |
+| resident, ordinary 5 PM / 5h | **REFUSED `P0001`** (021 cap) |
+| resident sees own bookings only | **5 of 27** |
+| TREASURER approves the guest booking | **rows=1** |
+| KAGAWAD attempts the same (negative control) | **rows=0** |
+
+### MASTER-A regression — unchanged
+
+| | |
+|---|---|
+| Secretary holds SEC/TRE/PUN | `t` / `f` / `f` |
+| `official_id_for_current_user()` = her own directory row | **true** |
+| Secretary → `document_requests` UPDATE | rows=1 |
+| `can_see_audience('secretary')` as the Secretary / as a Kagawad | `t` / `f` |
+| Full Name edit on her own row (033) | **rows=1** |
+| self-archive (032) | **REFUSED `P0001`** |
+| archive **another** official (018) | rows=1 — the existing business rule |
+| reads `official_account_links` (030) | **REFUSED `42501`** |
+| own `position` change (028) | **REFUSED `P0001`** |
+| Treasurer holds SEC/TRE, `reservations` UPDATE | `f`/`t`, rows=1 |
+| Punong holds PUN, `kapitan_status` UPDATE | `t`, rows=1 |
+| Kagawad: SEC/TRE/PUN, doc UPDATE, `kapitan_status` | `f`/`f`/`f`, rows=0, rows=0 |
+
+### B1 / B2 / B3 regression — unchanged
+
+| | |
+|---|---|
+| SECURITY DEFINER functions in `public` | **26** |
+| client-executable by `anon` / `authenticated` | **11 / 11** — the 7 policy predicates + 4 RPCs |
+| the other 15 | not executable by either client role |
+| `TRUNCATE` for `anon` / `authenticated` | **0 / 0**; `service_role` **21** |
+| `activity_log` UPDATE+DELETE, `profiles` DELETE, both queues' DELETE, `kapitan_*` INSERT+DELETE | **none granted to either client role** |
+| `profiles_role_check` | `CHECK (role = ANY (ARRAY['official','nurse','resident']))` |
+| policies whose expression mentions `admin` | **0** |
+| policy **names** containing "Admin" | **9** — unchanged, deliberately |
+| total RLS policies, all schemas | **75** |
+| profiles by role | official 11 · nurse 1 · resident 16 |
+
+### ⚠️ Replay order, and why migration 010 is NOT edited
+
+Migration 010 line 72 is `CREATE EXTENSION IF NOT EXISTS btree_gist;` with
+no schema qualification, so a **fresh** database replayed from these files
+creates it in `public` again — and then 037 moves it. Replaying `001..037`
+in order ends in the right state, which is the whole reason this is a new
+numbered file rather than an edit to 010.
+
+⚠️ **Ten earlier migration headers (016, 017, 018, 019, 021, 031, 032,
+033, 034, 035) record `btree_gist in public` as an open advisory.** They
+are left exactly as written: a header is a historical record of its own
+day, and editing them would make them disagree with the database they
+actually produced. Nothing in `src/` mentions btree_gist at all.
+
+### Advisors — before and after
+
+| Finding | before 037 | after |
+|---|---|---|
+| `extension_in_public` — `btree_gist` | WARN, 1 | ✅ **GONE** |
+| `rls_enabled_no_policy` — `official_account_links` | INFO, 1 | INFO, 1 — intentional, that is what a private table looks like |
+| `anon_security_definer_function_executable` | WARN, 11 | WARN, **11** |
+| `authenticated_security_definer_function_executable` | WARN, 11 | WARN, **11** |
+| `auth_leaked_password_protection` | WARN, 1 | WARN, 1 — Pro-only on this project |
+| anything new | — | **none** |
+
+### What was verified
+
+| Check | Result |
+|---|---|
+| baseline | `main` at **`20088e7`** (PR #35 merge), tree clean, 36 migrations `001`–`036` with no gaps |
+| Health Center fix present on `main` | yes — and the only `.limit(3)` in the file is the **comment** documenting its removal |
+| dependency map | 1 application object: the exclusion constraint's index |
+| dry run | succeeded, verified, rolled back, extension confirmed back in `public` |
+| behaviour matrix | 7 scenarios, **identical before and after** |
+| Jest | **38 suites, 930 tests** — the PR #35 baseline, unchanged |
+| Production build | clean, no ESLint warnings, **225.17 kB** gzipped, CSS 24.19 kB — **byte-identical to PR #35**, because B4 changes no application code |
+| `git diff --check` | clean |
+| live state | 27 reservations (8 approved · 8 pending · 8 declined · 3 cancelled), **0 probe rows**, 0 rows on any probe date, 13 health events (11 upcoming), 11 links, 11/11 active officials, powered holders unchanged, **1** copy of btree_gist, **0** extensions in `public` |
+
+⚠️ **No test was added and the count is deliberately unchanged.** B4
+changes no frontend file, so there is nothing for Jest to assert; the proof
+of this phase is the catalog and role impersonation. Padding the count
+would misrepresent what B4 did.
+
+⚠️ **One live-state drift is NOT mine**: `document_requests` is now 10 rows
+with `pending = 1`, where B3 recorded 9 with none pending. B4's probes only
+UPDATE'd an existing `approved` row and rolled back. That is a real request
+filed through the site between the two phases — the same kind of drift A1b
+recorded for a guest booking.
+
+### ⚠️ What was NOT verified
+
+- **No authenticated page was loaded in a browser from here.** The
+  dashboards are behind `ProtectedRoute` and this environment still has
+  **no test account**. Nothing was done to weaken authentication for a
+  screenshot. What that leaves unseen for B4: a resident actually booking
+  the covered court on a live page and being refused a taken slot. The
+  database half is covered above as a real `anon` call through
+  `create_court_reservation`, refused `23P01`.
+- **The public availability calendar was not rendered.** It reads
+  `get_reservation_slots_range`, which is untouched and still
+  `anon`-executable.
+
+### ✅ FINAL MASTER-B RECONCILIATION — COMPLETE
+
+| Step | Scope | Migration | Status |
+|---|---|---|---|
+| **B1** | SECURITY DEFINER execute surface | 034 | ✅ 24 → **11** client-executable; the 11 are the 7 RLS predicates + 4 RPCs |
+| **B2** | table privilege hardening | 035 | ✅ TRUNCATE 16 tables → **0/0**, plus `activity_log` UPDATE/DELETE, `profiles` DELETE, both queues' DELETE, `kapitan_*` INSERT/DELETE |
+| **B3** | dead `admin` policy branches | 036 | ✅ 8 → **0**; zero policies in any schema mention `admin` |
+| **B4** | `btree_gist` extension placement | **037** | ✅ `public` → `extensions`; advisor finding gone |
+
+**Previously deferred items, each resolved or deliberately owned:**
+
+| Item | Where it stands |
+|---|---|
+| `tmp_cleanup_probe_row` | ✅ **dropped** in the SQL Editor, 2026-10-11 (B1) |
+| the seven RLS policy predicates still `anon`/`authenticated`-executable | ⚠️ **deliberate, not a gap.** A policy is evaluated as the *querying* role, so revoking EXECUTE breaks the policy rather than hardening it |
+| the four public RPCs | ⚠️ **deliberate** — `anon` is supposed to reach them |
+| bare **PUBLIC** EXECUTE on those nine | ⚠️ **open, recorded by B1, not a new finding.** Dropping `PUBLIC` while keeping the explicit `anon`/`authenticated` grants is a candidate for a later step and needs the policy-still-works proof in a rolled-back transaction first |
+| `barangay_officials` DELETE | ⚠️ **deliberately kept** (B2) — a real DELETE policy backs it, archived rows only, migration 018 |
+| REFERENCES / TRIGGER grants on 16 tables | ⚠️ **deliberately kept** (B2) — exploiting either needs CREATE on `public`, which both client roles lack |
+| nine policy **names** containing "Admin" | ⚠️ **cosmetic**, referenced by a source comment; B3 chose not to rename |
+| who may archive another official | ⚠️ **a business rule the barangay owns**, carried untouched since A4 |
+| leaked-password protection | ⚠️ **platform** — Pro-only on this project |
+
+✅ **No MASTER-B security-hardening item remains unresolved. MASTER-B IS
+COMPLETE.** The four items still carrying a ⚠️ above are either deliberate
+design (the predicates and RPCs, the backed DELETE policy, the unexploitable
+default grants), cosmetic (the policy names), a barangay decision (archive
+scope), or a platform limit (leaked passwords) — and every one of them was
+recorded as such by the phase that examined it, not discovered here.
 
 ---
 
@@ -7665,8 +7991,8 @@ derives her initials from. It is no longer displayed as a label.
   client-executable), the table grants in migration 035 (TRUNCATE on
   sixteen tables → zero, plus `activity_log` UPDATE/DELETE, `profiles`
   DELETE and both queues' DELETE), and the eight dead `admin` policy
-  branches in migration 036. **`btree_gist` is the only MASTER-B item
-  still deferred.**
+  branches in migration 036, and `btree_gist`'s schema in migration 037
+  (moved from `public` to `extensions`). ✅ **MASTER-B IS COMPLETE.**
 - **The official barangay document forms.** X6 built the whole
   generation pipeline against PROTOTYPE layouts because the barangay has
   not supplied its real forms, and the X6 follow-up extended that to all
@@ -7929,15 +8255,25 @@ derives her initials from. It is no longer displayed as a label.
   contain "Admin"** and none was renamed — one of the nine
   (`reservations` :: *"Admin and official can view reservations"*) never
   had a branch to remove. See *MASTER-B step B3*.
-- **`btree_gist` is installed in the `public` schema**, which puts
+- ✅ ~~**`btree_gist` is installed in the `public` schema**, which puts
   **188** of the 218 functions in that schema on the exposed API
-  surface. It is load-bearing — the reservations overlap exclusion
-  constraint needs it for `date WITH =` — so it cannot be dropped, only
-  moved, and moving it touches the one constraint preventing double
-  booking. Low priority, recorded so the advisor warning is not
-  rediscovered. ⚠️ **Since migration 036 this is the ONLY MASTER-B item
-  still outstanding** — B1 closed the function execute surface, B2 the
-  table grants and B3 the dead `admin` policy branches.
+  surface.~~ **MOVED to `extensions` by migration 037 (MASTER-B B4),
+  2026-10-14**, and the `extension_in_public` advisor finding is **gone**.
+  `public` now holds **zero** extensions.
+  ⚠️ **It was moved, never dropped and never reinstalled**, and the
+  reservation overlap exclusion constraint was **not** dropped or
+  recreated: `extrelocatable` was `true`, so one
+  `ALTER EXTENSION btree_gist SET SCHEMA extensions` was the whole
+  migration. An index records its operator classes by **OID**, not by
+  name and not by `search_path`, so `reservations_no_overlapping_slots`
+  survived the move intact — still present, still validated, index still
+  valid/ready/live, `pg_get_constraintdef()` byte-identical.
+  ⚠️ **The scalar half of that constraint is what needed btree_gist**:
+  `preferred_date WITH =` resolves through `gist_date_ops`, which
+  btree_gist supplies because core GiST has **no `date` opclass**; the
+  `&&` overlap half is core `range_ops` and owes btree_gist nothing.
+  Verified with a seven-scenario behaviour matrix run **before and
+  after**, identical both times — see *MASTER-B step B4*.
 - **Source maps and the deployment target.** ⚠️ CLAUDE.md and README say
   Vercel; there are **two** live targets — Vercel
   (`barangay-batinguel-e-processing`) **and** Netlify
