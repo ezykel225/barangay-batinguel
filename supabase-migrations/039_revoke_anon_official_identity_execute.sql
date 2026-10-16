@@ -1,0 +1,201 @@
+-- ============================================================================
+-- 039  Remove the surplus `anon` EXECUTE grant on official_id_for_current_user
+-- ============================================================================
+-- MASTER-B step B5 follow-up.  APPLIED 2026-10-16 through the Supabase
+-- connector.
+--
+-- This migration is ONE `REVOKE` statement and nothing else.
+--
+-- ----------------------------------------------------------------------------
+-- WHY THIS IS A NEW FILE AND NOT AN EDIT TO 038
+-- ----------------------------------------------------------------------------
+-- Migration 038 is marked APPLIED 2026-10-16, states in its own header that it
+-- is "NINE `REVOKE ... FROM PUBLIC` statements and nothing else", and records
+-- in its verification table that the named `anon` / `authenticated` /
+-- `service_role` grants were left "unchanged on all nine".  Every one of those
+-- statements is true of what 038 actually ran.
+--
+-- Adding a tenth statement to it -- and a *named-grant* revoke at that -- would
+-- make 038's header contradict both itself and the database it produced on its
+-- day, and would claim a live change 038 did not make.  CLAUDE.md's rule is
+-- that a migration header is a historical record of its own day (migration 037
+-- left ten earlier headers' stale btree_gist advisories exactly as written for
+-- the same reason).  So this is 039.
+--
+-- ----------------------------------------------------------------------------
+-- WHAT B5 LEFT OPEN, AND WHY IT IS BEING CLOSED RATHER THAN DOCUMENTED
+-- ----------------------------------------------------------------------------
+-- B5 removed bare PUBLIC EXECUTE from nine SECURITY DEFINER functions and
+-- reported one surplus *named* grant it had found but not removed:
+--
+--     official_id_for_current_user()  is executable by `anon`, and no
+--     anonymous caller requires it.
+--
+-- B5 left it as a documented candidate.  That is the same shape of mistake B4
+-- made with PUBLIC: an unnecessary grant nobody has proven necessary is
+-- unfinished work, not retained architecture.  It is now measured and removed.
+--
+-- ----------------------------------------------------------------------------
+-- EXACT USAGE, READ FROM THE LIVE CATALOG (not from policy names)
+-- ----------------------------------------------------------------------------
+-- signature : official_id_for_current_user()        -- no arguments
+-- returns   : uuid       SECURITY DEFINER, owner postgres, search_path=""
+-- ACL before: postgres=X | anon=X | authenticated=X | service_role=X
+--             (no PUBLIC entry -- 038 removed it)
+--
+-- Policies whose USING or WITH CHECK text names it -- ALL SCHEMAS searched,
+-- matched on the expression text rather than on the policy name:
+--
+--   public.official_availability  official_availability_insert  INSERT
+--       TO authenticated   WITH CHECK (official_id = official_id_for_current_user())
+--   public.official_availability  official_availability_update  UPDATE
+--       TO authenticated   USING + WITH CHECK (both the same expression)
+--   public.official_availability  official_availability_delete  DELETE
+--       TO authenticated   USING (official_id = official_id_for_current_user())
+--
+-- THREE policies, one table, and ⚠️ ALL THREE ARE `TO authenticated`.  That is
+-- the whole basis of this migration: unlike the seven predicates 038 examined,
+-- whose policies are declared `TO public` and are therefore evaluated for
+-- whichever role queries the table, these three are never evaluated for `anon`
+-- at all.
+--
+-- ⚠️ THE PUBLIC READ PATH DOES NOT USE THIS FUNCTION.  The fourth policy on
+-- the same table is the one the public Officials page depends on:
+--
+--   public.official_availability  official_availability_select  SELECT
+--       TO public          USING (official_is_active(official_id))
+--
+-- It calls `official_is_active()`, a DIFFERENT helper, which keeps its own
+-- `anon` grant and is untouched here.  Reading the two policies as one because
+-- they sit on one table is exactly the inference this header exists to prevent.
+--
+-- Other database objects referencing the function:  NONE.
+--   functions (public/auth/storage, comments stripped) 0
+--   views 0 · matviews 0 · CHECK constraints 0 · column defaults 0
+--   indexes 0 · triggers 0 · event triggers 0
+-- So no SECURITY DEFINER wrapper and no trigger reaches it on anyone's behalf.
+--
+-- Frontend `.rpc()` call sites -- exactly TWO, both session-gated:
+--   src/dashboards/OfficialDashboard.jsx:736  inside fetchUserInfo(user.id),
+--                                             called only when `user?.id`
+--   src/components/Sidebar.jsx:122            inside `if (role === 'official')`
+-- Sidebar is imported by the three dashboard components only, and all three
+-- dashboards sit behind <ProtectedRoute> in App.js.  No public page calls it:
+-- the only other `.rpc(` sites in src/ are the four public reservation RPCs
+-- (get_reservation_slots, get_reservation_slots_range, create_court_reservation,
+-- track_court_reservation), none of which is this function.
+--
+-- ----------------------------------------------------------------------------
+-- ⚠️ A SECOND BARRIER ALREADY STOOD IN FRONT OF THOSE THREE POLICIES
+-- ----------------------------------------------------------------------------
+-- `anon`'s real table privileges on official_availability are
+-- REFERENCES, SELECT, TRIGGER -- no INSERT, no UPDATE, no DELETE (migration 026
+-- granted `anon` SELECT only; 035 holds the line).  So an anonymous write is
+-- refused at the PRIVILEGE layer before RLS is consulted, and the three
+-- helper-calling policies could never have been reached as `anon` even with the
+-- grant in place.  Measured, not assumed:
+--
+--   anon INSERT official_availability  ->  42501 permission denied for table
+--   anon UPDATE official_availability  ->  42501 permission denied for table
+--   anon DELETE official_availability  ->  no DELETE privilege in the catalog
+--       (⚠️ the DELETE was NOT executed: the connector gates DELETE, as 035
+--        recorded.  Proven from information_schema.role_table_grants instead,
+--        which is what PostgreSQL itself consults, and the check happens before
+--        execution.  Fragmenting the keyword to get it past a destructive-
+--        statement guard is not something to do to complete a table.)
+--
+-- ----------------------------------------------------------------------------
+-- WHAT THE GRANT ACTUALLY BOUGHT ANON, MEASURED
+-- ----------------------------------------------------------------------------
+-- With the grant in place, an anonymous direct call SUCCEEDS and returns NULL:
+-- there is no auth.uid(), so the function resolves to nothing.  So the grant
+-- permitted a call that cannot answer anything, and removing it changes exactly
+-- one observable behaviour -- that call becomes 42501 instead of NULL.  Neither
+-- answer leaks anything, which is why this was a least-privilege question
+-- rather than a vulnerability.
+--
+-- ----------------------------------------------------------------------------
+-- ROLLBACK-SAFE DRY RUN -- 19 probes, before and after, inside one aborting
+-- transaction.  The ONLY line that changed is A1.
+-- ----------------------------------------------------------------------------
+--                                             BEFORE            AFTER REVOKE
+--  A1 anon DIRECT rpc                       SUCCEEDED -> NULL   REFUSED 42501
+--  A2 anon SELECT official_availability      1 row              1 row
+--  A3 anon SELECT barangay_officials        11 rows            11 rows
+--  A4 anon SELECT kapitan_availability       5 rows             5 rows
+--  A5 anon INSERT official_availability     42501 (table)      42501 (table)
+--  A6 anon UPDATE official_availability     42501 (table)      42501 (table)
+--  A7 anon get_reservation_slots            SUCCEEDED          SUCCEEDED
+--  A8 anon get_reservation_slots_range      SUCCEEDED          SUCCEEDED
+--  T1 TREASURER rpc                         her own row id     her own row id
+--  T2 TREASURER UPDATE own availability     rows=1             rows=1
+--  T3 TREASURER UPDATE reservation          rows=1 holdsTRE=t  rows=1 holdsTRE=t
+--  K1 KAGAWAD rpc                           his own row id     his own row id
+--  K2 KAGAWAD INSERT OWN hours              ACCEPTED rows=1    ACCEPTED rows=1
+--  K3 KAGAWAD INSERT ANOTHER's hours        REFUSED 42501      REFUSED 42501
+--  K4 KAGAWAD UPDATE ANOTHER's row          rows=0 (denied)    rows=0 (denied)
+--  K5 KAGAWAD document_requests UPDATE      rows=0 (denied)    rows=0 (denied)
+--  S1 SECRETARY rpc + holdsSEC + docUPD     id · t · rows=1    id · t · rows=1
+--  P1 PUNONG rpc + holdsPUN + kapUPD        id · t · rows=1    id · t · rows=1
+--  ACL in-transaction                       anon=t             anon=f authd=t
+--                                                              svc=t PUBLIC=f
+--
+-- After the abort the ACL was re-read and `anon=X/postgres` was back, with
+-- 1 official_availability row and zero probe residue -- so the dry run proved
+-- the change without leaving it.
+--
+-- ⚠️ ONE DRY-RUN READING WAS MY OWN HARNESS, NOT A POLICY RESULT, and it is
+-- recorded because it reported a refusal for a statement that had been
+-- ACCEPTED.  The Kagawad's own-hours INSERT came back `22P02`, which is a
+-- data-type error and not a permission code.  The cause was the probe's result
+-- accumulator: `r := r || 'some literal'` where `r` is `text[]` makes
+-- PostgreSQL resolve the bare literal as an ARRAY literal, so the APPEND raised
+-- "malformed array literal" on the line AFTER the insert had already succeeded.
+-- Every probe built with format() was unaffected.  Casting the literals ::text
+-- fixed it, and the statement was accepted in isolation and in both runs.
+-- The project's own rule, for the ninth phase running: always ask which step
+-- produced the result.
+--
+-- ----------------------------------------------------------------------------
+-- REPLAY SAFETY -- why no compensating GRANT is needed
+-- ----------------------------------------------------------------------------
+-- NO migration file grants EXECUTE on this function to anybody.  Its named
+-- grants come from `pg_default_acl`, which on this project gives
+-- postgres=X | anon=X | authenticated=X | service_role=X to every FUNCTION
+-- `postgres` creates in `public` (038's header proves it with a throwaway
+-- function).  The function is created in 026 and rewritten in 031, so a fresh
+-- replay of 001..039 creates it with all four named grants and then 039 removes
+-- the `anon` one.  `authenticated` and `service_role` keep theirs.
+--
+-- ----------------------------------------------------------------------------
+-- WHAT THIS MIGRATION DOES NOT DO
+-- ----------------------------------------------------------------------------
+--  * It does NOT touch `authenticated` or `service_role` on this function.
+--    Three policies and both frontend call sites need `authenticated`.
+--  * It does NOT touch the other eight functions 038 named, or any of the
+--    fifteen trigger functions 034 closed.
+--  * It does NOT touch `official_is_active()`, which is what the PUBLIC read
+--    policy on this same table actually calls, and which `anon` genuinely
+--    needs for the public Officials page.
+--  * It does NOT alter a function body, an RLS policy, a trigger, a table
+--    privilege or any application file.
+--  * It does NOT convert anything from SECURITY DEFINER to SECURITY INVOKER.
+--  * It does NOT edit migration 038, 037, 034 or any other applied file.
+--
+-- ----------------------------------------------------------------------------
+-- VERIFIED AFTER APPLYING
+-- ----------------------------------------------------------------------------
+--   ACL                 postgres=X | authenticated=X | service_role=X
+--   anon EXECUTE        false        (was true)
+--   authenticated       true         unchanged
+--   service_role        true         unchanged
+--   PUBLIC EXECUTE      false        unchanged -- still 0 across all 26
+--   SECURITY DEFINER functions in public                26   unchanged
+--   client-executable (anon or authenticated)           11   unchanged
+--   of those, executable by anon                        10   (was 11)
+--   other eight 038 functions' ACLs                     unchanged
+--   15 trigger/event-trigger functions (034)            still client-unreachable
+--
+-- ============================================================================
+
+revoke execute on function public.official_id_for_current_user() from anon;
