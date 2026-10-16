@@ -381,13 +381,32 @@ src/
                       state lives here; OfficialComplaints passes it
                       four props.
 
+  kpcases/            The KP case file (Combined Phase 1). ⚠️ PROVISIONAL.
+    kpCaseLabels      The case/panel/hearing/attendance/outcome words.
+                      ⚠️ Holds NO rule mapping anything to an outcome --
+                      a human picks it and a different human may or may
+                      not conclude the case. Pure, and its vocabularies
+                      are asserted equal to migration 043's own CHECKs.
+    kpCaseApi         The eleven KP RPCs. ⚠️ Maps each P0001 to a
+                      readable sentence, so a function's own message --
+                      which names the position gate -- never reaches a
+                      screen.
+    KpCasePanel       Open a case, record a panel, schedule a
+                      proceeding, record attendance, minutes and ONE
+                      outcome. ⚠️ ALL case state lives here;
+                      OfficialComplaints passes it four props.
+    documents/        The summons and the hearing notice. ⚠️ SYSTEM
+                      TEMPLATES -- X6's print architecture, no seal of
+                      its own, no signature, no statutory wording, and
+                      factual case data only.
+
   supabase/
     supabaseClient.js The single Supabase client. Throws at import time
                       when the env vars are missing.
 
   assets/images/      11 official portraits, page backgrounds, logo.
 
-supabase-migrations/  42 numbered SQL files. A record, not a runner.
+supabase-migrations/  43 numbered SQL files. A record, not a runner.
 supabase/functions/   Edge Function source (notify-reservation-sms).
 docs/                 SETUP.md, TESTING-WALKTHROUGH.pdf + its generator.
 ```
@@ -879,14 +898,15 @@ such row.
 
 ## Database notes
 
-**42 migrations**, `001` through `042`, all applied. ⚠️ 027 is a
+**43 migrations**, `001` through `043`, all applied. ⚠️ 027 is a
 DATA CORRECTION, not a schema change — see *The portrait is lost by the
 RENAME* under *Public E-Services (X5)*.
 
-**26 tables, RLS enabled on every one.** The newest is
-`complaint_screenings` — migration 042, see *KP review screening
-foundation (P4-A)* — and the four before it are the P3-A complaint
-intake tables.
+**30 tables, RLS enabled on every one.** The newest four are
+`kp_cases`, `kp_case_panel`, `kp_hearings` and `kp_hearing_attendance`
+— migration 043, see *KP case, hearings and summons (Combined Phase
+1)* — and all four are PRIVATE, like the five complaint tables before
+them.
 
 | Table | Holds |
 |---|---|
@@ -9979,6 +9999,280 @@ provisional on screen:
 - **Whether a confirmed screening should notify anybody.**
 
 ---
+
+## KP case, hearings and summons (Combined Phase 1) — ⚠️ PROVISIONAL WORKFLOW
+
+2026-10-16, on `claude/kp-case-hearings-summons-mvp`, built on `main`
+after PR #42 merged (`946f710`). **One migration, 043, and six new
+frontend files.**
+
+It makes ONE flow demonstrable end to end:
+
+```
+a human-confirmed screening (042)
+  -> a human OPENS a KP case
+  -> a panel is RECORDED administratively
+  -> a proceeding is SCHEDULED
+  -> a summons / hearing notice is PRINTED from factual data
+  -> attendance or non-appearance is RECORDED
+  -> minutes and ONE outcome are RECORDED by a human
+```
+
+### ⚠️ THE SYSTEM STILL DECIDES NOTHING
+
+There is no function anywhere — SQL or JavaScript — that maps answers,
+attendance, minutes or panel composition to an outcome, a disposition or
+a next step. Every one is a parameter a human supplied, and
+source-reading tests assert by name that no such mapping exists.
+
+⚠️ **Whether a case is CONCLUDED is its own human answer**, a checkbox
+beside the outcome rather than a consequence of the outcome value.
+"Resolved — agreement recorded" does **not** conclude the case by
+itself, because the barangay may keep it open, and
+`record_kp_hearing_outcome()` takes `p_concludes_case` as a separate
+parameter. Measured: an unresolved outcome left the case `in_process`.
+
+⚠️ **The workflow split is PROVISIONAL and is marked so on screen**, in
+two places — the panel roster and the outcome form both read *"requires
+barangay confirmation"*. P2.5 found **no** Lupon, Justice or Katarungan
+committee recorded anywhere, so this system has no record from which to
+infer who is entitled to decide, and it does not try.
+
+### Complaint ≠ Screening ≠ KP Case
+
+⚠️ **`complaints.status` was NOT widened again.** A complaint that has
+become a case still reads `screened`, because that is the stage the
+COMPLAINT reached; the case carries its own status. Two columns meaning
+one fact is what 042 refused. **Nothing resident-facing changes in this
+phase at all** — `track_complaint()`, `complaint_queue()`,
+`complaint_parties_for()` and `complaint_history_for()` are untouched,
+and a test scans every resident and public complaint file for twelve KP
+terms.
+
+### Four tables, all private
+
+| Table | Holds |
+|---|---|
+| `kp_cases` | one case per complaint. `complaint_id` is **UNIQUE** — that is the duplicate guard — plus `screening_id` provenance, `reference`, `status`, and who opened/concluded it |
+| `kp_case_panel` | free-text `member_name` + `chairperson`/`member`. ⚠️ **Deliberately NOT linked to `barangay_officials`** |
+| `kp_hearings` | proceeding type, date, start time, location, status, presiding note, admin notes, minutes, and ONE outcome |
+| `kp_hearing_attendance` | keyed to **`complaint_parties.id`**; `present`/`absent`/`excused`, one row per party per hearing |
+
+All four: RLS enabled, **zero policies**, every client privilege
+revoked. RLS filters ROWS and cannot restrict COLUMNS, and a case file
+needs a column rule — an ordinary official must read nothing while the
+Secretary reads the minutes. `get_advisors` reports
+`rls_enabled_no_policy` on all four, which is what a private table looks
+like.
+
+⚠️ **NO `kp_case_parties` TABLE, and that is §1's own condition.**
+`complaint_parties` already carries the role, the name snapshot and the
+contact snapshot, and a case comes from exactly one complaint — so a
+second party table would be a drift-prone copy. Attendance keys straight
+to it, and the "is this person a party to THIS case" check lives in the
+RPC because a foreign key cannot express it. Measured: a party from
+another complaint is refused *"That person is not a party to this
+case."*
+
+### The role matrix, measured
+
+Every cell by impersonating the real account with its own JWT claims,
+inside a block ending in `RAISE EXCEPTION`.
+
+| caller | open | panel | schedule | attendance | minutes | outcome | read |
+|---|---|---|---|---|---|---|---|
+| **Punong Barangay** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | full |
+| **Barangay Secretary** | `P0001` | ✅ | ✅ | ✅ | ✅ | `P0001` | full |
+| Barangay Treasurer | `P0001` | `P0001` | `P0001` | `P0001` | `P0001` | `P0001` | **0 rows** |
+| Kagawad (Peace & Order) | `P0001` | `P0001` | `P0001` | `P0001` | `P0001` | `P0001` | **0 rows** |
+| SK Chairperson | `P0001` | — | — | — | — | — | 0 rows |
+| resident | `P0001` | `P0001` | `P0001` | — | — | — | **0 rows** |
+| nurse | `P0001` | — | — | — | — | — | **0 rows** |
+| `anon` | **`42501`** | — | — | — | — | — | **`42501`** |
+
+Every caller's **direct** table read: **`42501`** — the privilege layer,
+before RLS is consulted.
+
+⚠️ **THE PEACE AND ORDER KAGAWAD GETS NOTHING, re-measured in the
+strongest form.** He rewrote his own `committee` to *"Katarungang
+Pambarangay and Lupon"* over the API — `rows=1`, confirming P2.5's
+latent finding is still live — and **still** could not open a case
+(`P0001`) and still read **0 rows**. `barangay_officials.committee` is
+descriptive data, not authorization data; a test scans 043 and all
+frontend modules, comment-stripped, and finds the column read nowhere.
+
+### Only a human-confirmed `proceed_to_kp_process` screening opens a case
+
+`open_kp_case(p_complaint_id, p_note)` takes a **complaint** and derives
+the latest screening itself, so the client cannot nominate one. Measured
+— the Punong Barangay, every case refused:
+
+| the complaint's latest screening | result |
+|---|---|
+| none at all | *"This complaint has no screening yet."* |
+| prepared, **recommendation says proceed**, NOT confirmed | *"…has not been confirmed yet."* |
+| confirmed `refer_for_further_action` | refused |
+| confirmed `close_without_kp_process` | refused |
+| confirmed `needs_more_information` | refused |
+| confirmed `proceed_to_kp_process` | **accepted** |
+
+**Five negatives, zero cases created.** ⚠️ It reads **no checklist
+answer** — `v_outcome IS DISTINCT FROM 'proceed_to_kp_process'`, which
+is NULL-safe where `<>` would let a NULL outcome walk past.
+
+⚠️ **NO AUTOMATIC CREATION.** 042's `confirm_complaint_screening()` is
+not redefined and gains no branch; there is no trigger on
+`complaint_screenings` or `complaints`; and the only INSERT targets in
+043 are its own four tables.
+
+### The reference, and the outcome vocabulary
+
+**`KP-2026-AB12CD`** — random, server-stamped, Crockford base32 with I,
+L, O and U removed. ⚠️ **`KP-`, not a `BC`-anything**: `BCR-` is the
+court reservation and `CMP-` the complaint, and two references sharing a
+prefix is a hazard when somebody reads one out over the phone.
+
+Four outcomes, each naming what the **barangay will do** rather than a
+finding about the law — the shape 042's screening outcomes take, so a
+reader never learns two vocabularies for one kind of question:
+
+`unresolved_continue_process` · `resolved_agreement_recorded` ·
+`referral_needed` · `further_hearing_needed`
+
+⚠️ **Deliberately absent**: settlement terms, repudiation, compliance
+monitoring, a certificate to file action, and `eligible` / `ineligible`
+/ `dismissed`. The CHECK refuses all of them — measured, `kp_eligible`
+and `settled` both refused *"Unknown proceeding outcome."*
+
+### Summons and hearing notice — ⚠️ SYSTEM TEMPLATES
+
+X6's print architecture, reused rather than re-implemented:
+`DocumentShell`, `DocumentFields`, `PrototypeProse` and the A4 print
+CSS. **One template serves both sheets**, because a summons and a notice
+carry the same factual block and the barangay has supplied the wording
+of neither — only the title and one paragraph differ.
+
+| | |
+|---|---|
+| seal | the project's own `logo.png`, `alt=""` and `aria-hidden`. **No government seal is generated, altered or redrawn** |
+| signature | **none.** A rule plus `[AUTHORIZED SIGNATORY]` / `[POSITION]`; a test asserts the sheet carries exactly one image and names no real official |
+| statutory wording | **none.** A test scans both sheets for 26 phrases — *"you are hereby"*, *"under penalty"*, *"failure to appear"*, *"pursuant to"* — and for any digit that is not a recorded fact |
+| marking | four ways: the watermark, the banner, the footer disclaimer, **and the title itself reads `SYSTEM TEMPLATE`**, which survives a premature flip of `DOCUMENT_TEMPLATE_MODE` |
+| data | factual only — case reference, complaint reference, proceeding, date, time, place, recorded parties. ⚠️ **No contact number** (neither reader returns one), no narrative, no category, no minutes, no internal note |
+| missing value | reported, never filled. No `N/A`, `UNKNOWN`, `TBD` or em dash, and **Print is disabled** |
+
+⚠️ **A separate preview component, not a sixth document type.** X6's
+preview is driven by `documentRegistry`, which maps a
+`document_requests.document_type` and carries `canGenerate`'s three
+gates. A KP notice has no document request and a different
+authorization question, so registering it there would mean teaching the
+registry about cases. The print architecture is shared; the registry is
+not.
+
+### ⚠️ A REAL DEFECT IN 043, FOUND BY PROBING AND FIXED
+
+`protect_kp_record()` serves both tables and tested each with a flat
+`TG_TABLE_NAME = '…' AND OLD.…`. **PL/pgSQL hands that whole boolean to
+the SQL executor, which resolves `OLD.outcome` whether or not the left
+side is true** — and a `kp_cases` row has no such column. So **every API
+update to a case raised `42703 record "old" has no field "outcome"`**,
+breaking `schedule_kp_hearing()` (it moves the case `open` →
+`in_process`) and concluding a case.
+
+It read as a permission failure until `SQLERRM` was printed: the
+SQLSTATE was `42703`, not `P0001`. The branches are nested now — the
+shape migration 029 uses for `TG_OP` — and
+`kpCaseMigration.test.js` carries a source guard over that shape,
+verified in both directions.
+
+⚠️ **No Jest test could have caught the behaviour.** It is runtime
+PL/pgSQL on a live table and the suite runs no SQL, which is exactly why
+this project impersonates each role against the real database.
+
+### What was measured
+
+| Check | Result |
+|---|---|
+| Role matrix, 8 callers × 7 operations, all rolled back | as tabled above |
+| Eligibility negatives | 5 of 5 refused, **0 cases created** |
+| Duplicate case | refused, exactly 1 case for the complaint |
+| Confirmed screening after the whole flow | **byte-identical** (md5 before/after) |
+| `complaint_status_history` rows written by KP | **0** · `activity_log` **0** |
+| Overflow + clipping + 24px targets + label association + one `<h1>` + heading order, 7 states × 5 widths, plus axe at 375 and 1440 | **256 checks, 3 failures — all one PRE-EXISTING X6 behaviour** |
+| Harness proved capable of failing | 6 injected defect classes, all detected |
+| Jest | **52 suites, 1,560 tests** — from 48 / 1,376, so **+4 suites, +184 tests** |
+| **16 mutations** (7 migration, 5 UI, 2 wording, 2 document) | **16 caught**, every file restored byte-identical |
+| Production build | clean, no ESLint warnings, **247.03 kB** gzipped (+6.3 kB), CSS 26.44 kB |
+| Live state | all four KP tables **0 rows**, all five complaint tables 0, 11/11 officials, 11 links, committee restored, **zero probe residue** |
+
+⚠️ **THREE DEFECTS OF MINE WERE FOUND BY MEASURING, not by reading**:
+the attendance `<select>` at **125×19** (it sits outside `.kp-form`, so
+the control rule never reached it), the conclude checkbox at **18×18**
+(my own comment had claimed the padded row was the target — "a padded
+wrapper is not a target" cuts both ways), and the preview title
+rendering **11px wide by 2003px tall** at 375 because a KP reference is
+one unbreakable token and the heading had no wrap rule, which squeezed
+the scrolling stage to 343×16. The last was identified as *mine* by
+running the identical probe against X6's untouched preview, which
+measured 156×45 / 343×1053.
+
+⚠️ **The remaining 3 failures are PRE-EXISTING X6 behaviour** — the
+preview's scale wrapper clipping at 320px — **confirmed by reproducing
+it identically on the untouched `DocumentPreview`**. Not fixed here: it
+would change a file six other templates share.
+
+⚠️ **And a fourth finding was my harness, not a defect**, four times
+over: a `42501` from reading `official_account_links` inside an
+impersonation, a `set_config` placed *inside* a `BEGIN … EXCEPTION`
+block (a caught exception rolls it back, so later reads silently ran as
+`postgres`), lowercase regexes against uppercase SQL bodies, and a
+numeric scan that reported the reference generator's own arithmetic.
+
+### ⚠️ What was NOT verified
+
+**No authenticated page was loaded in a browser.** The dashboards are
+behind `ProtectedRoute` and this environment still has **no test
+account**; nothing was done to weaken authentication for a screenshot.
+So what is verified is the real components' output measured against the
+real CSS bundle, 184 unit tests, and the role matrix against the live
+database — **not** the Punong Barangay opening a case on a live page,
+and not a real browser print of either sheet.
+
+⚠️ **No test case was left.** Every probe ran inside a block ending in
+`RAISE EXCEPTION`, and all four KP tables are at **0 rows**.
+
+### Deferred, by decision
+
+- **`kp_cases` is created by a human and nothing else.** No capability
+  table — the implementation did not need one, and its grant path is
+  undesigned (an official must not be able to grant themselves a
+  capability).
+- **No settlement terms, repudiation, compliance monitoring,
+  certificate to file action or automated deadline.** §10.
+- **No incident, blotter, Tanod, map or analytics.**
+- **No notification, SMS or email.** `activity_log` is readable by every
+  official and the only non-identifying thing to log is that a case
+  exists; widening it is a two-gate change (the CHECK **and**
+  `stamp_activity_actor`) and belongs in its own migration.
+- **No statutory deadline is computed, suggested or defaulted.** The
+  date field opens empty.
+- **Nothing touches the covered court.** `reservations` has no column,
+  no policy and no trigger here, and the overlap exclusion constraint is
+  not involved in scheduling.
+
+### What the barangay must still confirm
+
+- **Who may open a KP case, schedule a proceeding and record an
+  outcome.** The brief locked Punong Barangay / Secretary for this MVP
+  as a workflow decision; it is not a proven legal requirement.
+- **Whether the four outcomes are the four they want**, and what
+  follows each.
+- **The real wording of the summons and the hearing notice**, who signs
+  them, and the real numbering scheme — the same four questions X6's
+  six templates still carry.
+- **Actual Lupon / Pangkat membership.** Nothing here assumes an
+  official is a Lupon member, and no name is suggested or defaulted.
+
 
 ## Health centre
 
