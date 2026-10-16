@@ -30,6 +30,7 @@ import {
 } from './complaintApi'
 import WalkInComplaintForm from './WalkInComplaintForm'
 import ScreeningPanel from '../screening/ScreeningPanel'
+import KpCasePanel from '../kpcases/KpCasePanel'
 import { useConfirm } from '../components/ConfirmDialog'
 import './Complaints.css'
 
@@ -102,7 +103,35 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
   // cannot afterwards be edited. It brings the focus trap, Escape,
   // Enter-defaults-to-Cancel and `aria-modal` every other confirmation in
   // this project already has.
-  const { confirm, dialog: confirmDialog } = useConfirm()
+  //
+  // ⚠️ `useConfirm()` RETURNS AN ARRAY, AND THIS LINE DESTRUCTURED IT AS
+  // AN OBJECT. That is the blocker the repo owner hit in the browser: an
+  // array has no `confirm` and no `dialog` property, so BOTH came back
+  // `undefined` -- the dialog below rendered nothing, and the `confirm`
+  // handed to both panels was not a function. `await confirm({...})` in
+  // `ScreeningPanel` therefore threw a TypeError OUTSIDE its try block,
+  // inside an async onClick nobody was awaiting, so the rejection was
+  // unhandled: no write, no error on screen, no state change. Clicking
+  // "Confirm screening" did nothing at all.
+  //
+  // It was latent through P3-B2 because nothing in THIS file ever called
+  // `confirm` -- it only passed it down -- and P4-A's own tests render
+  // `ScreeningPanel` directly with their own mock, so they never crossed
+  // this line. `screeningConfirmFlow.test.js` renders this component and
+  // would fail against the object form.
+  //
+  // The three working call sites -- ResidentDashboard, NurseDashboard
+  // and OfficialDashboard -- all read `const [confirm, confirmDialog]`.
+  const [confirm, confirmDialog] = useConfirm()
+
+  // ⚠️ A COUNTER THE SCREENING PANEL BUMPS AND THE KP PANEL WATCHES.
+  // They are siblings and neither owns the other's state, but whether a
+  // KP case may be opened is decided by this complaint's latest
+  // screening -- so confirming a review has to repaint the panel below
+  // it. One integer is the whole channel: no screening state is lifted
+  // out of `ScreeningPanel` and no case state is lifted out of
+  // `KpCasePanel`.
+  const [screeningSignal, setScreeningSignal] = useState(0)
 
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
@@ -650,35 +679,49 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
                 isSecretary={isSecretary}
                 isKapitan={isKapitan}
                 confirm={confirm}
+                onScreeningChanged={() => setScreeningSignal((n) => n + 1)}
               />
 
-              {/* ⚠️ THERE IS STILL NO CASE ACTION HERE, AND THAT IS THE
-                  PHASE. Saying so is better than an empty space where a
-                  reader expects a control.
+              {/* ── KP case (Combined Phase 1) ──────────────────────
+                  ⚠️ A SEPARATE COMPONENT AGAIN, for the reason the
+                  screening panel is one: `OfficialComplaints` already
+                  holds the queue, the filters and the detail, and
+                  `OfficialDashboard` is ~5,640 lines. All case, panel,
+                  hearing, attendance and notice state lives in
+                  `KpCasePanel`; this file passes it three things and the
+                  dashboard passes one more prop.
 
-                  ⚠️ REWORDED FOR P4-A, because the old sentence said
-                  screening was "not part of this system yet" and that is
-                  now untrue -- and because the reason it gave is also
-                  out of date: `complaints_status_check` permitted exactly
-                  `received` and migration 042 widened it to
-                  `received`/`under_review`/`screened`. So a complaint CAN
-                  move now, but only through `prepare_complaint_screening()`
-                  and `confirm_complaint_screening()`, which move the
-                  STAGE; there is still no Approve, Reject, Refer, Settle,
-                  Close or Schedule Hearing control and no status control
-                  of any kind on this panel.
+                  ⚠️ `isSecretary` and `isKapitan` decide WHICH CONTROLS
+                  ARE PAINTED and nothing more. `open_kp_case()` and
+                  `record_kp_hearing_outcome()` raise P0001 unless the
+                  caller holds `Punong Barangay`; the three
+                  administrative writers unless they hold `Barangay
+                  Secretary` or `Punong Barangay` -- all resolved through
+                  `official_account_links`, never a name and never
+                  `committee`. The five readers return ZERO ROWS to
+                  anybody who is neither, measured. So the database
+                  decides and this only avoids painting a control it
+                  would refuse.
 
-                  What is absent is everything AFTER a confirmed
-                  screening: no KP case row is created, no hearing,
-                  summons, settlement or CFA exists, and
-                  `complaint_screenings` RECORDS the decision rather than
-                  acting on it. */}
-              <p className="complaint-no-actions" role="note">
-                Case handling after screening — hearings, settlement and
-                referral records — is not part of this system yet. A
-                confirmed screening records what the barangay decided to do;
-                the work itself is followed up at the Barangay Hall.
-              </p>
+                  ⚠️ THE PARAGRAPH THAT WAS HERE SAID CASE HANDLING WAS
+                  "not part of this system yet", AND THAT IS NOW UNTRUE.
+                  It is replaced rather than left beside the panel it
+                  would contradict -- the same correction P4-A made to
+                  the sentence before it, and the reason that sentence
+                  was reworded rather than loosened.
+
+                  ⚠️ It renders only inside the AUTHORIZED detail branch,
+                  so an official who cannot read the complaint at all
+                  never reaches it, and no resident or public surface
+                  renders it at any point. */}
+              <h3>KP case</h3>
+              <KpCasePanel
+                complaintId={detail.row.id}
+                isSecretary={isSecretary}
+                isKapitan={isKapitan}
+                confirm={confirm}
+                screeningSignal={screeningSignal}
+              />
             </>
           )}
         </div>

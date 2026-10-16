@@ -1,0 +1,391 @@
+/* The KP case file panel.
+ *
+ * ⚠️ EVERY SELECTOR IS `kp-` PREFIXED, so nothing here can reach the
+ * screening panel, the complaint detail or the dashboard tables it
+ * renders inside. The one thing it styles without a prefix is a
+ * `.kp-form` descendant, which is scoped by the parent.
+ *
+ * ⚠️ IT REUSES THE EXISTING BUTTON CLASSES rather than introducing a
+ * KP appearance. `.btn-add` and its `.btn-sm` modifier are live in the
+ * dashboards already, and PR #24's lesson is the reason the class names
+ * were read out of the bundle rather than invented: a `btn-decline`
+ * that does not exist rendered a 20px button, and P3-B1 repeated it
+ * with a `btn-small`.
+ *
+ * ⚠️ `minmax(0, 1fr)` ON EVERY GRID, never a bare `1fr`. A bare track
+ * is `minmax(auto, 1fr)` and cannot shrink below its content's
+ * min-content width, so one unbreakable reference sets a floor and the
+ * whole document scrolls sideways — X2's largest finding, and the one
+ * P3-B1 hit again in a heading. Every element holding a reference, a
+ * name or a note that somebody typed also carries `overflow-wrap`.
+ */
+
+.kp-panel { min-width: 0; }
+
+.kp-loading,
+.kp-empty {
+  margin: 0 0 10px;
+  font-size: var(--fs-13);
+  color: var(--grey-600);
+}
+
+.kp-hint {
+  margin: 0 0 10px;
+  font-size: var(--fs-12);
+  color: var(--grey-600);
+  overflow-wrap: anywhere;
+}
+
+.kp-note {
+  margin: 0 0 8px;
+  font-size: var(--fs-13);
+  color: #1e293b;
+  overflow-wrap: anywhere;
+}
+
+/* The neutral sentence an unauthorized official reads. Styled as a
+ * statement rather than as a warning: a withheld record is a rule
+ * working, not a fault, and a red box would read as an error. */
+.kp-restricted,
+.kp-provisional {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+  font-size: var(--fs-12);
+  color: var(--grey-600);
+  overflow-wrap: anywhere;
+}
+
+.kp-restricted svg,
+.kp-provisional svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.kp-problem {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fef2f2;
+  font-size: var(--fs-13);
+  color: #b91c1c;
+  overflow-wrap: anywhere;
+}
+
+.kp-problem svg { flex-shrink: 0; margin-top: 2px; }
+
+/* ── The case summary ──────────────────────────────────────────────── */
+
+.kp-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 160px));
+  gap: 10px 18px;
+  margin: 0 0 10px;
+}
+
+.kp-summary > div { min-width: 0; }
+
+.kp-summary dt {
+  margin: 0 0 2px;
+  font-size: var(--fs-11);
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--grey-600);
+}
+
+.kp-summary dd {
+  margin: 0;
+  font-size: var(--fs-13);
+  color: #1e293b;
+  overflow-wrap: anywhere;
+}
+
+/* A reference is read out over the phone, so it is set in a mono face
+ * at the same size rather than larger — the shape the complaint
+ * reference already takes. */
+.kp-reference {
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-weight: 600;
+}
+
+/* ⚠️ A STATE IS CARRIED BY A WORD, NOT BY A COLOUR. The badge's text is
+ * the label itself, so a reader who cannot distinguish the tints still
+ * reads the state — the rule the notification bell and the ⋮ menu both
+ * follow. The tint is the least of the cues. */
+.kp-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: var(--fs-11);
+  font-weight: 600;
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.kp-badge-open,
+.kp-badge-scheduled { background: #fef3c7; color: #92400e; }
+.kp-badge-in_process,
+.kp-badge-rescheduled { background: #dbeafe; color: #1e40af; }
+.kp-badge-concluded,
+.kp-badge-completed { background: #dcfce7; color: #126c33; }
+.kp-badge-cancelled { background: #f1f5f9; color: #475569; }
+
+/* ── Lists ─────────────────────────────────────────────────────────── */
+
+.kp-list,
+.kp-hearings,
+.kp-attendance {
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+}
+
+.kp-list > li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: baseline;
+  padding: 6px 0;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: var(--fs-13);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.kp-meta {
+  font-size: var(--fs-12);
+  color: var(--grey-600);
+  overflow-wrap: anywhere;
+}
+
+.kp-hearing {
+  margin: 0 0 12px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  min-width: 0;
+}
+
+/* The panel renders under an `<h3>` in the complaint detail, so these
+ * are its children at `<h4>`/`<h5>` and skip no level. Both tags are
+ * matched per rule, so nothing depends on which one an element uses —
+ * the route X3 took on Announcements. */
+.kp-panel h4,
+.kp-panel h5 {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 16px 0 8px;
+  font-size: var(--fs-13);
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.kp-panel h5 { font-size: var(--fs-12); }
+
+.kp-hearing > h5:first-child {
+  margin-top: 0;
+  font-size: var(--fs-13);
+  overflow-wrap: anywhere;
+}
+
+.kp-subhead { color: var(--grey-600); }
+
+.kp-attendance > li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid #f1f5f9;
+  min-width: 0;
+}
+
+.kp-party {
+  font-size: var(--fs-13);
+  color: #1e293b;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.kp-att-state {
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: var(--grey-600);
+}
+
+/* ⚠️ THE ATTENDANCE SELECT NEEDED ITS OWN RULE, AND THAT IS A REAL
+ * DEFECT MEASUREMENT FOUND. It sits in `.kp-attendance > li`, NOT inside
+ * `.kp-form`, so the control rule above never reached it and it rendered
+ * at the browser default -- measured 125x19 in Chromium at every width,
+ * under WCAG 2.2 SC 2.5.8's 24px minimum.
+ *
+ * The same family as the dashboard filter bar's borderless input and the
+ * public drawer's 21px links: a control that looks fine because
+ * something around it is padded. Measured after: 24px+. */
+.kp-attendance select {
+  min-height: 26px;
+  padding: 3px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: var(--fs-12);
+  color: #1e293b;
+  background: #fff;
+  min-width: 0;
+}
+
+.kp-outcome {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-left: 3px solid #126c33;
+  background: #f0fdf4;
+  font-size: var(--fs-13);
+  color: #1e293b;
+  overflow-wrap: anywhere;
+}
+
+/* ── Forms ─────────────────────────────────────────────────────────── */
+
+.kp-form {
+  margin: 0 0 14px;
+  min-width: 0;
+}
+
+.kp-form label {
+  display: block;
+  margin: 8px 0 4px;
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: #334155;
+}
+
+/* ⚠️ `min-width: 0` AND `width: 100%` TOGETHER. An `<input>`'s default
+ * `min-width: auto` is its min-content width, which for a text input is
+ * the `size="20"` default — the defect that cut the login page's
+ * show/hide button 102px off the end of its own field at 375px. */
+.kp-form input[type='text'],
+.kp-form input[type='date'],
+.kp-form input[type='time'],
+.kp-form select,
+.kp-form textarea {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: var(--fs-13);
+  color: #1e293b;
+  background: #fff;
+}
+
+.kp-form textarea { resize: vertical; }
+
+.kp-form button { margin-top: 10px; }
+
+/* The inline panel-member row collapses to one column on a phone, and
+ * the grid tracks are `minmax(0, …)` so the inputs can shrink. */
+.kp-form-inline {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.kp-form-inline > div { min-width: 0; }
+.kp-form-inline label { margin-top: 0; }
+.kp-form-inline button { margin-top: 0; }
+
+@media (max-width: 600px) {
+  .kp-form-inline {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .kp-form-inline button { justify-self: start; }
+}
+
+/* ⚠️ THE CHECKBOX IS 24px ITSELF, not 18px inside a padded row -- and
+ * that is measurement correcting my own comment rather than the comment
+ * excusing the box. The first version said "the target is the row" and
+ * left the control at 18x18, which the probe reported at every width.
+ *
+ * "A padded wrapper is not a target" cuts BOTH ways: it is why the
+ * filter bar's borderless input failed, and it is why claiming the
+ * label's padding for the checkbox would have been the same mistake in
+ * reverse. The label still activates it -- that is what `htmlFor` is for
+ * -- but the control now meets SC 2.5.8 on its own. */
+.kp-check {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 10px 0 0;
+  min-width: 0;
+}
+
+.kp-check input[type='checkbox'] {
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.kp-check label {
+  margin: 0;
+  padding: 7px 0;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.kp-doc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 0;
+}
+
+
+/* ── The notice preview's own toolbar ──────────────────────────────── */
+/*
+ * ⚠️ A SECOND CLASS ON X6's MODAL, SO X6's SIX SHEETS ARE UNTOUCHED.
+ * `DocumentPreview.css` is shared by the document-request preview, and a
+ * rule added there would restyle surfaces this phase is not about --
+ * the scoping `PageIntro.css` and the Events day-panel both settled.
+ *
+ * ⚠️ AND IT FIXES A REAL DEFECT MEASUREMENT FOUND. A KP case reference
+ * is ONE unbreakable token by design, and the toolbar heading had no
+ * wrap rule: at 375px a long one broke to a single character per line
+ * and the title rendered 11px wide by 2003px TALL, consuming the whole
+ * modal and leaving the scrolling stage 343x16 -- so the sheet was
+ * effectively unreachable. X6's own preview measured 156x45 / 343x1053
+ * on the identical probe, which is what identified this as mine rather
+ * than inherited.
+ *
+ * ⚠️ `overflow-wrap: anywhere`, NOT `word-break: break-all` -- the
+ * latter hyphenates ordinary prose mid-word; this only breaks a word
+ * that cannot otherwise fit. X2's rule.
+ */
+.kp-doc-preview .doc-preview-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* The stage is what scrolls, so it keeps a floor even when the toolbar
+ * above it wraps. A reference long enough to wrap the title twice must
+ * not be able to squeeze the document out of its own preview. */
+.kp-doc-preview .doc-preview-stage {
+  min-height: 220px;
+}

@@ -78,6 +78,12 @@ const blankAnswers = () => CHECKLIST_KEYS.reduce(
 
 const ScreeningPanel = ({
   complaintId, isSecretary = false, isKapitan = false, confirm,
+  // ⚠️ A NOTIFICATION, NOT LIFTED STATE. The KP case panel is a sibling
+  // and its "may a case be opened" question is answered by this
+  // complaint's latest screening, so it has to be told when that
+  // changes. All screening state still lives here; this only says that
+  // something moved.
+  onScreeningChanged,
 }) => {
   const [screenings, setScreenings] = useState([])
   const [loading, setLoading] = useState(true)
@@ -149,6 +155,7 @@ const ScreeningPanel = ({
         recommendationNote,
       })
       await fetchScreenings()
+      if (onScreeningChanged) onScreeningChanged()
     } catch (err) {
       setProblem(screeningMessage(err, 'prepareFailed'))
     } finally {
@@ -188,6 +195,7 @@ const ScreeningPanel = ({
       setOutcome('')
       setDecisionNote('')
       await fetchScreenings()
+      if (onScreeningChanged) onScreeningChanged()
     } catch (err) {
       setProblem(screeningMessage(err, 'confirmFailed'))
     } finally {
