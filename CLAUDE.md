@@ -65,7 +65,7 @@ banned below: it silences the one check this project has.
 
 ### Tests
 
-Forty-three suites, 1,152 tests:
+Forty-five suites, 1,241 tests:
 
 | File | What it covers |
 |---|---|
@@ -113,6 +113,8 @@ Forty-three suites, 1,152 tests:
 | `src/complaints/FileComplaintForm.test.js` | 19 tests over the filing form: the eight labels in order, that the **stored** value is submitted, both required fields refusing with an accessible alert, that the form asks for **nothing the server owns**, respondents added and removed with names like `Remove person 2`, no registry or account lookup offered to a resident, the picker constrained and refusing a `.mp4` with a readable reason, ⚠️ **duplicate-submit prevention** proved by holding the promise open and clicking three times (1 call), a neutral failure message with no SQLSTATE, and the emergency notice carrying **no phone number** |
 | `src/complaints/complaintExperience.test.js` | 33 tests over My Complaints, the success panel, the tracking page and the wiring. The load-bearing ones: ⚠️ a respondent's contact renders as *"Contact not shown to you"* from the NULL `complaint_parties_for()` returns, tracking calls `track_complaint` **exactly once and makes no table read after a hit**, a wrong reference and a wrong contact produce **byte-identical** messages, an unreachable system says something **different**, the success panel keeps a valid reference when only an attachment fails, and every catalogue `to:` resolves to a route that exists in `App.js` |
 | `src/complaints/complaintIntakeMigration.test.js` | 76 **source-reading** guards over migrations 040 and 041 — P3-A ships no frontend, so what is pinned is the security SHAPE: the `CMP-` format and its Crockford alphabet, that no `nextval`/counter/`lpad` exists, the eight categories and two channels verbatim, the ONE intake status, that neither creation RPC takes an identity/status/reference parameter, Secretary-only walk-in encoding, the queue's exact six columns with **no category**, the tracking RPC's exact four with no masked name and no branch that could say which half was wrong, append-only history at both layers, PUBLIC EXECUTE revoked on all twelve new functions, `anon` EXECUTE on the tracking RPC **only**, a private bucket with four explicit MIME types and no `*/*`, no video, and that authorization reads neither `.committee` nor `full_name`. ⚠️ Every "is not used" scan runs over **comment-stripped** code, because both migrations discuss `committee` and `full_name` at length precisely to record that neither is read. Run **both directions**: four mutations — authorizing on `committee`, leaking `category` into the queue, dropping one PUBLIC revoke, making the reference sequential — produce **5 failures** |
+| `src/complaints/complaintQueue.test.js` | 25 tests over the Official Portal's queue rules as a pure module — the reference-only search (with the Crockford look-alikes folded, so an `O` read for a zero over the phone still finds the complaint), the channel/status narrowing, and ⚠️ that an **unrecognised filter value matches nothing rather than everything**, the direction that fails open. The load-bearing ones are the absences: **no category filter, column or search field**, no P4 stage named anywhere, and the restricted-detail sentence scanned for twelve things it must not contain — a position, a policy, an SQLSTATE, or any word that would read as a failure |
+| `src/complaints/officialComplaints.test.js` | 61 tests over the queue, the detail panel and the walk-in intake as **rendered**. The load-bearing ones: the list is built from `complaint_queue()` and `supabase.from` is **never called** for it; a queue row shows no narrative, party, contact or category **from a fixture that has all four**; the restricted detail renders a neutral sentence with the queue still on screen, **no `role="alert"`** and no SQLSTATE, policy or function name in the document; a withheld contact renders as *"No contact number recorded"* rather than a blank; and the walk-in control is **absent** without the Secretary flag, never disabled, with **no Punong Barangay branch that could render it**. Plus the dashboard holds no complaint state, no migration 042 exists, and P1's `Map` fail-safe is intact. ⚠️ The duplicate-submit test **proved nothing in its first version** — it clicked a `disabled` button, so it passed either way; it now submits the FORM, which is also the real case (a keyboard Enter beating the re-render). Five mutations produce **49 / 2 / 1 / 1 / 4** failures |
 
 Schema and policy changes are still verified by impersonating each role
 in SQL, with the results recorded in the migration headers — not by
@@ -199,7 +201,7 @@ src/
                       "8:00 AM - 5:00 PM" straight through and omitted
                       the lunch closure the Home page states.
     Sidebar.jsx       Dashboard nav. Defines the tab lists for all three
-                      roles: official (12), nurse (5), resident (4).
+                      roles: official (13), nurse (5), resident (5).
                       Official was 13 until the Punong Barangay Status
                       tab was folded into the overview -- see *The
                       compact Punong Barangay status*.
@@ -335,6 +337,28 @@ src/
                       Clearance and Other print bracketed placeholders
                       for values the schema does not hold.
     print/            The A4 sheet and the @media print block.
+
+  complaints/         The complaint experience, both halves.
+    complaintLabels   The words a user reads: the eight categories, the
+                      ONE status, the intake channels, the evidence
+                      contract and the tracking miss message. Pure.
+    complaintQueue    What the Official Portal's queue narrows, counts
+                      and says. ⚠️ Owns NO category -- `complaint_queue()`
+                      withholds it deliberately, and this module must not
+                      invent one. An unrecognised filter matches nothing.
+                      Pure.
+    complaintApi      Every complaint read and write. ⚠️ Holds the forced
+                      order of operations (file -> read the id back by
+                      reference -> attach), once, shared by the resident
+                      and walk-in paths.
+    FileComplaintForm The resident's filing form (P3-B1).
+    MyComplaints      The resident's own list and detail (P3-B1).
+    OfficialComplaints The official queue, the detail panel and the entry
+                      to walk-in intake (P3-B2). ⚠️ ALL complaint state
+                      lives here; OfficialDashboard contributes one line.
+    WalkInComplaintForm The Barangay Secretary's counter intake (P3-B2).
+                      ⚠️ Secretary-only, enforced by the RPC -- the
+                      Punong Barangay is refused by it too.
 
   supabase/
     supabaseClient.js The single Supabase client. Throws at import time
@@ -1142,10 +1166,15 @@ own domain with SPF, DKIM and DMARC.
 
 ### Officials
 
-**Twelve** sidebar tabs, defined in `Sidebar.jsx` as `officialNavItems`:
-Dashboard, Announcements, Events, Reservations, Document Requests, Waste
-Management, Officials Directory, Residents, Voter Reference List,
-Reports, Activity Log, Settings.
+**Thirteen** sidebar tabs, defined in `Sidebar.jsx` as
+`officialNavItems`: Dashboard, Announcements, Events, Reservations,
+Document Requests, **Complaints**, Waste Management, Officials
+Directory, Residents, Voter Reference List, Reports, Activity Log,
+Settings.
+
+Complaints is the newest and the only one P3-B2 added -- see *Official
+complaint queue and walk-in intake (P3-B2)*. It was twelve from the day
+the Punong Barangay Status tab was folded into the overview until then.
 
 It was thirteen until **Punong Barangay Status** was folded into the
 Dashboard overview — see *The compact Punong Barangay status* below.
@@ -9019,6 +9048,324 @@ defects of mine:**
 
 ---
 
+## Official complaint queue and walk-in intake (P3-B2)
+
+2026-10-16, on `claude/p3b2-official-complaint-intake`, built on `main`
+after PR #40 merged (`c3bbc5f`). **The Official Portal half of the
+complaint experience, on top of P3-A's already-reviewed surface.**
+
+⚠️ **NO MIGRATION, AND NO SQL AT ALL.** Every P3-A function this phase
+needs already existed and was read **from the live catalog** rather than
+from the earlier reports. There was no backend gap to close and nothing
+was added to make the frontend easier — the migration count is still 41,
+and a test asserts no `042` exists.
+
+### What it is, and why it is a tab
+
+Three surfaces, all inside the existing `/official` route:
+
+| Surface | Who |
+|---|---|
+| **Complaint queue** | any active official |
+| **Complaint detail** | the Barangay Secretary and the Punong Barangay |
+| **Record Walk-in Complaint** | the Barangay Secretary **only** |
+
+⚠️ **A TAB, NOT A ROUTE, and that is what is consistent with this router
+rather than a preference.** `/official` is a single
+`<ProtectedRoute allowedRole="official">` wrapping the dashboard, which
+switches on `activeTab` — and **not one of the twelve existing official
+tabs has a route of its own.** A `/official/complaints` route would be
+the only one, would need its own role gate, and would leave the
+sidebar's `setActiveTab` navigation unable to reach it. So the gate is
+unchanged, **no new role was added**, `profiles_role_check` is
+untouched, and P1's unsupported-role fail-safe still hands an
+unrecognised role an empty nav before this component can mount.
+
+⚠️ **ALL COMPLAINT STATE IS IN THE COMPONENT.**
+`OfficialDashboard.jsx` is ~5,640 lines and already holds every tab's
+state; it gained **18 lines, most of them comment** — an import and one
+`{activeTab === 'complaints' && <OfficialComplaints isSecretary={...} />}`,
+the same shape the resident side takes. A test asserts the dashboard
+contains no complaint RPC name and no complaint state.
+
+### ⚠️ Two visibility layers, and the database owns both
+
+Measured by impersonating each real account with its own JWT claims,
+inside a block that always ends in `RAISE EXCEPTION`:
+
+| caller | queue | full row | parties |
+|---|---|---|---|
+| Barangay Secretary | all | **1** | **1** |
+| Punong Barangay | all | **1** | **1** |
+| Barangay Treasurer | all | **0** | **0** |
+| Kagawad (Peace and Order) | all | **0** | **0** |
+| nurse / resident | **0** | 0 | 0 |
+
+`complaint_queue()` admits any **active** official;
+`complaint_is_visible_to_caller()` admits the filer, the Secretary and
+the Punong Barangay. So an ordinary official sees that work is waiting
+and how old it is, and no narrative, party, contact or evidence.
+
+⚠️ **THE QUEUE IS NEVER HIDDEN BECAUSE THE DETAIL IS RESTRICTED, and an
+empty detail is NOT an error.** RLS filters rows without raising, so the
+restricted case arrives as **zero rows and no error at all** — there is
+no `42501` and no `P0001` in that path to surface, and code that
+reported one would be describing a boundary working correctly as a
+fault. `.maybeSingle()` is what makes zero rows a value rather than an
+exception. The panel renders one neutral sentence —
+*"Full complaint details are restricted to authorized records staff."* —
+which names **no position**, no policy and no error code: an ordinary
+Kagawad cannot grant themselves records access, and naming the position
+that holds it only invites asking for it.
+
+⚠️ **The queue is `complaint_queue()` and never
+`from('complaints').select('*')`**, and the measurement is the reason
+rather than the rule: that table's only SELECT policy is
+`complaint_is_visible_to_caller(id)`, so a table read would hand most of
+the barangay's officials an **empty queue** — and widening the policy to
+fix that would publish every narrative to all eleven. A test asserts
+`supabase.from` is not called at all while the list is built.
+
+### ⚠️ The queue has no category, and that is the decision
+
+Six columns, exactly what the RPC returns: reference, how it arrived,
+status, date received, last updated, action. **No category, narrative,
+party, contact, location or evidence.**
+
+A queue row reading `family_dispute` beside a date, visible to all
+eleven officials in a barangay where everybody knows their neighbours,
+is an accusation about an identifiable household — the date and the
+channel are enough to work out who was at the hall that morning. The
+same line `reservations.purpose` draws and `exception_reason` draws.
+⚠️ The summary above the table therefore counts by **channel**, not by
+category: how many arrived at the counter is operational, how many are
+family disputes is the accusation.
+
+⚠️ **The reference is the only searchable field**, and the note under
+the box says so. A narrative or a party name is not merely
+unimplemented: neither is in the queue's output, and the table refuses
+an ordinary official every row. The search folds the Crockford
+look-alikes (I, L, O, U), so a reference read out over the phone with an
+`O` for a zero still finds it — a convenience on rows the caller already
+holds, never a lookup.
+
+⚠️ **No fabricated workflow states.** The status filter offers *All
+statuses* and *Received* and nothing else, because
+`complaints_status_check` permits exactly `received`. There is
+deliberately no *KP Eligible*, *Under Mediation*, *Settled*, *Referred*,
+*Closed* or *Dismissed* option: an option that can only ever match zero
+rows tells an official a stage exists in a system that cannot reach it.
+
+### ⚠️ Nothing here decides anything about a complaint
+
+There is no Approve, Reject, Decline, Refer, Settle, Close Case,
+Schedule Hearing, Issue Summons, Dismiss or Escalate control anywhere,
+and no status control of any kind — `received` is the only value the
+CHECK permits. The detail panel says so in words rather than leaving a
+blank where a reader expects a button. A test scans every rendered
+button for fourteen such verbs, and the source for `.update(`,
+`.insert(`, `.upsert(` and `.delete(`.
+
+⚠️ **The word "case" does not appear on screen**, and no screening
+vocabulary does either. P3 creates complaints and judges nothing — not
+jurisdiction, not Katarungang Pambarangay eligibility — and P2.5 found
+**no** Lupon, Justice or Katarungan committee recorded anywhere, so this
+system has no record from which to infer who is entitled to make that
+judgment. It is P4's, and it is the barangay's.
+
+⚠️ **`barangay_officials.committee` IS DESCRIPTIVE DATA, NOT
+AUTHORIZATION DATA**, and the real `Peace and Order and Appropriation`
+value on one Kagawad grants nothing here. The column is free text with
+no CHECK, the Edit Official form sends it for any row, and
+`protect_official_record()` does not guard it — so authorizing on it
+would reproduce migration 028's escalation on an unguarded column.
+Nothing in these files reads it, asserted over comment-stripped code.
+
+### The Secretary's walk-in intake
+
+⚠️ **Secretary-only, and the DATABASE is what enforces it.**
+`encode_walk_in_complaint()` raises `P0001` unless
+`current_official_holds_position('Barangay Secretary')`. ⚠️ **Measured:
+the PUNONG BARANGAY is refused by it too** — even though he reads every
+complaint — so he is rendered **no intake control at all**, because a
+control the database would refuse is worse than none. The component
+takes one `isSecretary` flag; a test asserts there is no `isKapitan`,
+`isTreasurer` or `Punong Barangay` branch anywhere in it that could
+paint one.
+
+⚠️ **The control is ABSENT, not disabled** — `ActionMenu`'s own rule: a
+disabled control advertises a capability and cannot be told from a bug.
+
+⚠️ **It asks for nothing the server owns.** No reference, status,
+`encoded_by`, `filed_by_profile_id`, timestamp, actor or system id —
+none of those is a parameter of the RPC. The reference is stamped by a
+trigger, the status is the literal `received`, `encoded_by` comes from
+`auth.uid()`, and `filed_by_profile_id` is NULL because a walk-in
+complainant has no account. A test reads every `<label>` on the form for
+eleven such terms.
+
+⚠️ **No resident or voter lookup is offered.** Every name is a free-text
+snapshot of what the complainant said at the counter. The Voter
+Reference List holds the voter records the barangay happens to have, not
+a roll of who lives here, and putting it behind a search box on an
+intake screen would publish it one query at a time. P3-A links a party
+only where a real link exists, and being named in a complaint creates
+**nothing** — no profile and no registry row.
+
+⚠️ **The location is free text, not a purok dropdown.** The column is
+`location_note`: P2 established that no entry in the current purok list
+has a documentary source, that Purok 7's only evidence post-dates the
+commit that added it to the dropdown, and that 17 off-list values sit in
+the live data. **`PUROKS` is untouched and still holds seven values.**
+
+**Duplicate submission is prevented twice** — the button disables, and
+the handler returns early if a request is in flight. ⚠️ The second
+mechanism is the load-bearing one: a keyboard Enter can beat the
+re-render, and a second encode would create a second complaint with its
+own reference that nothing downstream could tell apart.
+
+### ⚠️ The contact number is what makes tracking possible, and the form says so
+
+`encode_walk_in_complaint()` accepts a **blank** complainant contact
+deliberately — somebody may have no phone or decline to give one, and an
+intake the barangay has accepted in person must not be refused by a
+form. But `track_complaint()` requires a non-empty contact and matches
+it against the complainant's stored one, so:
+
+⚠️ **A walk-in complaint recorded without a contact number can NEVER be
+tracked online.** Measured as **zero rows for any contact, the empty
+string included.**
+
+So the form states what the number unlocks **before** the save, and the
+success panel states it **again** when it happened — at the counter,
+while the complainant is still there. It does not fabricate a number and
+does not block the intake. ⚠️ This is a **product consequence, not a
+backend gap**: the database is right to accept an intake from somebody
+with no phone, and a migration here would be wrong.
+
+The success panel otherwise reads *"Give this reference number to the
+complainant. They will also need the contact number recorded on this
+complaint to track it."*
+
+### Evidence
+
+The same private bucket, the same four MIME types, the same 5 MB, the
+same **no video**. ⚠️ **`createSignedUrl()` only, 60 seconds, minted per
+view and never stored** — a test opens the same file twice and asserts
+two signatures. `getPublicUrl()` appears nowhere, and neither does a
+hand-built `/storage/v1/object/public` path: that endpoint 404s on a
+private bucket even with a permissive policy, and reaching for it is how
+a private bucket quietly becomes a public one.
+
+⚠️ **An unauthorized official is told nothing about the evidence** — no
+filename, no storage path, no count. The restricted panel is the whole
+of what they see.
+
+⚠️ **The attach loop is now ONE copy shared by both intake paths.** Both
+creation RPCs return the reference alone, so both must resolve the id and
+then attach; a second copy of that loop is how two intake paths come to
+disagree about what a failed upload means. A failed attachment still
+reports `failedFiles` beside a **valid** reference rather than throwing —
+the Secretary must be able to give the complainant their number.
+
+### No history actor, no activity log, no notification
+
+⚠️ `complaint_history_for()` returns id, from_status, to_status, note and
+created_at and deliberately **omits `actor_profile_id`**, so no actor is
+displayed. Showing one would mean querying `complaint_status_history`
+directly, which carries no client privilege and would be refused. A test
+asserts the component names neither.
+
+**No `activity_log` entry and no notification**, unchanged from P3-A's
+decision: `activity_log` is readable by **every** official, and the only
+thing worth logging here is "a complaint was created", which the safe
+queue already tells them — while any more identifying subject would
+breach the rule that no complainant name, respondent name, narrative or
+evidence filename may sit in a field all officials can read.
+
+### What was measured
+
+Real component output captured through Jest and rendered against the
+**shipped CSS bundle** in Chromium, with deliberately pathological
+fixtures: a 68-character unbreakable reference, a 52-character
+unbreakable name, a 61-character filename and a 430-character narrative.
+
+| Check | Result |
+|---|---|
+| Overflow + clipping + 24px targets + label association + one `<h1>` + heading order, 7 states x 7 widths (320–1440) | **245 checks, 0 failures** |
+| axe-core 4.12.1 (WCAG 2.0/2.1 A + AA + best practice), 7 states x 2 widths | **0 violations** |
+| Role matrix, 6 callers x queue / full row / parties | as tabled above, all rolled back |
+| Punong Barangay walk-in encode | **refused `P0001`** |
+| Walk-in with no contact, tracked with any contact | **0 rows**, empty string included |
+| Jest | **45 suites, 1,241 tests** — from 43 / 1,152, so **+2 suites, +89 tests** |
+| Five mutations | **49 / 2 / 1 / 1 / 4** failures |
+| Production build | clean, no ESLint warnings, **237.21 kB** gzipped (+5.26 kB), CSS 25.21 kB (+302 B) |
+| `git diff --check` | clean |
+| Protected mobile table-to-card block | **byte-identical** to `main`, still `bda35a15…` |
+| Live state | all four complaint tables **0 rows**, 0 evidence objects, every pre-existing count unchanged, **zero probe residue** |
+
+⚠️ **TWO REAL DEFECTS OF MINE WERE FOUND BY MEASURING, not by reading**,
+and a third by the mutation run:
+
+- ⚠️ **The tab rendered no page `<h1>` at all.** Every other official tab
+  renders its own, and mine relied on one my capture harness had
+  injected — so the first Chromium pass reported an `h1 → h3` skip 49
+  times. Asking which step produced it showed the harness was supplying
+  a heading the real tab did not have. The component now renders
+  `<h1>Complaints</h1>` (matching the nav item, per X1) with `<h2>` card
+  headers and `<h3>` detail sections; the harness no longer injects one,
+  or it would hide the very gap it found.
+- ⚠️ **I invented six CSS classes that do not exist**, among them
+  `sr-only` — which would have rendered three "hidden" labels
+  **visible**. The real names are `.visually-hidden`,
+  `.resident-filter-bar`, `.resident-search-field`,
+  `.resident-search-input`, `.filter-select-wrap` and
+  `.complaint-reference`. Caught by scanning every `className` in both
+  new files against every selector in the bundle **before** measuring —
+  the check PR #24's `btn-decline` and P3-B1's `btn-small` both earned.
+- ⚠️ **The duplicate-submit test proved nothing**, and only the mutation
+  run showed it: deleting `if (submitting) return` failed **zero**
+  tests, because `userEvent.click` does nothing to a `disabled` button.
+  It now submits the **form**, which is both the honest test and the
+  real case. ⚠️ And the restore after that mutation **silently failed** —
+  `git checkout` on an untracked file is an error my `|| true`
+  swallowed, so the guard was still missing until I read the file back.
+  Restoring from a saved copy rather than from git is the fix.
+
+### ⚠️ What was NOT verified
+
+**No authenticated page was loaded in a browser.** The dashboards are
+behind `ProtectedRoute` and this environment still has **no test
+account**; nothing was done to weaken authentication for a screenshot.
+So what is verified is the real components' output measured against the
+real CSS bundle, plus 86 unit tests and the role matrix against the live
+database — **not** a signed-in Secretary encoding a walk-in complaint on
+a live page, and not an ordinary Kagawad seeing the restricted panel.
+
+⚠️ **No test complaint was seeded.** Every probe ran inside a
+rolled-back block and all four tables are still at **0 rows**, so the
+queue has never been seen with real data in it.
+
+### P3-B2 limitations
+
+- **No screening, KP case, hearing, summons, settlement or referral** —
+  P4, and the jurisdiction question is still the barangay's.
+- **No status transition of any kind.** `received` is the only value, so
+  the queue shows one status and two identical dates on every row until
+  P4 writes `updated_at`.
+- **No capability-assignment table**, so no committee-based or
+  Peace-and-Order authorization exists. The Peace and Order Kagawad is
+  an ordinary official here.
+- **No incident, blotter, Tanod, map or analytics.**
+- **No notifications, SMS or email.** A walk-in complainant learns their
+  reference from the Secretary reading it out; nothing is sent.
+- **No video evidence**, and no raised size limit.
+- **No bulk action, export or print** on the queue.
+- **No purok normalisation**, and `PUROKS` still holds seven values with
+  `Purok 7` present.
+
+---
+
 ## Health centre
 
 **Medicine stock is a status, not a quantity** — Available / Low stock /
@@ -9250,11 +9597,11 @@ derives her initials from. It is no longer displayed as a label.
   question rather than a reason to omit the template, since the sheet
   prints `[BUSINESS NAME]` until it is answered.
 - **The complaint / incident / KP expansion, beyond resident intake.**
-  P3-A built the backend and P3-B1 the resident/public frontend. Still
-  unbuilt, each deliberately: the **official complaint queue and the
-  Secretary walk-in screen** (P3-B2), KP jurisdiction screening and case
-  management (P4), incidents and the digital blotter, the Tanod directory,
-  the safety heatmap and complaint analytics. ⚠️ **The screening phase is blocked on a
+  P3-A built the backend, P3-B1 the resident/public frontend and
+  ✅ **P3-B2 the official queue, the detail panel and the Secretary's
+  walk-in intake.** Still unbuilt, each deliberately: KP jurisdiction
+  screening and case management (P4), incidents and the digital blotter,
+  the Tanod directory, the safety heatmap and complaint analytics. ⚠️ **The screening phase is blocked on a
   question only the barangay can answer** — who confirms that a matter is
   within Katarungang Pambarangay jurisdiction. P2.5 found **no** Lupon,
   Justice or Katarungan committee stored anywhere, so the system has no
@@ -9274,7 +9621,7 @@ derives her initials from. It is no longer displayed as a label.
 - **Source maps ship to production** (~7 MB), so the original JSX is
   publicly reconstructable. `GENERATE_SOURCEMAP=false` in Vercel fixes it.
 - **`public/logo.png` is 984 KB and referenced by nothing.**
-- **Thin automated test coverage.** 1,152 tests in forty-three suites:
+- **Thin automated test coverage.** 1,241 tests in forty-five suites:
   one smoke test over `<App />`, which fails without `.env` because
   `supabaseClient.js` throws at import time, and 886 tests over the
   resident workflow rules, the display labels, the booking window, the
@@ -9578,16 +9925,47 @@ derives her initials from. It is no longer displayed as a label.
   rolled-back impersonation proof P2.5 deliberately did not run.
   ⚠️ **Not "fixed" in P3-A** merely because it was discovered: P3-A
   authorizes nothing on it, so nothing there depends on the guard.
-- **The complaint experience is RESIDENT-ONLY so far.** P3-A built the
-  backend (migrations 040 and 041) and P3-B1 built the resident and public
-  frontend — filing, My Complaints, and public tracking at
-  `/track-complaint`. ⚠️ **There is no official complaint queue and no
-  Secretary walk-in screen**: `complaint_queue()` and
-  `encode_walk_in_complaint()` exist in the database and are called by
-  nothing in the application, asserted by test. Still unbuilt: screening,
-  KP case, incident, blotter, Tanod, capability table, notifications and
-  video evidence. See *Complaint intake foundation (P3-A)* and *Resident
-  complaint experience (P3-B1)*.
+- **The complaint experience is INTAKE ONLY, and nothing can move a
+  complaint.** P3-A built the backend (migrations 040 and 041), P3-B1 the
+  resident and public frontend, and ✅ **P3-B2 the official queue, the
+  detail panel and the Secretary's walk-in intake** — so all twelve P3-A
+  functions now have a caller. Still unbuilt: screening, KP case,
+  incident, blotter, Tanod, the capability table, notifications and video
+  evidence. ⚠️ `complaints_status_check` permits exactly `received`, so
+  there is no Approve, Refer, Settle, Close or Schedule Hearing control
+  anywhere and a complaint cannot change state. See *Complaint intake
+  foundation (P3-A)*, *Resident complaint experience (P3-B1)* and
+  *Official complaint queue and walk-in intake (P3-B2)*.
+- ⚠️ **A WALK-IN COMPLAINT RECORDED WITHOUT A CONTACT NUMBER CAN NEVER BE
+  TRACKED ONLINE.** `encode_walk_in_complaint()` accepts a blank
+  complainant contact deliberately — somebody may have no phone or
+  decline to give one, and an intake the barangay has accepted in person
+  must not be refused by a form — while `track_complaint()` requires a
+  non-empty contact and matches it against the complainant's stored one.
+  Measured as **zero rows for any contact, the empty string included**.
+  So the complainant would have to return to the hall to ask about it.
+  The walk-in form says so before the save and the success panel says so
+  again when it happened; it does **not** fabricate a number and does
+  **not** block the intake. Whether the barangay wants a counter-issued
+  alternative second factor is a business decision nobody has made.
+- ⚠️ **Eleven of the thirteen official tabs skip a heading level**, and
+  it is pre-existing. Every one is `<h1>Tab Name</h1>` followed directly
+  by `<h3>Card Title</h3>` — Announcements, Events, Reservations, Waste
+  Management, Voter Reference List, Officials Directory, Reports and
+  Settings among them — which is axe's `heading-order`. Found while
+  measuring P3-B2, whose own cards use `<h2>` with
+  `.dashboard-card-header h2` matching the h3 rule, the route X3 took on
+  Announcements and the post-X5 pass took on Home's contact cards. ⚠️ The
+  other tabs were **deliberately not changed**: it is eleven tabs' worth
+  of markup in a 5,640-line component, unrelated to this phase's diff,
+  and worth its own pass.
+- ⚠️ **`.complaint-form` and `.modal-actions` had no CSS rule at all
+  until P3-B2.** Both are used by `FileComplaintForm.jsx`, which shipped
+  in P3-B1, and neither matched a single selector in the bundle — so the
+  resident form's action row had no gap and no alignment of its own.
+  P3-B2 defines them in `Complaints.css` because the walk-in form uses
+  the same two classes; strictly additive, since an unmatched selector
+  has no computed style to change.
 - ⚠️ **`complaints.updated_at` exists and equals `created_at` on every
   row**, because nothing in P3-A updates a complaint and no trigger
   maintains it. The safe queue returns it, so a reader sees two identical

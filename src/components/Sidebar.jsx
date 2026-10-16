@@ -242,6 +242,12 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderActio
     { id: 'events', label: 'Events', icon: <FaCalendarAlt /> },
     { id: 'reservations', label: 'Reservations', icon: <FaClipboardList /> },
     { id: 'documents', label: 'Document Requests', icon: <FaFileAlt /> },
+    // P3-B2. Placed after the two decision queues it sits beside in the
+    // official's day, and before the management tabs. ⚠️ It is a TAB,
+    // like every other entry here: not one of these has a route of its
+    // own, so a complaint route would be the only one and the sidebar's
+    // own `setActiveTab` navigation could not reach it.
+    { id: 'complaints', label: 'Complaints', icon: <FaCommentDots /> },
     { id: 'waste', label: 'Waste Management', icon: <FaTrashAlt /> },
     // ⚠️ There is no `kapitan` tab here any more. The Punong Barangay's
     // status was a whole destination for one value that changes a few

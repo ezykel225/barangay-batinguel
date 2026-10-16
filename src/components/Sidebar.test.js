@@ -93,7 +93,12 @@ const OFFICIAL_ONLY = [
   'Residents', 'Voter Reference List', 'Reports', 'Activity Log',
 ]
 const NURSE_ONLY = ['Medicines', 'Availability', 'Health Events']
-const RESIDENT_ONLY = ['My Reservations', 'Complaints']
+// ⚠️ 'Complaints' LEFT THIS LIST IN P3-B2, and it was removed rather
+// than the assertion loosened: the Official Portal now has a Complaints
+// tab of its own, so the label is no longer evidence that the resident
+// nav was substituted. 'My Reservations' still is -- it exists in
+// exactly one of the three arrays -- which is what this set is for.
+const RESIDENT_ONLY = ['My Reservations']
 
 const renderSidebar = (role) => render(
   <MemoryRouter>
@@ -118,13 +123,17 @@ const drawerItems = (container) => Array.from(
 ).map((button) => button.textContent.trim())
 
 describe('A. role="official"', () => {
-  it('renders the twelve Official destinations', () => {
+  // ⚠️ THIRTEEN SINCE P3-B2, and the list is written out in full so a
+  // tab cannot be added or lost without this being changed on purpose.
+  // It was twelve from the day the Punong Barangay Status tab was folded
+  // into the overview until Complaints was added.
+  it('renders the thirteen Official destinations', () => {
     const { container } = renderSidebar('official')
     expect(navItems(container)).toEqual([
       'Dashboard', 'Announcements', 'Events', 'Reservations',
-      'Document Requests', 'Waste Management', 'Officials Directory',
-      'Residents', 'Voter Reference List', 'Reports', 'Activity Log',
-      'Settings',
+      'Document Requests', 'Complaints', 'Waste Management',
+      'Officials Directory', 'Residents', 'Voter Reference List',
+      'Reports', 'Activity Log', 'Settings',
     ])
   })
 
@@ -311,8 +320,11 @@ describe('the mobile drawer', () => {
   it('offers the Official destinations to an official', async () => {
     const { container } = renderSidebar('official')
     await openDrawer()
-    expect(drawerItems(container)).toHaveLength(12)
+    expect(drawerItems(container)).toHaveLength(13)
     expect(drawerItems(container)).toContain('Officials Directory')
+    // The drawer is the WHOLE of navigation on a phone, so a tab that
+    // reaches the rail and not the drawer is unreachable there.
+    expect(drawerItems(container)).toContain('Complaints')
   })
 
   it('offers ZERO privileged destinations to an unknown role', async () => {

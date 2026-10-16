@@ -106,6 +106,37 @@ export const describeComplaintStatus = (stored) => {
   }
 }
 
+// ─── Intake channel ───────────────────────────────────────────────────
+//
+// `complaints.intake_channel` is a closed two-value CHECK in migration
+// 040, and `complaint_queue()` returns it raw -- so these are the words
+// beside it, by the same rule as the categories above.
+//
+// ⚠️ IT IS NOT A STATUS AND NOT A PERMISSION. It records HOW a
+// complaint arrived, which is the one thing the queue can say about a
+// complaint without saying anything about its subject: `online` carries
+// `filed_by_profile_id` and no `encoded_by`, `walk_in` the reverse
+// (`complaints_channel_matches_source`). An official reading the queue
+// needs it because a walk-in complainant has no account and no portal,
+// so following one up means the counter rather than a notification.
+export const INTAKE_CHANNELS = [
+  { value: 'online', label: 'Online' },
+  { value: 'walk_in', label: 'Walk-in' },
+]
+
+const INTAKE_CHANNEL_LABELS = INTAKE_CHANNELS.reduce(
+  (map, c) => ({ ...map, [c.value]: c.label }), {}
+)
+
+// Unrecognised values come back exactly as stored, for the reason
+// `complaintCategoryLabel` does, and with the same `hasOwnProperty`
+// guard so a stored `constructor` does not resolve to a function.
+export const intakeChannelLabel = (stored) => (
+  Object.prototype.hasOwnProperty.call(INTAKE_CHANNEL_LABELS, stored)
+    ? INTAKE_CHANNEL_LABELS[stored]
+    : (stored ?? '')
+)
+
 // ─── Evidence ─────────────────────────────────────────────────────────
 //
 // ⚠️ THIS MIRRORS THE BACKEND AND DOES NOT DECIDE IT. The authoritative
@@ -247,4 +278,28 @@ export const COMPLAINT_ERRORS = {
     + ' the files to the Barangay Hall.',
   evidenceUrlFailed: 'That attachment could not be opened just now.'
     + ' Please try again.',
+
+  // ─── What an OFFICIAL reads (P3-B2) ─────────────────────────────────
+  //
+  // ⚠️ Separate strings, because the resident ones are addressed to the
+  // person who filed ("your complaint") and would be wrong read by the
+  // Secretary at a counter encoding somebody else's.
+  queueLoadFailed: 'The complaint queue could not be loaded just now.'
+    + ' Please try again in a moment.',
+  detailLoadFailed: 'That complaint could not be opened just now.'
+    + ' Please try again in a moment.',
+  encodeFailed: 'This complaint could not be recorded just now.'
+    + ' Please try again in a moment.',
+  // ⚠️ Says what to do, and names no position as the gate that refused.
+  // The trigger's own sentence does name one, which is exactly why it
+  // is mapped away rather than printed.
+  encodeNotPermitted: 'This account cannot record a walk-in complaint.'
+    + ' Walk-in intake is handled by barangay records staff.',
+  encodeNeedsName: "Please record the complainant's name.",
+  encodeRespondentNoName: 'One of the people complained about was left'
+    + ' without a name. Add a name or remove that entry.',
+  // ⚠️ The complaint ALREADY EXISTS, as on the resident side. The
+  // Secretary must still be able to give the complainant the reference.
+  encodeEvidencePartial: 'The complaint was recorded, but some attachments'
+    + ' could not be uploaded. The reference number below is valid.',
 }
