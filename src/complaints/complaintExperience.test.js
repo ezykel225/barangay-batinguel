@@ -501,22 +501,62 @@ describe('the route and every link to it land together', () => {
 // ── No screening language anywhere in the UI ──────────────────────────
 
 describe('no screening or KP functionality is exposed', () => {
+  // ⚠️ P4-A BUILT THE SCREENING, SO THIS LIST NARROWED -- AND WHAT IS
+  // LEFT ON IT GOT STRICTER, which is the opposite of loosening a guard
+  // to make a phase pass.
+  //
+  // Before P4-A every complaint file was held to "no screening
+  // vocabulary", because no screening existed. The Official Portal now
+  // has one, so its two files moved to `officialComplaints.test.js`,
+  // where the same terms are scanned with ONE paragraph scoped out --
+  // the paragraph whose job is to say those stages are absent.
+  //
+  // ⚠️ THE RESIDENT AND PUBLIC SURFACES ARE WHERE THE PROPERTY ACTUALLY
+  // MATTERS, and they are now scanned for the screening's own words as
+  // well: `screening`, `screened`, `checklist`, `under_review`, and the
+  // four outcome verbs. P4-A §16 is that a resident must not be shown
+  // checklist answers, a recommendation or a confirmed outcome, and
+  // these four files contain not one of those words -- measured, not
+  // assumed.
   it.each([
     'complaints/FileComplaintForm.jsx',
     'complaints/MyComplaints.jsx',
     'complaints/complaintApi.js',
     'pages/TrackComplaint.jsx',
-    // P3-B2's two official files are held to the same bar: the Official
-    // Portal is where screening language would be most tempting to add,
-    // because it is the screen an official would do it from.
-    'complaints/OfficialComplaints.jsx',
+    // The Secretary's intake form is held to the resident bar too: it
+    // records a complaint and screens nothing.
     'complaints/WalkInComplaintForm.jsx',
-    'complaints/complaintQueue.js',
-  ])('%s contains no screening vocabulary in its code', (file) => {
+  ])('%s contains no screening vocabulary at all', (file) => {
     const src = code(file).toLowerCase()
     ;['katarungang', 'lupon', 'pangkat', 'mediation', 'conciliation',
       'summons', 'settlement', 'certificate to file', 'kp_case',
-      'complaint_screenings', 'jurisdiction']
+      'complaint_screenings', 'jurisdiction',
+      // added in P4-A: the screening's own vocabulary, including the
+      // two new stage names, so a resident surface cannot acquire one.
+      'screening', 'screened', 'checklist', 'under_review',
+      'proceed_to_kp', 'refer_for_further_action', 'close_without_kp',
+      'needs_more_information', 'recommendation', 'confirmed_outcome']
+      .forEach((term) => expect(src).not.toContain(term))
+  })
+
+  // ⚠️ The two shared label modules DO name the two new stages, because
+  // a status the database can hold has to have words -- and they name
+  // nothing else. The stage says how far a complaint has got; the
+  // outcome is the screening's own record and is restricted to the two
+  // positions that may read it. `complaintLabels.test.js` scans the
+  // rendered wording for eighteen outcome terms; this pins the code.
+  it.each([
+    'complaints/complaintLabels.js',
+    'complaints/complaintQueue.js',
+  ])('%s names the stages and no outcome', (file) => {
+    const src = code(file).toLowerCase()
+    expect(src).toContain('under_review')
+    expect(src).toContain('screened')
+    ;['katarungang', 'lupon', 'pangkat', 'mediation', 'conciliation',
+      'summons', 'settlement', 'certificate to file', 'kp_case',
+      'complaint_screenings', 'jurisdiction', 'checklist',
+      'proceed_to_kp', 'refer_for_further_action', 'close_without_kp',
+      'needs_more_information', 'confirmed_outcome', 'eligible']
       .forEach((term) => expect(src).not.toContain(term))
   })
 

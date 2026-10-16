@@ -70,17 +70,52 @@ describe('category labels', () => {
 })
 
 describe('status labels', () => {
-  it('knows ONLY `received`, because the database permits only that', () => {
-    expect(Object.keys(COMPLAINT_STATUS_LABELS)).toEqual(['received'])
+  // ⚠️ THREE SINCE P4-A, AND THE RULE IS UNCHANGED: the map holds exactly
+  // the values `complaints_status_check` permits, no more. Migration 042
+  // widened that CHECK to these three, so this was updated rather than
+  // loosened -- the guard still fails if a word is added ahead of the
+  // database or left behind after it.
+  it('knows exactly the statuses the database permits, and no more', () => {
+    expect(Object.keys(COMPLAINT_STATUS_LABELS))
+      .toEqual(['received', 'under_review', 'screened'])
     expect(complaintStatusLabel('received')).toBe('Received')
+    expect(complaintStatusLabel('under_review')).toBe('Under barangay review')
+    expect(complaintStatusLabel('screened')).toBe('Reviewed by the barangay')
+  })
+
+  // ⚠️ THE LOAD-BEARING ONE IN P4-A. `screened` means a human confirmed a
+  // screening; it must never be worded as though it revealed WHICH
+  // outcome. A resident reads this label, and the outcome lives on
+  // `complaint_screenings` behind a predicate that deliberately excludes
+  // them -- so a status badge saying "Eligible for KP" or "Not eligible"
+  // would hand the complainant the barangay's internal decision through a
+  // side door.
+  it('reveals no screening outcome through a status label or explanation', () => {
+    const words = Object.values(COMPLAINT_STATUS_LABELS)
+      .map((v) => v.label)
+      .concat(['received', 'under_review', 'screened']
+        .map((v) => describeComplaintStatus(v).explanation))
+      .join(' ')
+      .toLowerCase()
+    ;['eligible', 'ineligible', 'not eligible', 'proceed', 'refer',
+      'referred', 'close', 'closed', 'dismiss', 'settled', 'mediation',
+      'conciliation', 'jurisdiction', 'katarungang', 'lupon', 'approved',
+      'rejected', 'denied']
+      .forEach((term) => expect(words).not.toContain(term))
   })
 
   it('fabricates no future status', () => {
     // ⚠️ Screening, referral and KP stages are P4 and will widen the
     // CHECK and this map together. A vocabulary written ahead of its
     // consumers is the displayLabels mistake.
-    ;['screening', 'referred', 'mediation', 'conciliation', 'settled',
-      'dismissed', 'kp_case', 'repudiated', 'withdrawn']
+    // ⚠️ `screening` LEFT THIS LIST IN P4-A and the rest did not: a
+    // screening is now a real object, but no COMPLAINT STATUS is named
+    // for it -- the stage values are `under_review` and `screened`, and
+    // the screening's own outcome is not a complaint status at all.
+    // Everything else here remains unreachable by any stored value.
+    ;['referred', 'mediation', 'conciliation', 'settled', 'dismissed',
+      'kp_case', 'repudiated', 'withdrawn', 'eligible', 'ineligible',
+      'certificate_to_file_action']
       .forEach((v) => expect(COMPLAINT_STATUS_LABELS[v]).toBeUndefined())
   })
 

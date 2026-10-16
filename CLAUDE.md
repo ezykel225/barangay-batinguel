@@ -65,7 +65,7 @@ banned below: it silences the one check this project has.
 
 ### Tests
 
-Forty-five suites, 1,241 tests:
+Forty-eight suites, 1,376 tests:
 
 | File | What it covers |
 |---|---|
@@ -114,7 +114,10 @@ Forty-five suites, 1,241 tests:
 | `src/complaints/complaintExperience.test.js` | 33 tests over My Complaints, the success panel, the tracking page and the wiring. The load-bearing ones: ⚠️ a respondent's contact renders as *"Contact not shown to you"* from the NULL `complaint_parties_for()` returns, tracking calls `track_complaint` **exactly once and makes no table read after a hit**, a wrong reference and a wrong contact produce **byte-identical** messages, an unreachable system says something **different**, the success panel keeps a valid reference when only an attachment fails, and every catalogue `to:` resolves to a route that exists in `App.js` |
 | `src/complaints/complaintIntakeMigration.test.js` | 76 **source-reading** guards over migrations 040 and 041 — P3-A ships no frontend, so what is pinned is the security SHAPE: the `CMP-` format and its Crockford alphabet, that no `nextval`/counter/`lpad` exists, the eight categories and two channels verbatim, the ONE intake status, that neither creation RPC takes an identity/status/reference parameter, Secretary-only walk-in encoding, the queue's exact six columns with **no category**, the tracking RPC's exact four with no masked name and no branch that could say which half was wrong, append-only history at both layers, PUBLIC EXECUTE revoked on all twelve new functions, `anon` EXECUTE on the tracking RPC **only**, a private bucket with four explicit MIME types and no `*/*`, no video, and that authorization reads neither `.committee` nor `full_name`. ⚠️ Every "is not used" scan runs over **comment-stripped** code, because both migrations discuss `committee` and `full_name` at length precisely to record that neither is read. Run **both directions**: four mutations — authorizing on `committee`, leaking `category` into the queue, dropping one PUBLIC revoke, making the reference sequential — produce **5 failures** |
 | `src/complaints/complaintQueue.test.js` | 25 tests over the Official Portal's queue rules as a pure module — the reference-only search (with the Crockford look-alikes folded, so an `O` read for a zero over the phone still finds the complaint), the channel/status narrowing, and ⚠️ that an **unrecognised filter value matches nothing rather than everything**, the direction that fails open. The load-bearing ones are the absences: **no category filter, column or search field**, no P4 stage named anywhere, and the restricted-detail sentence scanned for twelve things it must not contain — a position, a policy, an SQLSTATE, or any word that would read as a failure |
-| `src/complaints/officialComplaints.test.js` | 61 tests over the queue, the detail panel and the walk-in intake as **rendered**. The load-bearing ones: the list is built from `complaint_queue()` and `supabase.from` is **never called** for it; a queue row shows no narrative, party, contact or category **from a fixture that has all four**; the restricted detail renders a neutral sentence with the queue still on screen, **no `role="alert"`** and no SQLSTATE, policy or function name in the document; a withheld contact renders as *"No contact number recorded"* rather than a blank; and the walk-in control is **absent** without the Secretary flag, never disabled, with **no Punong Barangay branch that could render it**. Plus the dashboard holds no complaint state, no migration 042 exists, and P1's `Map` fail-safe is intact. ⚠️ The duplicate-submit test **proved nothing in its first version** — it clicked a `disabled` button, so it passed either way; it now submits the FORM, which is also the real case (a keyboard Enter beating the re-render). Five mutations produce **49 / 2 / 1 / 1 / 4** failures |
+| `src/complaints/officialComplaints.test.js` | 61 tests over the queue, the detail panel and the walk-in intake as **rendered**. The load-bearing ones: the list is built from `complaint_queue()` and `supabase.from` is **never called** for it; a queue row shows no narrative, party, contact or category **from a fixture that has all four**; the restricted detail renders a neutral sentence with the queue still on screen, **no `role="alert"`** and no SQLSTATE, policy or function name in the document; a withheld contact renders as *"No contact number recorded"* rather than a blank; and the walk-in control is **absent** without the Secretary flag, never disabled, with **no Punong Barangay branch that could render it**. Plus the dashboard holds no complaint state and P1's `Map` fail-safe is intact. ⚠️ The duplicate-submit test **proved nothing in its first version** — it clicked a `disabled` button, so it passed either way; it now submits the FORM, which is also the real case (a keyboard Enter beating the re-render). Five mutations produce **49 / 2 / 1 / 1 / 4** failures. ⚠️ **Nine of these guards were redefined by P4-A**, each at its own site and each a definition change rather than a loosened assertion: the migration count moved from 41 to **42** with `043` asserted absent, the status filter from one status to three, the no-action sentence to the reworded one with the old wording asserted **gone**, the walk-in Punong guard **re-scoped to the control** (the file legitimately gained `isKapitan`, which gates a different control with a different database gate), the KP-vocabulary scan **scoped around the one denial paragraph** per `prototypeCoverage.test.js`'s precedent and then asserted to *be* a denial, and the dashboard tab line given its second prop with the forbidden list **extended** by every screening surface |
+| `src/screening/screeningChecklist.test.js` | 31 tests over the PROVISIONAL checklist as a pure module. The load-bearing ones are absences: **no exported function maps the answer set to a recommendation or an outcome** (eighteen candidate names asserted missing), every item is phrased as a question and ends in `?`, no question states a legal conclusion or names a penalty, day limit or statutory period — **no bare number at all** — and `needsFurtherReview` takes one item and one answer, so its **arity** is the proof it is not a scorer. Plus that `unknown` is deliberately NOT flagged, the four outcomes name no P4-B stage or legal conclusion, and the refusal sentences leak no SQLSTATE, function name, table or policy. ⚠️ Six more **read `complaint_screening_checklist_keys` out of migration 042** and assert the JS list matches exactly, in order and as a set — the same cross-check `reservationWindow.test.js` makes against 020 and `officialAvailability.test.js` against 026. Both directions: renaming one SQL key fails **3**, widening the SQL answer vocabulary fails **1** |
+| `src/screening/screeningMigration.test.js` | 57 **source-reading** guards over migration 042 — the security SHAPE, since only SQL can prove a position gate. Pinned: one new table and **none** of the forbidden ones (`kp_jurisdiction_rules`, `kp_cases`, a capability table), **three** CHECKs widened together to the same three values with `received` kept, no outcome value usable as a status, **no legal rule and no numeric comparison in any CHECK**, the private table's two barriers, the version/actor/timestamp columns with the writing RPC's signature asserted to take **none** of them, the confirmation-complete constraint, the one-open-per-complaint index, the position gate on both RPCs, the self-confirm refusal, the **narrower** screening predicate, `search_path = ''` on all six functions, **PUBLIC and `anon` EXECUTE revoked on all six** with `authenticated` on the five client ones only, that the only two INSERT targets are the screening and the history, that the history note names no outcome, and that `track_complaint`/`complaint_queue`/`complaint_history_for` are **not redefined**. ⚠️ Two of its scans moved to **word boundaries** after reporting `tan` inside `circumstance` and `fine` inside `definer` — the `Badminton`/`admin` trap. Five mutations produce **2 / 1 / 1 / 1 / 1** failures |
+| `src/screening/screeningPanel.test.js` | 43 tests over the panel as **rendered**. The load-bearing ones: an ordinary official gets **one neutral sentence** naming no position, policy, function or SQLSTATE; the Secretary gets the prepare form and **no confirm control even with a draft open**; the Punong Barangay gets the confirm control and **no prepare form**; nothing is rendered `disabled` in place of being withheld; the recommendation sent is **the one a human picked** even when all six answers are flagged; a `P0001` naming the position gate is read as the module's own sentence and the RPC's words appear **nowhere**; a confirmed screening renders read-only with no control to change it; and the confirmation dialog names the outcome **in words**, not as an identifier. Plus `supabase.from` is never called, the duplicate-submit guard is proved by submitting the **form**, and the headings are asserted to start at `h4` and skip no level. Six mutations produce **1 / 2 / 3 / 1 / 1 / 2** failures |
 
 Schema and policy changes are still verified by impersonating each role
 in SQL, with the results recorded in the migration headers — not by
@@ -360,13 +363,31 @@ src/
                       ⚠️ Secretary-only, enforced by the RPC -- the
                       Punong Barangay is refused by it too.
 
+  screening/          The PROVISIONAL KP review screening (P4-A).
+    screeningChecklist The six review questions, the three answers, the
+                      four outcomes, the disclaimer and the refusal
+                      sentences. ⚠️ Holds NO rule, NO threshold and NO
+                      function mapping answers to a decision -- a human
+                      picks the outcome and a different human confirms
+                      it. Pure, and its key list is asserted equal to
+                      migration 042's own.
+    screeningApi      The three screening RPCs. ⚠️ Maps each P0001 to a
+                      readable sentence, so the function's own message --
+                      which names the position gate -- never reaches a
+                      screen.
+    ScreeningPanel    The panel: the Secretary's prepare form, the
+                      Punong Barangay's confirmation, and one neutral
+                      sentence for everybody else. ⚠️ ALL screening
+                      state lives here; OfficialComplaints passes it
+                      four props.
+
   supabase/
     supabaseClient.js The single Supabase client. Throws at import time
                       when the env vars are missing.
 
   assets/images/      11 official portraits, page backgrounds, logo.
 
-supabase-migrations/  41 numbered SQL files. A record, not a runner.
+supabase-migrations/  42 numbered SQL files. A record, not a runner.
 supabase/functions/   Edge Function source (notify-reservation-sms).
 docs/                 SETUP.md, TESTING-WALKTHROUGH.pdf + its generator.
 ```
@@ -858,12 +879,14 @@ such row.
 
 ## Database notes
 
-**41 migrations**, `001` through `041`, all applied. ⚠️ 027 is a
+**42 migrations**, `001` through `042`, all applied. ⚠️ 027 is a
 DATA CORRECTION, not a schema change — see *The portrait is lost by the
 RENAME* under *Public E-Services (X5)*.
 
-**25 tables, RLS enabled on every one.** The four newest are the P3-A
-complaint intake tables — see *Complaint intake foundation (P3-A)*.
+**26 tables, RLS enabled on every one.** The newest is
+`complaint_screenings` — migration 042, see *KP review screening
+foundation (P4-A)* — and the four before it are the P3-A complaint
+intake tables.
 
 | Table | Holds |
 |---|---|
@@ -888,10 +911,11 @@ complaint intake tables — see *Complaint intake foundation (P3-A)*.
 | `notifications` | In-app notifications. **Client-read-only** — written only by triggers; see *Notifications* |
 | `notification_reads` | Who has seen which notification. Insert and select only |
 | `official_account_links` | ⚠️ **PRIVATE, and since migration 031 it is THE authorization identity source at the database.** One-to-one `barangay_officials` ↔ `profiles` mapping. Migration 030, **11 rows.** `anon` and `authenticated` hold NO privilege on it and it has ZERO policies — every read is `42501`, the privilege layer, before RLS is consulted. Nothing in the app reads it directly and nothing may: the four authorization paths reach it only through `current_official_holds_position()` and `official_id_for_current_user()`, which answer one question about the caller. See *MASTER-A step A2* and *step A3* |
-| `complaints` | Complaint intake. Migration 040. Server-stamped random `CMP-YYYY-XXXXXX` reference, closed category and channel vocabularies, and ⚠️ `location_note` — a **free-text snapshot, NOT a purok reference**. The only one of the four with a SELECT policy |
+| `complaints` | Complaint intake. Migration 040. Server-stamped random `CMP-YYYY-XXXXXX` reference, closed category and channel vocabularies, and ⚠️ `location_note` — a **free-text snapshot, NOT a purok reference**. The only one of the five with a SELECT policy. ⚠️ `status` carries the **stage** and never the screening's decision — `received`/`under_review`/`screened` since migration 042 |
 | `complaint_parties` | Complainant, respondents, witnesses. Optional links to `profiles` / `residents_registry`, plus snapshots of what was recorded at filing. ⚠️ **PRIVATE** — zero policies, zero client privilege; read through an RPC |
 | `complaint_status_history` | Append-only complaint transitions. ⚠️ **PRIVATE**, and append-only at **both** layers — no UPDATE/DELETE policy and no client UPDATE/DELETE privilege |
 | `complaint_attachments` | Evidence metadata for the private `complaint-evidence` bucket. ⚠️ **PRIVATE** — the object path is never published |
+| `complaint_screenings` | One human-prepared, human-confirmed KP review screening per attempt. Migration 042. ⚠️ **PRIVATE** — zero policies, zero client privilege, reached only through SECURITY DEFINER functions whose predicate is **narrower** than the complaint one. The checklist answers are `jsonb` validated by the one writer that exists; ⚠️ `recommendation` (the Secretary's) and `confirmed_outcome` (the Punong Barangay's) are **separate columns**, and a CHECK means an outcome cannot exist without the person who chose it and the moment they did |
 
 What each migration *changed* stays in that migration's own header, not
 here — this section says what exists now, the headers say how it got
@@ -1173,7 +1197,11 @@ Directory, Residents, Voter Reference List, Reports, Activity Log,
 Settings.
 
 Complaints is the newest and the only one P3-B2 added -- see *Official
-complaint queue and walk-in intake (P3-B2)*. It was twelve from the day
+complaint queue and walk-in intake (P3-B2)*. ⚠️ Since P4-A it also
+carries the **PROVISIONAL KP review screening**, inside the restricted
+detail panel only -- the Secretary prepares it and the Punong Barangay
+confirms it, and nothing in it decides jurisdiction. See *KP review
+screening foundation (P4-A)*. It was twelve from the day
 the Punong Barangay Status tab was folded into the overview until then.
 
 It was thirteen until **Punong Barangay Status** was folded into the
@@ -9366,6 +9394,592 @@ queue has never been seen with real data in it.
 
 ---
 
+## KP review screening foundation (P4-A) — ⚠️ PROVISIONAL CHECKLIST, HUMAN-CONFIRMED
+
+2026-10-16, on `claude/p4a-kp-screening-foundation`, built on `main`
+after PR #41 merged (`bcb0fc1`). **One migration, 042, and four new
+frontend files.**
+
+### ⚠️ THE SYSTEM DOES NOT DECIDE KP JURISDICTION, AND NOTHING HERE CAN
+
+A human answers six review questions, a human picks what the barangay
+will do, and a *different* human confirms it. **There is no function
+anywhere — in SQL or in JavaScript — that maps the answers to a
+recommendation or to an outcome**, and a test asserts the absence by
+name across eighteen candidates.
+
+Nothing automatically declares a complaint eligible, rejects one,
+converts one into a KP case, issues a referral or closes anything.
+`needsFurtherReview()` is the one thing that looks like such a function
+and deliberately is not: it marks **one answer** for the reviewer's
+attention. It takes one item and one answer, it totals nothing, and its
+arity is the proof.
+
+⚠️ **The checklist is PROVISIONAL and is labelled so on screen.** Its
+six items are drawn from the review areas the capstone brief named; they
+are **not** a statement of law, **not** exhaustive, and **not** verified
+against Barangay Batinguel's actual Katarungang Pambarangay procedure,
+which has not been supplied. The panel carries
+`Provisional review checklist — awaiting barangay confirmation.` in
+words, beside a disclaimer that says it *"does not automatically
+determine legal jurisdiction, and it is not a complete list of legal
+criteria."*
+
+⚠️ **The authorization split is a PROVISIONAL barangay workflow
+decision, not a proven legal requirement.** The Secretary prepares and
+the Punong Barangay confirms because the brief locked that for this
+phase. Who is actually entitled to judge KP jurisdiction is the
+barangay's question, and P2.5 found **no** Lupon, Justice or Katarungan
+committee recorded anywhere — so this system has no record from which to
+infer it and does not try.
+
+### Who may do what, and who decides that
+
+| caller | prepare | read a screening | confirm | the table directly |
+|---|---|---|---|---|
+| **Barangay Secretary** | **accepted** | **1 row** | refused `P0001` | **`42501`** |
+| **Punong Barangay** | refused `P0001` | **1 row** | **accepted** | **`42501`** |
+| Barangay Treasurer | refused `P0001` | 0 rows | refused `P0001` | `42501` |
+| Kagawad (**Peace and Order**) | refused `P0001` | **0 rows** | refused `P0001` | `42501` |
+| SK Chairperson | refused `P0001` | 0 rows | refused `P0001` | `42501` |
+| resident (**the filer**) | refused `P0001` | **0 rows** | refused `P0001` | `42501` |
+| nurse | refused `P0001` | 0 rows | refused `P0001` | `42501` |
+| `anon` | **`42501`** | **`42501`** | **`42501`** | `42501` |
+
+Every cell was produced by impersonating the real account with its own
+JWT claims inside a block that always ends in `RAISE EXCEPTION`.
+
+⚠️ **THE PEACE AND ORDER KAGAWAD GETS NOTHING, AND THAT IS THE POINT.**
+A real `Peace and Order and Appropriation` value exists on one Kagawad
+and it grants no screening access whatever. `barangay_officials.committee`
+is **descriptive data, not authorization data**: it is free text with no
+CHECK, the Edit Official form sends it for an arbitrary row, the
+directory UPDATE policy is `profiles.role = 'official'` with no row
+restriction, and `protect_official_record()` does not guard it — so
+authorizing on it would reproduce migration 028's escalation on an
+unguarded column. Re-measured here: that Kagawad edits his own committee
+successfully (`rows=1`) and still reads **zero** screenings. A test
+scans migration 042 and all three frontend modules, comment-stripped,
+and asserts the column is read nowhere.
+
+⚠️ **No Kagawad's name is hardcoded anywhere**, and the scan for that
+runs on **word boundaries** — the first version used `toContain` and
+reported a hit on `tan` inside `circumstance`, which is the
+`Badminton`/`admin` trap migration 036 recorded verbatim.
+
+### ⚠️ The screening predicate is NARROWER than the complaint one
+
+`complaint_screening_is_visible_to_caller()` admits the Barangay
+Secretary and the Punong Barangay, and nobody else. **Reusing
+`complaint_is_visible_to_caller()` would have been a privacy defect**,
+and only reading the live definition rather than this file's own reports
+showed why: that predicate admits the **filing resident**, which is
+right for their own narrative and parties and wrong for a screening —
+the checklist records whether a matter possibly involves a minor or is a
+possible VAWC/sensitive family matter, and **a complainant must not read
+the barangay's internal review of their own complaint.** Measured: the
+filer reads their complaint, their parties and their history, and
+**zero** screenings.
+
+### ⚠️ Three CHECKs were widened, not one
+
+Reading the live catalog first is what found this:
+`complaint_status_history` carries its **own** `from_status` and
+`to_status` CHECKs, and each also permitted only `received`. Widening
+`complaints_status_check` alone would have moved the complaint and then
+failed on the history INSERT inside the same statement — migration 016's
+two-gates lesson, where the vocabulary was widened without the trigger
+that gates who may say the words.
+
+```
+received      intake complete, no screening prepared
+under_review  a screening is prepared and awaits confirmation
+screened      a human has confirmed a screening outcome
+```
+
+⚠️ **THE STATUS IS THE STAGE; THE SCREENING HOLDS THE DECISION.**
+`screened` means "a human confirmed a screening", **never which outcome
+they confirmed**. No status value is an outcome value, and a test
+asserts it in both directions. Two columns meaning one fact is what the
+brief's §14 forbids and what `displayLabels.js`'s dead second vocabulary
+already cost this project once.
+
+⚠️ **Widened, never narrowed.** A CHECK is revalidated on every UPDATE,
+so dropping a value a stored row carries would make that row
+un-editable — the reason migration 021 is a trigger branch rather than a
+constraint. All three keep `received`.
+
+⚠️ **No speculative legal rule went into a CHECK**, and a test proves
+it: no penalty, no fine, no statutory period, no repudiation window, no
+CFA requirement, and **no comparison against a number anywhere in the
+file** — a threshold is a number. The scan matches on word boundaries
+for the same reason as the name scan, and for a worse near miss: `fine`
+as a substring hits `definer`, so every `security definer` in the file
+reported as a hardcoded fine until I asked which step produced it.
+
+### JSONB, validated by the one writer that exists
+
+`complaint_screenings.answers` is `jsonb`. Explicit per-question columns
+were the alternative and were **compared and rejected**: a seventh
+question would then mean a migration *and* a nullable column, and on
+every pre-existing row that NULL is **indistinguishable from the real
+answer `unknown`** — so the model would lose exactly the distinction the
+checklist exists to record.
+
+⚠️ **The usual objection to JSONB does not apply here.** The table has
+**no client privilege and no INSERT policy**, so
+`prepare_complaint_screening()` is the only writer that exists, and it
+refuses an unknown key, a **missing** key, a non-object, and any answer
+outside the three permitted values — all four measured as `P0001`.
+Validation is in one place rather than spread across a dozen CHECKs.
+
+### ⚠️ SQL owns the keys; the application owns the wording
+
+`complaint_screening_checklist_keys('v1')` is the authority on which
+keys may be **stored**, so a typo'd or invented key cannot be.
+`src/screening/screeningChecklist.js` is the authority on how they
+**read**, so a question can be improved without a migration. A test
+parses the function out of migration 042 and asserts the two lists match
+exactly, in order and as sets — the same cross-check
+`reservationWindow.test.js` makes against migration 020 and
+`officialAvailability.test.js` against 026. Run both directions:
+renaming one SQL key fails **3** tests, and widening the answer
+vocabulary in SQL fails **1**.
+
+⚠️ **The version travels with every row.** `checklist_version` is
+`not null` and CHECKed to `['v1']`, because a row recorded under v1 must
+still be interpretable as these six questions — otherwise a key that no
+longer exists becomes unreadable rather than historical, and a missing
+key cannot be told from an unanswered one.
+
+### Three answers, and the third is the point
+
+**Yes / No / `Unknown / needs verification`.** A reviewer forced to
+choose would answer `no` to a question nobody checked, and `no` and "not
+looked into" are **different facts** on a record the Punong Barangay
+reads before confirming. The label says so in words rather than only by
+being third.
+
+⚠️ **An `unknown` is NOT flagged for attention**, deliberately: "we have
+not checked this" is an ordinary state of a draft, and flagging it would
+turn display emphasis into a **completeness score**, which is a judgment
+about the screening. Mutating `needsFurtherReview` to flag it fails 2
+tests.
+
+⚠️ **The flag is amber with an icon and a word**, not red and not colour
+alone — it says *"Possible condition requiring further review."* against
+the one answer it belongs to, and nothing on screen totals the marks.
+
+### The system flag and the human outcome are different columns
+
+| | |
+|---|---|
+| `recommendation` | what the Secretary **suggested**. Nullable, chosen by a human, never computed |
+| `confirmed_outcome` | what the Punong Barangay **decided**. Written by the confirming RPC only |
+
+⚠️ **A constraint keeps the second honest.**
+`complaint_screenings_confirmation_complete` is all three of
+`confirmed_outcome`/`confirmed_by`/`confirmed_at` NULL, or all three
+present. **There is no state in which the database holds a decision
+nobody made**, or a moment nobody acted at.
+
+Four outcomes, and they are this system's own vocabulary rather than a
+legal one — each names what the **barangay will do**, not a finding
+about the law:
+
+| value | on screen |
+|---|---|
+| `proceed_to_kp_process` | Proceed with the barangay KP process |
+| `refer_for_further_action` | Refer for further action |
+| `close_without_kp_process` | Close without the KP process |
+| `needs_more_information` | Needs more information |
+
+⚠️ **DELIBERATELY ABSENT**: `settled`, `conciliation`,
+`certificate_to_file_action` — P4-B/P4-C concepts with nothing in this
+phase able to reach them — and `eligible`, `ineligible`, `dismissed`,
+which are legal conclusions. The CHECK refuses all six, and
+`kp_eligible` was measured refused `P0001`.
+
+⚠️ **The recommendation draws on the SAME four words**, so a reader
+never learns two vocabularies for one question and a recommendation can
+be compared with the outcome that followed it.
+
+### Nobody confirms their own preparation
+
+Enforced **in the database**, not in the UI:
+`confirm_complaint_screening()` refuses when `prepared_by = auth.uid()`.
+⚠️ It is belt and braces rather than the control — one active official
+holds each powered position (migration 028's partial unique index), so
+today's Secretary cannot also be the Punong Barangay — and it is there
+so the separation survives a future change to who may prepare instead of
+resting on a constraint elsewhere in the schema. Deleting that branch
+fails 1 test.
+
+The Secretary is refused on the position gate first, measured: *"Only
+the Punong Barangay can confirm a screening."*
+
+### ⚠️ A confirmed screening is history, and a redone one preserves it
+
+A partial unique index permits **one open screening per complaint**. So
+revising a draft **updates the same row** (measured: `same row=true`,
+total stays 1), and re-screening after a confirmation **inserts a new
+row** (measured: `new row distinct=true`, total 2, the confirmed row and
+its actor intact, one open row).
+
+⚠️ **The confirmed row is not editable.** The confirming RPC refuses a
+second confirmation, a BEFORE UPDATE trigger refuses any change to a
+confirmed row for API callers, and in practice the **privilege layer
+answers first**: a direct UPDATE by the Punong Barangay is `42501`
+before the trigger is reached. That is the trigger being defence in
+depth exactly as its own comment claims — it exists so immutability is a
+property of the **table** rather than of the three functions that happen
+to be its only writers today.
+
+### ⚠️ Nothing a resident or the public can reach changed
+
+| | |
+|---|---|
+| `track_complaint()` | **untouched** — still four columns, still no category, no name, no contact. A wrong reference and a wrong contact both still return **0 rows** |
+| `complaint_queue()` | **untouched** — still the same six columns and **still no category** |
+| `complaint_history_for()` | **untouched** — still five columns and **still no actor** |
+| `complaint_parties_for()` | **untouched** — a respondent's contact still comes back NULL |
+
+⚠️ **The resident and public surfaces contain not one screening word.**
+`FileComplaintForm.jsx`, `MyComplaints.jsx`, `complaintApi.js`,
+`TrackComplaint.jsx` and `WalkInComplaintForm.jsx` are scanned for
+`screening`, `screened`, `checklist`, `under_review`, the four outcome
+values, `recommendation` and `confirmed_outcome` — **and for all eleven
+P3 terms as well.** That guard got *stricter* in this phase, not looser.
+
+⚠️ **The two new statuses DO have words**, because a status the database
+can hold has to: *"Under barangay review"* and *"Reviewed by the
+barangay"*. Both are generic. A test scans every status label and every
+status explanation for **eighteen** outcome terms and asserts none
+appears — so a resident learns their complaint has been reviewed and
+never what the barangay decided.
+
+⚠️ **THE HISTORY NOTE CARRIES NO OUTCOME**, and this is the
+load-bearing one: `complaint_history_for()`'s own predicate admits the
+**filing resident**, so writing the decision into a note would hand the
+complainant the barangay's internal conclusion by a side door. The two
+notes read *"Screening prepared for barangay review."* and *"Screening
+confirmed by the barangay."* Putting the outcome in that note fails 1
+test, and the measured note is asserted to match neither `proceed`,
+`refer`, `close` nor `eligib`.
+
+### ⚠️ The sensitive answers increase privacy
+
+Two items record that a matter may involve a minor or may be a
+VAWC/sensitive family matter. They are answers on a record **only the
+Secretary and the Punong Barangay can read**, and they reach nothing
+else: not the official queue, not public tracking, not the resident's
+own status, not a notification, not `activity_log`. **There is no public
+"VAWC" category**, no sensitivity column, no severity band and no VAWC
+procedure encoded anywhere.
+
+⚠️ **A finer tier WITHIN those two readers is deferred and reported.**
+P4-A could not add a distinct highly-restricted level without widening
+its own scope, so the flags stay inside the already-restricted record.
+
+### ⚠️ `activity_log` is deferred AGAIN, with the reason
+
+`complaint_status_history` is already the authoritative domain record:
+append-only at **both** layers, with the actor taken from the caller's
+own uid. And `activity_log` is readable by **every** official — so the
+only non-identifying thing worth logging there is "a screening was
+confirmed", which the safe queue and the status already convey, while
+anything more identifying would breach the rule that no complainant
+name, respondent name, narrative or evidence filename may sit in a field
+all officials can read. Widening it is a two-gate change (the CHECK
+**and** `stamp_activity_actor`, migration 016's lesson) and would have to
+happen in one migration. **No notification, SMS or email either.**
+
+### The execute surface, closed at creation
+
+| | |
+|---|---|
+| functions created | **6** — five client-facing, one trigger function |
+| bare **PUBLIC** EXECUTE | **0 of 6** |
+| `anon` EXECUTE | **0 of 6** |
+| `authenticated` EXECUTE | the **five** client ones; **not** the trigger function |
+| explicit `anon`/`PUBLIC`/`service_role` grants | **none** |
+| `set search_path = ''` | all six |
+
+⚠️ **MASTER-B's lesson applied at creation rather than in a later
+phase.** `pg_default_acl` grants `anon`, `authenticated` and
+`service_role` by name and PostgreSQL's own function default adds a bare
+PUBLIC entry on top, so revoking the named roles alone would leave
+`has_function_privilege('anon', …)` **true** through PUBLIC. That was
+migration 038's whole finding, and 042 does not repeat it: every revoke
+names `public, anon`. Dropping one PUBLIC revoke fails 1 test.
+
+⚠️ **`complaint_screening_checklist_keys()` is SECURITY INVOKER**,
+because it reads nothing — which is also why it does not appear in
+either advisor lint.
+
+**The table is private, both barriers** (019A's pattern): RLS enabled,
+**zero policies** and none to be added, `revoke all … from anon,
+authenticated, public`, ACL `postgres` + `service_role` only. Every
+client read is `42501` — the privilege layer, before RLS is consulted,
+which is the stronger result because RLS alone returns an empty set that
+cannot be told from "there are no rows".
+
+### Advisors — before and after
+
+| Finding | before 042 | after |
+|---|---|---|
+| `rls_enabled_no_policy` | INFO, 4 | INFO, **5** — `complaint_screenings` joins the four private tables. **That is what a private table looks like**, as `official_account_links` has since migration 030 |
+| `anon_security_definer_function_executable` | WARN, 11 | WARN, **11** — unchanged, because **no 042 function is anon-executable** |
+| `authenticated_security_definer_function_executable` | WARN, 21 | WARN, **25** — the four SECURITY DEFINER client functions, exactly as designed; the fifth client function is INVOKER and the trigger function is not granted |
+| `auth_leaked_password_protection` | WARN, 1 | WARN, 1 — Pro-only on this project |
+| `extension_in_public` | gone (B4) | **still gone** |
+| anything new | — | **none** |
+
+SECURITY DEFINER functions in `public`: 38 → **43**; client-executable
+21 → **25**. Functions carrying bare PUBLIC EXECUTE: **0**, unchanged —
+B5 holds.
+
+### The frontend, in four files and one line
+
+| File | Owns |
+|---|---|
+| `screening/screeningChecklist.js` | the six questions, the three answers, the four outcomes, the disclaimer and the refusal sentences. **Pure**, no Supabase import |
+| `screening/screeningApi.js` | the three RPC calls, and the mapping from a `P0001` message to a readable sentence |
+| `screening/ScreeningPanel.jsx` | the panel: the prepare form, the review, the confirmation |
+| `screening/Screening.css` | its own styles |
+| `complaints/OfficialComplaints.jsx` | **+50 lines** — an `<h3>` and a `<ScreeningPanel>` inside the authorized detail branch |
+| `dashboards/OfficialDashboard.jsx` | **one line** — a second prop on the existing tab line |
+
+⚠️ **A SEPARATE COMPONENT, not another block of state.** All screening
+state is in `ScreeningPanel`; `OfficialComplaints` passes it four
+things and holds none of it, and the dashboard still contributes only
+the switch line. A test asserts the dashboard names no screening RPC, no
+screening table and no screening state.
+
+⚠️ **THE FUNCTION'S OWN SENTENCE NEVER REACHES THE SCREEN.** Two of the
+RPCs name the position gate (*"Only the Barangay Secretary can…"*), and
+printing one would put an authorization model in an alert on a screen
+somebody may be standing beside. Each actionable refusal is mapped to
+its own words; everything else falls back to a neutral sentence. A test
+asserts no SQLSTATE, function name, table or policy appears in any of
+the nine, and renders the position refusal to prove the mapped sentence
+is what shows.
+
+⚠️ **The restricted note names no position**, exactly as the
+restricted-detail panel does: an ordinary official cannot grant
+themselves records access, and naming the holder only invites asking.
+⚠️ **The one deliberate asymmetry**: the note the **Secretary** sees
+when her own draft awaits confirmation says *"waiting for the barangay
+head"* — she needs to know who confirms or the draft sits forever, the
+office is public, and there is no "grant me that" path to a single
+elected post.
+
+⚠️ **Confirmation goes through the shared `useConfirm` dialog**, because
+it is the one action in this phase that records a barangay decision and
+cannot afterwards be edited. The sentence names the outcome **in the
+barangay's own words**, not an identifier, and passes
+`destructive: false`.
+
+⚠️ **Duplicate submission is prevented twice**, and the second is
+load-bearing: a keyboard Enter can beat the re-render that disables the
+button. The test **submits the form** rather than clicking a `disabled`
+button — P3-B2's first version of that test proved nothing, and deleting
+the guard here fails 1 test.
+
+### ⚠️ The heading nesting, and the P3-B2 defect not repeated
+
+The panel renders inside the detail card under its own
+`<h3>KP review screening</h3>`, so its sections are that heading's
+**children**: `h1` (page) → `h2` (card) → `h3` (section) → `h4` → `h5`,
+with none skipped. Rendering an `<h3>` in the panel would have made
+these siblings of the heading they belong to — not an axe violation, but
+a structure a screen-reader user navigating by heading reads as a flat
+list of unrelated sections. The stylesheet matches **both** tags each
+rule could carry, the route X3 took on Announcements.
+
+### What was measured
+
+Real component output captured through Jest and rendered against the
+**shipped CSS bundle** in Chromium — the pattern X2, X3, X4, X6, PR #24,
+P3-B1 and P3-B2 all used. Seven states (queue, restricted detail, blank
+prepare form, prepare form with every answer given and a flag showing,
+the Punong Barangay confirming, a confirmed screening beside a new
+draft, and the Secretary's awaiting note) at **320 / 375 / 768 / 1024 /
+1440**, with deliberately pathological fixtures: a 69-character
+unbreakable reference, a 56-character unbreakable name and a
+520-character note.
+
+| Check | Result |
+|---|---|
+| Overflow + clipping + 24px targets + label association + one `<h1>` + heading order, 7 states x 5 widths, plus axe at 375 and 1440 | **224 checks, 0 failures** |
+| axe-core 4.12.1 (WCAG 2.0/2.1 A + AA + best practice) | **0 violations** in all seven states, both widths |
+| Role matrix, 8 callers x prepare / read / confirm / direct table | as tabled above, all rolled back |
+| Validation refusals | unknown version · missing key · invented key · bad answer value · invalid outcome — **5 of 5 `P0001`** |
+| Draft revised vs re-screened | same row / total 1 · then a distinct new row / total 2, confirmed row and actor intact |
+| History | append-only, `(null)→received → under_review → screened` |
+| **Eleven mutations** | 5 on the migration (committee gate **2**, self-confirm guard 1, outcome in the note 1, dropped PUBLIC revoke 1, auto KP case 1) and 6 on the frontend (confirm painted for the Secretary 1, raw RPC sentence 2, restricted panel opened up 3, derived recommendation 1, dropped submit guard 1, flagged `unknown` 2) |
+| Jest | **48 suites, 1,376 tests** — from 45 / 1,241, so **+3 suites, +135 tests** |
+| Production build | clean, no ESLint warnings, **240.68 kB** gzipped (+3.47 kB), CSS 25.7 kB (+489 B) |
+| `git diff --check` | clean |
+| `Sidebar.css` | **byte-identical to `main`** — `git status` reports it unmodified, which is stronger than a line-range hash |
+| Live state | all five complaint tables **0 rows**, 0 evidence objects, 11/11/0 officials, 11 links, powered holders unchanged, **zero probe residue** |
+
+⚠️ **The measurement harness was proved capable of failing**, because a
+measurement that finds nothing proves nothing. Injecting a second
+`<h1>`, an 18px button, an unlabelled input, a 4,000px block and two
+skipped heading levels produced **27 failures across 32 checks**, and a
+separate control — content cut off by an `overflow: hidden` ancestor —
+fired the clipping probe at all five widths **while the overflow probe
+stayed silent**, which is X5's point about the two catching different
+things.
+
+⚠️ **The radio's pointer target was measured, not read off the box.**
+The painted `<input>` is 18x18, which looks like an SC 2.5.8 failure; the
+clickable target is the padded label row, measured by stepping
+`elementFromPoint` across it: **184x40 at 320px up to 328x38 at 1440**,
+with **91–95%** of the row activating the control. "A padded wrapper is
+not a target" is why that had to be measured by pointer rather than
+asserted.
+
+### ⚠️ SIX of my own results were the harness, not the code
+
+The project's own rule — *always ask which step produced the result* —
+for the ninth phase running, and it has never earned more in one phase:
+
+- **`apply_migration` timed out at 60 seconds.** Live state was re-read
+  first and showed **nothing had executed**; then the gating statement
+  was isolated by measurement — `DROP TRIGGER IF EXISTS` reproduces the
+  timeout alone, while `ALTER TABLE … DROP CONSTRAINT` applied cleanly
+  three times. That line was unnecessary on a first apply and on replay,
+  so it was removed and the file applied in six calls. ⚠️ **The keyword
+  was not fragmented to get past the guard.**
+- **`'tan'` reported as a hardcoded official's name** — it is inside
+  `circumstance`, a checklist key. The `Badminton`/`admin` trap.
+- **`'fine'` reported as a hardcoded penalty** — it is inside
+  `definer`, so every `security definer` matched. Both scans moved to
+  word boundaries.
+- **A scan of "which function returns the answers" caught the writer**,
+  because `prepare_complaint_screening`'s signature declares
+  `p_answers jsonb`. Scoped to what a function **returns**.
+- **`re-prepare = REFUSED 42501`**, where every other refusal was
+  `P0001`. The function was **accepted**; the `42501` was my own
+  verification read of the private table from inside the impersonation —
+  the privacy property working. Re-run with the read hoisted out:
+  accepted, new row, confirmed row intact.
+- **Three MASTER-A probes reported `42501` where the trigger's `P0001`
+  was expected** — my `WHERE id = (select official_id from
+  official_account_links …)` subquery read the private mapping while
+  impersonating `authenticated`. B1's own record warns about exactly
+  this. Re-run with the id hoisted: `P0001`, `P0001`, and the rename
+  accepted.
+- **"POINTER TARGET NONE" at every width** — the radio sits ~3,540px
+  down a 5,900px document and `elementFromPoint` returns null outside
+  the viewport. Scrolled into view: 91–95% coverage.
+
+And **one defect of mine that was real**: the panel's sections were
+`<h3>`, siblings of the `<h3>` they belong to. Corrected to `<h4>`/`<h5>`
+before any measurement, along with the stylesheet.
+
+⚠️ **Nine P3 guards failed after this phase's changes, and every one was
+a definition change rather than a loosened assertion.** Each is
+documented at its own site: the status map is now three statuses (with a
+**new** eighteen-term outcome scan added beside it), the queue filter
+four, the detail panel's no-action sentence reworded because the old one
+denied a feature the phase added, the walk-in Punong guard **re-scoped
+to the control** rather than deleted (the file legitimately gained
+`isKapitan`, which gates a different control with a different database
+gate), the KP-vocabulary scan **scoped around the one denial paragraph**
+per `prototypeCoverage.test.js`'s precedent and then asserted to *be* a
+denial, the dashboard tab line given its second prop with the forbidden
+list **extended** by every screening surface, and the migration count
+moved from 41 to 42 with `043` asserted absent.
+
+### MASTER-A, MASTER-B, P1, P2 and P3 all re-verified
+
+| | |
+|---|---|
+| **028** own `position` / `created_at` | `P0001` ×2 |
+| **029** powered-position INSERT · `Kagawad` INSERT (control) | `P0001` · accepted |
+| **033** own rename over the API | **accepted**, rows=1 |
+| **032** self-archive **after that rename** | **`P0001`** — the exact input that disarmed the old guard |
+| **018** archive another official | accepted — the existing business rule |
+| **030** a linked official reads the mapping | `42501` |
+| **031** Kagawad holds SEC/TRE/PUN | `f/f/f` |
+| **A5** helper returns his own row | true |
+| **034/B1** a trigger function called directly as `anon` | `42501` |
+| **039/B5** `anon` calls `official_id_for_current_user()` | `42501` |
+| **B5** `anon` slot range (control) | 4 rows |
+| **B2** TRUNCATE for `anon` / `authenticated` | 0 / 0 |
+| **B3** policies whose expression says `admin` | 0 |
+| **B4** `btree_gist` | `extensions`, exclusion constraint validated |
+| **P3-A** the three private tables, direct, as a resident | `42501` ×3; history UPDATE `42501` |
+| **P3-B1** the filer sees own complaint · respondent contact withheld | 1 row · 1 of 2 |
+| **P3-B2** walk-in / Punong Barangay · / Secretary | **`P0001`** · accepted |
+| **P1** unsupported-role fail-safe | untouched; `Sidebar.test.js` passes |
+| **P2** purok constraints · `puroks` table · `PUROKS` | 0 · 0 · still seven values with `Purok 7` |
+
+### ⚠️ What was NOT verified
+
+**No authenticated page was loaded in a browser.** The dashboards are
+behind `ProtectedRoute` and this environment still has **no test
+account**; nothing was done to weaken authentication for a screenshot.
+So what is verified is the real components' output measured against the
+real CSS bundle, 131 unit tests over three new suites, and the role
+matrix against the live database — **not** the Secretary answering six
+questions on a live page, and not the Punong Barangay confirming one.
+
+⚠️ **No test screening was left.** Every probe ran inside a block ending
+in `RAISE EXCEPTION`, and **all five complaint tables are still at 0
+rows** — so no complaint was seeded either, and the screening panel has
+never been seen with real data in it.
+
+### P4-A limitations
+
+- **No KP case.** `kp_cases` does not exist, and nothing is created when
+  the confirmed outcome is `proceed_to_kp_process` — a test asserts the
+  only two INSERT targets in the migration are `complaint_screenings`
+  and `complaint_status_history`. Complaint, Screening and KP Case stay
+  three distinct lifecycle objects; P4-B builds the third.
+- **No hearing, summons, settlement, conciliation or CFA**, and no
+  `kp_jurisdiction_rules` table — §7 excluded it, and the key-set
+  function is a list of six strings rather than a rules engine.
+- **No capability-assignment table**, so no committee-based or
+  Peace-and-Order authorization exists. ⚠️ Its grant path is undesigned
+  (an official must not be able to grant themselves a capability) and a
+  private table with no reader is dormant infrastructure.
+- **No incident, blotter, Tanod, map or analytics.**
+- **No notification, SMS or email.** The Secretary learns a screening
+  was confirmed by looking; nothing is sent.
+- **No `activity_log` entry**, per the reasoning above.
+- **No video evidence**, and no raised size limit.
+- **No bulk screening, export or print.**
+- **No finer privacy tier** for the two sensitive answers within the two
+  readers who may see them.
+- **No purok normalisation**, and `PUROKS` still holds seven values with
+  `Purok 7` present.
+- ⚠️ **`complaints.updated_at` is now maintained** by both screening
+  RPCs, so the queue's two dates can finally differ — that was a P3-B2
+  limitation and it is closed.
+
+### ⚠️ What the barangay must still confirm
+
+Unchanged by this phase, and now the reason the checklist is labelled
+provisional on screen:
+
+- **Who is entitled to confirm that a matter is within Katarungang
+  Pambarangay jurisdiction.** The brief locked the Punong Barangay for
+  P4-A as a workflow decision; P2.5 found **no** Lupon, Justice or
+  Katarungan committee recorded anywhere, so the system has no record
+  from which to infer it.
+- **Whether these six questions are the right six**, and what else
+  belongs on the list. `other_circumstance_requiring_review` is how the
+  list says on screen that it is not exhaustive.
+- **Whether the four outcomes are the four the barangay wants**, and
+  what should happen after each.
+- **Whether a confirmed screening should notify anybody.**
+
+---
+
 ## Health centre
 
 **Medicine stock is a status, not a quantity** — Available / Low stock /
@@ -9621,7 +10235,7 @@ derives her initials from. It is no longer displayed as a label.
 - **Source maps ship to production** (~7 MB), so the original JSX is
   publicly reconstructable. `GENERATE_SOURCEMAP=false` in Vercel fixes it.
 - **`public/logo.png` is 984 KB and referenced by nothing.**
-- **Thin automated test coverage.** 1,241 tests in forty-five suites:
+- **Thin automated test coverage.** 1,376 tests in forty-eight suites:
   one smoke test over `<App />`, which fails without `.env` because
   `supabaseClient.js` throws at import time, and 886 tests over the
   resident workflow rules, the display labels, the booking window, the
@@ -9923,19 +10537,30 @@ derives her initials from. It is no longer displayed as a label.
   authorization-grade needs a `protect_official_record()` branch and a
   closed vocabulary first — a migration in its own right, with the
   rolled-back impersonation proof P2.5 deliberately did not run.
-  ⚠️ **Not "fixed" in P3-A** merely because it was discovered: P3-A
-  authorizes nothing on it, so nothing there depends on the guard.
-- **The complaint experience is INTAKE ONLY, and nothing can move a
-  complaint.** P3-A built the backend (migrations 040 and 041), P3-B1 the
-  resident and public frontend, and ✅ **P3-B2 the official queue, the
-  detail panel and the Secretary's walk-in intake** — so all twelve P3-A
-  functions now have a caller. Still unbuilt: screening, KP case,
-  incident, blotter, Tanod, the capability table, notifications and video
-  evidence. ⚠️ `complaints_status_check` permits exactly `received`, so
-  there is no Approve, Refer, Settle, Close or Schedule Hearing control
-  anywhere and a complaint cannot change state. See *Complaint intake
-  foundation (P3-A)*, *Resident complaint experience (P3-B1)* and
-  *Official complaint queue and walk-in intake (P3-B2)*.
+  ⚠️ **Not "fixed" in P3-A or P4-A** merely because it was discovered:
+  neither authorizes anything on it, so nothing in either depends on the
+  guard. ⚠️ **Re-measured in P4-A**, which is the phase where it would
+  have been most tempting to use: the Peace and Order Kagawad edits his
+  own `committee` successfully (`rows=1`) and still reads **zero**
+  screenings and is refused both screening RPCs. A test scans migration
+  042 and all three new frontend modules, comment-stripped, and asserts
+  the column is read nowhere.
+- **The complaint experience reaches a CONFIRMED SCREENING and stops
+  there.** P3-A built the backend (migrations 040 and 041), P3-B1 the
+  resident and public frontend, P3-B2 the official queue and the
+  Secretary's walk-in intake, and ✅ **P4-A the PROVISIONAL KP review
+  screening** (migration 042). ⚠️ `complaints_status_check` now permits
+  `received`/`under_review`/`screened`, so a complaint moves through
+  **stages** — but only via `prepare_complaint_screening()` and
+  `confirm_complaint_screening()`, and there is still no Approve, Refer,
+  Settle, Close or Schedule Hearing control anywhere.
+  ⚠️ **No `kp_cases` table exists and nothing creates one**, even when
+  the confirmed outcome is `proceed_to_kp_process` — that is P4-B. Also
+  still unbuilt: hearings, summons, settlement, CFA, incident, blotter,
+  Tanod, the capability table, notifications and video evidence. See
+  *Complaint intake foundation (P3-A)*, *Resident complaint experience
+  (P3-B1)*, *Official complaint queue and walk-in intake (P3-B2)* and
+  *KP review screening foundation (P4-A)*.
 - ⚠️ **A WALK-IN COMPLAINT RECORDED WITHOUT A CONTACT NUMBER CAN NEVER BE
   TRACKED ONLINE.** `encode_walk_in_complaint()` accepts a blank
   complainant contact deliberately — somebody may have no phone or
@@ -9958,7 +10583,9 @@ derives her initials from. It is no longer displayed as a label.
   Announcements and the post-X5 pass took on Home's contact cards. ⚠️ The
   other tabs were **deliberately not changed**: it is eleven tabs' worth
   of markup in a 5,640-line component, unrelated to this phase's diff,
-  and worth its own pass.
+  and worth its own pass. ⚠️ **P4-A did not change them either**, and its
+  own panel nests `h3 → h4 → h5` under the detail section rather than
+  repeating the defect.
 - ⚠️ **`.complaint-form` and `.modal-actions` had no CSS rule at all
   until P3-B2.** Both are used by `FileComplaintForm.jsx`, which shipped
   in P3-B1, and neither matched a single selector in the bundle — so the
@@ -9966,12 +10593,13 @@ derives her initials from. It is no longer displayed as a label.
   P3-B2 defines them in `Complaints.css` because the walk-in form uses
   the same two classes; strictly additive, since an unmatched selector
   has no computed style to change.
-- ⚠️ **`complaints.updated_at` exists and equals `created_at` on every
-  row**, because nothing in P3-A updates a complaint and no trigger
-  maintains it. The safe queue returns it, so a reader sees two identical
-  dates until P4 adds a transition. `document_requests` and `reservations`
-  both have a real `updated_at`; this one is the shape without the writer
-  yet, included so P4 needs no migration for it.
+- ✅ ~~**`complaints.updated_at` exists and equals `created_at` on every
+  row.**~~ **CLOSED by migration 042.** Both screening RPCs write it
+  alongside the status, so the safe queue's two dates can now differ.
+  ⚠️ There is still **no trigger** maintaining it: the two RPCs are the
+  only writers, which is the same shape 040's creation RPCs take. A
+  future writer that changes a complaint without going through one of
+  them would leave it stale.
 - **No lint script and no typecheck script** — see *Commands* and
   *Tests* above.
 

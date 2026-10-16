@@ -283,13 +283,38 @@ describe('C. empty states and narrowing', () => {
     expect(screen.queryByText('CMP-2026-9XYZ70')).not.toBeInTheDocument()
   })
 
+  // ⚠️ THREE STATUSES NOW, NOT ONE, and the list is still exactly what
+  // the CHECK permits. Migration 042 widened `complaints_status_check`
+  // from `received` alone to `received`/`under_review`/`screened`, so
+  // the two new options are reachable rows rather than a fabricated
+  // workflow -- and no option exists for a stage the system cannot
+  // reach, which is the property this test has always held. There is
+  // deliberately no KP Eligible, Under Mediation, Settled, Referred,
+  // Closed or Dismissed.
   it('offers no status option the database cannot hold', async () => {
     renderQueue()
     await screen.findByText('CMP-2026-AB12CD')
     const options = Array.from(
       screen.getByLabelText('Filter by status').querySelectorAll('option'),
     ).map((o) => o.textContent)
-    expect(options).toEqual(['All statuses', 'Received'])
+    expect(options).toEqual([
+      'All statuses', 'Received', 'Under barangay review', 'Reviewed by the barangay',
+    ])
+  })
+
+  // ⚠️ And the outcome stays out of the queue. A status may say which
+  // STAGE a complaint has reached; it must never say what the barangay
+  // decided, which is the screening's own record and is restricted to
+  // the two positions that may read it.
+  it('names no screening outcome in the status filter', async () => {
+    renderQueue()
+    await screen.findByText('CMP-2026-AB12CD')
+    const words = Array.from(
+      screen.getByLabelText('Filter by status').querySelectorAll('option'),
+    ).map((o) => o.textContent).join(' ').toLowerCase()
+    ;['eligible', 'ineligible', 'proceed', 'refer', 'close', 'dismiss',
+      'settled', 'mediation', 'jurisdiction', 'katarungang', 'lupon']
+      .forEach((term) => expect(words).not.toContain(term))
   })
 })
 
@@ -417,10 +442,20 @@ describe('E. the authorized detail panel', () => {
     expect(src).not.toContain('complaint_status_history')
   })
 
-  it('says plainly that there is no action to take', async () => {
+  // ⚠️ THE SENTENCE CHANGED BECAUSE THE FACT DID. It used to read
+  // "Screening, referral and case handling are not part of this system
+  // yet", and P4-A has just made the first of those three untrue. The
+  // property is unchanged -- the panel still says in words that no case
+  // action happens here, rather than leaving an empty space where a
+  // reader expects a control -- so the assertion follows the new
+  // sentence and the old wording is asserted GONE, because a page that
+  // denies having a feature it now has is worse than one that says
+  // nothing.
+  it('says plainly that there is no case action to take', async () => {
     await open()
-    expect(screen.getByText(/Screening, referral and case handling are not part/i))
-      .toBeInTheDocument()
+    expect(screen.getByText(/Case handling after screening/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Screening, referral and case handling are not part/i))
+      .not.toBeInTheDocument()
   })
 })
 
@@ -491,14 +526,50 @@ describe('G. the walk-in intake control', () => {
   // rather than assumed: `encode_walk_in_complaint()` raises P0001
   // unless the caller holds the Barangay Secretary position, and the
   // Punong Barangay was refused by it against the live database -- even
-  // though he reads every complaint. The component takes ONE flag and
-  // there is no Punong branch anywhere in it.
+  // though he reads every complaint.
+  //
+  // ⚠️ SCOPED TO THE CONTROL, not to the file, and the narrowing is
+  // deliberate rather than a loosening. P4-A gave this component a
+  // second flag, `isKapitan`, which gates the SCREENING CONFIRMATION
+  // control -- a different control, with a different database gate
+  // (`confirm_complaint_screening()` requires the Punong Barangay and
+  // refuses the Secretary). So "the file mentions no Punong" stopped
+  // being the property; "the walk-in gate is `isSecretary` and nothing
+  // else" is, and that is what is asserted.
   it('has no Punong Barangay branch that could render it', () => {
     const src = code('complaints/OfficialComplaints.jsx')
-    expect(src).not.toContain('isKapitan')
-    expect(src).not.toContain('Punong Barangay')
-    expect(src).not.toContain('isTreasurer')
-    expect(src.match(/isSecretary/g) || []).toHaveLength(2)
+    const at = src.indexOf('Record Walk-in Complaint')
+    expect(at).toBeGreaterThan(-1)
+
+    // The conditional the control is rendered under, read out of the
+    // source rather than assumed: the last `{<expr> && (` before it.
+    const before = src.slice(0, at)
+    const gates = before.match(/\{\s*[^{}\n]*?&&\s*\(/g) || []
+    const gate = gates[gates.length - 1]
+    expect(gate).toBeDefined()
+    expect(gate).toContain('isSecretary')
+    expect(gate).not.toContain('isKapitan')
+    expect(gate).not.toContain('isTreasurer')
+    expect(gate).not.toMatch(/Punong|kapitan/i)
+  })
+
+  // ⚠️ And the second flag reaches ONE place: the screening panel's
+  // props. If `isKapitan` ever appeared in a second expression in this
+  // file it would be gating something the brief did not give it, which
+  // is exactly what the old whole-file scan was protecting against.
+  // ⚠️ COUNTED BY LINE, NOT BY TOKEN, and that is my own arithmetic
+  // corrected rather than a weakened assertion: the first version
+  // expected two occurrences and got three, because
+  // `isKapitan={isKapitan}` is one line carrying the name twice. A
+  // count of tokens answers a question nobody asked; the property is
+  // that the flag appears in exactly two PLACES -- where it arrives,
+  // and where it is handed on.
+  it('uses the Punong Barangay flag for the screening panel and nothing else', () => {
+    const lines = code('complaints/OfficialComplaints.jsx')
+      .split('\n').filter((l) => l.includes('isKapitan'))
+    expect(lines).toHaveLength(2)
+    expect(lines[0]).toMatch(/isKapitan\s*=\s*false/)   // the destructured default
+    expect(lines[1]).toMatch(/isKapitan=\{isKapitan\}/) // handed to ScreeningPanel
   })
 })
 
@@ -780,17 +851,52 @@ describe('J. nothing here decides anything about a complaint', () => {
     expect(src).not.toContain('.delete(')
   })
 
-  // ⚠️ P3 creates complaints and judges nothing -- not jurisdiction, not
-  // KP eligibility. P2.5 found no Lupon, Justice or Katarungan
-  // committee recorded anywhere, so this system has no record from
-  // which to infer who is entitled to make that judgment.
-  it('uses no screening or KP vocabulary, and does not say "case"', () => {
-    const src = (code('complaints/OfficialComplaints.jsx')
-      + code('complaints/WalkInComplaintForm.jsx')).toLowerCase()
+  // ⚠️ THIS FILE STILL JUDGES NOTHING, and the list is still the P3 one
+  // -- minus the one word the phase legitimately made reachable.
+  //
+  // P2.5 found no Lupon, Justice or Katarungan committee recorded
+  // anywhere, so this system has no record from which to infer who is
+  // entitled to decide KP jurisdiction, and P4-A does not invent one:
+  // a human confirms every screening and the system stores what they
+  // decided. None of the stages AFTER a screening exists at all.
+  //
+  // ⚠️ SCOPED AROUND THE DENIAL PARAGRAPH, and that is the precedent
+  // `prototypeCoverage.test.js` set rather than a hole: the one
+  // paragraph whose whole job is to say that hearings, settlement and
+  // referral records are NOT part of this system is the one place those
+  // words have to appear, exactly as Business Clearance's own prose
+  // denies having a permit number and a whole-sheet scan flagged the
+  // disclaimer for containing the words it exists to disclaim. So the
+  // scan runs over the file WITHOUT that paragraph, and the paragraph
+  // is then asserted to be a denial.
+  it('uses no screening-outcome or KP vocabulary outside its own denial', () => {
+    const whole = (code('complaints/OfficialComplaints.jsx')
+      + code('complaints/WalkInComplaintForm.jsx'))
+    const denial = whole.match(/Case handling after screening[\s\S]*?Barangay Hall\./)
+    expect(denial).not.toBeNull()
+
+    const src = whole.replace(denial[0], '').toLowerCase()
     ;['katarungang', 'lupon', 'pangkat', 'mediation', 'conciliation',
       'summons', 'settlement', 'certificate to file', 'kp_case',
       'complaint_screenings', 'jurisdiction', 'blotter', 'tanod']
       .forEach((term) => expect(src).not.toContain(term))
+
+    // ⚠️ And it is a denial, not a promise. A paragraph that named those
+    // stages without saying they are absent would be the defect this
+    // scope-out would otherwise hide.
+    expect(denial[0]).toMatch(/not part of this system yet/i)
+  })
+
+  // ⚠️ THE SCREENING NEVER REACHES THE DATABASE FROM HERE. This file
+  // renders `<ScreeningPanel>` and passes it two flags; it names no
+  // screening RPC and reads no screening table, so the queue file
+  // cannot acquire a second path to the same records.
+  it('calls no screening RPC and names no screening table itself', () => {
+    const src = code('complaints/OfficialComplaints.jsx')
+    expect(src).not.toContain('prepare_complaint_screening')
+    expect(src).not.toContain('confirm_complaint_screening')
+    expect(src).not.toContain('complaint_screenings_for')
+    expect(src).not.toContain('complaint_screenings')
   })
 
   it('files no activity-log entry and sends no notification', () => {
@@ -854,12 +960,22 @@ describe('L. the architecture the phase committed to', () => {
 
   // ⚠️ ALL COMPLAINT STATE IS IN THE COMPONENT. OfficialDashboard.jsx is
   // ~5,640 lines and already holds every tab's state.
+  //
+  // ⚠️ P4-A ADDED ONE PROP AND NOTHING ELSE. The screening needed the
+  // Punong Barangay flag, which the dashboard already computes for the
+  // kapitan status row, so the tab line carries a second attribute --
+  // and the forbidden list below grew by every screening surface, so
+  // the dashboard still cannot acquire state or a data path of its own.
   it('keeps the dashboard to a tab line, with no complaint state in it', () => {
     const dash = code('dashboards/OfficialDashboard.jsx')
-    expect(dash).toContain('<OfficialComplaints isSecretary={isSecretary} />')
+    expect(dash).toContain(
+      '<OfficialComplaints isSecretary={isSecretary} isKapitan={isKapitan} />',
+    )
     ;['complaint_queue', 'encode_walk_in_complaint', 'complaint_parties_for',
       'complaint_attachments_for', 'complaint_history_for',
-      'setComplaints', 'complaintRows']
+      'setComplaints', 'complaintRows',
+      'prepare_complaint_screening', 'confirm_complaint_screening',
+      'complaint_screenings', 'setScreenings', 'ScreeningPanel']
       .forEach((term) => expect(dash).not.toContain(term))
   })
 
@@ -903,10 +1019,16 @@ describe('L. the architecture the phase committed to', () => {
     expect(sidebarCode).not.toMatch(/portalsByRole\[/)
   })
 
-  it('adds no migration', () => {
+  // ⚠️ P3-B2 ADDED NO MIGRATION AND P4-A ADDED EXACTLY ONE. The count
+  // is asserted rather than the absence, so a phase that quietly
+  // reached for a second one fails here -- which is the property this
+  // test has held since P3-B2, with the number moved to what is now
+  // true. 042 is the KP screening foundation; there is no 043.
+  it('adds exactly one migration, the screening foundation', () => {
     const dir = path.join(__dirname, '..', '..', 'supabase-migrations')
-    const files = fs.readdirSync(dir).filter((f) => f.endsWith('.sql'))
-    expect(files).toHaveLength(41)
-    expect(files.some((f) => f.startsWith('042'))).toBe(false)
+    const files = fs.readdirSync(dir).filter((f) => f.endsWith('.sql')).sort()
+    expect(files).toHaveLength(42)
+    expect(files[41]).toBe('042_kp_screening_foundation.sql')
+    expect(files.some((f) => f.startsWith('043'))).toBe(false)
   })
 })

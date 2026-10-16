@@ -3921,7 +3921,7 @@ const OfficialDashboard = () => {
             PUNONG BARANGAY is refused by it too, which is why no intake
             control is rendered for him either. */}
         {activeTab === 'complaints' && (
-          <OfficialComplaints isSecretary={isSecretary} />
+          <OfficialComplaints isSecretary={isSecretary} isKapitan={isKapitan} />
         )}
 
         {activeTab === 'waste' && (

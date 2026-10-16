@@ -84,8 +84,13 @@ describe('A. the queue says nothing about what a complaint is about', () => {
 // ── B. No fabricated workflow ────────────────────────────────────────
 
 describe('B. no status this system cannot reach is offered', () => {
-  it('offers exactly All plus the one real status', () => {
-    expect(QUEUE_STATUS_FILTERS.map((f) => f.value)).toEqual(['all', 'received'])
+  // ⚠️ FOUR SINCE P4-A, AND THE RULE IS UNCHANGED: a filter may offer
+  // only a status the database can actually hold. Migration 042 widened
+  // `complaints_status_check` to three real values, so each option here
+  // matches real rows rather than advertising a stage nothing can reach.
+  it('offers exactly All plus the statuses the database permits', () => {
+    expect(QUEUE_STATUS_FILTERS.map((f) => f.value))
+      .toEqual(['all', 'received', 'under_review', 'screened'])
   })
 
   it('shows the stored status through the label map, not raw', () => {
