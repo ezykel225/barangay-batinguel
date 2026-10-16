@@ -29,6 +29,8 @@ import {
   signedEvidenceUrl,
 } from './complaintApi'
 import WalkInComplaintForm from './WalkInComplaintForm'
+import ScreeningPanel from '../screening/ScreeningPanel'
+import { useConfirm } from '../components/ConfirmDialog'
 import './Complaints.css'
 
 // The Official Portal's Complaints tab.
@@ -94,7 +96,14 @@ import './Complaints.css'
 // would reproduce migration 028's escalation on an unguarded column.
 // Nothing in this file reads it.
 
-const OfficialComplaints = ({ isSecretary = false }) => {
+const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
+  // ⚠️ The shared confirmation dialog, because confirming a screening is
+  // the one action in this phase that records a barangay decision and
+  // cannot afterwards be edited. It brings the focus trap, Escape,
+  // Enter-defaults-to-Cancel and `aria-modal` every other confirmation in
+  // this project already has.
+  const { confirm, dialog: confirmDialog } = useConfirm()
+
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -235,6 +244,7 @@ const OfficialComplaints = ({ isSecretary = false }) => {
 
   return (
     <div>
+      {confirmDialog}
       <div className="official-dashboard-header">
         <h1>Complaints</h1>
         <p>Record and review complaints brought to the barangay.</p>
@@ -614,17 +624,60 @@ const OfficialComplaints = ({ isSecretary = false }) => {
                 </ul>
               )}
 
-              {/* ⚠️ THERE IS NO ACTION HERE, AND THAT IS THE PHASE.
-                  `complaints_status_check` permits exactly `received`,
-                  so nothing in this system can move a complaint --
-                  there is no Approve, Reject, Refer, Settle, Close or
-                  Schedule Hearing button, and no status control of any
-                  kind. Saying so is better than an empty space where a
-                  reader expects one. */}
+              {/* ── KP review screening (P4-A) ──────────────────────
+                  ⚠️ A SEPARATE COMPONENT, not another block of state in
+                  this one. `OfficialComplaints` already holds the queue,
+                  the filters and the detail; the screening keeps its own
+                  state in `ScreeningPanel` and this file passes it three
+                  things.
+
+                  ⚠️ `isSecretary` and `isKapitan` decide WHICH CONTROLS
+                  ARE PAINTED and nothing more. `prepare_complaint_screening()`
+                  raises P0001 unless the caller holds `Barangay Secretary`
+                  and `confirm_complaint_screening()` unless they hold
+                  `Punong Barangay`, both resolved through
+                  `official_account_links` -- and `complaint_screenings_for()`
+                  returns ZERO ROWS to anybody who is neither, measured.
+                  So the database decides and this only avoids painting a
+                  control it would refuse.
+
+                  ⚠️ It renders only inside the AUTHORIZED detail branch,
+                  so an official who cannot read the complaint at all
+                  never reaches it. */}
+              <h3>KP review screening</h3>
+              <ScreeningPanel
+                complaintId={detail.row.id}
+                isSecretary={isSecretary}
+                isKapitan={isKapitan}
+                confirm={confirm}
+              />
+
+              {/* ⚠️ THERE IS STILL NO CASE ACTION HERE, AND THAT IS THE
+                  PHASE. Saying so is better than an empty space where a
+                  reader expects a control.
+
+                  ⚠️ REWORDED FOR P4-A, because the old sentence said
+                  screening was "not part of this system yet" and that is
+                  now untrue -- and because the reason it gave is also
+                  out of date: `complaints_status_check` permitted exactly
+                  `received` and migration 042 widened it to
+                  `received`/`under_review`/`screened`. So a complaint CAN
+                  move now, but only through `prepare_complaint_screening()`
+                  and `confirm_complaint_screening()`, which move the
+                  STAGE; there is still no Approve, Reject, Refer, Settle,
+                  Close or Schedule Hearing control and no status control
+                  of any kind on this panel.
+
+                  What is absent is everything AFTER a confirmed
+                  screening: no KP case row is created, no hearing,
+                  summons, settlement or CFA exists, and
+                  `complaint_screenings` RECORDS the decision rather than
+                  acting on it. */}
               <p className="complaint-no-actions" role="note">
-                Screening, referral and case handling are not part of this
-                system yet. A complaint is recorded here and followed up at
-                the Barangay Hall.
+                Case handling after screening — hearings, settlement and
+                referral records — is not part of this system yet. A
+                confirmed screening records what the barangay decided to do;
+                the work itself is followed up at the Barangay Hall.
               </p>
             </>
           )}

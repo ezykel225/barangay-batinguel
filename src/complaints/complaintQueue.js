@@ -82,6 +82,21 @@ const foldReference = (value) => normalise(value)
 export const QUEUE_STATUS_FILTERS = [
   { value: 'all', label: 'All statuses' },
   { value: 'received', label: complaintStatusLabel('received') },
+  // ⚠️ TWO MORE SINCE P4-A, AND THEY ARE NOT A WIDENING OF THE RULE ABOVE.
+  // The rule is that a filter may offer only a status the database can
+  // actually hold, and migration 042 widened `complaints_status_check` to
+  // exactly these three -- so each of these matches real rows rather than
+  // advertising a stage nothing can reach. `KP Eligible`, `Under
+  // Mediation`, `Settled`, `Referred`, `Closed` and `Dismissed` are still
+  // absent and still must be: nothing in this system can set one.
+  //
+  // ⚠️ THE STAGE IS PRIVACY-SAFE; THE OUTCOME WOULD NOT BE. `screened`
+  // says a human confirmed a screening and never which outcome they
+  // confirmed -- that lives on `complaint_screenings`, which an ordinary
+  // official cannot read at all. So the queue gains how far along a
+  // complaint is and still nothing about its subject or its decision.
+  { value: 'under_review', label: complaintStatusLabel('under_review') },
+  { value: 'screened', label: complaintStatusLabel('screened') },
 ]
 
 export const QUEUE_CHANNEL_FILTERS = [

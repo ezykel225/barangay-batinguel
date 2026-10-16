@@ -1,0 +1,239 @@
+/* The KP review screening panel (P4-A).
+   Its own file, imported by ScreeningPanel.jsx. A block one component
+   owns does not belong in another component's stylesheet -- the
+   dishonesty `@keyframes pulse` taught in X4, and the reason PageIntro.css
+   and TrackPage.css were each extracted. */
+
+.screening-panel { min-width: 0; }
+
+/* ─── One review question ─────────────────────────────────────────── */
+
+.screening-item { min-width: 0; }
+
+/* A real <fieldset> per question so the three radios are announced as one
+   group named by the question, rather than as three unrelated controls. */
+.screening-question {
+  min-width: 0;
+  margin: 0 0 14px;
+  padding: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.screening-question > legend {
+  padding: 0 4px;
+  font-size: var(--fs-13);
+  font-weight: 600;
+  line-height: 1.5;
+  color: #1f2937;
+  /* The question is prose somebody wrote, so it wraps rather than setting
+     a min-content floor -- X2's family of defect, and the one P3-B1 hit
+     with a reference in a heading. */
+  overflow-wrap: anywhere;
+}
+
+.screening-q-number { color: var(--grey-600); }
+
+/* ⚠️ `minmax(0, 1fr)`, never a bare `1fr`: a bare track is
+   `minmax(auto, 1fr)` and cannot shrink below its content's min-content
+   width, which is X2's single biggest finding. `auto-fit` lets the three
+   options sit in one row where there is room and stack at phone width
+   with no media query. */
+.screening-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
+  gap: 6px;
+  margin-top: 10px;
+}
+
+/* ⚠️ THE WHOLE ROW IS THE TARGET, NOT JUST THE RADIO. A bare radio is
+   ~13px and its label another line of text, so the pair would sit under
+   WCAG 2.2 SC 2.5.8's 24px -- the same "a padded wrapper is not a target"
+   defect the dashboard filter bar's borderless input had and the public
+   mobile drawer's 21px links had. Padding the LABEL and letting it fill
+   the row makes the hit area the row. Measured 44px tall. */
+.screening-option {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.screening-option input[type='radio'] {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin: 0 8px 0 0;
+  cursor: pointer;
+}
+
+.screening-option label {
+  min-width: 0;
+  flex: 1 1 auto;
+  padding: 11px 10px 11px 0;
+  font-size: var(--fs-13);
+  line-height: 1.4;
+  color: #374151;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+/* ⚠️ EMPHASIS, NOT A VERDICT. Amber rather than red: red reads as an
+   error or a refusal, and this says only "worth a further look". It
+   carries an icon and the word "Possible" as well as the tint, so the
+   colour is the least of the three cues -- the rule NotificationBell
+   follows for unread. */
+.screening-flag {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid #fde68a;
+  background: #fffbeb;
+  font-size: var(--fs-13);
+  line-height: 1.45;
+  /* #78350f on #fffbeb -- the amber this project already uses for the
+     success panel's warning line. */
+  color: #78350f;
+  overflow-wrap: anywhere;
+}
+
+.screening-flag svg { flex-shrink: 0; margin-top: 2px; }
+
+/* ─── The prepared screening, as the confirmer reads it ───────────── */
+
+.screening-review,
+.screening-history {
+  min-width: 0;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.screening-answer-list,
+.screening-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.screening-answer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+  padding: 10px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+@media (min-width: 769px) {
+  /* The question and its answer side by side where there is room. The
+     narrow layout above is the fallback, not the override -- if this rule
+     vanished the phone layout would be unchanged, which is the shape the
+     compact Punong Barangay status settled on. */
+  .screening-answer {
+    grid-template-columns: minmax(0, 1fr) 220px;
+    gap: 8px 16px;
+    align-items: baseline;
+  }
+}
+
+.screening-answer-q {
+  min-width: 0;
+  font-size: var(--fs-13);
+  color: #374151;
+  overflow-wrap: anywhere;
+}
+
+.screening-answer-a {
+  min-width: 0;
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: #1f2937;
+  overflow-wrap: anywhere;
+}
+
+.screening-answer-flag {
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: #78350f;
+}
+
+.screening-confirm {
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid #bfdbfe;
+  border-left: 4px solid #1e40af;
+  border-radius: 8px;
+  background: #eff6ff;
+}
+
+/* ⚠️ THE PANEL'S SECTIONS ARE <h4> AND ITS SUBSECTIONS <h5>, because it
+   renders under the detail card's own <h3>KP review screening</h3>. The
+   levels run h1 (page) -> h2 (card) -> h3 (section) -> h4 -> h5 with none
+   skipped -- the defect P3-B2's first Chromium pass reported 49 times and
+   the one X3 fixed on Announcements.
+
+   ⚠️ EACH RULE MATCHES BOTH TAGS IT COULD REASONABLY CARRY, which is the
+   route X3 took on Announcements and the post-X5 pass on Home's contact
+   cards: the appearance then does not depend on the level, so a future
+   nesting change cannot silently restyle a heading. */
+.screening-review h3,
+.screening-review h4,
+.screening-history h3,
+.screening-history h4 {
+  margin: 0 0 12px;
+  font-size: var(--fs-14);
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.screening-review h5,
+.screening-confirm h4,
+.screening-confirm h5 {
+  margin: 18px 0 10px;
+  font-size: var(--fs-13);
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.screening-confirm h4,
+.screening-confirm h5 { margin-top: 0; }
+
+.screening-history-item {
+  padding: 12px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.screening-outcome {
+  margin: 0 0 4px;
+  font-size: var(--fs-14);
+  font-weight: 700;
+  color: #126c33;
+  overflow-wrap: anywhere;
+}
+
+.screening-meta {
+  margin: 0;
+  font-size: var(--fs-13);
+  color: var(--grey-600);
+  overflow-wrap: anywhere;
+}
+
+.screening-note {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #f9fafb;
+  font-size: var(--fs-13);
+  line-height: 1.5;
+  color: #374151;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 480px) {
+  .screening-question { padding: 12px; }
+  .screening-confirm { padding: 12px; }
+}

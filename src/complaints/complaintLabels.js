@@ -76,6 +76,21 @@ export const complaintCategoryLabel = (stored) => (
 // rendering, and neither shipped.
 export const COMPLAINT_STATUS_LABELS = {
   received: { label: 'Received', className: 'badge-pending' },
+  // ⚠️ TWO MORE SINCE P4-A, AND EACH NAMES A STAGE, NEVER AN OUTCOME.
+  // Migration 042 widened `complaints_status_check` to three values, so
+  // without these two a resident and an official would read a raw
+  // `under_review` off the screen -- the rule *No raw database value is
+  // shown to a user* exists for exactly this.
+  //
+  // ⚠️ `screened` means "a human has confirmed a screening" and must NOT
+  // be worded as though it revealed WHICH outcome. The outcome lives on
+  // `complaint_screenings`, behind a predicate that admits only the
+  // Barangay Secretary and the Punong Barangay -- deliberately not the
+  // filing resident. A label like "Approved for KP" or "Not eligible"
+  // would hand the complainant the barangay's internal decision through
+  // a status badge, which is the one thing this vocabulary must not do.
+  under_review: { label: 'Under barangay review', className: 'badge-pending' },
+  screened: { label: 'Reviewed by the barangay', className: 'badge-pending' },
 }
 
 export const complaintStatusLabel = (stored) => (
@@ -94,6 +109,17 @@ export const complaintStatusLabel = (stored) => (
 const STATUS_EXPLANATIONS = {
   received: 'Your complaint has been received for barangay review.'
     + ' Barangay officials will look at it in the order complaints arrive.',
+  // ⚠️ GENERIC ON PURPOSE, AND IT PROMISES NOTHING. It states the stage
+  // and no more: not a mediation, a hearing, a settlement, a response
+  // time, or whether the matter is within Katarungang Pambarangay
+  // jurisdiction -- that is a human judgment P4-A records and only the
+  // barangay may act on.
+  under_review: 'Barangay officials are reviewing your complaint.',
+  // ⚠️ It does NOT say what was decided, and must never be reworded to.
+  // A resident is told their complaint has been reviewed and where to
+  // ask -- a person tells them the outcome, not a status badge.
+  screened: 'The barangay has completed its review of your complaint.'
+    + ' Please follow this up at the Barangay Hall.',
 }
 
 export const describeComplaintStatus = (stored) => {
