@@ -47,11 +47,21 @@ const fn = (name) => {
 // ── A. The migration is one file, and it is the next number ──────────
 
 describe('A. the migration', () => {
-  it('is 042 and there is no 043', () => {
+  // ⚠️ REDEFINED BY COMBINED PHASE 1, AND IT IS A DEFINITION CHANGE
+  // RATHER THAN A LOOSENED ASSERTION. This read "is 042 and there is no
+  // 043", which asserted two different things: that P4-A added exactly
+  // ONE file at the next number — still true, still asserted below — and
+  // that nothing came after it, which was a statement about the
+  // repository's present and stopped being true when 043 landed.
+  //
+  // ⚠️ The newest-file guard did not disappear; it MOVED to the phase
+  // that owns the newest file. `kpCaseMigration.test.js` asserts 043 is
+  // last and there is no 044, so a later phase that adds one without a
+  // test still fails — which is the property this clause was for.
+  it('is 042, and P4-A added exactly one file at the next number', () => {
     const files = fs.readdirSync(DIR).filter((f) => f.endsWith('.sql')).sort()
-    expect(files).toHaveLength(42)
     expect(files[41]).toBe('042_kp_screening_foundation.sql')
-    expect(files.some((f) => f.startsWith('043'))).toBe(false)
+    expect(files.filter((f) => f.startsWith('042'))).toHaveLength(1)
   })
 
   it('records in its header that it was applied, and how', () => {
@@ -81,10 +91,14 @@ describe('A. the migration', () => {
       })
   })
 
+  // ⚠️ SCOPED TO THE 41 THAT PRECEDE IT, not to "everything that is not
+  // 042". The original filter said `!startsWith('042')` and so counted
+  // every LATER file too, which made it an assertion about the future
+  // rather than about what P4-A left alone.
   it('leaves 001-041 alone', () => {
     const files = fs.readdirSync(DIR).filter((f) => f.endsWith('.sql')).sort()
     // The 41 that existed before this phase, by name, unchanged.
-    expect(files.filter((f) => !f.startsWith('042'))).toHaveLength(41)
+    expect(files.filter((f) => f < '042')).toHaveLength(41)
     expect(files[0]).toMatch(/^001_/)
     expect(files[40]).toMatch(/^041_/)
   })

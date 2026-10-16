@@ -442,18 +442,37 @@ describe('E. the authorized detail panel', () => {
     expect(src).not.toContain('complaint_status_history')
   })
 
-  // ⚠️ THE SENTENCE CHANGED BECAUSE THE FACT DID. It used to read
-  // "Screening, referral and case handling are not part of this system
-  // yet", and P4-A has just made the first of those three untrue. The
-  // property is unchanged -- the panel still says in words that no case
-  // action happens here, rather than leaving an empty space where a
-  // reader expects a control -- so the assertion follows the new
-  // sentence and the old wording is asserted GONE, because a page that
-  // denies having a feature it now has is worse than one that says
-  // nothing.
-  it('says plainly that there is no case action to take', async () => {
+  // ⚠️ THE SENTENCE IS GONE BECAUSE THE FACT CHANGED AGAIN, and this is
+  // the SECOND time at this one site -- which is worth reading, because
+  // it is what a guard over a denial looks like when the denial keeps
+  // becoming untrue.
+  //
+  //   P3-B2  "Screening, referral and case handling are not part of
+  //           this system yet."
+  //   P4-A   screening arrived, so the first of those three became
+  //           false and the sentence was REWORDED to deny the other
+  //           two: "Case handling after screening -- hearings,
+  //           settlement and referral records -- is not part of this
+  //           system yet."
+  //   now    hearings and a recorded outcome have arrived, so the
+  //           reworded sentence is false too. There is nothing left for
+  //           it to deny honestly, so it is REMOVED rather than reworded
+  //           a third time, and the panel it would have contradicted
+  //           takes its place.
+  //
+  // The property this test has held throughout is unchanged: the detail
+  // panel never leaves an empty space where a reader expects a control.
+  // It is now satisfied by a control rather than by a sentence, so the
+  // assertion is that the KP case panel is THERE -- and BOTH retired
+  // wordings are asserted gone, because a page that denies having a
+  // feature it now has is worse than one that says nothing. Settlement
+  // TERMS, repudiation, compliance and a CFA are still absent and are
+  // still asserted absent, in section J below.
+  it('offers the KP case panel where its denial sentence used to be', async () => {
     await open()
-    expect(screen.getByText(/Case handling after screening/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'KP case' })).toBeInTheDocument()
+    expect(screen.queryByText(/Case handling after screening/i))
+      .not.toBeInTheDocument()
     expect(screen.queryByText(/Screening, referral and case handling are not part/i))
       .not.toBeInTheDocument()
   })
@@ -564,12 +583,22 @@ describe('G. the walk-in intake control', () => {
   // count of tokens answers a question nobody asked; the property is
   // that the flag appears in exactly two PLACES -- where it arrives,
   // and where it is handed on.
-  it('uses the Punong Barangay flag for the screening panel and nothing else', () => {
+  // ⚠️ A THIRD LINE, AND IT IS THE SAME SHAPE AS THE SECOND. Combined
+  // Phase 1 hands the flag to one more child panel, so the count moves
+  // from two to three -- and the assertion is tightened rather than
+  // loosened: every line is now required to be either the destructured
+  // default or a `isKapitan={isKapitan}` HAND-OFF. A line using the flag
+  // in any other expression -- a gate, a ternary, a comparison -- fails,
+  // which is the property the original count was protecting and which a
+  // bare `toHaveLength(3)` would not have held.
+  it('uses the Punong Barangay flag only as a default and a hand-off', () => {
     const lines = code('complaints/OfficialComplaints.jsx')
       .split('\n').filter((l) => l.includes('isKapitan'))
-    expect(lines).toHaveLength(2)
+    expect(lines).toHaveLength(3)
     expect(lines[0]).toMatch(/isKapitan\s*=\s*false/)   // the destructured default
-    expect(lines[1]).toMatch(/isKapitan=\{isKapitan\}/) // handed to ScreeningPanel
+    lines.slice(1).forEach((line) => {
+      expect(line.trim()).toBe('isKapitan={isKapitan}')
+    })
   })
 })
 
@@ -851,40 +880,47 @@ describe('J. nothing here decides anything about a complaint', () => {
     expect(src).not.toContain('.delete(')
   })
 
-  // ⚠️ THIS FILE STILL JUDGES NOTHING, and the list is still the P3 one
-  // -- minus the one word the phase legitimately made reachable.
+  // ⚠️ THE SCOPE-OUT IS GONE BECAUSE THE PARAGRAPH IT PROTECTED IS
+  // GONE, and the scan is now whole-file again -- which is STRICTER
+  // than the P4-A version, not weaker.
   //
-  // P2.5 found no Lupon, Justice or Katarungan committee recorded
-  // anywhere, so this system has no record from which to infer who is
-  // entitled to decide KP jurisdiction, and P4-A does not invent one:
-  // a human confirms every screening and the system stores what they
-  // decided. None of the stages AFTER a screening exists at all.
+  // P4-A ran this over the file MINUS its one denial paragraph, the
+  // `prototypeCoverage.test.js` precedent: the paragraph whose whole job
+  // was to say hearings and settlement are absent was the one place
+  // those words had to appear. Combined Phase 1 removed that paragraph
+  // (see section E), so there is no exemption left to carve out and none
+  // is carved.
   //
-  // ⚠️ SCOPED AROUND THE DENIAL PARAGRAPH, and that is the precedent
-  // `prototypeCoverage.test.js` set rather than a hole: the one
-  // paragraph whose whole job is to say that hearings, settlement and
-  // referral records are NOT part of this system is the one place those
-  // words have to appear, exactly as Business Clearance's own prose
-  // denies having a permit number and a whole-sheet scan flagged the
-  // disclaimer for containing the words it exists to disclaim. So the
-  // scan runs over the file WITHOUT that paragraph, and the paragraph
-  // is then asserted to be a denial.
-  it('uses no screening-outcome or KP vocabulary outside its own denial', () => {
-    const whole = (code('complaints/OfficialComplaints.jsx')
-      + code('complaints/WalkInComplaintForm.jsx'))
-    const denial = whole.match(/Case handling after screening[\s\S]*?Barangay Hall\./)
-    expect(denial).not.toBeNull()
+  // ⚠️ THE LIST IS THE P3 LIST MINUS ONLY WHAT THIS PHASE GENUINELY
+  // MADE REACHABLE, named individually so a failure says which word
+  // appeared. `mediation`, `summons`, `pangkat` and `kp_case` are now
+  // real -- they live in `kpcases/`, which has its own suites -- but
+  // THIS file must still not acquire them, because it holds the queue
+  // and the detail and renders the case panel as a child rather than
+  // reaching into it.
+  //
+  // ⚠️ WHAT IS STILL FORBIDDEN OUTRIGHT, in this file and everywhere in
+  // this phase: `settlement` TERMS, `repudiation`, `certificate to
+  // file`, `jurisdiction`, `blotter`, `tanod`. Each is a §10 deferral
+  // and none of them is reachable from anywhere in the application.
+  it('names no KP vocabulary of its own, and none of the deferred stages', () => {
+    const src = (code('complaints/OfficialComplaints.jsx')
+      + code('complaints/WalkInComplaintForm.jsx')).toLowerCase()
 
-    const src = whole.replace(denial[0], '').toLowerCase()
+    // Not in THIS file, though `kpcases/` now holds them legitimately.
     ;['katarungang', 'lupon', 'pangkat', 'mediation', 'conciliation',
-      'summons', 'settlement', 'certificate to file', 'kp_case',
-      'complaint_screenings', 'jurisdiction', 'blotter', 'tanod']
+      'summons', 'complaint_screenings', 'kp_cases', 'kp_hearings']
       .forEach((term) => expect(src).not.toContain(term))
 
-    // ⚠️ And it is a denial, not a promise. A paragraph that named those
-    // stages without saying they are absent would be the defect this
-    // scope-out would otherwise hide.
-    expect(denial[0]).toMatch(/not part of this system yet/i)
+    // Not anywhere in this phase -- §10.
+    ;['settlement', 'repudiation', 'certificate to file', 'jurisdiction',
+      'blotter', 'tanod']
+      .forEach((term) => expect(src).not.toContain(term))
+
+    // ⚠️ The retired denial paragraph must not be back. A sentence
+    // saying case handling is absent, beside the panel that provides
+    // it, is the contradiction section E exists to prevent.
+    expect(src).not.toContain('not part of this system yet')
   })
 
   // ⚠️ THE SCREENING NEVER REACHES THE DATABASE FROM HERE. This file
@@ -1019,16 +1055,17 @@ describe('L. the architecture the phase committed to', () => {
     expect(sidebarCode).not.toMatch(/portalsByRole\[/)
   })
 
-  // ⚠️ P3-B2 ADDED NO MIGRATION AND P4-A ADDED EXACTLY ONE. The count
-  // is asserted rather than the absence, so a phase that quietly
-  // reached for a second one fails here -- which is the property this
-  // test has held since P3-B2, with the number moved to what is now
-  // true. 042 is the KP screening foundation; there is no 043.
-  it('adds exactly one migration, the screening foundation', () => {
+  // ⚠️ THE NUMBER MOVES WITH EACH PHASE AND THE PROPERTY DOES NOT:
+  // each phase adds AT MOST ONE migration, and the count is asserted
+  // rather than the absence, so a phase that quietly reached for a
+  // second one still fails here. P3-B2 added none, P4-A added 042 and
+  // Combined Phase 1 added 043 -- one apiece, and 043 is the newest.
+  it('adds at most one migration per phase, and 043 is the newest', () => {
     const dir = path.join(__dirname, '..', '..', 'supabase-migrations')
     const files = fs.readdirSync(dir).filter((f) => f.endsWith('.sql')).sort()
-    expect(files).toHaveLength(42)
+    expect(files).toHaveLength(43)
     expect(files[41]).toBe('042_kp_screening_foundation.sql')
-    expect(files.some((f) => f.startsWith('043'))).toBe(false)
+    expect(files[42]).toBe('043_kp_case_hearings_summons.sql')
+    expect(files.some((f) => f.startsWith('044'))).toBe(false)
   })
 })
