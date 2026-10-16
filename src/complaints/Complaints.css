@@ -362,3 +362,184 @@
 
   .complaint-file-name { flex-basis: 100%; }
 }
+
+/* ─── The Official Portal's complaint queue and intake (P3-B2) ───────
+   Appended, and nothing above is edited: every rule the resident
+   experience already relies on keeps its bytes and its source order. */
+
+/* ⚠️ PRE-EXISTING AND FOUND IN PASSING, NOT INTRODUCED HERE.
+   `.complaint-form` and `.modal-actions` are used by
+   `FileComplaintForm.jsx`, which shipped in P3-B1, and NEITHER had a
+   single rule anywhere in the bundle -- so the resident form's action
+   row had no gap and no alignment of its own and the buttons simply
+   flowed inline. The walk-in form uses the same two classes, so they
+   are defined here rather than left as two more unstyled selectors.
+   Strictly additive: both were previously unmatched, so no existing
+   computed style can change. */
+.complaint-form { min-width: 0; }
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  /* Wraps rather than squeezing: at 320px a Cancel beside a
+     "Record complaint" does not fit one row, and a shrunk button is how
+     a target drops under WCAG 2.2 SC 2.5.8's 24px. */
+  flex-wrap: wrap;
+  margin-top: 20px;
+}
+
+/* The walk-in form's own screen, outside the shared modal. */
+.complaint-panel {
+  padding: 20px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+}
+
+/* An informational note, deliberately NOT `.complaint-emergency`.
+   That one is red on #fef2f2 because it carries an emergency warning;
+   what the contact number unlocks is operational information, and
+   painting it as an error would tell the Secretary something is wrong. */
+.complaint-notice {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  border: 1px solid #bfdbfe;
+  border-left: 4px solid #1e40af;
+  border-radius: 8px;
+  background: #eff6ff;
+}
+
+.complaint-notice svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: #1e40af;
+  font-size: 18px;
+}
+
+.complaint-notice p {
+  /* `min-width: 0` because a flex item's default `min-width: auto` is
+     its min-content width -- X2's finding, and what let a long
+     unbreakable token push a panel wide. */
+  min-width: 0;
+  margin: 0;
+  font-size: var(--fs-13);
+  line-height: 1.5;
+  /* #1e3a8a on #eff6ff -- the navy this project already uses for
+     sidebar text, measured at 6.98:1 on white and darker still here. */
+  color: #1e3a8a;
+  overflow-wrap: anywhere;
+}
+
+.complaint-queue-summary {
+  margin: 0 0 14px;
+  font-size: var(--fs-13);
+  color: var(--grey-600);
+}
+
+/* The selected queue row. ⚠️ A LEFT BAR AND A TINT, NOT COLOUR ALONE --
+   the rule NotificationBell follows for unread, where the tint is the
+   least of three cues. `aria-label` on each View button already names
+   which complaint it opens, so selection is never the only thing
+   carrying that information. */
+.dashboard-table tr.is-selected > td {
+  background: #eff6ff;
+}
+
+.dashboard-table tr.is-selected > td:first-child {
+  box-shadow: inset 3px 0 0 #1e40af;
+}
+
+/* ⚠️ The restricted-detail state. An ordinary official reaches this and
+   it is NOT an error: RLS filters rows without raising, so the panel is
+   told nothing failed. Styled as a neutral note rather than a warning,
+   because a boundary working correctly is not a fault. */
+.complaint-restricted {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f9fafb;
+}
+
+.complaint-restricted svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--grey-600);
+  font-size: 18px;
+}
+
+.complaint-restricted p {
+  min-width: 0;
+  margin: 0;
+  font-size: var(--fs-13);
+  color: var(--grey-600);
+  overflow-wrap: anywhere;
+}
+
+.complaint-party-address {
+  font-size: var(--fs-13);
+  color: var(--grey-600);
+  overflow-wrap: anywhere;
+}
+
+.complaint-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.complaint-history-list li {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  padding: 8px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.complaint-history-when {
+  flex-shrink: 0;
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: var(--grey-600);
+}
+
+.complaint-history-what {
+  font-size: var(--fs-13);
+  font-weight: 600;
+}
+
+.complaint-history-note {
+  min-width: 0;
+  flex-basis: 100%;
+  font-size: var(--fs-13);
+  color: var(--grey-600);
+  overflow-wrap: anywhere;
+}
+
+/* Says that no action exists here, rather than leaving a blank where a
+   reader expects one. `complaints_status_check` permits exactly
+   `received`, so there is nothing to act with. */
+.complaint-no-actions {
+  margin: 20px 0 0;
+  padding: 12px 14px;
+  border-radius: 6px;
+  background: #f9fafb;
+  font-size: var(--fs-13);
+  line-height: 1.5;
+  color: var(--grey-600);
+}
+
+@media (max-width: 480px) {
+  .complaint-panel { padding: 14px; }
+
+  /* The two action buttons each take the full row rather than being
+     squeezed below the 24px minimum target. */
+  .modal-actions > button { flex: 1 1 100%; }
+}

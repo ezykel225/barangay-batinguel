@@ -164,6 +164,42 @@ export const uploadEvidence = async (complaintId, file) => {
   return path
 }
 
+// Attaches what it can to a complaint that already exists, and reports
+// which files did not make it.
+//
+// ⚠️ ONE COPY, SHARED BY BOTH INTAKE PATHS. The resident form and the
+// Secretary's walk-in form both reach this, because the forced order
+// above is a property of the RPCs rather than of either screen: both
+// creation functions return the reference alone, so both must resolve
+// the id and then attach. A second copy of this loop is how two intake
+// paths come to disagree about what a failed upload means -- the same
+// objection this project makes to a second status vocabulary.
+const attachEvidence = async (complaintId, files = []) => {
+  const failedFiles = []
+
+  if (!complaintId) {
+    // The complaint filed but its id could not be resolved, so no
+    // evidence can be attached to it. Reported rather than silently
+    // dropped.
+    files.forEach((f) => failedFiles.push(f.name || 'attachment'))
+    return failedFiles
+  }
+
+  for (const file of files) {
+    try {
+      // Sequential on purpose. Five parallel uploads from a phone on
+      // barangay wifi is how one of them fails for a reason nobody
+      // can reproduce.
+      // eslint-disable-next-line no-await-in-loop
+      await uploadEvidence(complaintId, file)
+    } catch {
+      failedFiles.push(file.name || 'attachment')
+    }
+  }
+
+  return failedFiles
+}
+
 // Files the complaint, then attaches what it can.
 //
 // ⚠️ Returns { reference, complaintId, failedFiles } and throws ONLY if
@@ -171,27 +207,7 @@ export const uploadEvidence = async (complaintId, file) => {
 // submission has succeeded, and the screen must say so.
 export const fileComplaintWithEvidence = async (input, files = []) => {
   const { reference, complaintId } = await fileComplaint(input)
-
-  const failedFiles = []
-  if (complaintId && files.length > 0) {
-    for (const file of files) {
-      try {
-        // Sequential on purpose. Five parallel uploads from a phone on
-        // barangay wifi is how one of them fails for a reason nobody
-        // can reproduce.
-        // eslint-disable-next-line no-await-in-loop
-        await uploadEvidence(complaintId, file)
-      } catch {
-        failedFiles.push(file.name || 'attachment')
-      }
-    }
-  } else if (!complaintId && files.length > 0) {
-    // The complaint filed but its id could not be resolved, so no
-    // evidence can be attached to it. Reported rather than silently
-    // dropped.
-    files.forEach((f) => failedFiles.push(f.name || 'attachment'))
-  }
-
+  const failedFiles = await attachEvidence(complaintId, files)
   return { reference, complaintId, failedFiles }
 }
 
@@ -280,4 +296,137 @@ export const trackComplaint = async (reference, contact) => {
   // The function returns a table, so supabase-js hands back an array of
   // at most one row.
   return Array.isArray(data) ? (data[0] || null) : (data || null)
+}
+
+// ─── The Official Portal (P3-B2) ──────────────────────────────────────
+
+// The queue every active official sees.
+//
+// ⚠️ `complaint_queue()` AND NOTHING ELSE. It is SECURITY DEFINER,
+// gated on `is_official(auth.uid()) AND official_is_active(...)`, and
+// it returns six columns: id, reference, intake_channel, status,
+// created_at, updated_at.
+//
+// ⚠️ IT IS NOT REPLACED BY `from('complaints').select('*')` FOR
+// CONVENIENCE, and the measurement is why rather than the rule. Against
+// the live database a Treasurer and a Peace-and-Order Kagawad each get
+// ZERO rows from that table -- its only SELECT policy is
+// `complaint_is_visible_to_caller(id)`, true for the filer, the
+// Barangay Secretary and the Punong Barangay. So a table read would
+// hand most of the barangay's officials an empty queue, and widening
+// the policy to fix that would publish every narrative to all eleven.
+//
+// ⚠️ A resident and the nurse may EXECUTE this and get zero rows, which
+// is the fail-closed answer rather than a refusal. Code that treated
+// "no rows" as an error would report a working boundary as a fault.
+export const listComplaintQueue = async () => {
+  const { data, error } = await supabase.rpc('complaint_queue')
+
+  if (error) {
+    logFailure('Load complaint queue', error)
+    throw new Error('load-failed')
+  }
+  return Array.isArray(data) ? data : []
+}
+
+// The full row for one complaint: the narrative, the category and the
+// location note the queue withholds.
+//
+// ⚠️ THE EMPTY ANSWER IS "RESTRICTED", NOT "FAILED", AND THE DIFFERENCE
+// IS THE WHOLE FUNCTION. RLS filters rows and does not raise, so an
+// ordinary official reaches this and receives `null` with NO error --
+// there is no `42501` and no `P0001` in this path to surface, and code
+// that invented one would be reporting a policy working correctly as a
+// malfunction. `maybeSingle()` is what makes zero rows a value rather
+// than an exception.
+//
+// So this returns { row, restricted } and the caller renders
+// `RESTRICTED_DETAIL_MESSAGE` for the restricted case, while the queue
+// above stays on screen.
+export const loadOfficialComplaintRow = async (complaintId) => {
+  const { data, error } = await supabase
+    .from('complaints')
+    .select('id, reference, category, status, narrative, location_note, intake_channel, created_at, updated_at')
+    .eq('id', complaintId)
+    .maybeSingle()
+
+  if (error) {
+    logFailure('Load complaint row', error)
+    throw new Error('load-failed')
+  }
+
+  return { row: data || null, restricted: !data }
+}
+
+// ─── Walk-in intake, the Barangay Secretary's own ─────────────────────
+
+// Encodes a complaint brought to the barangay hall in person.
+//
+// ⚠️ SECRETARY-ONLY, AND THE DATABASE IS WHAT ENFORCES IT.
+// `encode_walk_in_complaint()` raises `P0001` unless
+// `current_official_holds_position('Barangay Secretary')`. Measured:
+// the PUNONG BARANGAY is refused by it, even though he reads every
+// complaint -- so this phase renders him no intake control, because the
+// backend would refuse one. The frontend's position flag decides which
+// controls to paint and decides nothing about what is permitted.
+//
+// ⚠️ IT TAKES NO IDENTITY, STATUS, REFERENCE OR TIMESTAMP. `encoded_by`
+// comes from `auth.uid()`, `status` is the literal `received`, the
+// reference is server-stamped by a trigger, and `filed_by_profile_id`
+// is NULL because a walk-in complainant has no account. There is
+// nothing here for a crafted call to forge.
+export const encodeWalkInComplaint = async ({
+  complainantName, complainantContact, category, narrative, locationNote, respondents,
+}) => {
+  const { data: reference, error } = await supabase.rpc('encode_walk_in_complaint', {
+    p_complainant_name: String(complainantName ?? '').trim(),
+    p_complainant_contact: String(complainantContact ?? '').trim() || null,
+    p_category: category,
+    p_narrative: String(narrative ?? '').trim(),
+    p_location_note: String(locationNote ?? '').trim() || null,
+    p_respondents: respondentPayload(respondents),
+  })
+
+  if (error) {
+    logFailure('Encode walk-in complaint', error)
+    const err = new Error('encode-failed')
+    // ⚠️ THE TRIGGER'S OWN SENTENCE NEVER REACHES THE SCREEN. Every
+    // refusal this RPC raises is `P0001`, and one of them names the
+    // position gate ("Only the Barangay Secretary can encode a walk-in
+    // complaint."). Printing it would put an authorization model in a
+    // toast at the counter; the two the Secretary can act on are mapped
+    // to their own words and everything else falls back to a neutral
+    // sentence. Matched on the message, not on a code, because the code
+    // is `P0001` for all of them.
+    const message = String(error.message || '')
+    if (/Barangay Secretary/i.test(message)) err.kind = 'encodeNotPermitted'
+    else if (/complainant/i.test(message)) err.kind = 'encodeNeedsName'
+    else if (/respondent/i.test(message)) err.kind = 'encodeRespondentNoName'
+    else err.kind = 'encodeFailed'
+    throw err
+  }
+
+  // Same id read-back as the resident path, and for the same reason:
+  // the RPC returns the reference alone, and evidence needs the uuid.
+  const { data: row, error: idErr } = await supabase
+    .from('complaints')
+    .select('id')
+    .eq('reference', reference)
+    .maybeSingle()
+
+  if (idErr) logFailure('Resolve encoded complaint id', idErr)
+
+  return { reference, complaintId: row?.id ?? null }
+}
+
+// Encodes the walk-in, then attaches whatever the complainant brought.
+//
+// ⚠️ Throws ONLY if the complaint itself could not be encoded, exactly
+// as the resident path does. A reference means the complaint exists and
+// the Secretary has something to write on the complainant's slip; a
+// failed photo must never read as a lost intake.
+export const encodeWalkInWithEvidence = async (input, files = []) => {
+  const { reference, complaintId } = await encodeWalkInComplaint(input)
+  const failedFiles = await attachEvidence(complaintId, files)
+  return { reference, complaintId, failedFiles }
 }

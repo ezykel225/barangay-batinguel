@@ -40,6 +40,7 @@ import {
 } from '../utils/officialAvailability'
 import { logActivity } from '../utils/activityLog'
 import DocumentPreview from '../documents/DocumentPreview'
+import OfficialComplaints from '../complaints/OfficialComplaints'
 import { canGenerate } from '../documents/documentRegistry'
 import {
   actionCellIsEmpty,
@@ -3904,6 +3905,23 @@ const OfficialDashboard = () => {
               )}
             </div>
           </div>
+        )}
+
+        {/* ⚠️ ONE LINE, AND ALL COMPLAINT STATE LIVES IN THE
+            COMPONENT. This file is ~5,640 lines and already holds every
+            other tab's state; adding another block of it here is what
+            `OfficialComplaints` exists to avoid. The same shape
+            `{activeTab === 'complaints' && <MyComplaints />}` takes in
+            ResidentDashboard.
+
+            ⚠️ `isSecretary` is passed to decide WHICH CONTROLS ARE
+            PAINTED and nothing more. `encode_walk_in_complaint()`
+            raises P0001 unless the caller holds the Barangay Secretary
+            position, so the database is the authority -- measured, the
+            PUNONG BARANGAY is refused by it too, which is why no intake
+            control is rendered for him either. */}
+        {activeTab === 'complaints' && (
+          <OfficialComplaints isSecretary={isSecretary} />
         )}
 
         {activeTab === 'waste' && (

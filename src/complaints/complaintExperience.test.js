@@ -506,6 +506,12 @@ describe('no screening or KP functionality is exposed', () => {
     'complaints/MyComplaints.jsx',
     'complaints/complaintApi.js',
     'pages/TrackComplaint.jsx',
+    // P3-B2's two official files are held to the same bar: the Official
+    // Portal is where screening language would be most tempting to add,
+    // because it is the screen an official would do it from.
+    'complaints/OfficialComplaints.jsx',
+    'complaints/WalkInComplaintForm.jsx',
+    'complaints/complaintQueue.js',
   ])('%s contains no screening vocabulary in its code', (file) => {
     const src = code(file).toLowerCase()
     ;['katarungang', 'lupon', 'pangkat', 'mediation', 'conciliation',
@@ -514,17 +520,28 @@ describe('no screening or KP functionality is exposed', () => {
       .forEach((term) => expect(src).not.toContain(term))
   })
 
+  // ⚠️ THE ALLOWLIST GREW BY EXACTLY TWO IN P3-B2, and this is the
+  // guard that it grew by no more than that. Before P3-B2 the last two
+  // lines of this test asserted `encode_walk_in_complaint` and
+  // `complaint_queue` were ABSENT, because the official queue was not
+  // built; they are now present and the set is pinned instead. Every
+  // name here is a function migration 040 or 041 actually created --
+  // an invented RPC, or a P4 one written ahead of its migration, fails.
   it('calls only the P3-A surfaces that exist', () => {
     const src = code('complaints/complaintApi.js') + code('pages/TrackComplaint.jsx')
     const rpcs = [...src.matchAll(/rpc\(\s*'([a-z_]+)'/g)].map((m) => m[1])
     expect([...new Set(rpcs)].sort()).toEqual([
       'complaint_attachments_for', 'complaint_history_for',
-      'complaint_parties_for', 'file_complaint_as_resident',
+      'complaint_parties_for', 'complaint_queue',
+      'encode_walk_in_complaint', 'file_complaint_as_resident',
       'record_complaint_attachment', 'track_complaint',
     ])
-    // ⚠️ The Secretary walk-in path and the official queue are P3-B2.
-    expect(src).not.toContain('encode_walk_in_complaint')
-    expect(src).not.toContain('complaint_queue')
+    // ⚠️ NO P4 SURFACE IS REFERENCED, named individually so the failure
+    // says which one appeared rather than only that the set changed.
+    ;['screen_complaint', 'complaint_screenings', 'create_kp_case',
+      'refer_complaint', 'settle_complaint', 'close_complaint',
+      'schedule_hearing', 'issue_summons']
+      .forEach((fn) => expect(src).not.toContain(fn))
   })
 })
 
