@@ -334,7 +334,7 @@ src/
 
   assets/images/      11 official portraits, page backgrounds, logo.
 
-supabase-migrations/  37 numbered SQL files. A record, not a runner.
+supabase-migrations/  38 numbered SQL files. A record, not a runner.
 supabase/functions/   Edge Function source (notify-reservation-sms).
 docs/                 SETUP.md, TESTING-WALKTHROUGH.pdf + its generator.
 ```
@@ -826,7 +826,7 @@ such row.
 
 ## Database notes
 
-**37 migrations**, `001` through `037`, all applied. ⚠️ 027 is a
+**38 migrations**, `001` through `038`, all applied. ⚠️ 027 is a
 DATA CORRECTION, not a schema change — see *The portrait is lost by the
 RENAME* under *Public E-Services (X5)*.
 
@@ -851,7 +851,7 @@ RENAME* under *Public E-Services (X5)*.
 | `medicine_stock` | Medicine availability as a status, not a count |
 | `barangay_terms` | One row per barangay term. **Empty** — schema only, migration 019A |
 | `barangay_term_members` | Who served in a term. **Empty** — schema only, migration 019A |
-| `official_availability` | Weekly consultation hours per elected official. Migration 026. **Empty** — only an official can enter their own |
+| `official_availability` | Weekly consultation hours per elected official. Migration 026. ⚠️ **ONE row since 2026-10-02** — the Barangay Treasurer's own Monday 9:00 AM–5:00 PM, `updated_by` herself. This entry said **Empty** until B5 measured it; 026 seeded nothing, and the row is a real official publishing her own hours through the app, which is the table working as designed. Only an official can enter their own |
 | `notifications` | In-app notifications. **Client-read-only** — written only by triggers; see *Notifications* |
 | `notification_reads` | Who has seen which notification. Insert and select only |
 | `official_account_links` | ⚠️ **PRIVATE, and since migration 031 it is THE authorization identity source at the database.** One-to-one `barangay_officials` ↔ `profiles` mapping. Migration 030, **11 rows.** `anon` and `authenticated` hold NO privilege on it and it has ZERO policies — every read is `42501`, the privilege layer, before RLS is consulted. Nothing in the app reads it directly and nothing may: the four authorization paths reach it only through `current_official_holds_position()` and `official_id_for_current_user()`, which answer one question about the caller. See *MASTER-A step A2* and *step A3* |
@@ -6446,8 +6446,12 @@ barangay.
 > tables that held it, `activity_log` UPDATE/DELETE, `profiles` DELETE and
 > both queues' DELETE. Migration 036 (2026-10-13) removed the eight dead
 > `admin` policy branches. ✅ **And migration 037 (2026-10-14) moved
-> `btree_gist` out of `public` into `extensions`, which was the last item.**
-> **MASTER-B IS COMPLETE.** See *step B1*, *step B2*, *step B3* and *step B4*.
+> `btree_gist` out of `public` into `extensions`.** ⚠️ **B4 called MASTER-B
+> complete while its own deferred-items table still listed bare PUBLIC EXECUTE
+> on nine functions as open.** ✅ **Migration 038 (B5, 2026-10-16) removed it —
+> zero of the 26 SECURITY DEFINER functions now carry PUBLIC EXECUTE — and
+> MASTER-B IS COMPLETE as of B5.** See *step B1*, *step B2*, *step B3*,
+> *step B4* and *step B5*.
 
 Carried forward unchanged, all recorded under *Known gaps*: the eight
 remaining dead `admin` policy disjuncts; `TRUNCATE` granted to `anon`
@@ -6805,6 +6809,12 @@ migration of its own.
   nine is a candidate for a later step, and for the seven it needs the
   policy-still-works proof in a rolled-back transaction first. Recorded,
   not attempted.
+  ✅ **B5 did exactly that** — migration 038 revoked PUBLIC from all nine
+  and kept every named grant, with the policy-still-works proof run as a
+  23-line before/after workflow matrix. ⚠️ **The named `anon` and
+  `authenticated` grants were NOT narrowed**, because the policies that
+  call the predicates are declared `TO public` and are therefore evaluated
+  for whichever role queries the table; see *MASTER-B step B5*.
 
 ---
 
@@ -7107,7 +7117,10 @@ impersonation and the catalog. Padding the count would misrepresent the phase.
 2026-10-13, on `claude/master-b3-dead-admin-policy-cleanup`, built on
 `main` after PR #33 merged. **B3 only. MASTER-B is NOT finished** —
 `btree_gist` in `public` is still outstanding, and is now the only item.
-✅ **B4 closed it** — migration 037, 2026-10-14. **MASTER-B is COMPLETE.**
+✅ **B4 closed it** — migration 037, 2026-10-14. ⚠️ **But B4's own report
+still listed bare PUBLIC EXECUTE on nine functions as open, so "complete"
+was premature;** ✅ **B5 closed that — migration 038, 2026-10-16 — and
+MASTER-B is COMPLETE as of B5.**
 
 ✅ **Eight RLS policies across four tables stopped testing for a role this
 system does not have. Zero policies in any schema mention `admin` now.**
@@ -7458,7 +7471,7 @@ the count would misrepresent what B3 did.
 
 ---
 
-## ✅ MASTER-B step B4 — btree_gist leaves `public`. MASTER-B IS COMPLETE (migration 037)
+## ✅ MASTER-B step B4 — btree_gist leaves `public` (migration 037)
 
 2026-10-14, on `claude/master-b4-btree-gist-relocation`, built on `main`
 after PR #35 merged (`20088e7`). **B4 only — and B4 was the last item.**
@@ -7769,12 +7782,414 @@ recorded for a guest booking.
 | who may archive another official | ⚠️ **a business rule the barangay owns**, carried untouched since A4 |
 | leaked-password protection | ⚠️ **platform** — Pro-only on this project |
 
-✅ **No MASTER-B security-hardening item remains unresolved. MASTER-B IS
-COMPLETE.** The four items still carrying a ⚠️ above are either deliberate
-design (the predicates and RPCs, the backed DELETE policy, the unexploitable
-default grants), cosmetic (the policy names), a barangay decision (archive
-scope), or a platform limit (leaked passwords) — and every one of them was
-recorded as such by the phase that examined it, not discovered here.
+> ⚠️ **CORRECTED BY B5, AND THE CORRECTION IS THE POINT.** B4 originally
+> read *"No MASTER-B security-hardening item remains unresolved. MASTER-B IS
+> COMPLETE"* — while the table immediately above it listed **bare PUBLIC
+> EXECUTE on nine functions** as *"open, recorded by B1, not a new finding"*.
+> Those two statements contradict each other: an unnecessary broad grant that
+> nobody has proven necessary is unfinished work, not retained architecture.
+> ✅ **Migration 038 (B5, 2026-10-16) removed it**, and **MASTER-B is complete
+> as of B5, not as of B4.** Every measurement in this B4 section is left
+> exactly as recorded on its own day — only the verdict was wrong.
+
+The three items still carrying a ⚠️ above other than the PUBLIC grants are
+either deliberate design (the predicates and RPCs, the backed DELETE policy,
+the unexploitable default grants), cosmetic (the policy names), a barangay
+decision (archive scope), or a platform limit (leaked passwords) — and every
+one of them was recorded as such by the phase that examined it.
+
+
+---
+
+## ✅ MASTER-B step B5 — the last bare PUBLIC EXECUTE. MASTER-B IS COMPLETE (migration 038)
+
+2026-10-16, on `claude/master-b5-public-execute-hardening`, built on `main`
+after PR #36 merged (`102ff67`). **B5 only.**
+
+✅ **Zero of the 26 SECURITY DEFINER functions in `public` carry PUBLIC
+EXECUTE.** It was nine. The whole migration is **nine `REVOKE` statements**
+and no GRANTs:
+
+```sql
+revoke execute on function public.can_see_audience(text)                 from public;
+revoke execute on function public.current_official_holds_position(text)  from public;
+revoke execute on function public.is_official(uuid)                      from public;
+revoke execute on function public.notification_is_visible(uuid)          from public;
+revoke execute on function public.official_id_for_current_user()         from public;
+revoke execute on function public.official_is_active(uuid)               from public;
+revoke execute on function public.term_is_confirmed(uuid)                from public;
+revoke execute on function public.get_reservation_slots(date)            from public;
+revoke execute on function public.get_reservation_slots_range(date,date) from public;
+```
+
+| | before 038 | after |
+|---|---|---|
+| SECURITY DEFINER functions in `public` | 26 | **26** |
+| client-executable (`anon` or `authenticated`) | 11 | **11** |
+| of those, carrying bare PUBLIC EXECUTE | **9** | **0** |
+| carrying PUBLIC EXECUTE, all 26 | 9 | **0** |
+| named `anon` / `authenticated` / `service_role` grants | 11 / 11 / 26 | **11 / 11 / 26** — unchanged |
+| trigger + event-trigger functions client-unreachable (B1) | 15 | **15** |
+
+### ⚠️ Why B4's "MASTER-B COMPLETE" was premature
+
+B4's own deferred-items table listed *"bare **PUBLIC** EXECUTE on those
+nine — **open**, recorded by B1, not a new finding"* in the same section
+that declared MASTER-B complete. Those two statements cannot both stand:
+**an unnecessary broad grant that nobody has proven necessary is unfinished
+work, not retained architecture.** B4's measurements are left exactly as
+recorded; only its verdict was wrong, and this phase is the correction.
+
+### ⚠️ PUBLIC IS NOT `anon` — they are different privilege concepts
+
+This is the whole of B5 and it is easy to get backwards. `GRANT EXECUTE …
+TO PUBLIC` grants EXECUTE to **every role in the cluster**; `GRANT … TO
+anon` grants it to the one role PostgREST uses for unauthenticated
+requests. Removing PUBLIC **does not remove anonymous access** — `anon`
+keeps its own named grant, which is the point: the guest-facing behaviour
+is preserved by a grant to the role that needs it, while every other role
+loses a privilege it never used.
+
+⚠️ **The precedent was already in this database, and it settles the
+"but it's guest-facing" objection.** `create_court_reservation` and
+`track_court_reservation` are also client RPCs, are also reached by
+anonymous visitors on the public booking and tracking pages, and have read
+
+```
+postgres=X | anon=X | authenticated=X | service_role=X
+```
+
+with **no PUBLIC entry at all since migration 025**. They have worked that
+way for three weeks. So a guest page was never an argument for PUBLIC —
+only for an explicit `anon` grant.
+
+### The nine, and the required-role matrix
+
+Classified from the live catalog — `pg_policies` for the predicates, the
+application's own `.rpc(` calls for the RPCs. Nothing taken from a
+function's name or from this file's prose.
+
+| Function | Class | PUBLIC before | anon needed | authd needed | svc | Why |
+|---|---|---|---|---|---|---|
+| `can_see_audience(text)` | A | yes | kept | **yes** | yes | 1 policy, `notifications` SELECT, `TO public` |
+| `current_official_holds_position(text)` | A | yes | kept | **yes** | yes | 4 policies — both queues + both kapitan UPDATE, `TO public` |
+| `is_official(uuid)` | A | yes | **yes** | **yes** | yes | **11 policies** across 6 public tables **and `storage.objects`** |
+| `notification_is_visible(uuid)` | A | yes | kept | **yes** | yes | 1 policy, `notification_reads` INSERT, `TO public` |
+| `official_id_for_current_user()` | A+C | yes | *surplus — see below* | **yes** | yes | 3 `official_availability` policies `TO authenticated`, **and** the frontend's own `.rpc()` since A5 |
+| `official_is_active(uuid)` | A | yes | **yes** | **yes** | yes | 1 policy, `official_availability` SELECT, `TO public` — the public Officials page reads it |
+| `term_is_confirmed(uuid)` | A | yes | **yes** | **yes** | yes | 1 policy, `barangay_term_members` SELECT, declared **`TO anon+authenticated`** |
+| `get_reservation_slots(date)` | B | yes | **yes** | **yes** | yes | 0 policies — a pure client RPC, the public availability grid |
+| `get_reservation_slots_range(date,date)` | B | yes | **yes** | **yes** | yes | 0 policies — the public availability calendar, a month per call |
+
+⚠️ **An RLS policy is evaluated as the QUERYING role.** Seven of the nine
+are policy predicates, and all but two of their policies are declared
+`TO public` — so the predicate is evaluated for `anon` and `authenticated`
+alike whenever either queries that table. **Revoking the named grants is
+not what 038 does and would break the policies rather than harden them**,
+which is precisely what B1 recorded and what this phase re-proved.
+
+⚠️ **One named grant does look surplus, and it is REPORTED rather than
+removed.** `official_id_for_current_user()`'s **`anon`** grant: its three
+policies are declared `TO authenticated`, and the frontend calls it only
+with a session. Nothing in the live catalog needs `anon` to execute it.
+It is left in place because removing it is a behaviour change on a surface
+nobody has asked about — it would turn an anonymous call from *"returns
+NULL"* (which leaks nothing, there being no `auth.uid()`) into `42501` —
+and because narrowing a named grant deserves its own proof pass rather
+than riding along inside a PUBLIC cleanup. **Named as a candidate, not
+done.**
+
+### ⚠️ Who actually loses anything — measured by dry-running the revoke
+
+The revoke was executed inside an aborted transaction and **every role in
+`pg_roles`** re-tested with `has_function_privilege`, before and after:
+
+| | |
+|---|---|
+| **KEEP** execute | `anon`, `authenticated`, `postgres`, `service_role`, `supabase_admin` |
+| **LOSE** execute (25) | `authenticator`, `dashboard_user`, `pgbouncer`, `supabase_auth_admin`, `supabase_etl_admin`, `supabase_privileged_role`, `supabase_read_only_user`, `supabase_realtime_admin`, `supabase_replication_admin`, `supabase_storage_admin`, and the 15 `pg_*` predefined roles |
+
+Every role that loses EXECUTE is infrastructure, and **not one is a role
+this application executes as**. Three had a plausible claim and were
+settled individually, because a wrong answer would only show up in
+production:
+
+- **`authenticator`** — PostgREST's login role. It `SET ROLE`s to
+  `anon` / `authenticated` / `service_role` for every request, so the
+  function executes as the switched role, which keeps its named grant.
+  Re-verified behaviourally after the migration: `anon` called both slot
+  RPCs, `create_court_reservation` and `track_court_reservation`
+  successfully.
+- **`supabase_auth_admin`** — performs the `auth.users` INSERT that fires
+  `handle_new_resident_signup()`. That function does **not** call any of
+  the nine, checked by scanning every function body in `public`, `auth`
+  and `storage`. The six that **do** — `protect_reservation_status`,
+  `stamp_activity_actor`, `prevent_role_self_change`,
+  `enforce_reservation_window`, `protect_document_request_status`,
+  `stamp_notification_read` — are all SECURITY DEFINER owned by
+  `postgres`, and ⚠️ **inside a SECURITY DEFINER function the EXECUTE
+  check for a nested call is made as the DEFINER, not as the original
+  caller.** That is the same PostgreSQL fact migration 034 already
+  depends on.
+- **`supabase_storage_admin`** — three `storage.objects` policies call
+  `is_official()`. ⚠️ **That role OWNS `storage.objects`**, which has
+  `relrowsecurity = t` and **`relforcerowsecurity = f`** — and a table
+  owner bypasses RLS when FORCE is off, so those policies are never
+  evaluated as that role at all. When the storage API enforces RLS for a
+  user request it does so as `anon`/`authenticated`, which keep their
+  named grants. Neither path needs PUBLIC.
+
+### ⚠️ Replay safety — why 038 carries no GRANT statements, and how that was proven
+
+Only **three** functions in the whole migration set are granted EXECUTE
+explicitly by a migration file: `term_is_confirmed` (019) and the two
+reservation RPCs (025). The other **eight** of the nine hold named
+`anon`/`authenticated`/`service_role` grants that **no migration ever
+wrote**. If those came from somewhere non-deterministic, revoking PUBLIC
+would leave a **rebuilt** database with no client access — so this was
+established rather than assumed.
+
+They come from Supabase's default privileges. `pg_default_acl` holds, for
+role `postgres` creating **FUNCTION**s in schema `public`:
+
+```
+postgres=X | anon=X | authenticated=X | service_role=X
+```
+
+and PostgreSQL's own built-in function default adds the PUBLIC entry on
+top. Proven by `CREATE`ing a throwaway SECURITY DEFINER function in
+`public` inside an aborted transaction and reading its ACL:
+
+```
+=X/postgres | postgres=X | anon=X | authenticated=X | service_role=X
+anon=t authd=t svc=t  PUBLIC=t
+```
+
+So a fresh replay of `001..038` creates each of the nine with the three
+named grants already present, and 038 removes only the PUBLIC entry.
+⚠️ **Writing GRANTs into 038 would record as this migration's doing
+something the platform already guarantees** — and would mislead the next
+reader about where those grants come from.
+
+⚠️ **A NULL `proacl` is not "no PUBLIC".** For a function, a NULL ACL
+means *default* privileges, which include EXECUTE to PUBLIC. The
+inventory query therefore reads
+`proacl IS NULL OR exists(aclexplode … grantee = 0)`; counting only the
+explicit `=X/` entries would have under-reported the exposure.
+
+### The workflow matrix — 23 lines, identical before and after
+
+One block, run before 038 and again after, as the real roles with their
+own JWT claims, inside a transaction that always aborts:
+
+| Probe | BEFORE | AFTER |
+|---|---|---|
+| `anon` `get_reservation_slots('2026-08-19')` | 1 | **1** |
+| `anon` `get_reservation_slots_range(Aug 2026)` | 1 | **1** |
+| `anon` `create_court_reservation` | reference issued | **reference issued** |
+| `anon` track, correct reference + contact | 1 row | **1 row** |
+| `anon` track, **wrong** contact | 0 rows | **0 rows** — still no oracle |
+| `anon` `barangay_officials` (`is_official` path) | 11 | **11** |
+| `anon` `official_availability` (`official_is_active`) | 1 | **1** |
+| `anon` `barangay_term_members` (`term_is_confirmed`) | 0 | **0** |
+| `anon` `profiles` (`is_official` path) | 0 | **0** |
+| `anon` `notifications` (`can_see_audience` path) | `42501` | **`42501`** |
+| `anon` `residents_registry` | 0 | **0** |
+| resident — own reservations visible | 0 | **0** |
+| resident — `notifications` | 0 | **0** |
+| resident — `profiles` visible | 1 | **1** |
+| nurse — `health_events` UPDATE | rows=1 | **rows=1** |
+| Kagawad — `activity_log` (`is_official`) | 67 | **67** |
+| Kagawad — `residents_registry` (`is_official`) | 5 | **5** |
+| Kagawad — `document_requests` UPDATE (negative control) | rows=0 | **rows=0** |
+| Kagawad — inserts **his own** consultation hours | rows=1 | **rows=1** |
+| Kagawad — inserts **another official's** hours | `REFUSED 42501` | **`REFUSED 42501`** |
+| **Secretary** — `document_requests` UPDATE · `aud(sec)` | rows=1 · `t` | **rows=1 · `t`** |
+| **Treasurer** — `reservations` UPDATE · `aud(treas)` | rows=1 · `t` | **rows=1 · `t`** |
+| **Punong** — `kapitan_status` UPDATE · holds PUN | rows=1 · `t` | **rows=1 · `t`** |
+
+**23 of 23 identical.** The only differences between the two runs are the
+random booking reference (both succeeded) — which is what
+`stamp_reservation_reference` is supposed to produce.
+
+⚠️ **`anon` → `notifications` is `42501` in BOTH runs, and that is correct,
+not a regression.** `anon` holds no SELECT **privilege** on that table
+(migration 022's two-barrier pattern), so `can_see_audience` is never
+reached as `anon` at all — the privilege layer answers first. Worth knowing
+because it is the one line in the matrix that *looks* like a failure.
+
+⚠️ **One BEFORE probe returned `23514` and it was my payload, not a
+permission result.** The Kagawad's `official_availability` INSERT used
+`status = 'available'` with no times, which
+`official_availability_hours_present` refuses. ⚠️ **An RLS refusal is
+`42501`; a `23514` means the policy's `WITH CHECK` PASSED** and the table
+CHECK fired afterwards — so even the failed probe proved
+`official_id_for_current_user()` had executed. Re-run with the times the
+constraint requires: `rows=1`. The project's own rule, for the eighth
+phase running: *always ask which step produced the result.*
+
+### MASTER-A regression — unchanged
+
+| | |
+|---|---|
+| Secretary holds SEC/TRE/PUN | `t` / `f` / `f` |
+| `official_id_for_current_user()` = her own directory row | **true** |
+| `document_requests` UPDATE (031) · `can_see_audience('secretary')` | rows=1 · `t` |
+| Full Name edit on her own row (033) | **rows=1** |
+| self-archive (032) | **REFUSED `P0001`** |
+| archive **another** official (018) | rows=1 — the existing business rule |
+| reads `official_account_links` (030) | **REFUSED `42501`** |
+| own `position` change (028) | **REFUSED `P0001`** |
+| client INSERT naming a powered position (029) | **REFUSED `P0001`** |
+| client INSERT of `Kagawad` (positive control) | **rows=1** |
+
+Identity still resolves `auth.uid()` → `profiles` →
+`official_account_links` → `barangay_officials.id`, with **no fallback to
+`full_name` anywhere**.
+
+### B1 / B2 / B3 / B4 regression — unchanged
+
+| | |
+|---|---|
+| **B1** direct calls to the 15 revoked trigger functions, as `anon` **and** `authenticated` | **30 / 30 refused `42501`**, 0 anything else |
+| **B1** SECURITY DEFINER total / client-executable | 26 / **11** |
+| **B1** trigger functions that regained PUBLIC | **none** |
+| **B2** `TRUNCATE` for `anon` / `authenticated` / `service_role` | **0 / 0** / 21 |
+| **B2** `activity_log` UPD+DEL, `profiles` DEL, both queues' DEL, `kapitan_*` INS+DEL | **none granted to either client role** |
+| **B2** `barangay_officials` DELETE policy still present | 1 — archived rows only (018) |
+| **B2** REFERENCES/TRIGGER grants to clients · `CREATE` on `public` | 72 grants · **anon=f, authenticated=f** — unexploitable, exactly as B2 recorded |
+| **B3** `profiles_role_check` | `CHECK (role = ANY (ARRAY['official','nurse','resident']))` |
+| **B3** policies whose expression says `admin` · names containing "Admin" · total policies | **0** · 9 · **75** |
+| **B4** `btree_gist` schema / version / copies / extensions in `public` | **`extensions`** / **1.7** / 1 / **0** |
+| **B4** exclusion constraint validated · index valid/ready/live · `gist_date_ops` schema | `t` · `t`/`t`/`t` · `extensions` |
+| **B4** overlap · duplicate · adjacency · same-date non-overlap · `cancelled` · `declined` | `23P01` · `23P01` · accepted · accepted · accepted · accepted |
+
+⚠️ **B4's reservation matrix was re-run in full and is identical**, both
+refusals naming `reservations_no_overlapping_slots` with SQLSTATE `23P01`.
+
+### Health Center regression
+
+`HealthCenter.jsx` was **not touched**. The only `.limit(` on the
+`health_events` read is still absent — the two matches in the file are the
+**comment** documenting its removal and a `.limit(1)` belonging to the
+`nurse_availability` query. Jest's 33 Health Center tests pass, View All /
+Show Less included.
+
+⚠️ **Upcoming health events is now 10, not the 11 B4 recorded**, and that
+is `manilaToday()` working: the 15 Oct 2026 event is in the past as of
+16 Oct. 13 rows total, unchanged.
+
+### Advisors — before and after
+
+| Finding | before 038 | after |
+|---|---|---|
+| `rls_enabled_no_policy` — `official_account_links` | INFO, 1 | INFO, 1 — intentional, that is what a private table looks like |
+| `anon_security_definer_function_executable` | WARN, 11 | WARN, **11** |
+| `authenticated_security_definer_function_executable` | WARN, 11 | WARN, **11** |
+| `auth_leaked_password_protection` | WARN, 1 | WARN, 1 — Pro-only on this project |
+| `extension_in_public` | gone (B4) | **still gone** |
+| anything new | — | **none** |
+
+⚠️ **The two SECURITY DEFINER lints do not move, and that is correct
+rather than a failure.** They flag a SECURITY DEFINER function reachable by
+`anon`/`authenticated` — which is exactly what the named grants
+deliberately preserve and what the policies require. **Removing PUBLIC
+cannot move them by construction.** So for this phase the catalog ACL is
+the authoritative measurement, and it moved from **9 functions with bare
+PUBLIC EXECUTE to 0**. The same lesson B2 and B3 each recorded: the
+advisor is the wrong instrument for a privilege phase.
+
+### What was verified
+
+| Check | Result |
+|---|---|
+| baseline | `main` at **`102ff67`** (PR #36 merge), tree clean, 38 migrations `001`–`038` after this file, no gaps |
+| baseline suite + build, run **before** any change | 38 suites / 930 tests · 225.17 kB · `main.cacec8c3.js` |
+| PUBLIC EXECUTE across all 26 SECURITY DEFINER functions | **9 → 0** |
+| named grants | `anon` 11, `authenticated` 11, `service_role` 26 — unchanged |
+| role-by-role dry run | 5 roles keep, 25 infrastructure roles lose, measured across `pg_roles` |
+| replay safety | proven from `pg_default_acl` **and** by creating a throwaway function |
+| workflow matrix | **23 / 23 identical** before and after |
+| MASTER-A + B1 + B2 + B3 + B4 | all unchanged, as tabled above |
+| Jest | **38 suites, 930 tests** — the baseline, unchanged |
+| Production build | clean, no ESLint warnings, **225.17 kB** gzipped, CSS 24.19 kB, `main.cacec8c3.js` — **byte-identical to the pre-change baseline**, because B5 changes no application code |
+| `git diff --check` | clean |
+| live state | 27 reservations unchanged, **0 probe rows**, 0 rows on either probe date, 11 links, 11/11 active officials, powered holders unchanged, 13 health events, no name-probe residue |
+
+⚠️ **No test was added and the count is deliberately unchanged.** B5
+changes no frontend file, so there is nothing for Jest to assert; the proof
+of this phase is the catalog ACL and role impersonation, as it was for B1,
+B2, B3 and B4. Padding the count would misrepresent what B5 did.
+
+### ⚠️ Two live changes are REAL USER ACTIVITY, not probe residue
+
+Both are reported separately because each looks like residue and is not:
+
+| | |
+|---|---|
+| `profiles` **28 → 29** | one new `resident`, `pending`, created **2026-10-15** — an ordinary signup through the live site between B4 and B5. B5's probes create no profile and every block aborted |
+| `official_availability` **0 → 1** | ⚠️ the **Barangay Treasurer's own** Monday 9:00 AM–5:00 PM row, `updated_by` herself, `updated_at` **2026-10-02** — *two weeks before B5*. A real official publishing her own hours, which is migration 026 working as designed |
+
+⚠️ **CLAUDE.md had said `official_availability` holds zero rows, and that
+was stale from 2026-10-02.** A3's own header already referred to *"the
+Treasurer's one live row"*, so the two statements had been in conflict for
+a fortnight. Corrected in the table under *Database notes*; the row itself
+was not touched.
+
+### ⚠️ What was NOT verified
+
+- **No authenticated page was loaded in a browser from here.** The
+  dashboards are behind `ProtectedRoute` and this environment still has
+  **no test account**. Nothing was done to weaken authentication for a
+  screenshot. What that leaves unseen for B5: the public Covered Court
+  availability calendar actually rendering its slots through
+  `get_reservation_slots_range` from a browser, and a signed-in official's
+  dashboard resolving its identity through
+  `official_id_for_current_user()`. Both are covered above as real calls
+  by the real roles against the live database, but not by a click.
+- **`authenticator` was not impersonated.** It is a `LOGIN` role whose
+  password this session does not hold, so the "PostgREST switches role"
+  property is argued from the role's purpose and then **demonstrated** by
+  the `anon` and `authenticated` probes succeeding through PostgREST's own
+  roles after the revoke.
+
+### ✅ FINAL MASTER-B RECONCILIATION — COMPLETE as of B5
+
+| Step | Scope | Migration | Status |
+|---|---|---|---|
+| **B1** | SECURITY DEFINER *direct execute* surface | 034 | ✅ 24 → **11** client-executable |
+| **B2** | table privilege hardening | 035 | ✅ TRUNCATE on 16 tables → **0/0**, plus six more revokes |
+| **B3** | dead `admin` policy branches | 036 | ✅ 8 → **0** |
+| **B4** | `btree_gist` extension placement | 037 | ✅ `public` → `extensions` |
+| **B5** | bare **PUBLIC EXECUTE** | **038** | ✅ 9 → **0** |
+
+Every explicitly deferred item, classified:
+
+| Item | Class | Where it stands |
+|---|---|---|
+| SECURITY DEFINER *direct execute* surface | **A — RESOLVED** | 034; 15 of 26 client-unreachable, re-measured 30/30 refused |
+| bare **PUBLIC EXECUTE** grants | **A — RESOLVED** | **038; 9 → 0** |
+| the seven policy predicates still `anon`/`authenticated`-executable | **B — INTENTIONAL RETAINED** | An RLS policy is evaluated as the *querying* role; revoking breaks the policy rather than hardening it. Proven by the 23-line matrix |
+| the four intentional RPCs | **B — INTENTIONAL RETAINED** | `anon` is *supposed* to reach them — the availability grid, the calendar, guest booking, guest tracking |
+| `official_id_for_current_user()`'s **`anon`** grant | **E — candidate, named and not done** | Its policies are `TO authenticated` and the frontend calls it with a session, so `anon` appears surplus. ⚠️ Reported, not removed: it returns NULL for `anon` and leaks nothing, and narrowing a named grant needs its own proof pass |
+| `barangay_officials` DELETE | **B — INTENTIONAL RETAINED** | A real DELETE policy backs it, matching archived rows only (018). Re-measured: the policy is still there. Revoking the privilege would make a policy the barangay deliberately wrote unreachable |
+| REFERENCES privileges | **B — INTENTIONAL RETAINED** | 72 default grants to client roles; exploiting one needs `CREATE` on schema `public` to build the referencing table, and **`anon`/`authenticated` both measured `CREATE = false`** |
+| TRIGGER privileges | **B — INTENTIONAL RETAINED** | Same measurement, same reason — a trigger needs an object the client cannot create |
+| nine cosmetic "Admin" policy **names** | **B — INTENTIONAL RETAINED** | Zero admin *branches*; the names are referenced by a source comment, and B3 chose not to rename |
+| who may archive another official | **C — BUSINESS RULE** | Any official, untouched since 018; A4's guard answers *"not your own record"* and nothing else |
+| leaked-password protection | **D — PLATFORM** | Pro-only on this project; the dashboard toggle appears to save and is rejected |
+| `btree_gist` placement | **A — RESOLVED** | 037; `extensions`, one copy, advisor finding gone |
+
+✅ **No MASTER-B security-hardening item remains unresolved, and MASTER-B
+IS COMPLETE as of B5.** Every item still carrying a ⚠️ is deliberate
+retained architecture whose necessity was *measured* (the predicates, the
+RPCs, the backed DELETE policy, the grants that need an unavailable
+`CREATE`), cosmetic (the policy names), a barangay decision (archive
+scope), or a platform limit (leaked passwords). ⚠️ **The one open
+candidate — `official_id_for_current_user()`'s `anon` grant — is named
+with its evidence rather than quietly closed**, because it is a narrowing
+nobody has proven safe for the live frontend, and because declaring it
+done would repeat exactly the mistake B4 made with PUBLIC.
 
 ---
 
@@ -7991,8 +8406,10 @@ derives her initials from. It is no longer displayed as a label.
   client-executable), the table grants in migration 035 (TRUNCATE on
   sixteen tables → zero, plus `activity_log` UPDATE/DELETE, `profiles`
   DELETE and both queues' DELETE), and the eight dead `admin` policy
-  branches in migration 036, and `btree_gist`'s schema in migration 037
-  (moved from `public` to `extensions`). ✅ **MASTER-B IS COMPLETE.**
+  branches in migration 036, `btree_gist`'s schema in migration 037
+  (moved from `public` to `extensions`) and the last bare **PUBLIC EXECUTE**
+  grants in migration 038 (nine functions → zero). ✅ **MASTER-B IS COMPLETE
+  as of B5.**
 - **The official barangay document forms.** X6 built the whole
   generation pipeline against PROTOTYPE layouts because the barangay has
   not supplied its real forms, and the X6 follow-up extended that to all
@@ -8236,6 +8653,23 @@ derives her initials from. It is no longer displayed as a label.
   reads `postgres=X/postgres | service_role=X/postgres` and nothing else.
   See *MASTER-B step B1* for the classification and the proof that a
   trigger still fires for a caller holding no EXECUTE on it.
+  ✅ **And since migration 038 (MASTER-B B5) NONE of the 26 carries bare
+  PUBLIC EXECUTE** — it was **nine** of the eleven, and it is now **zero**
+  across all 26. ⚠️ **PUBLIC is not `anon`**: PUBLIC grants EXECUTE to
+  every role in the cluster, so removing it is strictly narrower than the
+  three named grants the application actually uses, and `anon`,
+  `authenticated` and `service_role` all keep theirs. Measured by
+  dry-running the revoke and re-testing **every** role in `pg_roles`: the
+  25 that lose EXECUTE are all infrastructure (`authenticator`,
+  `supabase_auth_admin`, `supabase_storage_admin`, `dashboard_user`,
+  `pgbouncer`, the `pg_*` predefined roles …) and not one of them is a
+  role this application executes as.
+  ⚠️ **Both advisor lints still report 11 and that is correct, not a
+  failure**: they flag a SECURITY DEFINER function reachable by
+  `anon`/`authenticated`, which is exactly what the named grants
+  deliberately preserve, so removing PUBLIC cannot move them by
+  construction. The catalog ACL is the authoritative measurement here.
+  See *MASTER-B step B5*.
 - ✅ ~~**Eight RLS policies still test for a `role = 'admin'` that this
   system does not have.**~~ **CLOSED by migration 036 (MASTER-B B3).**
   `announcements` (INSERT, UPDATE), `events` (INSERT, UPDATE),

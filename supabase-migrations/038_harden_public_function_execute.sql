@@ -1,0 +1,189 @@
+-- =============================================================================
+-- 038  Remove bare PUBLIC EXECUTE from the last nine SECURITY DEFINER functions
+-- =============================================================================
+-- MASTER-B step B5.  APPLIED 2026-10-16 through the Supabase connector.
+--
+-- This migration is NINE `REVOKE ... FROM PUBLIC` statements and nothing else.
+-- No function body, no RLS policy, no trigger, no table privilege, no
+-- SECURITY DEFINER/INVOKER change, no new GRANT and no application file.
+--
+-- It closes the one item B4 reported as still deferred: after 034 took the
+-- client-executable SECURITY DEFINER surface from 24 functions to 11, those
+-- eleven still carried a bare `=X/postgres` ACL entry -- PostgreSQL's built-in
+-- PUBLIC EXECUTE -- on nine of them.  PUBLIC grants EXECUTE to *every role in
+-- the cluster*, which is strictly broader than the three client roles the
+-- application actually uses.
+--
+-- -----------------------------------------------------------------------------
+-- ⚠️ PUBLIC IS NOT `anon`.  THEY ARE DIFFERENT PRIVILEGE CONCEPTS
+-- -----------------------------------------------------------------------------
+-- Removing PUBLIC does NOT remove anonymous access.  `anon` keeps EXECUTE
+-- through its own named grant, and that is the whole point: the guest-facing
+-- behaviour is preserved by an explicit grant to the role that needs it, while
+-- every other role in the cluster loses an inherited privilege it never used.
+--
+-- ⚠️ **The precedent is already in this database.**  `create_court_reservation`
+-- and `track_court_reservation` are also client RPCs, are also guest-facing,
+-- and have read
+--     postgres=X | anon=X | authenticated=X | service_role=X
+-- with NO PUBLIC entry since migration 025.  The public booking and tracking
+-- pages have worked that way all along.  So "a guest page needs it" was never
+-- an argument for PUBLIC -- only for an explicit `anon` grant.
+--
+-- -----------------------------------------------------------------------------
+-- THE NINE, AND WHY EACH ROLE'S EXPLICIT GRANT IS KEPT
+-- -----------------------------------------------------------------------------
+-- Classified from the live catalog: pg_policies for the predicates, the
+-- application's own `.rpc(` calls for the RPCs.  Nothing was taken from this
+-- file's prose or from a function's name.
+--
+--   can_see_audience(text)                 A  1 policy  notifications SELECT
+--   current_official_holds_position(text)  A  4 policies document_requests +
+--                                             reservations + both kapitan UPDATE
+--   is_official(uuid)                      A  11 policies across 6 public
+--                                             tables AND storage.objects
+--   notification_is_visible(uuid)          A  1 policy  notification_reads INSERT
+--   official_id_for_current_user()         A+C 3 official_availability policies
+--                                             (TO authenticated) AND the
+--                                             frontend's own .rpc() since A5
+--   official_is_active(uuid)               A  1 policy  official_availability SELECT
+--   term_is_confirmed(uuid)                A  1 policy  barangay_term_members
+--                                             SELECT, declared TO anon+authenticated
+--   get_reservation_slots(date)            B  0 policies -- a pure client RPC,
+--                                             the public availability grid
+--   get_reservation_slots_range(date,date) B  0 policies -- the public
+--                                             availability calendar, a month per call
+--
+-- ⚠️ **An RLS policy is evaluated as the QUERYING role**, so a predicate a
+-- policy calls must be executable by whichever role queries that table.  Seven
+-- of the nine are such predicates, and all but two of their policies are
+-- declared `TO public` -- meaning the predicate is evaluated for `anon` and
+-- `authenticated` alike whenever either queries the table.  Both named grants
+-- are therefore kept on all nine.  Revoking them is NOT what this migration
+-- does and would break the policies rather than harden them.
+--
+-- -----------------------------------------------------------------------------
+-- ⚠️ WHO ACTUALLY LOSES ANYTHING -- measured by dry-running the revoke
+-- -----------------------------------------------------------------------------
+-- The revoke was executed inside an aborted transaction and every role in
+-- `pg_roles` was re-tested with has_function_privilege, before and after:
+--
+--   KEEP execute : anon, authenticated, postgres, service_role, supabase_admin
+--   LOSE execute : authenticator, dashboard_user, pgbouncer, supabase_auth_admin,
+--                  supabase_etl_admin, supabase_privileged_role,
+--                  supabase_read_only_user, supabase_realtime_admin,
+--                  supabase_replication_admin, supabase_storage_admin,
+--                  pg_checkpoint, pg_create_subscription, pg_database_owner,
+--                  pg_execute_server_program, pg_maintain, pg_monitor,
+--                  pg_read_all_data, pg_read_all_settings, pg_read_all_stats,
+--                  pg_read_server_files, pg_signal_backend, pg_stat_scan_tables,
+--                  pg_use_reserved_connections, pg_write_all_data,
+--                  pg_write_server_files                      -- 25 roles
+--
+-- Every role that loses EXECUTE is infrastructure.  Not one of them is a role
+-- this application's code ever executes as.  Three of the 25 were checked
+-- individually, because each had a plausible claim and a wrong answer would
+-- have broken something that only shows up in production:
+--
+--   authenticator           PostgREST's login role.  It SETs ROLE to anon /
+--                           authenticated / service_role for every request, so
+--                           the function executes as the switched role, which
+--                           keeps its named grant.  Re-verified behaviourally
+--                           after the migration by calling the RPCs as `anon`.
+--
+--   supabase_auth_admin     performs the auth.users INSERT that fires
+--                           handle_new_resident_signup().  That function does
+--                           NOT call any of the nine -- checked by scanning
+--                           every function body in public/auth/storage.  The
+--                           six functions that DO call one of them
+--                           (protect_reservation_status, stamp_activity_actor,
+--                           prevent_role_self_change, enforce_reservation_window,
+--                           protect_document_request_status,
+--                           stamp_notification_read) are all SECURITY DEFINER
+--                           owned by `postgres`, and ⚠️ **inside a SECURITY
+--                           DEFINER function the EXECUTE check for a nested
+--                           call is made as the DEFINER, not as the original
+--                           caller** -- which is the same PostgreSQL fact
+--                           migration 034 already depends on.
+--
+--   supabase_storage_admin  three storage.objects policies call is_official().
+--                           ⚠️ That role OWNS storage.objects, which has
+--                           relrowsecurity = t and **relforcerowsecurity = f**
+--                           -- a table owner bypasses RLS when FORCE is off, so
+--                           those policies are never evaluated as that role at
+--                           all.  When the storage API enforces RLS for a user
+--                           request it does so as anon / authenticated, which
+--                           keep their named grants.  Neither path needs PUBLIC.
+--
+-- -----------------------------------------------------------------------------
+-- ⚠️ REPLAY SAFETY -- why this file carries no GRANT statements
+-- -----------------------------------------------------------------------------
+-- Only THREE functions in this whole migration set are granted EXECUTE
+-- explicitly by a migration file: term_is_confirmed (019) and the two
+-- reservation RPCs (025).  The other eight of the nine hold named
+-- anon/authenticated/service_role grants that no migration ever wrote.  If
+-- those grants came from somewhere non-deterministic, revoking PUBLIC here
+-- would leave a REBUILT database with no client access at all -- so this was
+-- established rather than assumed.
+--
+-- They come from Supabase's default privileges.  pg_default_acl holds, for
+-- role `postgres` creating FUNCTIONs in schema `public`:
+--     postgres=X | anon=X | authenticated=X | service_role=X
+-- and PostgreSQL's own built-in default adds the PUBLIC entry on top.  Proven
+-- by CREATEing a throwaway SECURITY DEFINER function in `public` inside an
+-- aborted transaction and reading its ACL:
+--     =X/postgres | postgres=X | anon=X | authenticated=X | service_role=X
+--     anon=t authd=t svc=t  PUBLIC=t
+--
+-- So on a fresh replay of 001..038 every one of the nine is created with the
+-- three named grants already present, and this migration removes only the
+-- PUBLIC entry.  Adding GRANT statements here would be writing down something
+-- the platform already guarantees, and would read as though the named grants
+-- were this migration's doing.
+--
+-- -----------------------------------------------------------------------------
+-- BEFORE / AFTER
+-- -----------------------------------------------------------------------------
+--   SECURITY DEFINER functions in public                26  ->  26
+--   client-executable (anon or authenticated)           11  ->  11
+--   of those, carrying bare PUBLIC EXECUTE               9  ->   0
+--   anon / authenticated / service_role named grants    unchanged on all nine
+--
+-- ⚠️ This migration does NOT reduce the client-executable count, and is not
+-- meant to.  The eleven client-executable functions are the seven policy
+-- predicates plus the four RPCs, and B1 already recorded why each has to stay
+-- reachable by the roles that reach it.  What changes is that they are reachable
+-- by *those roles* rather than by every role in the cluster.
+--
+-- -----------------------------------------------------------------------------
+-- WHAT THIS MIGRATION DELIBERATELY DOES NOT DO
+-- -----------------------------------------------------------------------------
+--   * no function body is touched, and no function changes to SECURITY INVOKER
+--     -- each of the nine needs DEFINER rights for a reason recorded in the
+--     migration that created it (the private official_account_links mapping,
+--     the reservations table a guest cannot SELECT, the draft-term visibility
+--     rule), and flipping one would be a redesign, not a privilege cleanup;
+--   * the 15 trigger and event-trigger functions hardened in 034 are NOT
+--     touched -- re-measured intact;
+--   * no RLS policy expression changes, so no policy was altered to make a
+--     probe pass;
+--   * no table privilege changes -- B2's work is re-measured, not revisited;
+--   * ⚠️ the existing named anon/authenticated/service_role grants are KEPT as
+--     they stand.  One of them looks surplus on the evidence --
+--     `official_id_for_current_user()`'s `anon` grant, since its three policies
+--     are declared TO authenticated and the frontend only calls it with a
+--     session -- and it is REPORTED rather than removed: narrowing it is a
+--     behaviour change on a surface nobody has asked about, it would turn an
+--     anonymous call from "returns NULL" into 42501, and it needs its own
+--     proof pass. Recorded in CLAUDE.md as a named candidate, not done here.
+-- =============================================================================
+
+revoke execute on function public.can_see_audience(text)                 from public;
+revoke execute on function public.current_official_holds_position(text)  from public;
+revoke execute on function public.is_official(uuid)                      from public;
+revoke execute on function public.notification_is_visible(uuid)          from public;
+revoke execute on function public.official_id_for_current_user()         from public;
+revoke execute on function public.official_is_active(uuid)               from public;
+revoke execute on function public.term_is_confirmed(uuid)                from public;
+revoke execute on function public.get_reservation_slots(date)            from public;
+revoke execute on function public.get_reservation_slots_range(date,date) from public;
