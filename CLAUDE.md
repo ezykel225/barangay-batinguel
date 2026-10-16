@@ -65,7 +65,7 @@ banned below: it silences the one check this project has.
 
 ### Tests
 
-Thirty-eight suites, 930 tests:
+Forty suites, 1,067 tests:
 
 | File | What it covers |
 |---|---|
@@ -108,6 +108,8 @@ Thirty-eight suites, 930 tests:
 | `src/utils/officialAvailability.test.js` | 24 tests over per-official consultation hours. The load-bearing one **reads `026_official_availability.sql`** and asserts the four statuses the form offers are exactly the four the CHECK accepts — the same thing `reservationWindow.test.js` does for migration 020 |
 | `src/components/EServicesMenu.test.js` | 15 tests over the E-Services dropdown and the catalogue: the disclosure pattern, Escape and focus restore, that it does **not** use `role="menu"`, and that every service states its access requirement in words |
 | `src/utils/residentTabs.test.js` | 7 tests over `?tab=` resolution — a hint, never authorization |
+| `src/components/Sidebar.test.js` | 61 tests over the Sidebar's ROLE SELECTION, the first this component ever had. The nav and the portal name were ternary chains whose final `else` was the Official one, so **any** unrecognised role — `null`, `undefined`, `''`, a fourth role, `'constructor'` — was handed all twelve Official destinations. Run **both directions**: against the pre-fix source **28 of 61 fail**, and the 33 that pass do so honestly (the three supported roles were already correct; Logout and Back-to-Home already failed safe). Also the drawer, the privileged RPC guard, the `Main Menu` heading both ways, and the ARIA/keyboard behaviour the change could affect |
+| `src/complaints/complaintIntakeMigration.test.js` | 76 **source-reading** guards over migrations 040 and 041 — P3-A ships no frontend, so what is pinned is the security SHAPE: the `CMP-` format and its Crockford alphabet, that no `nextval`/counter/`lpad` exists, the eight categories and two channels verbatim, the ONE intake status, that neither creation RPC takes an identity/status/reference parameter, Secretary-only walk-in encoding, the queue's exact six columns with **no category**, the tracking RPC's exact four with no masked name and no branch that could say which half was wrong, append-only history at both layers, PUBLIC EXECUTE revoked on all twelve new functions, `anon` EXECUTE on the tracking RPC **only**, a private bucket with four explicit MIME types and no `*/*`, no video, and that authorization reads neither `.committee` nor `full_name`. ⚠️ Every "is not used" scan runs over **comment-stripped** code, because both migrations discuss `committee` and `full_name` at length precisely to record that neither is read. Run **both directions**: four mutations — authorizing on `committee`, leaking `category` into the queue, dropping one PUBLIC revoke, making the reference sequential — produce **5 failures** |
 
 Schema and policy changes are still verified by impersonating each role
 in SQL, with the results recorded in the migration headers — not by
@@ -334,7 +336,7 @@ src/
 
   assets/images/      11 official portraits, page backgrounds, logo.
 
-supabase-migrations/  39 numbered SQL files. A record, not a runner.
+supabase-migrations/  41 numbered SQL files. A record, not a runner.
 supabase/functions/   Edge Function source (notify-reservation-sms).
 docs/                 SETUP.md, TESTING-WALKTHROUGH.pdf + its generator.
 ```
@@ -826,11 +828,12 @@ such row.
 
 ## Database notes
 
-**39 migrations**, `001` through `039`, all applied. ⚠️ 027 is a
+**41 migrations**, `001` through `041`, all applied. ⚠️ 027 is a
 DATA CORRECTION, not a schema change — see *The portrait is lost by the
 RENAME* under *Public E-Services (X5)*.
 
-**21 tables, RLS enabled on every one.**
+**25 tables, RLS enabled on every one.** The four newest are the P3-A
+complaint intake tables — see *Complaint intake foundation (P3-A)*.
 
 | Table | Holds |
 |---|---|
@@ -855,6 +858,10 @@ RENAME* under *Public E-Services (X5)*.
 | `notifications` | In-app notifications. **Client-read-only** — written only by triggers; see *Notifications* |
 | `notification_reads` | Who has seen which notification. Insert and select only |
 | `official_account_links` | ⚠️ **PRIVATE, and since migration 031 it is THE authorization identity source at the database.** One-to-one `barangay_officials` ↔ `profiles` mapping. Migration 030, **11 rows.** `anon` and `authenticated` hold NO privilege on it and it has ZERO policies — every read is `42501`, the privilege layer, before RLS is consulted. Nothing in the app reads it directly and nothing may: the four authorization paths reach it only through `current_official_holds_position()` and `official_id_for_current_user()`, which answer one question about the caller. See *MASTER-A step A2* and *step A3* |
+| `complaints` | Complaint intake. Migration 040. Server-stamped random `CMP-YYYY-XXXXXX` reference, closed category and channel vocabularies, and ⚠️ `location_note` — a **free-text snapshot, NOT a purok reference**. The only one of the four with a SELECT policy |
+| `complaint_parties` | Complainant, respondents, witnesses. Optional links to `profiles` / `residents_registry`, plus snapshots of what was recorded at filing. ⚠️ **PRIVATE** — zero policies, zero client privilege; read through an RPC |
+| `complaint_status_history` | Append-only complaint transitions. ⚠️ **PRIVATE**, and append-only at **both** layers — no UPDATE/DELETE policy and no client UPDATE/DELETE privilege |
+| `complaint_attachments` | Evidence metadata for the private `complaint-evidence` bucket. ⚠️ **PRIVATE** — the object path is never published |
 
 What each migration *changed* stays in that migration's own header, not
 here — this section says what exists now, the headers say how it got
@@ -1038,6 +1045,7 @@ Rename either trigger and that breaks silently. See migration 011.
 | `id-verification` | **no** | ID documents. Residents upload into a folder named after their own uid; officials read via short-lived signed URLs. |
 | `official-photos` | yes | Official portraits shown on public pages |
 | `resident-photos` | yes | Resident profile photos |
+| `complaint-evidence` | **no** | Complaint evidence (P3-A, migration 041). 5 MB; JPEG, PNG, WebP **and PDF**. SELECT and INSERT policies only — ⚠️ no UPDATE and no DELETE policy, deliberately. Both gate on `complaint_evidence_is_visible()`, which delegates to the one complaint visibility predicate |
 
 All three are capped at **5 MB** and restricted to **JPEG, PNG, WebP**.
 HEIC is excluded on purpose: browsers cannot render it in an `<img>`, so
@@ -8431,6 +8439,314 @@ real calls by the real roles against the live database, but not by a click.
 
 ---
 
+## Complaint intake foundation (P3-A) — migrations 040 and 041
+
+2026-10-16, on `claude/p3a-complaint-intake-foundation`, built on `main`
+after PR #38 merged. **The first implementation phase of the Complaint /
+Incident / KP expansion, and it is BACKEND AND SECURITY ONLY.**
+
+⚠️ **THERE IS NO COMPLAINT FRONTEND.** No File Complaint page, no My
+Complaints page, no official Complaint tab, no sidebar entry, no Home
+change. P3-B builds the UI against this surface after it passes review.
+The production bundle is **byte-identical** to PR #38 (`main.fa2cd129.js`,
+225.25 kB) because this phase changes no application code at all.
+
+### What exists
+
+Four tables, twelve functions, one private bucket, two storage policies.
+
+| | |
+|---|---|
+| `complaints` | the intake record. One SELECT policy |
+| `complaint_parties` | complainant / respondent / witness. ⚠️ **private** |
+| `complaint_status_history` | append-only transitions. ⚠️ **private** |
+| `complaint_attachments` | evidence metadata. ⚠️ **private** |
+
+⚠️ **Three of the four carry ZERO policies and ZERO client privilege**, and
+that is the design rather than an omission. RLS filters **rows**; it cannot
+restrict **columns** — and a resident must read their own contact number
+while *not* reading the respondent's, which no SELECT policy can express.
+So those three are reached only through SECURITY DEFINER functions that
+return a fixed narrow column list. `get_advisors` reports
+`rls_enabled_no_policy` on all three, which is exactly what a private table
+looks like; `official_account_links` has carried the same INFO finding since
+migration 030.
+
+### The role matrix, measured
+
+Every cell below was produced by impersonating the real account with its own
+JWT claims inside a block that always ends in `RAISE EXCEPTION`.
+
+| caller | queue | full detail | create online | create walk-in | evidence |
+|---|---|---|---|---|---|
+| `anon` | **42501** | **42501** | **42501** | **42501** | **42501** |
+| resident (filer) | 0 rows | **own only** | **yes** | refused | **yes** |
+| resident (not filer) | 0 rows | 0 rows | — | refused | **42501** |
+| nurse | **0 rows** | 0 rows | refused | refused | **42501** |
+| Kagawad (Peace and Order) | **2** | **0 rows** | refused | **refused** | **42501** |
+| Barangay Treasurer | **2** | **0 rows** | refused | refused | **42501** |
+| Barangay Secretary | **2** | **full** | refused | **yes** | **yes** |
+| Punong Barangay | **2** | **full** | refused | refused (by design) | **yes** |
+
+⚠️ **The Treasurer is an ORDINARY official on complaints.** No proven
+existing requirement gives her anything here; her exclusive write is
+`reservations` (migration 031) and that is untouched.
+
+⚠️ **The Punong Barangay reads everything and creates nothing.** A second
+creation path would be a second place for the stamping rules to drift.
+
+### ⚠️ COMMITTEE IS DESCRIPTIVE DATA, NOT AUTHORIZATION DATA
+
+A real `Peace and Order and Appropriation` committee value exists on the
+Kagawad at `display_order` 8, and **P3-A authorizes nothing on it.**
+
+P2.5 established the whole chain: `barangay_officials.committee` is free
+text with no CHECK, is sent by the Edit Official form for **any** row, is
+permitted by the directory UPDATE policy for **any** official, and is
+**not** guarded by `protect_official_record()` — which guards only
+`position`, `created_at` and `created_by`. So authorizing on it would
+reproduce migration 028's escalation on a column nobody has protected: a
+Kagawad wanting complaint authority would type it into their own committee
+field and save.
+
+⚠️ **This is now a standing architecture rule.** No later phase may read
+`committee` for authorization until it is guarded by a trigger branch and
+given a closed vocabulary — a migration in its own right. The Peace and
+Order Kagawad therefore gets **no special authorization yet**; that is a
+capability-table phase, and ⚠️ **the capability table is deliberately NOT
+built here** because its grant path is undesigned (an official must not be
+able to grant themselves a capability) and a private table with no reader is
+the inert state migration 030 held for exactly one phase.
+
+A test asserts `committee` appears in **no executable line** of either
+migration, scanning **comment-stripped** code — because both files discuss
+the column at length precisely to record that it is not used.
+
+### The reference
+
+**`CMP-2026-AB12CD`.** Random, never sequential, server-stamped by a BEFORE
+INSERT trigger that discards whatever the row carried.
+
+⚠️ **`CMP-`, not `BC`-anything.** `BCR-` is the court reservation, and two
+references sharing a two-character prefix is a hazard when somebody reads
+one out over the phone.
+
+Same Crockford base32 as the reservation reference, with **I, L, O and U
+removed**, and lookup goes through `normalize_reservation_reference()` —
+⚠️ **reused rather than copied.** Both references have the same look-alike
+problem, so it is the same rule; the function's name is historical, and a
+second implementation is how two copies drift. The *generator* is a separate
+function, because generalizing the existing one means replacing an applied,
+verified migration-024 function that the reservation trigger depends on.
+
+Measured on 200 generated references: **200/200** match
+`^CMP-YYYY-[Crockford]{6}$`, **200** distinct, **0** contain a look-alike,
+and **1** position where generation order equals sorted order — a counter
+would give 200.
+
+### ⚠️ The safe queue omits CATEGORY, and that is the decision
+
+Any **active** official sees a queue of six columns: id, reference, intake
+channel, status, created, updated. **No narrative, no category, no party, no
+contact, no location, no evidence.**
+
+Category is omitted deliberately. A queue row reading `family_dispute` or
+`threats` beside a date, visible to all eleven officials in a barangay where
+everybody knows their neighbours, is an accusation about an identifiable
+household — the date and the channel are enough to work out who was at the
+hall that morning. The project already draws this line: `reservations.purpose`
+is officials-only because residents write personal things in it, and
+`exception_reason` is kept out of the public slot RPCs for the same reason.
+⚠️ A coarse "sensitivity band" was considered and **rejected** — a band
+separating interpersonal from property disputes still leaks the thing that
+matters. An ordinary official needs to know how much work is waiting and how
+old it is; the subject belongs to whoever handles it.
+
+It is a **function, not a policy**, because "a queue without the narrative"
+is a column rule and RLS is a row tool.
+
+### One visibility predicate, six callers
+
+`complaint_is_visible_to_caller(uuid)` is true for exactly three callers:
+the filing resident, the Barangay Secretary, the Punong Barangay. The
+`complaints` SELECT policy, all three detail RPCs, the attachment recorder
+and **both storage policies** call it — so evidence access and narrative
+access are **the same rule** by construction, not by two policies agreeing.
+Four copies of a rule is four places to drift, which is the objection
+migration 031 made when it replaced four inline name joins.
+
+⚠️ **Contact is nulled per row, not hidden per row.** Measured: the filing
+resident reads their own `09171234567` and `<NULL>` for the respondent,
+while the Secretary reads both. Hiding the respondent row entirely would
+hide a name the complainant themselves supplied.
+
+### Tracking is narrower than the reservation one
+
+`track_complaint(reference, contact)` returns **four** columns: reference,
+status, received date, last-updated date.
+
+⚠️ **No masked name and no masked contact**, unlike
+`track_court_reservation()` — a masked name in a barangay of neighbours is
+still a strong hint. And **no category**, because the category is the
+accusation.
+
+⚠️ **A wrong reference and a wrong contact give the same empty result.**
+Both conditions are ANDed in one `WHERE` with no `CASE`, no `IF` and no
+second query, so there is no branch that could report which half failed, and
+the function raises nothing. Measured: right+right → 1 row; right ref +
+wrong contact → **0**; wrong ref + right contact → **0**; wrong+wrong →
+**0**; either empty → **0**; `NULL`+`NULL` → **0**. Formatting and
+look-alikes are normalised, so `0917-555-0000` and an `O` read for a zero
+both still find it.
+
+### Evidence: photo and document; ⚠️ VIDEO IS DEFERRED
+
+The `complaint-evidence` bucket is **private**, capped at **5 MB**, and
+permits exactly `image/jpeg`, `image/png`, `image/webp` and
+`application/pdf`. ⚠️ **There is no `*/*` allowlist**, and
+`complaint_attachments` carries the same four in a CHECK so the bucket and
+the metadata cannot disagree.
+
+⚠️ **Video is an explicit P3-B/P3-C follow-up, not a silent omission.**
+Three measured reasons: 5 MB is the ceiling every other bucket on this
+project uses and a few seconds of phone video exceeds it; `video/quicktime`
+(what an iPhone produces) does not play in a browser `<video>` on every
+platform — the exact reason HEIC was excluded from the image buckets, and
+evidence that cannot be viewed is not evidence; and no upload component here
+handles video, so a video MIME type would be a permission with no caller.
+
+⚠️ **No UPDATE and no DELETE policy on the bucket.** Evidence in a complaint
+is not a profile photo. Migration 009's lesson means the consequence is known
+rather than discovered: with no DELETE policy `storage.remove()` matches zero
+rows and reports success — wrong when a flow promises deletion, right here
+because no flow does. A retention process is the barangay's decision (RA
+10173 applies to photographic evidence of real disputes) and is a deferred
+item. ⚠️ **No `withdrawn_at` column was added** either: nothing in P3-A could
+set it, and a column with no writer is the `displayLabels` mistake.
+
+Access is `createSignedUrl()` only. `getPublicUrl()` 404s on a private
+bucket even with a permissive policy, and the object path is returned by
+exactly one surface — `complaint_attachments_for()`, itself gated on the
+predicate.
+
+⚠️ **The storage predicate shape-checks the path rather than casting it.**
+An object whose first folder is not a uuid must evaluate **false**, not raise
+`22P02`: an exception inside a policy turns a denial into an error, and an
+error that only fires for well-formed paths tells a prober their path parsed.
+
+### Creation is RPC-only, and nothing is forgeable
+
+The four tables carry **no INSERT, UPDATE or DELETE policy** and no client
+DML privilege, so a forged row is refused `42501` at the privilege layer
+before RLS is consulted — 019A's two-barrier pattern. Measured as the filing
+resident: forging a complaint as another resident, updating their own
+complaint, writing history, updating history and deleting history are **all
+five refused `42501`**.
+
+Neither creation RPC takes `reference`, `status`, `filed_by_profile_id`,
+`encoded_by`, `created_at` or a history actor as a parameter, so there is
+nothing to forge. ⚠️ **An RPC rather than a table insert for the measured
+reason migration 024 found**: `.insert().select()` is `INSERT … RETURNING`,
+and the parties and history rows have no SELECT policy at all, so a
+multi-table filing cannot be done over the table API.
+
+⚠️ **A party is never forced to have an account**, and being named in a
+complaint creates **nothing** — no profile, and no `residents_registry` row,
+which would corrupt the one voter dataset the barangay actually has. There
+is **no name matching** anywhere: `Frankie Sia Credo` vs `Hon. Frankie Credo`
+is one person a matcher would miss, and `Catherine Lacson Tan` vs
+`Alexis Theress P. Tan` is two people sharing a surname and an office that a
+matcher would wrongly join.
+
+### ⚠️ ONE status, and no purok
+
+`complaints.status` permits exactly **`received`**. P3-A is intake; nothing
+in it can move a complaint. Screening, referral and case stages are P4 and
+each will widen the CHECK — widening is safe, and a CHECK is revalidated on
+every UPDATE so **narrowing** it later would make history un-editable. Adding
+values nothing can reach would be the `displayLabels` mistake.
+
+⚠️ **`location_note` is a free-text snapshot and is deliberately NOT called
+`purok`.** P2 established that no entry in the current purok constant has a
+documentary source, that Purok 7's only evidence post-dates the commit that
+added it to the dropdown, and that 17 off-list values sit in the live data.
+There is nothing canonical to reference yet. **No `puroks` table, no
+`purok_id`, no purok CHECK, and not one stored purok value normalised.**
+
+### activity_log and notifications: deliberately untouched
+
+⚠️ **A decision, and the reason is privacy rather than effort.**
+`complaint_status_history` is the authoritative domain history, it records
+the actor from the caller's own uid, and it is append-only at **both** layers
+— stronger than `activity_log` was before migration 035. And `activity_log`
+is readable by **every** official: the only thing worth logging in P3-A is
+"a complaint was created", which tells every Kagawad something the safe queue
+already tells them, while any more identifying subject would breach the rule
+that no complainant name, respondent name, narrative or evidence filename may
+sit in a field all officials can read.
+
+P4 is the phase to revisit it, when officials start taking decisions others
+may need to audit — with the CHECK and `stamp_activity_actor` widened
+together (migration 016's lesson) and a non-identifying subject convention
+decided first.
+
+**No notifications, no SMS, no email.** The audience, category, entity_type
+and event vocabularies are all closed CHECKs with no complaint value, and the
+wording must come from a module that owns it. Its own reviewed change.
+
+### What was verified, and what was not
+
+| Check | Result |
+|---|---|
+| Role matrix, 8 callers × queue / detail / create / evidence | as tabled above, all rolled back |
+| Forgery attempts by the filing resident | **5 of 5 refused `42501`** |
+| Attachment refusals | another complaint `P0001` · foreign folder path `P0001` · `.exe` `P0001` · 6 MB `23514` · valid PNG accepted |
+| Tracking oracle | 9 input combinations; all three wrong-combination cases **identically empty** |
+| Reference | 200/200 format, 200 distinct, 0 look-alikes, 1/200 order correlation |
+| Storage | bucket `public=false`, 4 MIME types, SELECT+INSERT policies only, UPDATE → **0 rows** and 0 objects tampered |
+| B1 pattern | the two internal functions refuse a direct call `42501` to both client roles **while the trigger still stamps** a valid reference for a resident |
+| MASTER-A | 028 `P0001` · 029 `P0001` + Kagawad control accepted · 033 rows=1 · 032 `P0001` · 030 `42501` · 031 Secretary rows=1, Punong rows=1 · Kagawad `f/f/f` · helper = his own row |
+| MASTER-B | PUBLIC EXECUTE **0** · secdef 26→**38**, client-executable 11→**21** · TRUNCATE **0** · admin expressions **0** · btree_gist in `extensions` · exclusion constraint validated |
+| P2 | 0 purok constraints · 5 purok columns unchanged · no `puroks` table |
+| Jest | **40 suites, 1,067 tests** — from 39 / 991, so **+1 suite, +76 tests** |
+| Production build | clean, no ESLint warnings, **225.25 kB** gzipped, `main.fa2cd129.js` — **byte-identical** to PR #38 |
+| Live state | all four tables **0 rows**, 0 evidence objects, every pre-existing count unchanged, **zero probe residue** |
+
+⚠️ **No authenticated page was loaded in a browser.** The dashboards are
+behind `ProtectedRoute` and this environment still has no test account.
+P3-A ships no component, so there is nothing to render — what is unverified
+is a real resident filing a complaint through a real form, which is P3-B.
+
+⚠️ **Three of my own probe results were the harness, not defects**, each
+caught by asking which step produced it: a `PERFORM complaint_queue()` that
+reported "not refused" without a row count (a resident *can* execute it and
+gets **0 rows**); an `UPDATE storage.objects` that reported "not refused"
+because RLS filters rather than raising (re-measured: **0 rows**); and a
+`generate_complaint_reference` direct call that returned `42883` because I
+called it with no argument when it takes `(int)` (re-measured with the right
+signature: **42501**). A fourth was a gated statement — a
+`DELETE FROM storage.objects` in a probe timed out the whole call at 60
+seconds, exactly as migration 035 recorded, and the aborting `RAISE` made the
+delete unnecessary anyway.
+
+### ⚠️ P3-A limitations, carried forward
+
+- **No frontend.** P3-B.
+- **No screening, no KP case, no hearing, no summons, no settlement.** P4.
+- **No incident, no blotter, no Tanod table, no `tanod_account_links`.**
+- **No capability-assignment table**, so no committee-based or
+  Peace-and-Order authorization exists.
+- **No notifications, no SMS, no email.**
+- **No video evidence**, and no raised size limit.
+- **No status transition of any kind** — `received` is the only value, and
+  nothing can change it.
+- **No `updated_at` trigger.** The column exists and equals `created_at` on
+  every row, because nothing in P3-A updates a complaint. P4 sets it.
+- **No evidence retention or withdrawal process.**
+- **No purok normalisation**, and no canonical purok model.
+
+---
+
 ## Health centre
 
 **Medicine stock is a status, not a quantity** — Available / Low stock /
@@ -8661,6 +8977,16 @@ derives her initials from. It is no longer displayed as a label.
   Clearance needs columns the schema does not have — which is now a live
   question rather than a reason to omit the template, since the sheet
   prints `[BUSINESS NAME]` until it is answered.
+- **The complaint / incident / KP expansion, beyond intake.** P3-A built the
+  intake backend (migrations 040 and 041). Still unbuilt, each deliberately:
+  the complaint UI (P3-B), KP jurisdiction screening and case management
+  (P4), incidents and the digital blotter, the Tanod directory, the safety
+  heatmap and complaint analytics. ⚠️ **The screening phase is blocked on a
+  question only the barangay can answer** — who confirms that a matter is
+  within Katarungang Pambarangay jurisdiction. P2.5 found **no** Lupon,
+  Justice or Katarungan committee stored anywhere, so the system has no
+  record to infer it from, and *the system must not make an autonomous legal
+  judgment* applies to inventing who is entitled to make it.
 - **019B — the Previous Term Officials roster and its UI.** Migration 019A
   created the tables; both are **empty**, and there is **no frontend**. 019B
   seeds the confirmed roster from SQL and adds the read-only Official Portal
@@ -8675,7 +9001,7 @@ derives her initials from. It is no longer displayed as a label.
 - **Source maps ship to production** (~7 MB), so the original JSX is
   publicly reconstructable. `GENERATE_SOURCEMAP=false` in Vercel fixes it.
 - **`public/logo.png` is 984 KB and referenced by nothing.**
-- **Thin automated test coverage.** 930 tests in thirty-eight suites:
+- **Thin automated test coverage.** 1,067 tests in forty suites:
   one smoke test over `<App />`, which fails without `.env` because
   `supabaseClient.js` throws at import time, and 886 tests over the
   resident workflow rules, the display labels, the booking window, the
@@ -8960,6 +9286,37 @@ derives her initials from. It is no longer displayed as a label.
   deployment artefact in the repo is `public/_redirects`, which is
   Netlify-only. `GENERATE_SOURCEMAP=false` has to be set in **both**
   dashboards; measured on a real build from `main`, the map is **7.6 MB**.
+- ⚠️ **`barangay_officials.committee` IS WRITABLE BY ANY OFFICIAL, ON ANY
+  ROW, AND NOTHING GUARDS IT.** Found by P2.5 and established as a complete
+  chain: it is free text with no CHECK, the Edit Official form sends it for
+  an arbitrary row, the directory UPDATE policy is `profiles.role =
+  'official'` with no row restriction, `authenticated` holds the UPDATE
+  privilege, and `protect_official_record()` guards only `position`,
+  `created_at` and `created_by`. A real `Peace and Order and Appropriation`
+  value exists on one Kagawad.
+  ⚠️ **It is LATENT, not exploitable, because nothing reads the column** —
+  it is display data on the public Officials page, in the directory table
+  and in the Sidebar's position line, and no logic branches on it. It stops
+  being latent the moment anything authorizes on it, which is why
+  *COMMITTEE IS DESCRIPTIVE DATA, NOT AUTHORIZATION DATA* is now a standing
+  rule, asserted by a test over both P3-A migrations. Making it
+  authorization-grade needs a `protect_official_record()` branch and a
+  closed vocabulary first — a migration in its own right, with the
+  rolled-back impersonation proof P2.5 deliberately did not run.
+  ⚠️ **Not "fixed" in P3-A** merely because it was discovered: P3-A
+  authorizes nothing on it, so nothing there depends on the guard.
+- **Complaint intake is backend-only.** P3-A (migrations 040 and 041) built
+  the four tables, twelve functions and the private evidence bucket; there
+  is **no complaint UI at all**, no status transition beyond `received`, no
+  screening, no KP case, no incident, no blotter, no Tanod table, no
+  capability table, no notifications and no video evidence. Each is a named
+  later phase — see *Complaint intake foundation (P3-A)*.
+- ⚠️ **`complaints.updated_at` exists and equals `created_at` on every
+  row**, because nothing in P3-A updates a complaint and no trigger
+  maintains it. The safe queue returns it, so a reader sees two identical
+  dates until P4 adds a transition. `document_requests` and `reservations`
+  both have a real `updated_at`; this one is the shape without the writer
+  yet, included so P4 needs no migration for it.
 - **No lint script and no typecheck script** — see *Commands* and
   *Tests* above.
 
