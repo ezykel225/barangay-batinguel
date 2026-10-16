@@ -8,6 +8,7 @@ import Home from './pages/Home'
 import Reservation from './pages/Reservation'
 import EServices from './pages/EServices'
 import TrackReservation from './pages/TrackReservation'
+import TrackComplaint from './pages/TrackComplaint'
 import About from './pages/About'
 import HealthCenter from './pages/HealthCenter'
 import Officials from './pages/Officials'
@@ -45,6 +46,9 @@ function App() {
           <Route path="/e-services" element={<EServices />} />
           <Route path="/reservation" element={<Reservation />} />
           <Route path="/track-reservation" element={<TrackReservation />} />
+          {/* ⚠️ Public on purpose: a walk-in complainant has no account.
+              The lookup itself is two-factor inside track_complaint(). */}
+          <Route path="/track-complaint" element={<TrackComplaint />} />
           <Route path="/about" element={<About />} />
           <Route path="/health-center" element={<HealthCenter />} />
           <Route path="/officials" element={<Officials />} />

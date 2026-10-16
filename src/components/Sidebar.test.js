@@ -93,7 +93,7 @@ const OFFICIAL_ONLY = [
   'Residents', 'Voter Reference List', 'Reports', 'Activity Log',
 ]
 const NURSE_ONLY = ['Medicines', 'Availability', 'Health Events']
-const RESIDENT_ONLY = ['My Reservations']
+const RESIDENT_ONLY = ['My Reservations', 'Complaints']
 
 const renderSidebar = (role) => render(
   <MemoryRouter>
@@ -164,10 +164,13 @@ describe('B. role="nurse"', () => {
 })
 
 describe('C. role="resident"', () => {
-  it('renders the four Resident destinations', () => {
+  it('renders the five Resident destinations', () => {
     const { container } = renderSidebar('resident')
     expect(navItems(container)).toEqual([
-      'Dashboard', 'Document Requests', 'My Reservations', 'Settings',
+      // ⚠️ `Complaints` was added by P3-B1, which also added
+      // 'complaints' to RESIDENT_TABS -- residentTabs.test.js is what
+      // holds those two arrays together.
+      'Dashboard', 'Document Requests', 'My Reservations', 'Complaints', 'Settings',
     ])
   })
 

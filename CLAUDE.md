@@ -65,7 +65,7 @@ banned below: it silences the one check this project has.
 
 ### Tests
 
-Forty suites, 1,067 tests:
+Forty-three suites, 1,152 tests:
 
 | File | What it covers |
 |---|---|
@@ -109,6 +109,9 @@ Forty suites, 1,067 tests:
 | `src/components/EServicesMenu.test.js` | 15 tests over the E-Services dropdown and the catalogue: the disclosure pattern, Escape and focus restore, that it does **not** use `role="menu"`, and that every service states its access requirement in words |
 | `src/utils/residentTabs.test.js` | 7 tests over `?tab=` resolution — a hint, never authorization |
 | `src/components/Sidebar.test.js` | 61 tests over the Sidebar's ROLE SELECTION, the first this component ever had. The nav and the portal name were ternary chains whose final `else` was the Official one, so **any** unrecognised role — `null`, `undefined`, `''`, a fourth role, `'constructor'` — was handed all twelve Official destinations. Run **both directions**: against the pre-fix source **28 of 61 fail**, and the 33 that pass do so honestly (the three supported roles were already correct; Logout and Back-to-Home already failed safe). Also the drawer, the privileged RPC guard, the `Main Menu` heading both ways, and the ARIA/keyboard behaviour the change could affect |
+| `src/complaints/complaintLabels.test.js` | 33 tests over the words a resident reads: the eight categories with no underscore reaching a screen, an unrecognised value returned **exactly as stored** and `constructor` not resolving to a function, that the status map knows **only `received`** and fabricates no future status, the evidence contract mirroring the bucket's four MIME types and 5 MB, that **no video** appears in the picker or the copy, that `complaintDate` constructs **no `Date`** from a date string, and ⚠️ **the tracking miss message**, scanned for seventeen phrasings that would reveal which half of the pair was wrong |
+| `src/complaints/FileComplaintForm.test.js` | 19 tests over the filing form: the eight labels in order, that the **stored** value is submitted, both required fields refusing with an accessible alert, that the form asks for **nothing the server owns**, respondents added and removed with names like `Remove person 2`, no registry or account lookup offered to a resident, the picker constrained and refusing a `.mp4` with a readable reason, ⚠️ **duplicate-submit prevention** proved by holding the promise open and clicking three times (1 call), a neutral failure message with no SQLSTATE, and the emergency notice carrying **no phone number** |
+| `src/complaints/complaintExperience.test.js` | 33 tests over My Complaints, the success panel, the tracking page and the wiring. The load-bearing ones: ⚠️ a respondent's contact renders as *"Contact not shown to you"* from the NULL `complaint_parties_for()` returns, tracking calls `track_complaint` **exactly once and makes no table read after a hit**, a wrong reference and a wrong contact produce **byte-identical** messages, an unreachable system says something **different**, the success panel keeps a valid reference when only an attachment fails, and every catalogue `to:` resolves to a route that exists in `App.js` |
 | `src/complaints/complaintIntakeMigration.test.js` | 76 **source-reading** guards over migrations 040 and 041 — P3-A ships no frontend, so what is pinned is the security SHAPE: the `CMP-` format and its Crockford alphabet, that no `nextval`/counter/`lpad` exists, the eight categories and two channels verbatim, the ONE intake status, that neither creation RPC takes an identity/status/reference parameter, Secretary-only walk-in encoding, the queue's exact six columns with **no category**, the tracking RPC's exact four with no masked name and no branch that could say which half was wrong, append-only history at both layers, PUBLIC EXECUTE revoked on all twelve new functions, `anon` EXECUTE on the tracking RPC **only**, a private bucket with four explicit MIME types and no `*/*`, no video, and that authorization reads neither `.committee` nor `full_name`. ⚠️ Every "is not used" scan runs over **comment-stripped** code, because both migrations discuss `committee` and `full_name` at length precisely to record that neither is read. Run **both directions**: four mutations — authorizing on `committee`, leaking `category` into the queue, dropping one PUBLIC revoke, making the reference sequential — produce **5 failures** |
 
 Schema and policy changes are still verified by impersonating each role
@@ -175,9 +178,12 @@ in `react-scripts` → `webpack-dev-server`, which never ships. `--force`
 
 ```
 src/
-  App.js              All routing: 14 public routes, 3 role-protected
+  App.js              All routing: 15 public routes, 3 role-protected
                       (/official, /nurse, /resident) wrapped in
                       ProtectedRoute, plus path="*" — see the note below.
+                      /track-complaint is the newest, and the ONLY route
+                      P3-B1 added: the resident complaint experience is
+                      a TAB of /resident, not a route of its own.
   index.js            CRA entry point.
   index.css           Global CSS, plus the unused @tailwind directives.
 
@@ -8747,6 +8753,272 @@ delete unnecessary anyway.
 
 ---
 
+## Resident complaint experience (P3-B1)
+
+2026-10-16, on `claude/p3b1-resident-complaint-ui`, built on `main` after
+PR #39 merged. **The resident and public frontend on top of P3-A's
+already-reviewed security surface.**
+
+⚠️ **NO MIGRATION, AND NO SQL AT ALL.** The whole chain was measured
+against the live database before any component was written, and it works
+through P3-A's approved surfaces — so there was no backend gap to close
+and nothing was added to make the frontend easier.
+
+⚠️ **NO OFFICIAL COMPLAINT QUEUE AND NO SECRETARY WALK-IN SCREEN.** Those
+are P3-B2. `complaint_queue()` and `encode_walk_in_complaint()` exist in
+the database and are called by nothing in this phase — asserted by test.
+
+### Routes, and the one that is new
+
+| Surface | Where | Gate |
+|---|---|---|
+| **Track a Complaint** | ⚠️ `/track-complaint` — the **only** new route | public, by design: a walk-in complainant has no account |
+| **File a Complaint** | `/resident?tab=complaints` | `ProtectedRoute allowedRole="resident"` |
+| **My Complaints** | `/resident?tab=complaints` | the same |
+
+⚠️ **The resident experience is a TAB, not a route.** The E-Services
+catalogue deep-links `/resident?tab=complaints`, exactly as it already
+does for document requests — so `ProtectedRoute` gates it for free, an
+official, the nurse and any unsupported role are bounced before it
+renders, and **P1's unsupported-role fail-safe is untouched**. No new
+role, no new protected route, and `profiles_role_check` unchanged.
+
+⚠️ **`RESIDENT_TABS` and `Sidebar`'s `residentNavItems` both gained
+`complaints`**, and `residentTabs.test.js` is what holds the two arrays
+together — it failed when only one was edited, which is the guard
+working. The resident nav is five items now, and `Sidebar.test.js`'s own
+assertion was updated to five rather than loosened.
+
+⚠️ **The route and every link to it landed in the same commit**, because
+`path="*"` renders Home: a catalogue entry whose route does not exist
+yet does not 404, it silently shows the homepage and looks like the
+service is broken. A test walks every `to:` in the catalogue and asserts
+the route exists in `App.js`, and that each `?tab=` value is one
+`residentTabs.js` resolves.
+
+### E-Services entry
+
+Two catalogue entries, so all three surfaces (navbar dropdown, mobile
+drawer, `/e-services`) and `returnTo.js`'s allowlist pick them up with
+no second edit:
+
+| | access | words |
+|---|---|---|
+| **File a Complaint** | `resident` | "A resident account is required." |
+| **Track a Complaint** | `guest` | "Works for a complaint recorded at the Barangay Hall." |
+
+⚠️ **"Track a Complaint", never "File a Case".** P3 creates complaints
+and decides nothing about them — no jurisdiction, no mediation, no KP
+eligibility — so calling it a case would assert a decision nobody has
+made. A test scans the catalogue's **comment-stripped** code for the
+word.
+
+### ⚠️ The order of operations is forced by the API, and it matters
+
+`file_complaint_as_resident()` returns **`text`** — the reference and
+nothing else. Evidence needs the complaint's **uuid** twice: the storage
+path must be `<complaint_id>/<file>` for the bucket policy to resolve
+it, and `record_complaint_attachment()` takes the id first. So:
+
+1. file the complaint → reference
+2. read the id back **by reference**, through the existing `complaints`
+   SELECT policy
+3. upload each file, then record its metadata
+
+**Measured as a real resident before building on it**, not assumed: step
+2 returns the id and step 3 succeeds. ⚠️ **The consequence is that the
+complaint exists before any evidence does**, so a failed attachment
+always happens *after* a successful filing. `fileComplaintWithEvidence`
+therefore returns `failedFiles` rather than throwing, and the success
+panel shows the warning **beside a valid reference** — a resident must
+never be told their complaint disappeared because a photo did not
+upload. Uploads are sequential, not parallel: five at once from a phone
+on barangay wifi is how one fails for a reason nobody can reproduce.
+
+⚠️ **An orphaned object is reported, not cleaned up.** If the upload
+succeeds and the metadata call fails, the object sits in the bucket with
+no row. It is **not** removed, because the bucket has no DELETE policy
+(migration 041) — `storage.remove()` would match zero rows and report
+success, which is migration 009's exact silent failure. Reporting the
+file as failed is honest; pretending to clean up would not be.
+
+### The form
+
+Eight categories with human labels, a narrative, an optional free-text
+location, 0..n respondents and up to five optional files. ⚠️ It asks for
+**nothing the server owns** — no status, reference, `filed_by_profile_id`,
+`encoded_by`, timestamp or history actor, none of which is a parameter
+of the RPC.
+
+⚠️ **A respondent is optional and needs no account.** A noise complaint
+may not know who is responsible, and requiring a name would push people
+to invent one. There is **no registry search and no account picker**
+offered to a resident: P3-A links a party only where a real link exists,
+and being named in a complaint creates nothing.
+
+⚠️ **Location is free text, not a purok dropdown.** P2 established the
+official list is unconfirmed, so there is nothing canonical to choose
+from, and the column is `location_note` — deliberately not named `purok`.
+
+⚠️ **Duplicate submission is prevented twice**: the button disables, and
+the handler returns early if a request is already in flight — because a
+keyboard Enter can beat a re-render, and a second filing would create a
+second complaint with its own reference that nothing downstream could
+tell apart.
+
+### ⚠️ The emergency notice carries NO phone number
+
+It says the form is not an emergency service, that nobody is alerted
+immediately, and to contact a local emergency or police service
+directly. **No number**, and that is the decision: the only numbers this
+repository holds are the Barangay Hall's own office landline and mobile,
+which keep office hours with a documented lunch closure — presenting
+those as emergency response would be untrue, and inventing a police or
+hotline number would be worse. A test asserts no three-digit sequence
+appears in the notice.
+
+### Evidence, as shown to the resident
+
+**JPG, PNG, WebP or PDF, up to 5 MB each, up to 5 files** — the bucket's
+own four MIME types and `file_size_limit`, mirrored so a resident is
+told before a 12 MB upload fails. ⚠️ **"Video is not supported yet"** is
+stated in words, and the picker's `accept` is the four types and their
+extensions — ⚠️ **never `*/*`**, asserted by test both on the constant
+and on the rendered attribute.
+
+### My Complaints
+
+Reference, category, status, **date received** and a per-row details
+disclosure. ⚠️ The date column is headed **"Date received"**, not
+"Received", because the status badge in the previous column also reads
+"Received" — the near-identical-strings-stacked fault
+`HEALTH_NURSE_ROLE` exists to prevent, found by a test that could not
+tell the two apart either.
+
+⚠️ **One status, because the database has one.** `received` is the only
+value migration 040's CHECK permits, and the map fabricates no future
+status — a vocabulary written ahead of its consumers is the
+`displayLabels` mistake.
+
+⚠️ **No `.eq('filed_by_profile_id', …)` anywhere.** The SELECT policy
+already restricts the list to the caller's own rows; writing the filter
+would imply the filter is what protects the data. `encoded_by` and
+`filed_by_profile_id` are **not selected** — nothing on a resident's own
+screen needs another account's identifier.
+
+### ⚠️ A respondent's contact number stays hidden
+
+`complaint_parties_for()` returns `contact_number_snapshot` as **NULL**
+for any party that is not the caller. The resident sees their own number
+and reads **"Contact not shown to you"** against the respondent —
+rendered as a statement rather than an empty cell, so the absence reads
+as a rule and not as missing data.
+
+⚠️ **Nothing reconstructs it, and there is no second source**:
+`complaint_parties` carries no client privilege at all. A test asserts
+the frontend never selects from `complaint_parties`,
+`complaint_status_history` or `complaint_attachments` directly.
+
+### Attachment access
+
+⚠️ **`createSignedUrl()` only, 60 seconds, minted per view and never
+stored.** A signed URL is a bearer token for one object; keeping one in
+state means a link that outlives the session entitled to it.
+`getPublicUrl()` appears **nowhere** — it 404s on a private bucket even
+with a permissive policy, and reaching for it is how a private bucket
+quietly becomes a public one. An expired or refused signature gets a
+neutral retry message, not the storage error.
+
+### Public tracking
+
+Four fields and no more: **reference, status, received date, last
+updated** — exactly what `track_complaint()` returns. ⚠️ **No category**
+(the category is the accusation), no narrative, no party, no contact, no
+evidence.
+
+⚠️ **ONE call, and no second query after a hit.** A test asserts
+`supabase.rpc` is called exactly once and `supabase.from` not at all.
+Fetching anything else once the lookup succeeds would defeat a
+narrowness the database went to trouble to guarantee — and would be
+refused anyway.
+
+⚠️ **A wrong reference and a wrong contact produce byte-identical
+output.** Proved by running both and comparing the rendered strings, not
+by reading the code. The message says nothing about not-found,
+existence, or which field was wrong — seventeen phrasings are asserted
+absent — while still being useful: it names both fields as a pair to
+re-check and says where to go. ⚠️ **An unreachable system says something
+different**, because showing the miss message when the request never
+arrived would tell somebody their complaint does not exist.
+
+### ⚠️ One shared stylesheet, not two
+
+`TrackReservation.css` became **`TrackPage.css`**, imported by both
+tracking pages. A second file declaring the same `.track-*` selectors
+would be the `@keyframes pulse` trap X4 recorded: only whichever the
+bundler emitted last would apply, and editing the other would silently
+do nothing. The project settled this once already by extracting
+`PageIntro.css`. ⚠️ **The rename changed no declaration** — every rule
+is byte-identical to what `TrackReservation.css` held.
+
+### What was measured
+
+Real component output captured through Jest and rendered against the
+**shipped CSS bundle** in Chromium — 6 surfaces × 5 widths
+(320/375/768/1024/1440), with deliberately pathological fixtures: a
+68-character unbreakable reference, a 48-character unbreakable surname, a
+57-character filename and a 440-character narrative.
+
+**150 checks, 0 failures**: zero document-level horizontal overflow, zero
+elements clipped by an `overflow: hidden` ancestor, zero controls under
+WCAG 2.2 SC 2.5.8's 24px, zero form controls without an associated
+label, zero heading-order skips, exactly one `<h1>` per surface.
+
+⚠️ **The first run had 34 failures in four classes, and three were real
+defects of mine:**
+
+- **`.btn-small` does not exist in any stylesheet.** I invented it from
+  my own CSS comment, so those buttons rendered as unstyled browser
+  defaults at **19.5px** — under the 24px minimum. The real pattern is
+  `.btn-sm` as a **modifier** on `.btn-add` / `.btn-deny`. ⚠️ Exactly the
+  mistake PR #24 recorded: *"a `btn-decline` class that does not exist
+  (the real one is `btn-deny`) reported a 20px button"*.
+- **A heading held a reference with no wrap pair.** The detail panel's
+  heading rendered the 68-character token, and headings carry no
+  `overflow-wrap`, so its min-content width set a **425px floor** and the
+  document scrolled to **462px** at a 320px viewport. ⚠️ **No element's
+  right edge exceeded the viewport**, so a bounding-rect probe saw
+  nothing — it took measuring `scrollWidth` to find it. X2's family of
+  defect, found by X5's method.
+- **Heading-order skips**: `h1 → h3` on the card and `h2 → h4` on the
+  respondent block. Fixed by using the correct levels and making the
+  stylesheet match **both** tags, which is the route X3 took for
+  Announcements and the post-X5 pass took for Home's contact cards.
+
+### P3-B1 limitations
+
+- **No official complaint queue** and **no Secretary walk-in screen** —
+  P3-B2. `complaint_queue()` and `encode_walk_in_complaint()` are called
+  by nothing here.
+- **No screening, KP case, hearing, summons, settlement or referral** —
+  P4, and the jurisdiction question is still the barangay's.
+- **No status transition.** `received` is the only value, so a resident's
+  list and the tracking page both show one status and two identical
+  dates until P4.
+- **No video evidence.**
+- **No notifications, SMS or email.** A resident learns a complaint was
+  received from the success panel and the tracking page, nothing else.
+- **No incident, blotter, Tanod, map or analytics.**
+- **No purok normalisation**, and `PUROKS` still holds seven values with
+  `Purok 7` present.
+- ⚠️ **No authenticated page was loaded in a browser.** This environment
+  has no test account, so what is verified is the real components'
+  output measured against the real CSS bundle plus 85 unit tests — not a
+  signed-in resident filing a complaint on a live page. ⚠️ **No test
+  complaint was seeded**: all four tables are still at 0 rows.
+
+---
+
 ## Health centre
 
 **Medicine stock is a status, not a quantity** — Available / Low stock /
@@ -8977,11 +9249,12 @@ derives her initials from. It is no longer displayed as a label.
   Clearance needs columns the schema does not have — which is now a live
   question rather than a reason to omit the template, since the sheet
   prints `[BUSINESS NAME]` until it is answered.
-- **The complaint / incident / KP expansion, beyond intake.** P3-A built the
-  intake backend (migrations 040 and 041). Still unbuilt, each deliberately:
-  the complaint UI (P3-B), KP jurisdiction screening and case management
-  (P4), incidents and the digital blotter, the Tanod directory, the safety
-  heatmap and complaint analytics. ⚠️ **The screening phase is blocked on a
+- **The complaint / incident / KP expansion, beyond resident intake.**
+  P3-A built the backend and P3-B1 the resident/public frontend. Still
+  unbuilt, each deliberately: the **official complaint queue and the
+  Secretary walk-in screen** (P3-B2), KP jurisdiction screening and case
+  management (P4), incidents and the digital blotter, the Tanod directory,
+  the safety heatmap and complaint analytics. ⚠️ **The screening phase is blocked on a
   question only the barangay can answer** — who confirms that a matter is
   within Katarungang Pambarangay jurisdiction. P2.5 found **no** Lupon,
   Justice or Katarungan committee stored anywhere, so the system has no
@@ -9001,7 +9274,7 @@ derives her initials from. It is no longer displayed as a label.
 - **Source maps ship to production** (~7 MB), so the original JSX is
   publicly reconstructable. `GENERATE_SOURCEMAP=false` in Vercel fixes it.
 - **`public/logo.png` is 984 KB and referenced by nothing.**
-- **Thin automated test coverage.** 1,067 tests in forty suites:
+- **Thin automated test coverage.** 1,152 tests in forty-three suites:
   one smoke test over `<App />`, which fails without `.env` because
   `supabaseClient.js` throws at import time, and 886 tests over the
   resident workflow rules, the display labels, the booking window, the
@@ -9305,12 +9578,16 @@ derives her initials from. It is no longer displayed as a label.
   rolled-back impersonation proof P2.5 deliberately did not run.
   ⚠️ **Not "fixed" in P3-A** merely because it was discovered: P3-A
   authorizes nothing on it, so nothing there depends on the guard.
-- **Complaint intake is backend-only.** P3-A (migrations 040 and 041) built
-  the four tables, twelve functions and the private evidence bucket; there
-  is **no complaint UI at all**, no status transition beyond `received`, no
-  screening, no KP case, no incident, no blotter, no Tanod table, no
-  capability table, no notifications and no video evidence. Each is a named
-  later phase — see *Complaint intake foundation (P3-A)*.
+- **The complaint experience is RESIDENT-ONLY so far.** P3-A built the
+  backend (migrations 040 and 041) and P3-B1 built the resident and public
+  frontend — filing, My Complaints, and public tracking at
+  `/track-complaint`. ⚠️ **There is no official complaint queue and no
+  Secretary walk-in screen**: `complaint_queue()` and
+  `encode_walk_in_complaint()` exist in the database and are called by
+  nothing in the application, asserted by test. Still unbuilt: screening,
+  KP case, incident, blotter, Tanod, capability table, notifications and
+  video evidence. See *Complaint intake foundation (P3-A)* and *Resident
+  complaint experience (P3-B1)*.
 - ⚠️ **`complaints.updated_at` exists and equals `created_at` on every
   row**, because nothing in P3-A updates a complaint and no trigger
   maintains it. The safe queue returns it, so a reader sees two identical

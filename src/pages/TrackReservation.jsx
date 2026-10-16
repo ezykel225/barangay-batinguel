@@ -7,7 +7,7 @@ import {
   describeTrackedStatus,
   trackingInputProblem,
 } from '../utils/reservationTracking'
-import './TrackReservation.css'
+import './TrackPage.css'
 
 // Checking on a court booking without an account.
 //

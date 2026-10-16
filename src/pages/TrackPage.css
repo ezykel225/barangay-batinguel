@@ -1,3 +1,26 @@
+/* The public two-factor tracking pages: Track a Court Reservation and
+   Track a Complaint.
+
+   ─── ⚠️ ONE STYLESHEET, TWO PAGES, AND THAT IS DELIBERATE ────────────
+
+   This began as TrackReservation.css. When Track a Complaint arrived it
+   needed the same hero, the same form card, the same result card and the
+   same miss state -- so the choice was a second file declaring the same
+   `.track-*` selectors, or one file both pages import.
+
+   A second file would be the `@keyframes pulse` trap X4 recorded: two
+   declarations of one name are not scoped to the files that hold them,
+   so only whichever the bundler emitted LAST would ever apply, and
+   editing the other would silently do nothing. The project already
+   settled this once by extracting PageIntro.css for a block the
+   announcements and events pages shared -- "a block two pages share,
+   owned by one of them, is the dishonesty @keyframes pulse taught".
+
+   So the file is named for the job rather than for the first page to
+   need it, and both pages import it. Every rule below is byte-identical
+   to what TrackReservation.css held; the rename changed no declaration.
+*/
+
 /* ================================
    TRACK A COURT RESERVATION
    ================================

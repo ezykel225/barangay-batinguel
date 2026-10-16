@@ -1,0 +1,364 @@
+/* The resident complaint experience.
+
+   ─── ⚠️ NEW CLASS NAMES ONLY ──────────────────────────────────────────
+
+   Every selector here is `.complaint-*` and appears in no other
+   stylesheet, so nothing below overrides or is overridden by an
+   existing rule. The form reuses the dashboard's own `.modal-form-*`,
+   `.btn-add`, `.btn-save`, `.btn-cancel`, `.btn-small`, `.btn-deny`,
+   `.dashboard-card`, `.dashboard-table` and `.badge` classes rather
+   than restyling them -- a second appearance for a control that already
+   has one is how two buttons for the same job start to differ.
+
+   ⚠️ The protected mobile table-to-card block in Sidebar.css is not
+   touched and nothing here is appended after it: the complaint table is
+   an ordinary `.dashboard-table`, so it converts to cards at 768px
+   through the existing rules with no new declaration. */
+
+/* ── Not an emergency service ──────────────────────────────────────── */
+.complaint-emergency {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  border: 1px solid #fecaca;
+  border-left: 4px solid #b91c1c;
+  border-radius: 8px;
+  background: #fef2f2;
+}
+
+.complaint-emergency svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: #b91c1c;
+  font-size: 18px;
+}
+
+.complaint-emergency strong {
+  display: block;
+  font-size: var(--fs-14);
+  color: #7f1d1d;
+}
+
+.complaint-emergency p {
+  margin: 4px 0 0;
+  font-size: var(--fs-13);
+  line-height: 1.5;
+  /* #7f1d1d on #fef2f2 -- the error red this project already darkened
+     to #b91c1c for AA, taken one step further because it sits on a
+     tinted panel rather than on white. */
+  color: #7f1d1d;
+}
+
+/* ── Respondent and attachment groups ─────────────────────────────── */
+.complaint-fieldset {
+  margin: 0 0 20px;
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  /* A fieldset's default min-width is min-content, which is the
+     `1fr` family of defect X2 measured: one unbreakable value sets a
+     floor nothing can shrink past. */
+  min-width: 0;
+}
+
+.complaint-fieldset legend {
+  padding: 0 6px;
+  font-size: var(--fs-14);
+  font-weight: 600;
+  color: #1e3a8a;
+}
+
+.complaint-respondent {
+  padding: 12px;
+  margin-bottom: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #f9fafb;
+  min-width: 0;
+}
+
+.complaint-respondent-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+/* ── Chosen and attached files ────────────────────────────────────── */
+.complaint-file-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+
+.complaint-file {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.complaint-file svg {
+  flex-shrink: 0;
+  color: var(--grey-600);
+}
+
+.complaint-file-name {
+  flex: 1;
+  /* A filename is text somebody chose, so it can be one long
+     unbreakable token. `min-width: 0` because a flex item's default
+     `min-width: auto` is its min-content width, and
+     `overflow-wrap: anywhere` so it breaks rather than widening the
+     card -- the pair X2 applied to every element holding user text. */
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--fs-13);
+  font-weight: 500;
+}
+
+.complaint-file-meta {
+  flex-shrink: 0;
+  font-size: var(--fs-12);
+  color: var(--grey-600);
+}
+
+/* ── The success panel ────────────────────────────────────────────── */
+.complaint-success {
+  padding: 20px;
+  margin-bottom: 20px;
+  border: 1px solid #bbf7d0;
+  border-left: 4px solid #126c33;
+  border-radius: 8px;
+  background: #f0fdf4;
+}
+
+.complaint-success h2 {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 0 0 8px;
+  font-size: var(--fs-16);
+  color: #126c33;
+}
+
+.complaint-success h2 svg { flex-shrink: 0; }
+
+.complaint-success p {
+  margin: 0 0 8px;
+  font-size: var(--fs-13);
+  line-height: 1.5;
+  color: #14532d;
+}
+
+.complaint-success-label {
+  margin-top: 14px !important;
+  font-size: var(--fs-12) !important;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* The reference is the one thing the resident must take away, so it is
+   the largest thing in the panel. It receives focus after submission,
+   which is why it needs a visible focus ring despite not being a
+   control. */
+.complaint-success-reference {
+  margin: 0 0 10px !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 22px !important;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #14532d;
+  overflow-wrap: anywhere;
+}
+
+.complaint-success-reference:focus-visible {
+  outline: 2px solid #126c33;
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.complaint-success-note {
+  font-weight: 500;
+}
+
+/* ⚠️ A warning INSIDE the success panel, not instead of it. The
+   complaint exists by the time an attachment can fail, so this sits
+   beside a valid reference. */
+.complaint-success-warning {
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #78350f !important;
+}
+
+/* ── List and detail ──────────────────────────────────────────────── */
+.complaint-reference {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--fs-13);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  overflow-wrap: anywhere;
+}
+
+.complaint-empty {
+  margin: 0;
+  font-size: var(--fs-13);
+  color: var(--grey-600);
+}
+
+.complaint-field-error {
+  margin: 10px 0 0;
+  font-size: var(--fs-13);
+  color: #b91c1c;
+}
+
+/* ⚠️ `.dashboard-card-header h3` in Sidebar.css supplies the card
+   heading's size, weight and colour. This card's heading is an <h2>
+   because the page's own heading is an <h1> and jumping to <h3> skips a
+   level -- the defect X3 fixed on Announcements and the post-X5 pass
+   fixed on Home's contact cards. Both passes took the same route the
+   project settled on: use the correct level, and make the stylesheet
+   match BOTH tags so nothing depends on which one a card uses.
+   Declared here rather than by editing Sidebar.css, and at the same
+   specificity, so it cannot disturb the five other cards. */
+.dashboard-card-header h2 {
+  margin: 0;
+  font-size: var(--fs-16);
+  font-weight: 700;
+  color: #1f2937;
+}
+
+/* ⚠️ A HEADING HOLDS A REFERENCE, SO IT NEEDS THE WRAP PAIR. Measured
+   at 320px with a 68-character unbreakable token: the heading's
+   min-content width set a 425px floor and the whole document scrolled
+   to 462px -- while NO element's right edge exceeded the viewport, so a
+   bounding-rect overflow probe saw nothing. It is X2's family exactly
+   (an element holding text somebody typed, without `overflow-wrap`),
+   and X5's lesson about where to look: measure `scrollWidth`, not just
+   positions. */
+.complaint-detail-reference,
+.complaint-detail h3 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.complaint-detail-reference {
+  margin: 0 0 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--fs-16);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #1f2937;
+}
+
+.complaint-detail h3 {
+  margin: 20px 0 8px;
+  font-size: var(--fs-14);
+  color: #1e3a8a;
+}
+
+/* The respondent block's heading, an <h3> under the modal's <h2>. */
+.complaint-respondent-head h3 {
+  margin: 0;
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: var(--grey-600);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.complaint-detail-status {
+  margin: 0 0 14px;
+  font-size: var(--fs-13);
+  color: var(--grey-600);
+}
+
+.complaint-detail-list { margin: 0; }
+
+.complaint-detail-row {
+  display: grid;
+  /* ⚠️ `minmax(0, 1fr)`, never a bare `1fr`. A bare track is
+     `minmax(auto, 1fr)` and cannot shrink below its content's
+     min-content width, which is X2's single biggest finding. */
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: 8px 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.complaint-detail-row dt {
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: var(--grey-600);
+}
+
+.complaint-detail-row dd {
+  margin: 0;
+  min-width: 0;
+  font-size: var(--fs-13);
+  overflow-wrap: anywhere;
+}
+
+.complaint-detail-narrative { white-space: pre-wrap; }
+
+.complaint-party-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.complaint-party {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+}
+
+.complaint-party-role {
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: var(--grey-600);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.complaint-party-name {
+  font-size: var(--fs-14);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.complaint-party-contact {
+  font-size: var(--fs-13);
+  color: var(--grey-600);
+  overflow-wrap: anywhere;
+}
+
+/* The filing form inside the shared modal. `.modal` is already capped
+   at calc(100vh - 40px) with overflow-y: auto by the X2 fix, so a form
+   taller than the viewport scrolls itself and the submit button stays
+   reachable -- nothing here reintroduces a height. */
+.complaint-modal { max-width: 640px; }
+
+@media (max-width: 480px) {
+  .complaint-detail-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+
+  .complaint-file-name { flex-basis: 100%; }
+}

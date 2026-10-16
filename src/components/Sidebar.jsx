@@ -23,6 +23,7 @@ import {
   FaTimes,
   FaAngleLeft,
   FaAngleRight,
+  FaCommentDots,
 } from 'react-icons/fa'
 import { supabase } from '../supabase/supabaseClient'
 import { useAuth } from '../context/AuthContext'
@@ -273,6 +274,7 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderActio
     { id: 'dashboard', label: 'Dashboard', icon: <FaTachometerAlt /> },
     { id: 'documents', label: 'Document Requests', icon: <FaFileAlt /> },
     { id: 'reservations', label: 'My Reservations', icon: <FaClipboardList /> },
+    { id: 'complaints', label: 'Complaints', icon: <FaCommentDots /> },
     { id: 'settings', label: 'Settings', icon: <FaCog /> },
   ]
 
