@@ -276,15 +276,60 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderActio
     { id: 'settings', label: 'Settings', icon: <FaCog /> },
   ]
 
-  const navItems =
-    role === 'nurse' ? nurseNavItems
-      : role === 'resident' ? residentNavItems
-        : officialNavItems
+  // ⚠️ ROLE SELECTION FAILS CLOSED. It used to fail OPEN.
+  //
+  // Both of these were ternary chains whose final `else` was the
+  // Official one:
+  //
+  //   role === 'nurse' ? nurseNavItems
+  //     : role === 'resident' ? residentNavItems
+  //       : officialNavItems            // <- every other value
+  //
+  // so any value that was not 'nurse' or 'resident' -- null,
+  // undefined, '', a fourth role added later -- was handed all twelve
+  // Official destinations and told it was the Official Portal.
+  //
+  // It was NOT reachable from the shipped app, which is exactly why it
+  // went unnoticed for so long: all three dashboards pass a string
+  // literal, `profiles_role_check` permits only these three values,
+  // and ProtectedRoute redirects an unrecognised role to /login before
+  // a dashboard ever mounts. It was a latent fail-open default waiting
+  // for the day somebody adds a role.
+  //
+  // ⚠️ This is a UI fail-safe, NOT an authorization control. RLS
+  // decides every read and write whatever navigation is painted, and a
+  // tab a role may not use returns nothing. What changed is the
+  // DIRECTION of the default: an unsupported role now reaches no
+  // privileged destination instead of all of them.
+  //
+  // ⚠️ A Map, not an object keyed by `role`. A plain object lookup
+  // answers for inherited property names -- `portalsByRole['constructor']`
+  // returns a function, not undefined -- which is the same trap
+  // `officialPhotos` guards with `hasOwnProperty` and which
+  // `officialPhotos.test.js` pins. `Map.get` walks no prototype chain,
+  // so there is nothing left to guard; `Sidebar.test.js` covers
+  // 'constructor' either way.
+  const portalsByRole = new Map([
+    ['official', { navItems: officialNavItems, portalName: 'Official Portal' }],
+    ['nurse', { navItems: nurseNavItems, portalName: 'Health Center Portal' }],
+    ['resident', { navItems: residentNavItems, portalName: 'Resident Portal' }],
+  ])
 
-  const portalName =
-    role === 'nurse' ? 'Health Center Portal'
-      : role === 'resident' ? 'Resident Portal'
-        : 'Official Portal'
+  const portal = portalsByRole.get(role)
+
+  // An unsupported role gets an EMPTY list, and the nav renders its own
+  // explanatory line in place of the destinations -- see the empty
+  // state below. A nav that renders nothing at all cannot be told apart
+  // from one that is broken, the same rule NotificationBell's
+  // "No notifications yet." follows.
+  const navItems = portal ? portal.navItems : []
+
+  // Deliberately NOT 'Official Portal' as the fallback, and
+  // deliberately not a word that names the problem either: it is read
+  // aloud as "<name> sidebar" and printed above "Barangay Batinguel" in
+  // the logo, so it has to be neutral and say nothing about roles or
+  // security.
+  const portalName = portal ? portal.portalName : 'Dashboard'
 
   // Who is signed in. Rendered in the desktop footer and, since it was
   // missing there entirely, in the mobile drawer -- on a phone the
@@ -403,7 +448,14 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderActio
         </div>
 
         <nav className="sidebar-nav" id="sidebar-nav">
-          <div className="sidebar-nav-label">Main Menu</div>
+          {/* ⚠️ No "Main Menu" heading when there are no destinations
+              under it. A heading with nothing beneath reads as a list
+              that failed to load -- the same defect the mobile cards'
+              empty ACTION heading was, and fixed the same way: hide the
+              heading, not just its contents. */}
+          {navItems.length > 0 && (
+            <div className="sidebar-nav-label">Main Menu</div>
+          )}
           {navItems.map((item) => (
             <button
               key={item.id}
@@ -423,6 +475,24 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderActio
               )}
             </button>
           ))}
+
+          {/* The unsupported-role state. It says what is true for the
+              ACCOUNT and nothing about roles, policies or why -- a
+              navigation rail is not the place to explain an
+              authorization model, and the account holder cannot act on
+              it anyway. Logout is still in the footer below, outside
+              this nav, so it is reachable in every case.
+
+              ⚠️ Unreachable from the shipped app today: all three
+              dashboards pass a literal role and ProtectedRoute
+              redirects an unrecognised one to /login first. It exists
+              so that the day a fourth role is added, the default is
+              nothing rather than everything. */}
+          {navItems.length === 0 && (
+            <p className="sidebar-nav-empty">
+              Dashboard navigation is unavailable for this account.
+            </p>
+          )}
 
           {role === 'resident' && (
             <button
@@ -511,6 +581,17 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderActio
                   )}
                 </button>
               ))}
+
+              {/* Same state in the drawer, because the drawer is the
+                  WHOLE of navigation on a phone. Both are mounted at
+                  once -- the rail is hidden by CSS rather than
+                  unmounted -- which is why Sidebar.test.js asserts the
+                  sentence appears twice with the drawer open. */}
+              {navItems.length === 0 && (
+                <p className="nav-drawer-empty">
+                  Dashboard navigation is unavailable for this account.
+                </p>
+              )}
 
               {role === 'resident' && (
                 <button
