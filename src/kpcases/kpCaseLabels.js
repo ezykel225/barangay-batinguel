@@ -195,6 +195,26 @@ export const KP_ERRORS = Object.freeze({
 // ⚠️ NAMES NO POSITION, exactly as the restricted complaint detail does.
 // An official who cannot read a case cannot grant themselves access, and
 // naming the holder only invites asking for it.
+// ─── WHEN A KP CASE MAY BE OPENED ─────────────────────────────────────
+//
+// ⚠️ THESE WORDS GATE A CONTROL; `open_kp_case()` GATES THE WRITE, AND
+// THE DATABASE CHECK IS UNTOUCHED. The RPC still finds the complaint's
+// latest screening itself, still requires that a human confirmed it, and
+// still requires the confirmed outcome to say to proceed -- so a crafted
+// call is refused exactly as before. What changed is that the UI stops
+// painting an "Open KP case" form in the three states the database would
+// turn down, which is `ActionMenu`'s own rule: an action a caller cannot
+// perform is ABSENT, never present and refused after the click.
+//
+// ⚠️ THE OUTCOME IS READ, THE CHECKLIST ANSWERS ARE NOT. Eligibility is
+// the human-confirmed decision and nothing else -- no answer, no count,
+// no flag and no threshold reaches this.
+export const KP_OPEN_GATE = Object.freeze({
+  noScreening: 'A KP case can be opened only after this complaint has been reviewed and the review confirmed. No review has been prepared yet.',
+  unconfirmed: 'A review has been prepared for this complaint but has not been confirmed yet. A KP case can be opened once the barangay head confirms it.',
+  notProceed: 'The confirmed review did not direct this complaint to the KP process, so no KP case can be opened for it. A later review would be a new screening.',
+})
+
 export const KP_RESTRICTED_NOTE = 'KP case administration is restricted to authorized records staff.'
 
 // ── Dates and times, formatted once ────────────────────────────────────

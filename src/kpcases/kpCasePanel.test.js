@@ -109,12 +109,44 @@ const withCase = (overrides = {}) => {
   })
 }
 
+// ⚠️ THE SCREENING THE PANEL NOW READS TO DECIDE WHETHER TO PAINT
+// "Open KP case". Exactly the shape `complaint_screenings_for()`
+// returns, and exactly the one state `open_kp_case()` accepts: confirmed
+// by a human, and confirmed to proceed. The gate itself -- which of the
+// four confirmed outcomes, and the unconfirmed and no-screening cases --
+// is covered end to end in `screening/screeningConfirmFlow.test.js`,
+// where the real `OfficialComplaints` wiring is on screen.
+const ELIGIBLE_SCREENING = {
+  id: 's1',
+  checklist_version: 'v1',
+  answers: {},
+  recommendation: 'proceed_to_kp_process',
+  recommendation_note: null,
+  prepared_by_name: 'Alexis Theress P. Tan',
+  prepared_at: '2026-10-16T02:00:00.000Z',
+  confirmed_outcome: 'proceed_to_kp_process',
+  confirmed_by_name: 'Hon. Frankie Credo',
+  confirmed_at: '2026-10-16T03:00:00.000Z',
+  confirmation_note: null,
+  is_open: false,
+}
+
 // ⚠️ NO CASE YET: the reader returns an EMPTY ARRAY with NO ERROR. RLS
 // filters rows without raising, so this is the same shape an
 // unauthorized caller gets -- which is exactly why the panel must tell
 // the two apart by the caller's own flags rather than by the response.
+//
+// ⚠️ The screening reader answers with an ELIGIBLE screening, because
+// these tests are about what happens once the control is reachable. A
+// panel with no confirmed screening paints no control at all, which is
+// the point of the gate and is proved in the flow suite.
 const withoutCase = () => {
-  supabase.rpc.mockImplementation(() => Promise.resolve({ data: [], error: null }))
+  supabase.rpc.mockImplementation((fn) => {
+    if (fn === 'complaint_screenings_for') {
+      return Promise.resolve({ data: [ELIGIBLE_SCREENING], error: null })
+    }
+    return Promise.resolve({ data: [], error: null })
+  })
 }
 
 const confirmYes = jest.fn()
@@ -234,6 +266,12 @@ describe('B. opening a case', () => {
           },
         })
       }
+      // ⚠️ The gate's own input: these tests are about what the RPC
+      // answers AFTER the control is reachable, so the screening reader
+      // must say the control may be painted at all.
+      if (fn === 'complaint_screenings_for') {
+        return Promise.resolve({ data: [ELIGIBLE_SCREENING], error: null })
+      }
       return Promise.resolve({ data: [], error: null })
     })
     mount({ isKapitan: true })
@@ -255,6 +293,12 @@ describe('B. opening a case', () => {
             message: 'A KP case has already been opened for this complaint.',
           },
         })
+      }
+      // ⚠️ The gate's own input: these tests are about what the RPC
+      // answers AFTER the control is reachable, so the screening reader
+      // must say the control may be painted at all.
+      if (fn === 'complaint_screenings_for') {
+        return Promise.resolve({ data: [ELIGIBLE_SCREENING], error: null })
       }
       return Promise.resolve({ data: [], error: null })
     })
@@ -279,6 +323,12 @@ describe('B. opening a case', () => {
           },
         })
       }
+      // ⚠️ The gate's own input: these tests are about what the RPC
+      // answers AFTER the control is reachable, so the screening reader
+      // must say the control may be painted at all.
+      if (fn === 'complaint_screenings_for') {
+        return Promise.resolve({ data: [ELIGIBLE_SCREENING], error: null })
+      }
       return Promise.resolve({ data: [], error: null })
     })
     mount({ isKapitan: true })
@@ -298,6 +348,12 @@ describe('B. opening a case', () => {
             message: 'A KP case can only be opened when the confirmed screening says to proceed with the KP process.',
           },
         })
+      }
+      // ⚠️ The gate's own input: these tests are about what the RPC
+      // answers AFTER the control is reachable, so the screening reader
+      // must say the control may be painted at all.
+      if (fn === 'complaint_screenings_for') {
+        return Promise.resolve({ data: [ELIGIBLE_SCREENING], error: null })
       }
       return Promise.resolve({ data: [], error: null })
     })
@@ -320,6 +376,9 @@ describe('B. opening a case', () => {
       if (fn === 'open_kp_case') {
         calls += 1
         return held.then(() => ({ data: 'KP-2026-7HQ2MN', error: null }))
+      }
+      if (fn === 'complaint_screenings_for') {
+        return Promise.resolve({ data: [ELIGIBLE_SCREENING], error: null })
       }
       return Promise.resolve({ data: [], error: null })
     })

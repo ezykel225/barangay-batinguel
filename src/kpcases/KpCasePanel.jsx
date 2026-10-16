@@ -9,6 +9,7 @@ import {
   KP_CONCLUDE_PROMPT,
   KP_HEARING_OUTCOME_KEYS,
   KP_HEARING_STATUS_KEYS,
+  KP_OPEN_GATE,
   KP_OUTCOME_PROVISIONAL_NOTE,
   KP_PANEL_MAX,
   KP_PANEL_PROVISIONAL_NOTE,
@@ -41,6 +42,13 @@ import {
   updateHearingRecord,
 } from './kpCaseApi'
 import KpNoticePreview from './documents/KpNoticePreview'
+// ⚠️ THE SAME READER THE SCREENING PANEL USES, not a second copy of the
+// rule and not a second source. `complaint_screenings_for()` is gated on
+// exactly the pair who may administer a case, returns the rows newest
+// first, and is what `open_kp_case()` itself reads -- so the control and
+// the database agree by construction rather than by two rules happening
+// to say the same thing.
+import { loadScreenings } from '../screening/screeningApi'
 import './KpCase.css'
 
 // The KP case file, as one official sees it.
@@ -106,8 +114,14 @@ const blankHearing = () => ({
 
 const KpCasePanel = ({
   complaintId, isSecretary = false, isKapitan = false, confirm,
+  // ⚠️ A BUMPED COUNTER, NOT LIFTED STATE. All screening state still
+  // lives in `ScreeningPanel` and all case state still lives here; this
+  // is only how a sibling says "the screening changed, look again", so
+  // confirming a review repaints this panel without a page reload.
+  screeningSignal = 0,
 }) => {
   const [kpCase, setKpCase] = useState(null)
+  const [screenings, setScreenings] = useState([])
   const [hearings, setHearings] = useState([])
   const [parties, setParties] = useState([])
   const [panel, setPanel] = useState([])
@@ -138,8 +152,12 @@ const KpCasePanel = ({
     setLoading(true)
     setProblem('')
     try {
-      const row = await loadKpCase(complaintId)
+      const [row, screeningRows] = await Promise.all([
+        loadKpCase(complaintId),
+        loadScreenings(complaintId),
+      ])
       setKpCase(row)
+      setScreenings(screeningRows)
       if (!row) {
         setHearings([])
         setParties([])
@@ -166,9 +184,37 @@ const KpCasePanel = ({
     } finally {
       setLoading(false)
     }
-  }, [complaintId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [complaintId, screeningSignal])
 
   useEffect(() => { fetchCase() }, [fetchCase])
+
+  // ─── ⚠️ WHETHER A CASE MAY BE OPENED, MIRRORING THE SQL EXACTLY ─────
+  //
+  // `open_kp_case()` takes the COMPLAINT id, reads that complaint's
+  // screenings `ORDER BY created_at DESC LIMIT 1`, refuses unless
+  // `confirmed_at` is set, and then refuses unless `confirmed_outcome`
+  // is `proceed_to_kp_process`. `complaint_screenings_for()` returns the
+  // same rows in the same order with `is_open = (confirmed_at IS NULL)`,
+  // so `rows[0]` is the same screening the RPC will look at.
+  //
+  // ⚠️ THIS DOES NOT REPLACE THE DATABASE CHECK AND MUST NOT. It decides
+  // which control is painted; the RPC still decides whether the row is
+  // written, and a crafted call is still refused with its own P0001.
+  const latestScreening = screenings[0] || null
+  const screeningConfirmed = Boolean(latestScreening) && !latestScreening.is_open
+  const mayOpenCase = screeningConfirmed
+    && latestScreening.confirmed_outcome === 'proceed_to_kp_process'
+
+  // ⚠️ Which sentence explains the absence. A control that is simply
+  // gone with nothing in its place reads as something that failed to
+  // render -- the reason the Archived Officials panel renders even when
+  // it finds nothing.
+  const openGateNote = () => {
+    if (!latestScreening) return KP_OPEN_GATE.noScreening
+    if (!screeningConfirmed) return KP_OPEN_GATE.unconfirmed
+    return KP_OPEN_GATE.notProceed
+  }
 
   // ⚠️ THE GUARD IS A REF, NOT THE `busy` STATE, and that is a real
   // defect of mine that my own test caught rather than a precaution.
@@ -325,7 +371,19 @@ const KpCasePanel = ({
           <p className="kp-empty">
             No KP case has been opened for this complaint.
           </p>
-          {isKapitan ? (
+          {/* ⚠️ THE CONTROL IS ABSENT, NEVER DISABLED AND NEVER PAINTED
+              OVER A RULE THE DATABASE WOULD REFUSE. The preview showed
+              "Open a KP case" before any review had been confirmed, so
+              the one visible next step was a button whose only possible
+              answer was a refusal. It now appears for the one state
+              `open_kp_case()` accepts, and the other three say why
+              instead -- a missing control with nothing in its place
+              cannot be told from one that failed to render.
+
+              ⚠️ A sentence, not a disabled button: `ActionMenu`'s own
+              rule, and the reason the Add Official form OMITS the three
+              powered positions rather than showing them greyed. */}
+          {isKapitan && mayOpenCase ? (
             <form className="kp-form" onSubmit={handleOpenCase}>
               <h4><FaBalanceScale aria-hidden="true" /> Open a KP case</h4>
               <p className="kp-hint">
@@ -346,7 +404,10 @@ const KpCasePanel = ({
             </form>
           ) : (
             <p className="kp-hint" role="note">
-              Opening a KP case is handled by the barangay head.
+              <FaInfoCircle aria-hidden="true" />{' '}
+              {mayOpenCase
+                ? 'Opening a KP case is handled by the barangay head.'
+                : openGateNote()}
             </p>
           )}
         </>

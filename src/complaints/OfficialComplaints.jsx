@@ -103,7 +103,35 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
   // cannot afterwards be edited. It brings the focus trap, Escape,
   // Enter-defaults-to-Cancel and `aria-modal` every other confirmation in
   // this project already has.
-  const { confirm, dialog: confirmDialog } = useConfirm()
+  //
+  // ⚠️ `useConfirm()` RETURNS AN ARRAY, AND THIS LINE DESTRUCTURED IT AS
+  // AN OBJECT. That is the blocker the repo owner hit in the browser: an
+  // array has no `confirm` and no `dialog` property, so BOTH came back
+  // `undefined` -- the dialog below rendered nothing, and the `confirm`
+  // handed to both panels was not a function. `await confirm({...})` in
+  // `ScreeningPanel` therefore threw a TypeError OUTSIDE its try block,
+  // inside an async onClick nobody was awaiting, so the rejection was
+  // unhandled: no write, no error on screen, no state change. Clicking
+  // "Confirm screening" did nothing at all.
+  //
+  // It was latent through P3-B2 because nothing in THIS file ever called
+  // `confirm` -- it only passed it down -- and P4-A's own tests render
+  // `ScreeningPanel` directly with their own mock, so they never crossed
+  // this line. `screeningConfirmFlow.test.js` renders this component and
+  // would fail against the object form.
+  //
+  // The three working call sites -- ResidentDashboard, NurseDashboard
+  // and OfficialDashboard -- all read `const [confirm, confirmDialog]`.
+  const [confirm, confirmDialog] = useConfirm()
+
+  // ⚠️ A COUNTER THE SCREENING PANEL BUMPS AND THE KP PANEL WATCHES.
+  // They are siblings and neither owns the other's state, but whether a
+  // KP case may be opened is decided by this complaint's latest
+  // screening -- so confirming a review has to repaint the panel below
+  // it. One integer is the whole channel: no screening state is lifted
+  // out of `ScreeningPanel` and no case state is lifted out of
+  // `KpCasePanel`.
+  const [screeningSignal, setScreeningSignal] = useState(0)
 
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
@@ -651,6 +679,7 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
                 isSecretary={isSecretary}
                 isKapitan={isKapitan}
                 confirm={confirm}
+                onScreeningChanged={() => setScreeningSignal((n) => n + 1)}
               />
 
               {/* ── KP case (Combined Phase 1) ──────────────────────
@@ -691,6 +720,7 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
                 isSecretary={isSecretary}
                 isKapitan={isKapitan}
                 confirm={confirm}
+                screeningSignal={screeningSignal}
               />
             </>
           )}

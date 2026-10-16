@@ -10274,6 +10274,145 @@ and not a real browser print of either sheet.
   official is a Lupon member, and no name is suggested or defaulted.
 
 
+---
+
+## ✅ PR #43 blocker — the Confirm screening button did nothing (no migration)
+
+2026-10-16, on the **existing** `claude/kp-case-hearings-summons-mvp`
+branch, after the repo owner clicked through the deploy preview as the
+Punong Barangay. **No migration, no SQL, no policy and no RPC changed** —
+`git diff` touches `supabase-migrations/` not at all, and **migration
+043's eligibility check is byte-identical**.
+
+### ⚠️ `useConfirm()` RETURNS AN ARRAY, AND ONE CALLER DESTRUCTURED IT AS
+### AN OBJECT
+
+```js
+// src/components/ConfirmDialog.jsx — the hook, unchanged
+return [confirm, dialog]
+
+// src/complaints/OfficialComplaints.jsx — the defect
+const { confirm, dialog: confirmDialog } = useConfirm()   // both undefined
+```
+
+An array has no `confirm` and no `dialog` **own property**, so both came
+back `undefined`. Two consequences, and the second is what the repo owner
+saw:
+
+- `{confirmDialog}` rendered **nothing** — no dialog was ever mounted;
+- the `confirm` handed down to `ScreeningPanel` and `KpCasePanel` was
+  **not a function**, so `await confirm({...})` threw a `TypeError`.
+
+⚠️ **And the throw was SILENT.** That line sits *before* the `try` that
+wraps the RPC, inside an `async` `onClick` nobody awaits — so the
+rejection was unhandled: no write, no `setProblem`, no `setConfirming`,
+nothing on screen. **The button looked enabled and did nothing**, which
+is exactly the report.
+
+⚠️ **The three working call sites were right all along**, and comparing
+against them is what settled it rather than reading the hook:
+
+| | |
+|---|---|
+| `ResidentDashboard.jsx:89` · `NurseDashboard.jsx:66` · `OfficialDashboard.jsx:418` | `const [confirm, confirmDialog] = useConfirm()` |
+| `OfficialComplaints.jsx:106` | `const { confirm, dialog: confirmDialog } = useConfirm()` |
+
+**The shared component is not broken and was not touched.** One line
+changed, per the rule that only the faulty integration gets fixed.
+
+### ⚠️ It was LATENT from P3-B2 and no existing test could reach it
+
+`OfficialComplaints` never *called* `confirm` itself — P3-B2 only passed
+it down — so the dead dialog cost nothing until P4-A's screening used it.
+And **no strengthening of `screeningPanel.test.js` could have caught
+it**: that suite renders `ScreeningPanel` directly with **its own**
+`confirm` mock, so it never crosses the broken line. The same is true of
+`kpCasePanel.test.js`.
+
+So the new proof renders **`OfficialComplaints`** — the component that
+owns the hook — and drives the **real** shared dialog, with nothing
+stubbed between the button and the RPC except Supabase.
+`src/screening/screeningConfirmFlow.test.js`, **20 tests**: the dialog
+appears, names the outcome **in words** (not `proceed_to_kp_process`),
+calls `confirm_complaint_screening` **exactly once** with the right
+arguments, and the panel refreshes to the **read-only** confirmed state
+with no control left to change it; cancelling writes nothing and keeps
+the choice; a second click cannot produce a second write; an empty
+outcome opens no dialog at all; Escape closes without writing; and the
+Secretary is painted no control.
+
+⚠️ **Run both directions**: against the object form **8 of 10 fail**, and
+the two that pass do so honestly — the empty-outcome case returns before
+it reaches `confirm()`, and the Secretary has no control either way.
+⚠️ **It is not a source-string test.** A scan for `const [confirm` would
+pass the moment somebody typed it and would say nothing about whether the
+dialog opens.
+
+### ⚠️ "Open a KP case" now follows the database rule
+
+The preview offered it **before any review had been confirmed**, so the
+one visible next step was a control whose only possible answer was a
+refusal. `open_kp_case()` reads the complaint's latest screening itself,
+requires `confirmed_at`, and requires `confirmed_outcome =
+proceed_to_kp_process`.
+
+| latest screening | control |
+|---|---|
+| none prepared | **absent** — *"No review has been prepared yet."* |
+| prepared, not confirmed | **absent** — *"…can be opened once the barangay head confirms it."* |
+| confirmed `proceed_to_kp_process` | **the form** |
+| confirmed `refer_for_further_action` / `close_without_kp_process` / `needs_more_information` | **absent** — *"The confirmed review did not direct this complaint to the KP process."* |
+
+⚠️ **THE DATABASE CHECK IS NOT WEAKENED, AND NOT DUPLICATED EITHER.**
+`KpCasePanel` reads `complaint_screenings_for()` — **the same reader the
+screening panel uses**, gated on the same pair, returning the rows
+`ORDER BY created_at DESC`, which is the same row `open_kp_case()` will
+look at — and `rows[0]` decides. The RPC still decides the **write**, a
+crafted call is still refused with its own `P0001`, and the panel still
+sends the complaint id and nothing else. ⚠️ **No checklist ANSWER is
+read** by either layer; eligibility is the human-confirmed decision only.
+
+⚠️ **A sentence, never a disabled button** — `ActionMenu`'s own rule, and
+the reason the Add Official form omits the powered positions rather than
+greying them. A control that is simply gone with nothing in its place
+cannot be told from one that failed to render.
+
+### One integer, not lifted state
+
+Confirming a review has to repaint the panel below it. `ScreeningPanel`
+fires an optional `onScreeningChanged`, `OfficialComplaints` bumps a
+counter, `KpCasePanel` watches it. **All screening state still lives in
+`ScreeningPanel` and all case state still lives in `KpCasePanel`**;
+nothing was lifted out of either.
+
+### What was verified
+
+| Check | Result |
+|---|---|
+| New suite, both directions | 20 pass; **8 of 10** of the confirm-flow tests fail against the object form, **7 of 10** of the gate tests fail against the ungated control |
+| `kpCasePanel.test.js` | 54 pass. ⚠️ Nine needed the panel's **new input** — the screening reader — which is a definition change, not a loosened assertion: the four RPC-refusal tests are **kept**, because the race they describe (a new screening prepared between load and click) is still live |
+| Focused: screening · kpcases · complaints | 14 suites, **589 tests** |
+| Jest | **53 suites, 1,580 tests** — from 52 / 1,560 |
+| Production build | clean, no ESLint warnings, **247.36 kB** gzipped (+335 B) |
+| `git diff --check` | clean |
+| `supabase-migrations/` | **not touched** |
+
+⚠️ **No live data was read or written.** There is a real manual test
+complaint in the database; it was not deleted, its screening was not
+edited, nothing was confirmed through SQL and no KP case was opened for
+it. Everything above is component tests against mocked Supabase — the
+repo owner's own click on the corrected preview is what confirms it.
+
+### ⚠️ Flagged in passing, deliberately NOT changed
+
+`handleConfirm` calls `await confirm(...)` **outside** its `try`, which
+is why this failed silently rather than showing the panel's own error
+sentence. Moving it inside would make a future integration mistake
+visible — but the integration is what was broken, the brief scopes this
+to fixing that, and the new suite is the guard. Recorded rather than
+done.
+
+
 ## Health centre
 
 **Medicine stock is a status, not a quantity** — Available / Low stock /
