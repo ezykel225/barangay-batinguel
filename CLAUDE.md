@@ -334,7 +334,7 @@ src/
 
   assets/images/      11 official portraits, page backgrounds, logo.
 
-supabase-migrations/  38 numbered SQL files. A record, not a runner.
+supabase-migrations/  39 numbered SQL files. A record, not a runner.
 supabase/functions/   Edge Function source (notify-reservation-sms).
 docs/                 SETUP.md, TESTING-WALKTHROUGH.pdf + its generator.
 ```
@@ -826,7 +826,7 @@ such row.
 
 ## Database notes
 
-**38 migrations**, `001` through `038`, all applied. ⚠️ 027 is a
+**39 migrations**, `001` through `039`, all applied. ⚠️ 027 is a
 DATA CORRECTION, not a schema change — see *The portrait is lost by the
 RENAME* under *Public E-Services (X5)*.
 
@@ -6450,8 +6450,11 @@ barangay.
 > complete while its own deferred-items table still listed bare PUBLIC EXECUTE
 > on nine functions as open.** ✅ **Migration 038 (B5, 2026-10-16) removed it —
 > zero of the 26 SECURITY DEFINER functions now carry PUBLIC EXECUTE — and
-> MASTER-B IS COMPLETE as of B5.** See *step B1*, *step B2*, *step B3*,
-> *step B4* and *step B5*.
+> B5 then reported one surplus **named** `anon` grant and left it open as a
+> candidate — ⚠️ **the same shape of unfinished work, one degree smaller.**
+> ✅ **Migration 039 (2026-10-16) removed it**, so **MASTER-B IS COMPLETE**
+> with no unnecessary function EXECUTE grant known to remain. See *step B1*,
+> *step B2*, *step B3*, *step B4*, *step B5* and *its follow-up*.
 
 Carried forward unchanged, all recorded under *Known gaps*: the eight
 remaining dead `admin` policy disjuncts; `TRUNCATE` granted to `anon`
@@ -6811,10 +6814,15 @@ migration of its own.
   not attempted.
   ✅ **B5 did exactly that** — migration 038 revoked PUBLIC from all nine
   and kept every named grant, with the policy-still-works proof run as a
-  23-line before/after workflow matrix. ⚠️ **The named `anon` and
-  `authenticated` grants were NOT narrowed**, because the policies that
-  call the predicates are declared `TO public` and are therefore evaluated
-  for whichever role queries the table; see *MASTER-B step B5*.
+  23-line before/after workflow matrix. ⚠️ **The named `authenticated`
+  grants were NOT narrowed, and `anon` was narrowed on exactly ONE
+  function.** Six of the seven predicates are called by policies declared
+  `TO public`, which are evaluated for whichever role queries the table,
+  so their `anon` grant is load-bearing. The seventh,
+  `official_id_for_current_user()`, is called only by policies declared
+  `TO authenticated` — ✅ **migration 039 took its `anon` grant**, which is
+  why the `anon` lint reads 10 while the `authenticated` lint reads 11.
+  See *MASTER-B step B5* and its *follow-up*.
 
 ---
 
@@ -7119,8 +7127,9 @@ impersonation and the catalog. Padding the count would misrepresent the phase.
 `btree_gist` in `public` is still outstanding, and is now the only item.
 ✅ **B4 closed it** — migration 037, 2026-10-14. ⚠️ **But B4's own report
 still listed bare PUBLIC EXECUTE on nine functions as open, so "complete"
-was premature;** ✅ **B5 closed that — migration 038, 2026-10-16 — and
-MASTER-B is COMPLETE as of B5.**
+was premature;** ✅ **B5 closed that — migration 038, 2026-10-16 — and ⚠️ B5 in turn left one
+surplus `anon` grant as a documented candidate, which migration 039 then
+removed, so MASTER-B is COMPLETE as of that follow-up.**
 
 ✅ **Eight RLS policies across four tables stopped testing for a role this
 system does not have. Zero policies in any schema mention `admin` now.**
@@ -7875,7 +7884,7 @@ function's name or from this file's prose.
 | `current_official_holds_position(text)` | A | yes | kept | **yes** | yes | 4 policies — both queues + both kapitan UPDATE, `TO public` |
 | `is_official(uuid)` | A | yes | **yes** | **yes** | yes | **11 policies** across 6 public tables **and `storage.objects`** |
 | `notification_is_visible(uuid)` | A | yes | kept | **yes** | yes | 1 policy, `notification_reads` INSERT, `TO public` |
-| `official_id_for_current_user()` | A+C | yes | *surplus — see below* | **yes** | yes | 3 `official_availability` policies `TO authenticated`, **and** the frontend's own `.rpc()` since A5 |
+| `official_id_for_current_user()` | A+C | yes | ✅ *surplus — **REMOVED in 039*** | **yes** | yes | 3 `official_availability` policies `TO authenticated`, **and** the frontend's own `.rpc()` since A5 |
 | `official_is_active(uuid)` | A | yes | **yes** | **yes** | yes | 1 policy, `official_availability` SELECT, `TO public` — the public Officials page reads it |
 | `term_is_confirmed(uuid)` | A | yes | **yes** | **yes** | yes | 1 policy, `barangay_term_members` SELECT, declared **`TO anon+authenticated`** |
 | `get_reservation_slots(date)` | B | yes | **yes** | **yes** | yes | 0 policies — a pure client RPC, the public availability grid |
@@ -7888,16 +7897,17 @@ alike whenever either queries that table. **Revoking the named grants is
 not what 038 does and would break the policies rather than harden them**,
 which is precisely what B1 recorded and what this phase re-proved.
 
-⚠️ **One named grant does look surplus, and it is REPORTED rather than
-removed.** `official_id_for_current_user()`'s **`anon`** grant: its three
-policies are declared `TO authenticated`, and the frontend calls it only
-with a session. Nothing in the live catalog needs `anon` to execute it.
-It is left in place because removing it is a behaviour change on a surface
-nobody has asked about — it would turn an anonymous call from *"returns
-NULL"* (which leaks nothing, there being no `auth.uid()`) into `42501` —
-and because narrowing a named grant deserves its own proof pass rather
-than riding along inside a PUBLIC cleanup. **Named as a candidate, not
-done.**
+⚠️ **One named grant looked surplus, and B5 reported it rather than
+removing it.** `official_id_for_current_user()`'s **`anon`** grant: its
+three policies are declared `TO authenticated`, and the frontend calls it
+only with a session. Nothing in the live catalog needed `anon` to execute
+it. B5 left it in place because narrowing a named grant deserves its own
+proof pass rather than riding along inside a PUBLIC cleanup.
+
+> ✅ **CLOSED by migration 039, 2026-10-16, before PR #37 merged** — in
+> the same branch, because "named as a candidate, not done" is the same
+> shape of unfinished work B4 left behind with PUBLIC. It got the proof
+> pass B5 said it deserved. See *MASTER-B step B5 follow-up*.
 
 ### ⚠️ Who actually loses anything — measured by dry-running the revoke
 
@@ -8153,7 +8163,7 @@ was not touched.
   the `anon` and `authenticated` probes succeeding through PostgREST's own
   roles after the revoke.
 
-### ✅ FINAL MASTER-B RECONCILIATION — COMPLETE as of B5
+### ✅ FINAL MASTER-B RECONCILIATION — COMPLETE as of B5 + 039
 
 | Step | Scope | Migration | Status |
 |---|---|---|---|
@@ -8162,6 +8172,7 @@ was not touched.
 | **B3** | dead `admin` policy branches | 036 | ✅ 8 → **0** |
 | **B4** | `btree_gist` extension placement | 037 | ✅ `public` → `extensions` |
 | **B5** | bare **PUBLIC EXECUTE** | **038** | ✅ 9 → **0** |
+| **B5 follow-up** | the one surplus **named** grant B5 reported | **039** | ✅ `anon` EXECUTE on `official_id_for_current_user()` removed; `anon` advisor lint 11 → **10** |
 
 Every explicitly deferred item, classified:
 
@@ -8171,7 +8182,7 @@ Every explicitly deferred item, classified:
 | bare **PUBLIC EXECUTE** grants | **A — RESOLVED** | **038; 9 → 0** |
 | the seven policy predicates still `anon`/`authenticated`-executable | **B — INTENTIONAL RETAINED** | An RLS policy is evaluated as the *querying* role; revoking breaks the policy rather than hardening it. Proven by the 23-line matrix |
 | the four intentional RPCs | **B — INTENTIONAL RETAINED** | `anon` is *supposed* to reach them — the availability grid, the calendar, guest booking, guest tracking |
-| `official_id_for_current_user()`'s **`anon`** grant | **E — candidate, named and not done** | Its policies are `TO authenticated` and the frontend calls it with a session, so `anon` appears surplus. ⚠️ Reported, not removed: it returns NULL for `anon` and leaks nothing, and narrowing a named grant needs its own proof pass |
+| `official_id_for_current_user()`'s **`anon`** grant | **A — RESOLVED** | **039**; its three policies are `TO authenticated` and both frontend callers hold a session, so no anonymous caller could reach it. Dry-run proved 18 of 19 probes byte-identical — the only change is that an anonymous direct call goes from *returns NULL* to `42501`. The `anon` SECURITY DEFINER advisor lint moved **11 → 10** |
 | `barangay_officials` DELETE | **B — INTENTIONAL RETAINED** | A real DELETE policy backs it, matching archived rows only (018). Re-measured: the policy is still there. Revoking the privilege would make a policy the barangay deliberately wrote unreachable |
 | REFERENCES privileges | **B — INTENTIONAL RETAINED** | 72 default grants to client roles; exploiting one needs `CREATE` on schema `public` to build the referencing table, and **`anon`/`authenticated` both measured `CREATE = false`** |
 | TRIGGER privileges | **B — INTENTIONAL RETAINED** | Same measurement, same reason — a trigger needs an object the client cannot create |
@@ -8181,15 +8192,242 @@ Every explicitly deferred item, classified:
 | `btree_gist` placement | **A — RESOLVED** | 037; `extensions`, one copy, advisor finding gone |
 
 ✅ **No MASTER-B security-hardening item remains unresolved, and MASTER-B
-IS COMPLETE as of B5.** Every item still carrying a ⚠️ is deliberate
-retained architecture whose necessity was *measured* (the predicates, the
-RPCs, the backed DELETE policy, the grants that need an unavailable
-`CREATE`), cosmetic (the policy names), a barangay decision (archive
-scope), or a platform limit (leaked passwords). ⚠️ **The one open
-candidate — `official_id_for_current_user()`'s `anon` grant — is named
-with its evidence rather than quietly closed**, because it is a narrowing
-nobody has proven safe for the live frontend, and because declaring it
-done would repeat exactly the mistake B4 made with PUBLIC.
+IS COMPLETE as of B5 plus its 039 follow-up.** ⚠️ **There is no longer an
+open candidate.** B5's own report named one — `anon` EXECUTE on
+`official_id_for_current_user()` — and migration **039** closed it inside
+the same branch rather than shipping it as a documented maybe, which is
+exactly the mistake B4 made with PUBLIC and B5 made one degree smaller.
+**Zero unnecessary function EXECUTE grants are known to remain.**
+
+Every item still carrying a ⚠️ is deliberate retained architecture whose
+necessity was *measured* (the six policy predicates that must stay
+`anon`-executable, the four public RPCs, the backed DELETE policy, the
+grants that need a `CREATE` the client roles do not have), cosmetic (the
+policy names), a barangay decision (archive scope), or a platform limit
+(leaked passwords).
+
+---
+
+## ✅ MASTER-B step B5 follow-up — the one surplus NAMED grant (migration 039)
+
+2026-10-16, on `claude/master-b5-public-execute-hardening` — **the same
+branch and the same PR #37 as B5**, deliberately, because B5's own report
+named this and left it open.
+
+✅ **`anon` can no longer execute `official_id_for_current_user()`.** The
+whole migration is **one statement**:
+
+```sql
+revoke execute on function public.official_id_for_current_user() from anon;
+```
+
+### ⚠️ Why this is not just tidying
+
+B5 found it, measured it, wrote it down — and shipped it as a *candidate*.
+That is one degree smaller than, but the same shape as, the mistake B4
+made in declaring MASTER-B complete while its own table listed PUBLIC as
+open. **An unnecessary grant nobody has proven necessary is unfinished
+work, not retained architecture.** So it got the proof pass B5 said it
+deserved, inside the same branch, before the PR merged.
+
+### The exact usage, read from the live catalog
+
+| | |
+|---|---|
+| signature | `official_id_for_current_user()` — **no arguments** |
+| returns · security | `uuid` · SECURITY DEFINER, owner `postgres`, `search_path=""` |
+| ACL before 039 | `postgres=X \| anon=X \| authenticated=X \| service_role=X` (no PUBLIC — 038 took it) |
+
+Policies whose `USING`/`WITH CHECK` **text** names it — every schema
+searched, matched on the expression rather than on the policy name:
+
+| Table | Policy | Cmd | Roles | Clause |
+|---|---|---|---|---|
+| `official_availability` | `official_availability_insert` | INSERT | **`TO authenticated`** | `WITH CHECK (official_id = official_id_for_current_user())` |
+| `official_availability` | `official_availability_update` | UPDATE | **`TO authenticated`** | both `USING` and `WITH CHECK` |
+| `official_availability` | `official_availability_delete` | DELETE | **`TO authenticated`** | `USING (official_id = official_id_for_current_user())` |
+
+⚠️ **Three policies, one table, and all three are `TO authenticated`.**
+That is the whole basis of this migration. The six predicates 038 left
+alone are called by policies declared `TO public`, which are evaluated for
+**whichever role queries the table** — so their `anon` grant is
+load-bearing. These three are never evaluated for `anon` at all.
+
+⚠️ **THE PUBLIC READ PATH ON THAT SAME TABLE USES A DIFFERENT HELPER.**
+The fourth policy is the one the public Officials page depends on:
+
+```
+official_availability_select   SELECT   TO public
+    USING (official_is_active(official_id))
+```
+
+`official_is_active()` keeps its own `anon` grant and is untouched.
+**Reading those two policies as one because they sit on one table is
+exactly the inference to avoid here** — it is why the brief said not to
+infer from policy names, and the two differ in helper, command and role.
+
+Everything else that could reach it: **nothing.** Zero functions in
+`public`/`auth`/`storage` (comments stripped), zero views, zero matviews,
+zero CHECK constraints, zero column defaults, zero indexes, zero triggers,
+zero event triggers. So no SECURITY DEFINER wrapper and no trigger calls it
+on anybody's behalf.
+
+**Frontend callers — exactly two, both session-gated:**
+
+| | |
+|---|---|
+| `OfficialDashboard.jsx:736` | inside `fetchUserInfo(user.id)`, called only when `user?.id` |
+| `Sidebar.jsx:122` | inside `if (role === 'official')` |
+
+`Sidebar` is imported by the three dashboard components only, and all three
+dashboards sit behind `<ProtectedRoute>`. The only other `.rpc(` sites in
+`src/` are the four public reservation RPCs. **No public page calls it.**
+
+### ⚠️ A second barrier already stood in front of those three policies
+
+`anon`'s real privileges on `official_availability` are **REFERENCES,
+SELECT, TRIGGER** — no INSERT, no UPDATE, no DELETE. So an anonymous write
+is refused at the **privilege** layer before RLS is consulted, and those
+three policies were unreachable as `anon` even with the grant. Measured:
+`anon` INSERT and UPDATE both `42501 permission denied for table`.
+
+⚠️ **The DELETE was NOT executed** — the connector gates DELETE, as 035
+recorded — and is proven from `information_schema.role_table_grants`, which
+is what PostgreSQL itself consults before execution. Fragmenting the keyword
+to get past a destructive-statement guard is not a thing to do to complete
+a table.
+
+### What the grant actually bought `anon`
+
+With it in place an anonymous direct call **succeeded and returned NULL**:
+there is no `auth.uid()`, so the function resolves to nothing. The grant
+permitted a call that could not answer anything. **Neither answer leaks
+anything**, which is why this was a least-privilege question and not a
+vulnerability — and also why it could not be left as a maybe.
+
+### The dry run — 19 probes, and exactly one line moved
+
+Inside one aborting transaction: revoke, re-run everything, roll back.
+
+| | BEFORE | AFTER REVOKE |
+|---|---|---|
+| **A1 anon DIRECT rpc** | **SUCCEEDED → NULL** | **REFUSED `42501`** |
+| A2 anon SELECT `official_availability` | 1 row | 1 row |
+| A3 anon SELECT `barangay_officials` | 11 rows | 11 rows |
+| A4 anon SELECT `kapitan_availability` | 5 rows | 5 rows |
+| A5 anon INSERT availability | `42501` (table) | `42501` (table) |
+| A6 anon UPDATE availability | `42501` (table) | `42501` (table) |
+| A7/A8 anon slot RPCs | SUCCEEDED | SUCCEEDED |
+| T1 Treasurer rpc | her own row id | her own row id |
+| T2 Treasurer UPDATE own availability | rows=1 | rows=1 |
+| T3 Treasurer UPDATE reservation | rows=1 · holdsTRE=t | rows=1 · holdsTRE=t |
+| K1 Kagawad rpc | his own row id | his own row id |
+| K2 Kagawad INSERT **own** hours | ACCEPTED rows=1 | ACCEPTED rows=1 |
+| K3 Kagawad INSERT **another's** hours | REFUSED `42501` | REFUSED `42501` |
+| K4 Kagawad UPDATE another's row | rows=0 (denied) | rows=0 (denied) |
+| K5 Kagawad `document_requests` UPDATE | rows=0 (denied) | rows=0 (denied) |
+| S1 Secretary rpc · holdsSEC · docUPD | id · t · rows=1 | id · t · rows=1 |
+| P1 Punong rpc · holdsPUN · kapUPD | id · t · rows=1 | id · t · rows=1 |
+| ACL in-transaction | `anon=t` | `anon=f` authd=t svc=t PUBLIC=f |
+
+**One line of nineteen moved**, and it is the line the migration exists to
+move. After the abort the ACL was re-read with `anon=X/postgres` back, one
+availability row, zero probe residue.
+
+### ⚠️ One dry-run reading was MY HARNESS, and it reported a refusal for a statement that had succeeded
+
+The Kagawad's own-hours INSERT came back **`22P02`** — a data-type code, not
+a permission one. The cause was the probe's accumulator:
+`r := r || 'some literal'` where `r` is `text[]` makes PostgreSQL resolve the
+bare literal as an **array literal**, so the APPEND raised *"malformed array
+literal"* on the line **after** the insert had already committed inside the
+block. Every probe built with `format()` was unaffected, which is why only
+two of eighteen lines were wrong. Casting them `::text` fixed it, and the
+statement is accepted in isolation and in both runs.
+
+⚠️ **An RLS refusal is `42501`. A `22P02` or a `23514` is not a refusal at
+all** — B5 hit the same class of thing with a CHECK constraint. The
+project's own rule, for the ninth phase running: *always ask which step
+produced the result.*
+
+### ⚠️ Migration-history decision: a NEW file, not an edit to 038
+
+038 is marked **APPLIED 2026-10-16**, states in its own header that it is
+*"NINE `REVOKE ... FROM PUBLIC` statements and nothing else"*, and records in
+its verification table that the named grants were left *"unchanged on all
+nine"*. **All of that is true of what 038 ran.**
+
+Adding a tenth statement — a *named-grant* revoke at that — would make 038's
+header contradict both itself and the database it produced on its day, and
+would claim a live change it did not make. A header is a historical record
+of its own day; 037 left ten earlier headers' stale `btree_gist` advisories
+exactly as written for the same reason. **So this is 039, and 038 was not
+touched.** The file was written and then applied live, because editing a
+file under `supabase-migrations/` changes nothing by itself.
+
+**Replay safety:** no migration file grants EXECUTE on this function to
+anybody — the named grants come from `pg_default_acl`. The function is
+created in 026 and rewritten in 031, so a replay of `001..039` creates it
+with all four named grants and then 039 removes the `anon` one.
+
+### Verified after applying
+
+| Check | Result |
+|---|---|
+| ACL | `postgres=X \| authenticated=X \| service_role=X` |
+| `anon` EXECUTE | **false** (was true) |
+| `authenticated` / `service_role` EXECUTE | **true / true** — unchanged |
+| PUBLIC EXECUTE, all 26 SECURITY DEFINER functions | **0** — unchanged |
+| SECURITY DEFINER total · client-executable | 26 · **11** — unchanged |
+| of those, `anon`-executable | **10** (was 11) · `authenticated` **11** |
+| the other eight functions 038 touched | ACLs **byte-identical**, `anon=X` kept on all eight |
+| B1's 15 client-unreachable functions | still 15; **30/30 direct calls refused `42501`** |
+| AFTER matrix, 19 probes | identical to BEFORE except A1 |
+| MASTER-A | 028 `P0001` · 029 `P0001` + Kagawad control accepted · 033 rows=1 · 032 `P0001` · 018 rows=1 · 030 `42501` · helper = own row · SEC/TRE/PUN `t/f/f` · audience `t/f` |
+| B2 · B3 · B4 | TRUNCATE 0, six privileges 0 · 0 admin branches, 75 policies · btree_gist in `extensions`, constraint validated |
+| Jest | **38 suites, 930 tests** — unchanged |
+| Production build | clean, **225.17 kB**, `main.cacec8c3.js` — **byte-identical**, no application file changed |
+| `git diff --check` | clean |
+| Live state | 1 availability row · 11/11 active officials · 11 links · 27 reservations · 13 health events · **zero probe residue** |
+
+### ✅ The advisor moved, for the first time in this workstream
+
+| Finding | before 039 | after |
+|---|---|---|
+| `anon_security_definer_function_executable` | WARN, 11 | WARN, **10** |
+| `authenticated_security_definer_function_executable` | WARN, 11 | WARN, **11** |
+| `rls_enabled_no_policy` · `auth_leaked_password_protection` | 1 · 1 | 1 · 1 — unchanged |
+| `extension_in_public` | gone (B4) | **still gone** |
+| anything new | — | **none** |
+
+⚠️ B2, B3, B4 and B5 each recorded that the advisor was the **wrong
+instrument** for their phase — no lint exists for excess table privileges,
+dead policy disjuncts, or bare PUBLIC EXECUTE. **039 is the one that the
+advisor can see**, because this lint keys on exactly what was removed:
+`anon` reachability. It is the only MASTER-B step whose lint count moved,
+and the function is gone from that list by name.
+
+### ⚠️ What this does NOT do
+
+- It does **not** touch `authenticated` or `service_role` on this function
+  — three policies and both frontend callers need `authenticated`.
+- It does **not** touch the other eight functions 038 named, or any of the
+  fifteen 034 closed.
+- It does **not** touch `official_is_active()`, which is what the **public**
+  read policy on the same table calls and which `anon` genuinely needs.
+- It does **not** alter a function body, a policy, a trigger, a table
+  privilege or **any application file**.
+- It does **not** edit 038, 037, 034 or any other applied migration.
+
+### ⚠️ What was NOT verified
+
+**No authenticated page was loaded in a browser from here.** The dashboards
+are behind `ProtectedRoute` and this environment still has **no test
+account**; nothing was done to weaken authentication for a screenshot. What
+that leaves unseen: the public Officials page rendering consultation hours
+through `official_is_active()` from a browser, and a signed-in official's
+dashboard resolving its identity through the RPC. Both are covered above as
+real calls by the real roles against the live database, but not by a click.
 
 ---
 
@@ -8407,9 +8645,10 @@ derives her initials from. It is no longer displayed as a label.
   sixteen tables → zero, plus `activity_log` UPDATE/DELETE, `profiles`
   DELETE and both queues' DELETE), and the eight dead `admin` policy
   branches in migration 036, `btree_gist`'s schema in migration 037
-  (moved from `public` to `extensions`) and the last bare **PUBLIC EXECUTE**
-  grants in migration 038 (nine functions → zero). ✅ **MASTER-B IS COMPLETE
-  as of B5.**
+  (moved from `public` to `extensions`), the last bare **PUBLIC EXECUTE**
+  grants in migration 038 (nine functions → zero) and the one surplus
+  **named** `anon` grant in migration 039. ✅ **MASTER-B IS COMPLETE**, with
+  no unnecessary function EXECUTE grant known to remain.
 - **The official barangay document forms.** X6 built the whole
   generation pipeline against PROTOTYPE layouts because the barangay has
   not supplied its real forms, and the X6 follow-up extended that to all
@@ -8664,12 +8903,18 @@ derives her initials from. It is no longer displayed as a label.
   `supabase_auth_admin`, `supabase_storage_admin`, `dashboard_user`,
   `pgbouncer`, the `pg_*` predefined roles …) and not one of them is a
   role this application executes as.
-  ⚠️ **Both advisor lints still report 11 and that is correct, not a
-  failure**: they flag a SECURITY DEFINER function reachable by
-  `anon`/`authenticated`, which is exactly what the named grants
-  deliberately preserve, so removing PUBLIC cannot move them by
-  construction. The catalog ACL is the authoritative measurement here.
-  See *MASTER-B step B5*.
+  ⚠️ **PUBLIC removal could not move either advisor lint, and that was
+  correct rather than a failure**: they flag a SECURITY DEFINER function
+  reachable by `anon`/`authenticated`, which is exactly what the named
+  grants deliberately preserve, so 038 cannot move them by construction.
+  The catalog ACL is the authoritative measurement for that phase.
+  ✅ **Migration 039 then moved one of them for real**: `anon` EXECUTE on
+  `official_id_for_current_user()` was the one surplus *named* grant, its
+  three policies being declared `TO authenticated`, so the `anon` lint now
+  reads **10** while `authenticated` stays **11**. ⚠️ **The remaining six
+  predicates must keep `anon`** — their policies are `TO public` and are
+  evaluated for whichever role queries the table. See *MASTER-B step B5*
+  and its *follow-up*.
 - ✅ ~~**Eight RLS policies still test for a `role = 'admin'` that this
   system does not have.**~~ **CLOSED by migration 036 (MASTER-B B3).**
   `announcements` (INSERT, UPDATE), `events` (INSERT, UPDATE),
