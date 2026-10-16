@@ -27,6 +27,11 @@ describe('the ?tab= deep link into the resident portal', () => {
   // The two lists that must not drift: these ids are matched against
   // `activeTab` in ResidentDashboard and rendered by Sidebar.
   it('lists exactly the resident portal tabs', () => {
-    expect(RESIDENT_TABS).toEqual(['dashboard', 'documents', 'reservations', 'settings'])
+    expect(RESIDENT_TABS).toEqual([
+      // ⚠️ 'complaints' was added by P3-B1 together with the fifth
+      // entry in Sidebar's residentNavItems. This assertion failing is
+      // the guard working: the two arrays must not drift.
+      'dashboard', 'documents', 'reservations', 'complaints', 'settings',
+    ])
   })
 })

@@ -58,12 +58,43 @@ export const E_SERVICES = [
     cta: 'Track a Booking',
   },
   {
+    // ⚠️ "Track a Complaint", not "Track a Case". P3 creates complaints
+    // and decides nothing about them -- no jurisdiction, no mediation,
+    // no KP eligibility -- so calling it a case would assert a decision
+    // nobody has made.
+    key: 'track-complaint',
+    label: 'Track a Complaint',
+    to: '/track-complaint',
+    access: 'guest',
+    summary: 'Check what has happened to a complaint using its reference number'
+      + ' and the contact number it was filed with. Works for a complaint'
+      + ' recorded at the Barangay Hall.',
+    cta: 'Track a Complaint',
+  },
+  {
     key: 'request-document',
     label: 'Request Barangay Document',
     to: '/resident?tab=documents',
     access: 'resident',
     summary: 'Request a barangay document. A verified resident account is required.',
     cta: 'Request Document',
+  },
+  {
+    key: 'file-complaint',
+    label: 'File a Complaint',
+    to: '/resident?tab=complaints',
+    access: 'resident',
+    summary: 'Report a problem to the barangay — noise, a debt, a boundary'
+      + ' dispute and more. A resident account is required.',
+    cta: 'File a Complaint',
+  },
+  {
+    key: 'my-complaints',
+    label: 'My Complaints',
+    to: '/resident?tab=complaints',
+    access: 'resident',
+    summary: 'View the complaints you have filed and their current status.',
+    cta: 'View My Complaints',
   },
   {
     key: 'my-requests',

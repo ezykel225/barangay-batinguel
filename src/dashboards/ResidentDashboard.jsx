@@ -20,6 +20,7 @@ import {
 } from '../utils/displayLabels'
 import { residentStatusLabel } from '../utils/reservationWindow'
 import { resolveResidentTab } from '../utils/residentTabs'
+import MyComplaints from '../complaints/MyComplaints'
 import { logActivity } from '../utils/activityLog'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
@@ -982,6 +983,14 @@ const ResidentDashboard = () => {
             </div>
           </div>
         )}
+
+        {/* ⚠️ A TAB, NOT A NEW ROUTE. The E-Services catalogue
+            deep-links here as /resident?tab=complaints, exactly as it
+            does for document requests -- ProtectedRoute already gates
+            /resident, so an official, the nurse and any unsupported
+            role are bounced before this renders, and P1's fail-safe is
+            untouched. No new role, and no new protected route. */}
+        {activeTab === 'complaints' && <MyComplaints />}
 
         {activeTab === 'settings' && (
           <div>
