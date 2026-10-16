@@ -246,6 +246,39 @@
   padding: 8px 20px 4px;
 }
 
+/* The unsupported-role navigation state, in the rail and in the drawer.
+   NEW classes: nothing anywhere else in this file or any other styles
+   them, so they override nothing and are declared here, beside the nav
+   label they stand in for, rather than appended at the end of the file.
+   The protected mobile table-to-card block is NOT touched and still
+   hashes to its pre-X2 bytes.
+
+   Contrast is against the navy rail, not the page, and the rail is a
+   GRADIENT -- so both ends were computed, and the lighter one is the
+   case that has to clear AA: #cbd5e1 measures 6.98:1 on #1e3a8a and
+   5.87:1 on #1e40af. The drawer uses the same gradient, so the same
+   two numbers hold there. Deliberately NOT --grey-600 (#5f6775),
+   which is tuned for dark text on white and measures 1.53:1 here.
+
+   ⚠️ Hidden in the collapsed rail, because every other label in the
+   rail is -- `.sidebar.is-collapsed .sidebar-nav-text` and
+   `.sidebar-nav-label` are both hidden there, and a sentence reflowed
+   into a 72px icon rail is worse than the icons-only rail it is in.
+   The expanded rail and the mobile drawer both carry the message, and
+   the collapse toggle is still there to expand it. */
+.sidebar-nav-empty,
+.nav-drawer-empty {
+  margin: 0;
+  padding: 12px 20px;
+  font-size: var(--fs-13);
+  line-height: 1.5;
+  color: #cbd5e1;
+}
+
+.sidebar.is-collapsed .sidebar-nav-empty {
+  display: none;
+}
+
 /* Sidebar Footer */
 .sidebar-footer {
   padding: 16px 20px;
