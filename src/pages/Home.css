@@ -623,13 +623,23 @@
   margin-top: 4px;
 }
 
-.home-about-teaser {
+/* ⚠️ TWO teasers share every rule below, and the selector lists are why
+   rather than a second copy of the block. Home now carries a doorway to
+   /about and a doorway to /community-safety, and they are the same
+   shape: a heading, a sentence, one button. A `.home-safety-teaser`
+   block with the same values would be the `@keyframes pulse` trap in
+   another form -- two declarations of one treatment, where editing
+   either silently leaves the other behind. Same reasoning the
+   announcement and event cards already follow for h2/h3. */
+.home-about-teaser,
+.home-safety-teaser {
   padding: 48px 40px;
   background-color: #f9fafb;
   border-top: 1px solid #e5e7eb;
 }
 
-.home-about-teaser-container {
+.home-about-teaser-container,
+.home-safety-teaser-container {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -637,19 +647,22 @@
   gap: 18px 32px;
 }
 
-.home-about-teaser-container > div {
+.home-about-teaser-container > div,
+.home-safety-teaser-container > div {
   flex: 1 1 320px;
   min-width: 0;
 }
 
-.home-about-teaser h2 {
+.home-about-teaser h2,
+.home-safety-teaser h2 {
   font-size: var(--fs-22);
   font-weight: 700;
   color: #1f2937;
   margin: 0 0 8px;
 }
 
-.home-about-teaser p {
+.home-about-teaser p,
+.home-safety-teaser p {
   font-size: var(--fs-14);
   color: #5f6775;
   line-height: 1.7;
@@ -679,7 +692,8 @@
 
 @media (max-width: 768px) {
   .home-services,
-  .home-about-teaser {
+  .home-about-teaser,
+  .home-safety-teaser {
     padding: 42px 20px;
   }
 

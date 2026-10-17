@@ -161,6 +161,37 @@ export const kpHearingOutcomeLabel = (value) => (
 // `record_kp_hearing_outcome` takes the answer as its own parameter.
 export const KP_CONCLUDE_PROMPT = 'Also record that this case is concluded'
 
+// ─── ⚠️ CONCLUDING A CASE LATER, AND WHY IT HAS TO BE POSSIBLE ────────
+//
+// Answering the prompt above with "no" used to be irreversible: ONE
+// outcome per hearing is immutable at both layers, and that RPC was the
+// only writer of a concluded case. So a case whose outcome did not
+// conclude it could never be concluded from that hearing at all —
+// measured in Final Integration's Flow A trace as
+// `P0001 This hearing already has a recorded outcome.`
+//
+// ⚠️ IT IMPLIES NO LEGAL JUDGMENT, and every word here is chosen for
+// that. The barangay is closing its own file; this is not a finding
+// about anybody, so there is no "settled", "dismissed", "eligible" or
+// "in favour of" in any of it, and a test scans these three strings for
+// eleven such words.
+export const KP_CONCLUDE_CASE_LABEL = 'Conclude case'
+
+export const KP_CONCLUDE_CASE_HEADING = 'Conclude the case'
+
+// ⚠️ IT SAYS WHAT STAYS UNCHANGED, because the one thing an official
+// needs to know before clicking is that the proceeding's own record is
+// not being rewritten.
+export const KP_CONCLUDE_CASE_NOTE = 'Recording this closes the barangay\'s case file. The outcome already recorded for the proceeding is not changed by it, and a concluded case can no longer be changed.'
+
+export const KP_CONCLUDE_CASE_CONFIRM_TITLE = 'Conclude this KP case?'
+
+export const kpConcludeCaseConfirmMessage = (reference) => (
+  `This records that the barangay is concluding case ${reference}. `
+  + 'The outcome already recorded for the proceeding is left exactly as it '
+  + 'is. A concluded case can no longer be changed.'
+)
+
 export const KP_OUTCOME_PROVISIONAL_NOTE = 'Provisional outcome wording — requires barangay confirmation. These four options describe what the barangay will do next; none of them is a legal finding, and this system makes no judgment of its own.'
 
 // ── Refusals, in words an official can act on ──────────────────────────
@@ -176,12 +207,15 @@ export const KP_ERRORS = Object.freeze({
   notPermittedOpen: 'Opening a KP case is handled by the barangay head.',
   notPermittedAdmin: 'This action is handled by barangay records staff.',
   notPermittedOutcome: 'Recording a proceeding outcome is handled by the barangay head.',
+  notPermittedConclude: 'Concluding a KP case is handled by the barangay head.',
   notConfirmed: 'This complaint needs a confirmed review before a case can be opened.',
   notProceed: 'The confirmed review for this complaint does not say to proceed with the KP process.',
   noScreening: 'This complaint has no review on record yet.',
   duplicateCase: 'A KP case has already been opened for this complaint.',
   concludedCase: 'This case is concluded and its records can no longer be changed.',
   outcomeRecorded: 'This proceeding already has a recorded outcome and cannot be changed.',
+  alreadyConcluded: 'This case has already been concluded.',
+  noOutcomeYet: 'A case is concluded from a recorded proceeding outcome, and this case has none yet.',
   panelFull: 'A panel records at most three people.',
   notAParty: 'That person is not recorded as a party to this case.',
   openFailed: 'The case could not be opened just now. Try again in a moment.',
@@ -190,6 +224,7 @@ export const KP_ERRORS = Object.freeze({
   recordFailed: 'The record could not be saved just now. Try again in a moment.',
   attendanceFailed: 'Attendance could not be recorded just now. Try again in a moment.',
   outcomeFailed: 'The outcome could not be recorded just now. Try again in a moment.',
+  concludeFailed: 'The case could not be concluded just now. Try again in a moment.',
 })
 
 // ⚠️ NAMES NO POSITION, exactly as the restricted complaint detail does.

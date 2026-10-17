@@ -11,6 +11,12 @@ import { E_SERVICES, SERVICE_ACCESS } from '../constants/eServices'
 import {
   BARANGAY_PROFILE,
 } from '../constants/about'
+// The teaser takes its words from the page it leads to, so the two
+// cannot describe the map differently.
+import {
+  PAGE_INTRO as PUBLIC_SAFETY_INTRO,
+  PAGE_TITLE as PUBLIC_SAFETY_TITLE,
+} from '../safetymap/publicSafetyLabels'
 import { upcomingEvents } from '../utils/eventCalendar'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
@@ -201,6 +207,26 @@ const Home = () => {
               </Link>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ⚠️ The doorway to the PUBLIC Community Safety Map, and
+          deliberately not an E-Services card above: that catalogue is
+          transactions a visitor asks the barangay to perform, each
+          stating an access requirement, and this is published
+          information with no account and nothing to submit.
+          It says AREAS, never addresses: the published map is built
+          from aggregated cells, so promising a precise location here
+          would describe something the page cannot show. */}
+      <section className="home-safety-teaser">
+        <div className="home-safety-teaser-container">
+          <div>
+            <h2>{PUBLIC_SAFETY_TITLE}</h2>
+            <p>{PUBLIC_SAFETY_INTRO}</p>
+          </div>
+          <Link to="/community-safety" className="home-about-teaser-btn">
+            View the Community Safety Map
+          </Link>
         </div>
       </section>
 
