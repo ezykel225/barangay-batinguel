@@ -50,6 +50,9 @@ const kpError = (error, fallbackKey) => {
   const message = String(error?.message || '')
   const err = new Error(fallbackKey)
   if (/Punong Barangay can open/i.test(message)) err.kind = 'notPermittedOpen'
+  else if (/Punong Barangay can conclude/i.test(message)) err.kind = 'notPermittedConclude'
+  else if (/already been concluded/i.test(message)) err.kind = 'alreadyConcluded'
+  else if (/recorded proceeding outcome/i.test(message)) err.kind = 'noOutcomeYet'
   else if (/Punong Barangay can record a proceeding outcome/i.test(message)) err.kind = 'notPermittedOutcome'
   else if (/cannot (record|schedule|update)/i.test(message)) err.kind = 'notPermittedAdmin'
   else if (/already been opened/i.test(message)) err.kind = 'duplicateCase'
@@ -216,6 +219,35 @@ export const recordHearingOutcome = async ({
   if (error) {
     logFailure('Record KP hearing outcome', error)
     throw kpError(error, 'outcomeFailed')
+  }
+  return data
+}
+
+// ─── ⚠️ CONCLUDING A CASE, LATER AND ON ITS OWN ───────────────────────
+//
+// The PR #45 blocker fix. `recordHearingOutcome` above still carries
+// `concludesCase` and is still the ordinary path; this is the second way
+// in, for a case whose outcome was recorded WITHOUT concluding it.
+//
+// ⚠️ IT SENDS THE CASE ID AND AN OPTIONAL NOTE, AND NOTHING ELSE. No
+// hearing id, no outcome, no status, no actor and no timestamp —
+// `status`, `concluded_by` and `concluded_at` are all stamped
+// server-side from `auth.uid()` and the server clock, so there is no
+// parameter here a crafted call could forge.
+//
+// ⚠️ AND IT TOUCHES NO HEARING. Migration 046 writes four columns of
+// `kp_cases` and reads the hearings only to count whether any outcome
+// has been recorded at all, so the historical record of what happened at
+// the proceeding is unchanged by a later conclusion. The Punong
+// Barangay alone, enforced by the RPC.
+export const concludeKpCase = async ({ caseId, note }) => {
+  const { data, error } = await supabase.rpc('conclude_kp_case', {
+    p_case_id: caseId,
+    p_note: String(note ?? '').trim() || null,
+  })
+  if (error) {
+    logFailure('Conclude KP case', error)
+    throw kpError(error, 'concludeFailed')
   }
   return data
 }

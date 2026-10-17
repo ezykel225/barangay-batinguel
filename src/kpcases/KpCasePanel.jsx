@@ -6,6 +6,10 @@ import {
 import {
   KP_ATTENDANCE_KEYS,
   KP_ATTENDANCE_UNRECORDED,
+  KP_CONCLUDE_CASE_CONFIRM_TITLE,
+  KP_CONCLUDE_CASE_HEADING,
+  KP_CONCLUDE_CASE_LABEL,
+  KP_CONCLUDE_CASE_NOTE,
   KP_CONCLUDE_PROMPT,
   KP_HEARING_OUTCOME_KEYS,
   KP_HEARING_STATUS_KEYS,
@@ -19,6 +23,7 @@ import {
   kpAttendanceLabel,
   kpCaseStatusLabel,
   kpCaseStatusNote,
+  kpConcludeCaseConfirmMessage,
   kpHearingDate,
   kpHearingOutcomeLabel,
   kpHearingStatusLabel,
@@ -29,6 +34,7 @@ import {
 } from './kpCaseLabels'
 import {
   assignPanelMember,
+  concludeKpCase,
   kpMessage,
   loadKpAttendance,
   loadKpCase,
@@ -133,6 +139,7 @@ const KpCasePanel = ({
   const [memberName, setMemberName] = useState('')
   const [memberRole, setMemberRole] = useState(KP_PANEL_ROLE_KEYS[0])
   const [form, setForm] = useState(blankHearing)
+  const [conclusionNote, setConclusionNote] = useState('')
   const [notice, setNotice] = useState(null)
 
   // Per-hearing editing state, keyed by hearing id so two open rows
@@ -327,6 +334,62 @@ const KpCasePanel = ({
       note: draft.outcomeNote,
       concludesCase: concludes,
     }), 'outcomeFailed')
+  }
+
+  // ─── ⚠️ CONCLUDING THE CASE LATER — THE PR #45 BLOCKER ──────────────
+  //
+  // `record_kp_hearing_outcome()` takes "does this conclude the case?"
+  // as a separate human answer, which is right. What was wrong is that
+  // answering "no" was irreversible: ONE outcome per hearing is
+  // immutable at both layers, and that RPC was the only writer of a
+  // concluded case — so the case could never be concluded from that
+  // hearing at all. Measured in Final Integration's Flow A trace as
+  // `P0001 This hearing already has a recorded outcome.`
+  //
+  // ⚠️ THREE CONDITIONS, AND EACH MIRRORS THE SQL RATHER THAN INVENTING
+  // A RULE. `conclude_kp_case()` refuses a caller who does not hold
+  // Punong Barangay, refuses a case already `concluded`, and refuses a
+  // case with no recorded proceeding outcome. ⚠️ THIS DOES NOT REPLACE
+  // ANY OF THOSE CHECKS AND MUST NOT: it decides which control is
+  // painted, and a crafted call is still refused with its own `P0001`.
+  //
+  // ⚠️ THE OUTCOME CONDITION IS THE INVARIANT, NOT A NEW RULE. Before
+  // the fix a case could only ever become concluded alongside a recorded
+  // outcome, because the only writer was the function that records one.
+  const hasRecordedOutcome = hearings.some((h) => Boolean(h.outcome))
+  const mayConcludeCase = Boolean(kpCase)
+    && isKapitan
+    && kpCase.status !== 'concluded'
+    && hasRecordedOutcome
+
+  // ⚠️ THROUGH THE SHARED `useConfirm`, for the same reason the outcome
+  // is: this records a barangay decision that cannot afterwards be
+  // changed. The sentence names the CASE and says plainly that the
+  // recorded proceeding outcome is left alone — and it implies no legal
+  // judgment, which is what the wording in `kpCaseLabels` is scanned
+  // for. `destructive: false`, because concluding a case file is not a
+  // deletion.
+  //
+  // ⚠️ `useConfirm()` RETURNS AN ARRAY, and the caller that destructured
+  // it as an object is what made PR #43's confirm button silently do
+  // nothing. This component is handed `confirm` as a prop by
+  // `OfficialComplaints`, which takes it from the array form.
+  const handleConcludeCase = async (event) => {
+    event.preventDefault()
+    if (!mayConcludeCase) return
+    const ok = await confirm({
+      title: KP_CONCLUDE_CASE_CONFIRM_TITLE,
+      message: kpConcludeCaseConfirmMessage(kpCase.reference),
+      confirmLabel: KP_CONCLUDE_CASE_LABEL,
+      destructive: false,
+    })
+    if (!ok) return
+    const done = await run(
+      'conclude',
+      () => concludeKpCase({ caseId: kpCase.id, note: conclusionNote }),
+      'concludeFailed',
+    )
+    if (done) setConclusionNote('')
   }
 
   if (loading) return <p className="kp-loading">Loading case file...</p>
@@ -787,6 +850,38 @@ const KpCasePanel = ({
 
               <button type="submit" className="btn-add" disabled={Boolean(busy)}>
                 {busy === 'schedule' ? 'Scheduling...' : 'Schedule proceeding'}
+              </button>
+            </form>
+          )}
+
+          {mayConcludeCase && (
+            /* ⚠️ A SEPARATE, DELIBERATE ACTION — not an edit of the
+               hearing. It writes four columns of the case and touches no
+               hearing column at all, so the recorded outcome above stays
+               exactly as it was recorded and stays immutable.
+               ⚠️ ABSENT, NEVER DISABLED, for everybody else: the
+               Secretary administers every other part of this case file
+               and is refused this by the RPC, measured. A disabled
+               control advertises a capability and cannot be told from a
+               bug. */
+            <form className="kp-form" onSubmit={handleConcludeCase}>
+              <h5 className="kp-subhead">{KP_CONCLUDE_CASE_HEADING}</h5>
+              <p className="kp-provisional" role="note">
+                <FaInfoCircle aria-hidden="true" /> {KP_CONCLUDE_CASE_NOTE}
+              </p>
+
+              <label htmlFor="kp-conclusion-note">
+                Conclusion note (optional)
+              </label>
+              <textarea
+                id="kp-conclusion-note"
+                rows={2}
+                value={conclusionNote}
+                onChange={(e) => setConclusionNote(e.target.value)}
+              />
+
+              <button type="submit" className="btn-add" disabled={Boolean(busy)}>
+                {busy === 'conclude' ? 'Concluding...' : KP_CONCLUDE_CASE_LABEL}
               </button>
             </form>
           )}

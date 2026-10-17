@@ -75,18 +75,19 @@ const fnLower = (name) => fnBody(name).toLowerCase()
 // fails somewhere.
 
 describe('A. the migration', () => {
-  // ⚠️ REDEFINED BY COMBINED PHASE 2, which added 044 -- a definition
-  // change, not a loosened assertion. What this guard is FOR is that 043
-  // stays 043 and stays untouched by a later phase; the "nothing after it"
-  // half moved to 046 when Final Integration added 045, so a phase that
-  // quietly reaches for a second migration still fails here.
-  it('is still 043, still in place, and nothing has reached past 045', () => {
+  // ⚠️ REDEFINED AGAIN BY THE PR #45 BLOCKER FIX, which added 046 -- a
+  // definition change at its own site, not a loosened assertion. What this
+  // guard is FOR is that 043 stays 043 and stays untouched by a later
+  // phase, and that holds: 046 adds ONE function and alters nothing in
+  // this file. The "nothing after it" half moves to 047.
+  it('is still 043, still in place, and nothing has reached past 046', () => {
     const files = fs.readdirSync(DIR).filter((f) => f.endsWith('.sql')).sort()
-    expect(files).toHaveLength(45)
+    expect(files).toHaveLength(46)
     expect(files[42]).toBe('043_kp_case_hearings_summons.sql')
     expect(files[43]).toBe('044_incident_blotter_tanod.sql')
     expect(files[44]).toBe('045_public_safety_aggregates.sql')
-    expect(files.some((f) => f.startsWith('046'))).toBe(false)
+    expect(files[45]).toBe('046_kp_conclude_case.sql')
+    expect(files.some((f) => f.startsWith('047'))).toBe(false)
   })
 
   it('leaves 001-042 alone', () => {

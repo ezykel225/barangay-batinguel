@@ -34,17 +34,18 @@ const squish = (value) => value.replace(/[ \t]+/g, ' ')
 const flat = squish(code)
 
 describe('A. the migration file', () => {
-  // ⚠️ Final Integration added 045, so the "nothing past it" half moved to
-  // 046. 044 is still asserted to BE 044 and to sit where it sat -- the
-  // guard's force is that a phase cannot quietly reach for a second
+  // ⚠️ The PR #45 blocker fix added 046, so the "nothing past it" half
+  // moves to 047. 044 is still asserted to BE 044 and to sit where it sat
+  // -- the guard's force is that a phase cannot quietly reach for a second
   // migration, and that still holds. A definition change at its own site,
   // not a loosened assertion.
-  it('is still 044, still in place, and nothing has reached past 045', () => {
+  it('is still 044, still in place, and nothing has reached past 046', () => {
     const files = fs.readdirSync(DIR).filter((f) => f.endsWith('.sql')).sort()
-    expect(files).toHaveLength(45)
+    expect(files).toHaveLength(46)
     expect(files[43]).toBe(FILE)
     expect(files[44]).toBe('045_public_safety_aggregates.sql')
-    expect(files.some((f) => f.startsWith('046'))).toBe(false)
+    expect(files[45]).toBe('046_kp_conclude_case.sql')
+    expect(files.some((f) => f.startsWith('047'))).toBe(false)
   })
 
   it('records in its header that it was applied, and how', () => {

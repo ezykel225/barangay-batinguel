@@ -65,7 +65,7 @@ banned below: it silences the one check this project has.
 
 ### Tests
 
-Sixty suites, 1,899 tests:
+Sixty-one suites, 1,922 tests:
 
 | File | What it covers |
 |---|---|
@@ -398,14 +398,17 @@ src/
                       a human picks it and a different human may or may
                       not conclude the case. Pure, and its vocabularies
                       are asserted equal to migration 043's own CHECKs.
-    kpCaseApi         The eleven KP RPCs. ⚠️ Maps each P0001 to a
+    kpCaseApi         The twelve KP RPCs -- 043's eleven, plus 046's
+                      `conclude_kp_case`. ⚠️ Maps each P0001 to a
                       readable sentence, so a function's own message --
                       which names the position gate -- never reaches a
                       screen.
     KpCasePanel       Open a case, record a panel, schedule a
                       proceeding, record attendance, minutes and ONE
-                      outcome. ⚠️ ALL case state lives here;
-                      OfficialComplaints passes it four props.
+                      outcome -- and, since migration 046, CONCLUDE the
+                      case later without touching that outcome.
+                      ⚠️ ALL case state lives here; OfficialComplaints
+                      passes it four props.
     documents/        The summons and the hearing notice. ⚠️ SYSTEM
                       TEMPLATES -- X6's print architecture, no seal of
                       its own, no signature, no statutory wording, and
@@ -474,7 +477,7 @@ src/
 
   assets/images/      11 official portraits, page backgrounds, logo.
 
-supabase-migrations/  44 numbered SQL files. A record, not a runner.
+supabase-migrations/  46 numbered SQL files. A record, not a runner.
 supabase/functions/   Edge Function source (notify-reservation-sms).
 docs/                 SETUP.md, TESTING-WALKTHROUGH.pdf + its generator,
                       DEMO-CHECKLIST.md and DEMO-SCRIPT.md. ⚠️ The last
@@ -971,7 +974,7 @@ such row.
 
 ## Database notes
 
-**45 migrations**, `001` through `045`, all applied. ⚠️ 027 is a
+**46 migrations**, `001` through `046`, all applied. ⚠️ 027 is a
 DATA CORRECTION, not a schema change — see *The portrait is lost by the
 RENAME* under *Public E-Services (X5)*.
 
@@ -11200,6 +11203,142 @@ the simpler path.)
 
 ---
 
+## ✅ PR #45 blocker — a KP case could become impossible to conclude (migration 046)
+
+2026-10-17, on the **existing** `claude/final-integration-professor-demo`
+branch, from the repo owner's own review of the deploy preview. **One
+migration, 046, and one new RPC. No table, column, constraint, index,
+trigger or policy was added, altered or dropped, and no existing function
+was touched.**
+
+### ⚠️ A SEPARATE HUMAN ANSWER WAS RIGHT; MAKING IT IRREVERSIBLE WAS NOT
+
+`record_kp_hearing_outcome()` takes `p_concludes_case` as its own
+parameter rather than inferring conclusion from the outcome value — that is
+Combined Phase 1's rule and it is **unchanged**: "Resolved — agreement
+recorded" does not conclude a case by itself, because the barangay may keep
+it open, and software that decided otherwise would be deciding the case.
+
+What was wrong is that answering **no** could not be revisited. ONE outcome
+per hearing is immutable at **two** layers — the RPC refuses a second, and
+`protect_kp_record()` refuses any API update to a hearing that has one —
+and that RPC was the **only writer of `kp_cases.status = 'concluded'`
+anywhere in the schema.** Measured in Final Integration's own Flow A
+trace:
+
+```
+10  outcome=resolved_agreement_recorded concludes=false -> case=in_process
+10b CONCLUDE -> P0001 This hearing already has a recorded outcome.
+```
+
+So the only remaining paths were to schedule and record a **further
+proceeding** — writing down a hearing that did not happen — or to leave the
+case open for ever. ⚠️ **Final Integration reported this and did not fix
+it**, on the grounds that the alternatives were making a recorded outcome
+editable or adding a control; the repo owner judged it too risky for the
+professor demo, and the second of those is what this is.
+
+### ⚠️ No existing operation could do it safely
+
+Checked before anything was written, from the live catalog rather than from
+this file: `kp_cases.status = 'concluded'` is written by
+**`record_kp_hearing_outcome()` and nothing else**, the four KP tables
+carry no client privilege at all (a direct UPDATE is `42501`, measured),
+and the only other route — a second hearing — fabricates a proceeding. So
+the smallest safe fix is one dedicated RPC.
+
+### `conclude_kp_case(p_case_id, p_note)`
+
+| | |
+|---|---|
+| Who | **the Punong Barangay alone**, through `current_official_holds_position()` — so through `official_account_links`, never a name and never `committee`. ⚠️ **No permission was broadened**: the Secretary administers every other part of the case file and is refused this, exactly as she is refused the outcome itself |
+| What it writes | **four columns of one table** — `kp_cases.status`, `concluded_by`, `concluded_at`, `conclusion_note`. `status`, the actor and the timestamp are all stamped server-side; there is no parameter a crafted call could forge |
+| What it does NOT write | **`kp_hearings`, at all.** It reads that table only to count whether any outcome has been recorded — so the historical record of what happened at the proceeding is untouched by a later conclusion. Measured: the hearing row's `md5(to_jsonb(h.*))` is **byte-identical** either side |
+| Once only | refused if the case is already `concluded`, and `protect_kp_record()` refuses the UPDATE for an API caller anyway. The readable sentence is in front of the trigger; the trigger is what makes the property belong to the **table** |
+| Requires a recorded outcome | ⚠️ **the INVARIANT, not a new rule.** Before 046 a case could only ever become `concluded` alongside a recorded proceeding outcome, because the only writer was the function that records one. Requiring at least one keeps that exactly — this function can reach no state the old path could not, and dropping the check would be the broader change |
+| Decides nothing | the outcome VALUE, the attendance, the minutes, the panel and the screening answers are **not read**. Whether the case is over is still the human's answer, exactly as `p_concludes_case` was |
+
+⚠️ **No visibility predicate is called, and that is not an omission.**
+`kp_case_is_visible_to_caller()` admits the Secretary too, so it is
+**wider** than this gate; the position check is the authority, which is the
+shape `record_kp_hearing_outcome()` already uses.
+
+### The control
+
+Rendered only when **all three** hold: the caller holds the Punong
+Barangay flag, the case is not already `concluded`, and **some hearing
+carries a recorded outcome**. Each mirrors a refusal in the SQL rather than
+inventing a rule, and ⚠️ **none of them replaces the database check** — a
+crafted call is still refused with its own `P0001`.
+
+⚠️ **Absent, never disabled**, for everybody else — `ActionMenu`'s own
+rule. It goes through the shared `useConfirm` (⚠️ **which returns an
+ARRAY**; destructuring it as an object is what made PR #43's confirm button
+silently do nothing), names the case in words, says plainly that the
+recorded outcome is left as it is, and passes `destructive: false`.
+
+⚠️ **It implies no legal judgment**, and the wording is scanned for eleven
+words that would — `guilty`, `liable`, `dismiss`, `jurisdiction`, `penalt`,
+`fine`, `eligib`, `in favour of`, `settled in`, `judg`, `convict`. The
+barangay is closing its own file; this is not a finding about anybody.
+
+### The regression, run against PR #45 first
+
+`src/kpcases/kpConcludeCase.test.js`, **23 tests**. ⚠️ **Run against PR #45
+before the fix: 11 failed.** The 12 that passed do so honestly — the
+withheld-control cases, which correctly show nothing either way, plus the
+two covering the existing `p_concludes_case` path, which the fix leaves
+alone.
+
+Then as the real roles against the live database, every probe inside a
+block ending in `RAISE EXCEPTION`:
+
+| | |
+|---|---|
+| **A** outcome recorded, `concludes_case = false` | **accepted** |
+| **B** case status afterwards | **`in_process`** — still open |
+| **C1** a second outcome on that hearing | **`P0001`** *This hearing already has a recorded outcome.* |
+| **C2** a direct `UPDATE` on the hearing | **`42501`** — the privilege layer |
+| **D** the Punong Barangay concludes it later | **accepted**; `concluded`, actor = him, timestamp set, note recorded |
+| **E** the Barangay Secretary | **`P0001`** *Only the Punong Barangay can conclude a KP case.* |
+| **F** a Kagawad · the Barangay Treasurer | **`P0001`** ×2 |
+| **G** a second conclusion | **`P0001`** *That KP case has already been concluded.* |
+| **X** a case with no recorded outcome | **`P0001`** *…and this case has none yet.* |
+| **Z** `anon` | **`42501`** |
+| **H1** the hearing row, md5 before vs after | **unchanged** |
+| **H2** the confirmed screening row | **unchanged** |
+| **H3** `complaint_status_history` | **3 → 3** — nothing written |
+| **H4** the complaint's own status | still **`screened`** |
+| **H5** hearings on the case | **1** — no fabricated proceeding |
+
+### Verified
+
+| Check | Result |
+|---|---|
+| New function | `prosecdef = true`, `search_path = ""` |
+| **PUBLIC EXECUTE** | **0 of 1 — and still 0 across all 88 SECURITY DEFINER functions in `public`**, so MASTER-B's B5 holds |
+| `anon` / `authenticated` EXECUTE | **0 / 1** |
+| Advisors | `anon_security_definer_function_executable` **15 — unchanged**; `authenticated` 62 → **63**, exactly `conclude_kp_case`; `rls_enabled_no_policy` **15 — unchanged** (046 adds no table); `extension_in_public` still gone; **no new finding class** |
+| KP policies · KP table rows | **0** · **0** |
+| Jest | **61 suites, 1,922 tests** — from 60 / 1,899, so **+1 suite, +23 tests** |
+| Production build | clean, no ESLint warnings, **304.49 kB** gzipped (+396 B), CSS **35.11 kB** unchanged |
+| `git diff --check` | clean |
+| Live residue | all four KP tables **0 rows**, **zero probe rows** anywhere, the one real complaint `CMP-2026-FFZYAX` still `screened` and untouched, 11/11 active officials, 11 links |
+
+⚠️ **Three migration-count guards moved from 45 to 46**, each at its own
+site and each a definition change rather than a loosened assertion —
+`kpCaseMigration.test.js`, `incidentMigration.test.js` and
+`complaints/officialComplaints.test.js`. `043` is still asserted to **be**
+043 and to sit where it sat, which is what those guards are for.
+
+⚠️ **No authenticated page was loaded in a browser.** The dashboards are
+behind `ProtectedRoute` and this environment still has no test account, so
+what is verified is the real component's output through Jest and the role
+matrix against the live database — **not** the Punong Barangay clicking
+*Conclude case* on a live page.
+
+---
+
 ## Health centre
 
 **Medicine stock is a status, not a quantity** — Available / Low stock /
@@ -11867,18 +12006,19 @@ derives her initials from. It is no longer displayed as a label.
   app-wide colour change rather than a defect fix, and it only shows in a
   transient loading state. Worth its own pass with every consumer
   re-measured.
-- ⚠️ **A KP case whose outcome was recorded WITHOUT concluding it cannot
-  then be concluded from that hearing.** `record_kp_hearing_outcome` takes
-  `p_concludes_case` separately, which is right — a human decides whether a
-  case is over — but a recorded outcome is immutable (ONE per hearing), so
-  a second call is refused *"This hearing already has a recorded
-  outcome."* The only paths are scheduling another hearing or ticking the
-  box the first time. Measured in Final Integration's flow trace.
-  ⚠️ **Not changed**: the alternatives are making a recorded outcome
-  editable, which Combined Phase 1 deliberately refuses, or adding a
-  separate conclude-case control, which is a feature. Whether the barangay
-  wants to conclude a case independently of a hearing outcome is theirs to
-  say.
+- ✅ ~~**A KP case whose outcome was recorded WITHOUT concluding it cannot
+  then be concluded from that hearing.**~~ **CLOSED by migration 046.**
+  `record_kp_hearing_outcome` still takes `p_concludes_case` separately —
+  that half was always right — but it was the only writer of a concluded
+  case, and a recorded outcome is immutable, so answering "no" once put the
+  case beyond conclusion. `conclude_kp_case()` is the later, explicit
+  action: Punong Barangay only, four columns of `kp_cases`, and
+  ⚠️ **it touches no hearing** — the recorded outcome's row is byte-identical
+  either side, measured. See *PR #45 blocker*.
+  ⚠️ **What is still the barangay's to say** is whether a case should be
+  concludable with **no** recorded proceeding outcome at all. It is not: 046
+  keeps the pre-existing invariant that a conclusion rests on a recorded
+  proceeding, and widening it would be a decision nobody has made.
 - ⚠️ **`.section-link` on Home reaches no CSS rule at all.** It is on the
   *View All E-Services* link and is matched by **zero** selectors in any
   stylesheet; the link is styled by `.section-header a` instead, which
