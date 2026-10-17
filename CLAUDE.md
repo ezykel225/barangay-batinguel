@@ -65,7 +65,7 @@ banned below: it silences the one check this project has.
 
 ### Tests
 
-Fifty-eight suites, 1,835 tests:
+Sixty suites, 1,899 tests:
 
 | File | What it covers |
 |---|---|
@@ -80,7 +80,7 @@ Fifty-eight suites, 1,835 tests:
 | `src/utils/notificationLabels.test.js` | 33 tests over the notification wording. The load-bearing ones walk **migration 022's whole `event` CHECK vocabulary** and assert every value produces a title with no underscore in it — so widening the migration without touching this module fails in Jest rather than printing `ready_for_pickup` on screen. Also a guard that this module **defines no status map of its own** |
 | `src/components/NotificationBell.test.js` | 24 tests over the bell: the unread count in the accessible name **as words**, Escape and focus restore, click-outside closing *without* stealing focus back, mark-read-then-navigate ordering, and that unread is carried by a class **and** the spoken word "New" rather than by colour |
 | `src/components/useModalA11y.test.js` | 9 tests over Escape, focus entry and focus restoration for the seventeen hand-rolled modals. Run **both directions**: with the hook stubbed, 4 of 9 fail. Includes the case where the opener is removed by the save the modal performed — focusing a detached node silently sends focus to `<body>` |
-| `src/components/Navbar.test.js` | 6 tests over the public mobile menu button, which had **no accessible name at all** before X3: the name changes with state, `aria-expanded` tracks it, and `aria-controls` points at an id that exists |
+| `src/components/Navbar.test.js` | 14 tests. 6 over the public mobile menu button, which had **no accessible name at all** before X3: the name changes with state, `aria-expanded` tracks it, and `aria-controls` points at an id that exists. ⚠️ **4 more from Final Integration** over the Community Safety entry: present in the desktop nav AND the mobile drawer (so a phone is not a second surface), pointing at `/community-safety`, **absent from the E-Services catalogue** and not inside `.navbar-mobile-sublist`, and rendered with `useAuth` returning a null user -- which is what proves an anonymous visitor can reach it |
 | `src/utils/eventCalendar.test.js` | 39 tests over event placement and the upcoming split. The load-bearing one: the homepage filters **then** limits, plus 6 over `eventTimeLabel`: the `HH:MM:SS` a `time` column really returns, and that anything which is not a time — a location beginning with one included — yields `''` rather than being printed. **10 more over `eventCardDate`**, added with the Health Center fix: the month, day and year all derive from `event_date`, the stored `event_month`/`event_day` copies are **ignored** when `event_date` is usable and are the fallback **only** when it is not, the year comes back **empty rather than guessed**, `2026-02-30` is refused rather than slid into March, and a source guard that the helper constructs **no `Date`** |
 | `src/utils/documentFilter.test.js` | 16 tests over `filterDocumentRequests` — the status narrowing, the five searched fields, and that an unknown status yields nothing rather than everything |
 | `src/utils/reservationWindow.test.js` | 46 tests over the 5–10 PM window, the per-slot and per-kind durations, the noon-spanning exception and the office-hours exception — deliberately mirroring the SQL cases in migration 020's header, so client and database are asserted to agree rather than each checked alone. The load-bearing one is that an exception is read from `exception_reason` and never from the hour |
@@ -122,6 +122,8 @@ Fifty-eight suites, 1,835 tests:
 | `src/incidents/incidentsPanel.test.js` | 26 tests over the queue, the record form and the blotter as rendered. The load-bearing ones: the list is built from `incident_queue()` and `supabase.from` is **never called**; records actions are **absent, not disabled**, without the flag, with a neutral sentence naming no position; and a Tanod is submitted **by id**, asserted by checking the name appears nowhere in the payload. ⚠️ The "reads no complaint surface" scan is scoped to **reader names**, not the bare word -- its first version failed on `className="complaint-reference"`, which is §10's design-language reuse doing what it was asked |
 | `src/safetymap/safetyMapPanel.test.js` | 28 tests over the map card and the analytics. ⚠️ **`leaflet` is mocked as a MEASUREMENT, not a stub** -- it records every `bindPopup` string, so the privacy guards read what a marker would actually show. Every fixture plants a narrative and a witness name; the whole document and every popup must contain neither. Plus the escaping check (fed `<img src=x onerror=...>`), the coverage caveat asserted present in **both** directions, counts-not-rates, and ⚠️ the **two-definitions-of-plotted** regression guard, which found a real defect |
 | `src/tanod/tanodPanel.test.js` | 24 tests over the roster and the patrol schedule. The load-bearing ones are absences: no `<label>` asks for an email, password, account, role, latitude or longitude; the modules touch no auth, profile or role surface; and an assignment is scheduled **by Tanod id**. Plus the two on-screen sentences saying a Tanod has no account and is not tracked, and a duplicate-submit guard proved by submitting the **form** |
+| `src/safetymap/publicSafetyMigration.test.js` | 29 **source-reading** guards over migration 045 and the three public modules. ⚠️ **The RETURN TYPES are the security boundary**, so these read them out of the SQL rather than trusting a component not to render a column -- a test that only checked the React could pass while the function handed the browser a narrative. Pinned: the five functions created and no table/policy/trigger/view, nothing written at all, no existing reader redefined, 5×`search_path`, the zone reader's exact four columns, the overview's three integers with **no text/uuid/timestamp**, a month key that is `YYYY-MM` and never `YYYY-MM-DD`, no polygon, 5×PUBLIC revoke, the four readers granted to `anon` and the coarsening helper to **neither**, and a 22-term forbidden-column scan. Three load-bearing ones: the threshold `>= 2` exists and has **exactly one home**; the overview counts the ZONE FUNCTION rather than re-deriving the rule, reading `incidents` exactly **once** (for the total, which must include the unmapped); and the published coordinate is the **cell centre**, with `avg(` asserted absent. ⚠️ Two scans are scoped the way `prototypeCoverage.test.js` taught -- the "no rate" scan runs over everything EXCEPT the disclaimer, which must contain "crime rate" to deny it, and a second test asserts the disclaimer **is** a denial; the complaint scan names reader and table names rather than the bare word, because the page legitimately links to "file a complaint" |
+| `src/pages/CommunitySafety.test.js` | 29 tests over the public page as **rendered**, with `leaflet` mocked as a MEASUREMENT so the privacy guards read what a circle would actually say. ⚠️ **Every fixture carries a narrative, a witness name, a reference and a street name** on properties the public RPCs do not return; the document, every attribute and every popup string must contain none of them. The load-bearing ones: each popup carries a count and reads *"not the location of any incident"*; no coordinate is printed anywhere; the four public RPCs are the only ones called and `supabase.from` never is (the mock **throws** on any other RPC name); the three privacy notes and the disclaimer render **in both directions**, with data and with none; the three empty states are three different facts, including "recorded but not mappable", which must never read as "nothing recorded"; a failure names no SQLSTATE or function; the period control carries `.filter-select` (Combined Phase 2 shipped six controls at 19px by reusing the padded WRAPPER class); and the closing notice carries **no three-digit sequence**, so no phone number can creep in |
 | `src/screening/screeningPanel.test.js` | 43 tests over the panel as **rendered**. The load-bearing ones: an ordinary official gets **one neutral sentence** naming no position, policy, function or SQLSTATE; the Secretary gets the prepare form and **no confirm control even with a draft open**; the Punong Barangay gets the confirm control and **no prepare form**; nothing is rendered `disabled` in place of being withheld; the recommendation sent is **the one a human picked** even when all six answers are flagged; a `P0001` naming the position gate is read as the module's own sentence and the RPC's words appear **nowhere**; a confirmed screening renders read-only with no control to change it; and the confirmation dialog names the outcome **in words**, not as an identifier. Plus `supabase.from` is never called, the duplicate-submit guard is proved by submitting the **form**, and the headings are asserted to start at `h4` and skip no level. Six mutations produce **1 / 2 / 3 / 1 / 1 / 2** failures |
 
 Schema and policy changes are still verified by impersonating each role
@@ -188,12 +190,16 @@ in `react-scripts` → `webpack-dev-server`, which never ships. `--force`
 
 ```
 src/
-  App.js              All routing: 15 public routes, 3 role-protected
+  App.js              All routing: 16 public routes, 3 role-protected
                       (/official, /nurse, /resident) wrapped in
                       ProtectedRoute, plus path="*" — see the note below.
-                      /track-complaint is the newest, and the ONLY route
-                      P3-B1 added: the resident complaint experience is
-                      a TAB of /resident, not a route of its own.
+                      /community-safety is the newest, and the ONLY route
+                      Final Integration added: the PUBLIC Community
+                      Safety Map, which a resident reads from the same
+                      public navigation rather than from a second
+                      resident-only copy. /track-complaint before it was
+                      P3-B1's only route: the resident complaint
+                      experience is a TAB of /resident, not a route.
   index.js            CRA entry point.
   index.css           Global CSS, plus the unused @tailwind directives.
 
@@ -428,8 +434,11 @@ src/
                       record, never an account: no profile link, no
                       coordinate, no login.
 
-  safetymap/          The INTERNAL safety map and the descriptive
-                      analytics. ⚠️ There is no public map.
+  safetymap/          Two surfaces, and they are DIFFERENT DATA.
+                      The internal one draws one circle per incident;
+                      the public one draws aggregated cells. ⚠️ They do
+                      not share a component -- see *The public
+                      Community Safety Map*.
     safetyAnalytics   Hotspot ranking, intensity bands, plottable
                       points, coverage gaps and the observation
                       sentence. ⚠️ Holds NO rule mapping anything to a
@@ -442,6 +451,22 @@ src/
                       `<details>` list fallback.
     SafetyMapPanel    Filters, map, counts, trend, repeated locations
                       and coverage gaps. ⚠️ Counts, never rates.
+    publicSafetyLabels The PUBLIC map's words: the aggregation notes a
+                      reader is shown, the disclaimer, three empty
+                      states and the observation sentence. Borrows the
+                      incident TYPE labels from `incidentLabels` so a
+                      resident and an official never read two words for
+                      one stored value, and defines no status of its
+                      own. Pure.
+    publicSafetyApi   The four aggregate readers of migration 045, and
+                      nothing else. ⚠️ No `supabase.from`, and a test
+                      asserts no official reader is named in it.
+    PublicSafetyMap   The public canvas. ⚠️ A SEPARATE component from
+                      `IncidentMap`, not a mode flag: it accepts ZONES
+                      only and has no points, reference, type, date or
+                      label prop, so no code path can render a
+                      narrative. Shares only `bandFor` and
+                      `markerRadiusFor`, which hold no incident data.
 
   supabase/
     supabaseClient.js The single Supabase client. Throws at import time
@@ -451,7 +476,12 @@ src/
 
 supabase-migrations/  44 numbered SQL files. A record, not a runner.
 supabase/functions/   Edge Function source (notify-reservation-sms).
-docs/                 SETUP.md, TESTING-WALKTHROUGH.pdf + its generator.
+docs/                 SETUP.md, TESTING-WALKTHROUGH.pdf + its generator,
+                      DEMO-CHECKLIST.md and DEMO-SCRIPT.md. ⚠️ The last
+                      two are for the professor demo: the checklist is
+                      data to enter BY HAND through the real UI, because
+                      nothing in this repository seeds demo data, and
+                      the script is the 10-step walkthrough.
 ```
 
 ### ⚠️ The mobile table-to-card block converts rows, not the table
@@ -941,7 +971,7 @@ such row.
 
 ## Database notes
 
-**44 migrations**, `001` through `044`, all applied. ⚠️ 027 is a
+**45 migrations**, `001` through `045`, all applied. ⚠️ 027 is a
 DATA CORRECTION, not a schema change — see *The portrait is lost by the
 RENAME* under *Public E-Services (X5)*.
 
@@ -10826,8 +10856,13 @@ seen with real data in them.
 - **No Tanod login**, no account, no portal, no `tanod` role.
 - **No continuous GPS**, no live tracking, no device telemetry.
 - **No official purok polygons** and no purok normalisation.
-- **No public incident map and no public analytics page.** Nothing in
-  this phase adds a route; all three surfaces are tabs of `/official`.
+- ~~**No public incident map and no public analytics page.** Nothing in
+  this phase adds a route; all three surfaces are tabs of `/official`.~~
+  ✅ **A PUBLIC MAP EXISTS SINCE FINAL INTEGRATION** — `/community-safety`,
+  migration 045. ⚠️ It is **not** this panel made public: it is a separate
+  component reading separate aggregate functions, and all three surfaces
+  above are still tabs of `/official` and still `anon`-refused. The
+  sentence is left as Combined Phase 2's own record of its day.
 - **No SMS, email or notification.** Widening `activity_log` is a
   two-gate change (the CHECK **and** `stamp_activity_actor`, migration
   016's lesson) and belongs in its own migration -- and `activity_log` is
@@ -10851,6 +10886,319 @@ seen with real data in them.
   from a list rather than typed. Today they are free text on both
   screens, which is exactly why the coverage caveat exists.
 - **Whether a blotter entry should ever be printable**, and in what form.
+
+## The public Community Safety Map (Final Integration) — ⚠️ AGGREGATED, NOT A FILTERED VIEW
+
+2026-10-17, on `claude/final-integration-professor-demo`, built on `main`
+after PR #44 merged (`9ec851a`). **One migration, 045, five new frontend
+files, and two new test suites.**
+
+### ⚠️ THE INTERNAL MAP IS NOT PUBLISHED, AND THIS IS NOT A FILTERED COPY OF IT
+
+Combined Phase 2's Safety Map & Analytics tab is **operational**: it draws
+one `circleMarker` per incident from `incident_map_points()`, and each popup
+carries a reference, a type, a timestamp and the location label an official
+typed. None of that can be published.
+
+So the public surface is a **different data surface**, not the same one with
+columns hidden. Migration 045 adds four aggregate readers:
+
+| Reader | Returns |
+|---|---|
+| `public_safety_zones(from, to)` | `zone_key`, `center_latitude`, `center_longitude`, `total` |
+| `public_safety_overview(from, to)` | `total_incidents`, `mapped_incidents`, `zone_count` — three integers |
+| `public_safety_type_counts(from, to)` | `incident_type`, `total` — no location, no date |
+| `public_safety_monthly(from, to)` | `month_key` (`YYYY-MM`), `total` |
+
+⚠️ **THE RETURN TYPES ARE THE SECURITY BOUNDARY.** There is no narrative, no
+reference, no street or place name, no status, no incident id, no
+complainant, respondent or witness, no contact number, no evidence, no
+complaint, no KP screening, no KP case, no blotter content, and nothing
+whatever about a Tanod or a patrol — because the **functions do not return
+them**, not because a component filters them out. A source-reading test
+reads those `returns table` clauses out of the SQL, because a test that
+only checked the React could pass while the function handed the browser a
+narrative.
+
+### The aggregation rule, in four points
+
+Stated here, in 045's header, **and on the page itself** — a map that
+coarsens its data without saying so invites the reader to believe the circle
+is the place.
+
+1. Coordinates are floored onto a **0.002° grid**, about **220 m** across.
+2. The published coordinate is the **CELL CENTRE**, never the mean of the
+   points. ⚠️ A mean is itself a derived precise location: with two
+   incidents at 9.3070/123.3055 and 9.3078/123.3058 the mean is
+   **9.307400/123.305650**, which is a point near both of them. The
+   published centre is **9.307000/123.305000**, which is a property of the
+   grid and not of the incidents. Measured, both numbers.
+3. A cell is published **only when it holds two or more incidents**. A
+   place with one recorded incident is never shown, so the map cannot point
+   at one household or one report. Measured: a lone `threat` incident
+   **with usable coordinates** was suppressed.
+4. ⚠️ **The threshold has ONE home** — `public_safety_zones`' own `HAVING
+   count(*) >= 2`. The overview's `mapped_incidents` and `zone_count` are
+   counted **from that function**, so the number the page prints and the
+   circles the map draws cannot disagree. A second copy is how a page comes
+   to report a count the map cannot draw, which is the
+   two-definitions-of-plotted defect Combined Phase 2 found in its own
+   analytics card.
+
+⚠️ **The official map is unchanged and stays precise.**
+`incident_map_points()` was not edited, not narrowed and not reused.
+
+### ⚠️ `location_text` IS DELIBERATELY NOT PUBLISHED
+
+This is a departure from a literal reading of "repeated-location
+summaries", and it is the decision rather than an oversight.
+`incidents.location_text` is **free text an official typed**, so it can name
+a household — *"beside the Dela Cruz house"*, *"the corner near Tatay
+Ben's"*. Publishing a count against such a label would identify a family
+more precisely than a coordinate would.
+
+The privacy-safe form of a repeated location is therefore the **grid cell
+and its count**: the page says how many areas exist and how many incidents
+fall in each, and names none of them. `status` is not published either —
+it is operational and the surface is kept minimal.
+
+### ⚠️ NO PUROK POLYGON, AND NO PUROK NORMALISATION
+
+P2 remains authoritative: the barangay's own purok names and boundaries are
+unconfirmed, so **nothing invents one**. A grid cell asserts nothing about
+the barangay's geography, which is exactly why the aggregation is a grid.
+The map centres on Dumaguete as an **opening view**, not an asserted
+border, and a test scans the component for `L.polygon`, `L.geoJSON`,
+`L.rectangle` and `.geojson`. `PUROKS` is untouched and still holds seven
+values with `Purok 7` present.
+
+### ONE public surface, and a resident reads the same one
+
+`/community-safety` has **no gate**. An anonymous visitor and a signed-in
+resident load the same route, call the same four RPCs and see the same
+numbers — measured as both: `total=4 mapped=2 zones=1`, identical. There is
+deliberately **no resident-specific copy**, because the one that drifted
+would be the one nobody tested.
+
+⚠️ **It is NOT an E-Services entry.** That catalogue is transactions a
+visitor asks the barangay to perform, and every entry in it states an access
+requirement in words; this is published information read with no account and
+nothing to submit. So it takes a navigation slot of its own — the public
+Navbar (desktop **and** mobile drawer) and a teaser on Home.
+
+⚠️ **The route and every link to it landed in ONE commit.** `path="*"`
+renders `Home`, so a navigation entry whose route does not exist does not
+404 — it silently shows the homepage and reads as a service that is broken.
+P3-B1 recorded the same rule for `/track-complaint`.
+
+The Home teaser shares every CSS rule with the `/about` teaser through a
+**selector list**, not a second block: two declarations of one treatment is
+the `@keyframes pulse` trap X4 recorded, where editing either silently
+leaves the other behind. The teaser also takes its heading and sentence from
+`publicSafetyLabels`, so it cannot describe the map differently from the map.
+
+### ⚠️ COUNTS, NEVER RATES
+
+There is **no population denominator anywhere in this database** — no
+household count and no resident roll (`residents_registry` is the voter
+reference list, not a census). So "crime rate", "incidents per 1,000" and
+"per capita" are numbers this project cannot compute, and printing one would
+be inventing a denominator. The heading is **`Recorded incident
+concentration`**.
+
+⚠️ And "crime" is the wrong word regardless: `incident_type` is an
+operational category, no court has found anything, and the page says so
+where a reader meets the categories — *"They are not criminal charges, and
+no finding has been made about any of them."* The intensity bands are named
+by how many were recorded (`Fewer recorded` / `More recorded` / `Most
+recorded`), reusing Combined Phase 2's own pure `bandFor`.
+
+**No AI, no prediction, no score, no ranking of danger**, and the public
+observation sentence is deliberately **weaker** than the official one: the
+official version invites the barangay to *"review for possible local safety
+intervention"*, and a resident is not the one who reviews, so the public
+version states the count and stops. A test runs every observation through a
+thirteen-verb directive scan.
+
+### The execute surface, closed at creation
+
+| | |
+|---|---|
+| functions 045 adds | **5**, all with `set search_path to ''` |
+| bare **PUBLIC** EXECUTE | **0 of 5** |
+| `anon` / `authenticated` EXECUTE | the **four** readers |
+| `public_safety_coarsen` | granted to **no client role** |
+
+⚠️ **MASTER-B's lesson applied at creation.** `pg_default_acl` grants
+`anon`, `authenticated` and `service_role` by name and PostgreSQL's own
+function default adds a bare PUBLIC entry on top, so revoking the named
+roles alone would leave `has_function_privilege('anon', …)` **true** through
+PUBLIC — migration 038's whole finding. Every revoke in 045 names `public`
+explicitly, and a mutation that drops one PUBLIC revoke fails a test.
+
+⚠️ **The coarsening helper needs no client grant**, and that is migration
+034's measured fact rather than an assumption: a nested call inside a
+SECURITY DEFINER function is EXECUTE-checked as the **definer**. Measured
+after: `anon` calling it directly is **refused `42501`** while the four
+readers that call it work.
+
+**Advisors**: `anon_security_definer_function_executable` 11 → **15** and
+`authenticated_security_definer_function_executable` 58 → **62** — in both
+cases exactly the four new readers, listed by name and confirmed to be the
+only additions. `rls_enabled_no_policy` **unchanged at 15** (045 adds no
+table), `extension_in_public` still gone, and **0 of 87** SECURITY DEFINER
+functions in `public` carry bare PUBLIC EXECUTE, so B5's property holds.
+
+### The anon matrix
+
+No JWT claims at all, `role = anon`, each probe in its own sub-block with
+the role switch **outside** it:
+
+| | |
+|---|---|
+| the four public readers | **all four OK** |
+| `incident_map_points` · `incident_queue` · `incident_location_frequency` | **42501** ×3 |
+| `incident_counts_by_type` · `incident_monthly_trend` | **42501** ×2 |
+| `tanod_roster` · `tanod_assignments_for` · `tanod_coverage_summary` | **42501** ×3 |
+| `complaint_queue` · `public_safety_coarsen` | **42501** ×2 |
+| `incidents` · `blotter_entries` · `tanod_members` tables | **42501** ×3 |
+| `kp_cases` · `complaint_screenings` · `official_account_links` tables | **42501** ×3 |
+| **positive controls** — `get_reservation_slots`, the public Officials page | **OK (0 rows, 11 rows)** |
+
+⚠️ **The controls are not decoration.** An earlier phase recorded a false
+"NOT REFUSED" that came from a caught exception rolling back its own
+subtransaction and taking a local `set_config` with it, so later probes ran
+as the previous role. Two surfaces that *should* work, working, is what
+proves the role switch was genuinely in effect.
+
+### Both demo flows, traced end to end as the real roles
+
+All rolled back. **Flow A**: a resident files → 2 parties with the
+respondent's contact **NULL** → public tracking by reference **and** contact
+works while a wrong contact returns 0 rows → an ordinary Kagawad sees the
+queue and **0** screenings and **0** parties → the Secretary prepares
+(complaint → `under_review`) → **her own confirmation is refused** → opening
+a case before confirmation is **refused** → the Punong Barangay confirms
+(complaint → `screened`) → the case opens `KP-2026-…` → a **duplicate case
+is refused** and exactly one exists → a hearing is scheduled and the case
+moves to `in_process` → the summons reads 2 parties from
+`complaint_parties` → minutes → one outcome → and the resident still sees
+only `screened`, with **0** screenings, **0** KP cases, and three history
+notes that name no outcome.
+
+**Flow B**: two Tanod added → an incident recorded, which creates its
+`BLT-` blotter entry **in the same call** and attributes the Tanod → four
+incidents, two sharing a cell, one alone, one with no coordinates → two
+patrol assignments and two coverage areas → the **official** map shows 3
+precise points with `"Rizal Street"` → analytics by type and month → the
+**public** map shows `total=4 mapped=2 zones=1` with the lone sensitive
+incident suppressed → and a resident reads **identical public numbers** and
+**0 rows** from the official map, the queue and the roster.
+
+⚠️ **The records-administration gate was re-measured** because recording and
+administering are different permissions: an ordinary Kagawad and the
+Treasurer both read the queue and may **record** an incident (Combined Phase
+2's design), and both are refused `P0001` on `amend_blotter_entry`,
+`set_incident_status`, `add_tanod_member`, `schedule_tanod_assignment` and
+`attribute_incident_tanod`.
+
+### ⚠️ ONE WORKFLOW GAP FOUND AND DELIBERATELY NOT CHANGED
+
+`record_kp_hearing_outcome` takes `p_concludes_case` as a **separate**
+parameter, so recording an outcome with `false` leaves the case
+`in_process` — a human decides whether the case is over, which is Combined
+Phase 1's rule and is right. But a recorded outcome is **immutable** (ONE
+outcome per hearing), so **a case whose outcome was recorded without
+concluding it cannot then be concluded from that hearing** — measured:
+*"This hearing already has a recorded outcome."* The only paths are another
+hearing, or ticking the box the first time.
+
+Changing it would mean either making a recorded outcome editable, which
+Combined Phase 1 deliberately refuses, or adding a separate "conclude case"
+control, which is a new feature this phase is not for. **Reported, not
+built** — and the demo script says to tick the box.
+
+### What was measured
+
+Real component output captured through Jest and rendered against the
+**shipped CSS bundle** in Chromium, with deliberately pathological fixtures:
+a 68-character unbreakable reference, a 52-character unbreakable name, five
+zones and a 520-character note.
+
+| Check | Result |
+|---|---|
+| Overflow + clipping + 24px targets + label association + one `<h1>` + heading order, 5 public-map states × 5 widths (320–1440), plus axe at 375 and 1440 | **160 checks, 0 failures** |
+| axe-core 4.12.1, **WCAG 2.2 AA tags included**, 5 states × 2 widths | **0 violations**; `target-size` ran and **passed** every time |
+| Harness proved capable of failing | **8 injected defect classes, all 8 detected** |
+| The changed Navbar and Home, same probes | clean except two known artifacts — see below |
+| Jest | **60 suites, 1,899 tests** — from 58 / 1,837, so **+2 suites, +62 tests** |
+| **20 mutations** (8 migration, 12 frontend) | **20 of 20 caught**, every file restored byte-identical |
+| Production build | clean, no ESLint warnings, **304.1 kB** gzipped, CSS 35.11 kB |
+| `git diff --check` | clean |
+| `Sidebar.css` | **not modified at all** — `git diff main` is empty, which is stronger than a line-range hash |
+| Live residue | all six Combined Phase 2 tables and all four KP tables **0 rows**, zero `DEMOFLOW` rows anywhere, 11/11 officials, 11 links |
+
+⚠️ **ONE PROBE RESULT OF MINE WAS A HARNESS LIMITATION, NOT A DEFECT, AND
+IT TOOK AXE TO SETTLE IT.** My target-size probe reported an 87×15 anchor on
+**every state at every width** — 25 reports. It is `file a complaint`, an
+inline link inside a 280-character sentence, which is precisely SC 2.5.8's
+own **Inline exception** (*"the target is in a sentence, or its size is
+otherwise constrained by the line-height of non-target text"*). Enlarging it
+would mean breaking the sentence or inflating its line-height, making the
+prose worse rather than the target better. **axe's own `target-size` rule
+ran on the same markup and passed it**, which is what settled it rather than
+my own judgment; the probe now implements the exception, scoped to an anchor
+whose parent block holds a real run of non-target text. ⚠️ **And the scoping
+was verified not to swallow a real failure**: an injected sub-24px
+*standalone* link is still caught.
+
+⚠️ **Two findings on the changed files are NOT this phase's:**
+
+- **`landmark-one-main` / `page-has-heading-one` / `0 <h1>` on the Navbar
+  capture** — the bare component fragment has neither by construction, the
+  artifact X3, X6 and PR #24 each recorded. The nav shows no target,
+  overflow, clipping, label or heading failure.
+- ⚠️ **`color-contrast` on Home: `.loading-text` at 4.34:1.** Pre-existing
+  and not mine. `--text-light`/`--text-muted` is `#64748b` from
+  `tokens.css`, introduced in commit `31dcb71`, and my Home.css diff adds
+  **no colour declaration at all**. The token's own comment records
+  **4.76:1**, which is true **on white** — the violation is the pairing with
+  the events section's tinted `#f1f5f9` background. Eight surfaces use the
+  class, so changing the token is the broad historical redesign this phase
+  excludes. **Reported, not fixed**, and recorded under *Known gaps*.
+
+### ⚠️ What was NOT verified
+
+**No authenticated page was loaded in a browser.** The dashboards are behind
+`ProtectedRoute` and this environment still has **no test account**; nothing
+was done to weaken authentication for a screenshot. And ⚠️ **no real Leaflet
+map has ever rendered**: `leaflet` is mocked in Jest, jsdom has no layout,
+and this container's browser cannot reach OpenStreetMap — so the panel around
+the canvas and the popup **strings** are measured, and the drawn map is not.
+
+⚠️ **The public page itself was never loaded in a browser either**, because
+it reads Supabase and this container's browser cannot reach it. What is
+verified is the real component's output against the real CSS bundle, 58 unit
+tests, and the four RPCs called as `anon` and as a resident against the live
+database.
+
+⚠️ **No demo data was seeded.** All six Combined Phase 2 tables and all four
+KP tables are still at **0 rows**, so the public map, the official map and
+the analytics have never been seen with data in them. The manual checklist
+is in the PR body; seeding is the repo owner's to do.
+
+### ⚠️ One live fact worth knowing before the demo
+
+The one real complaint, `CMP-2026-FFZYAX`, is already **`screened` with
+`confirmed_outcome = close_without_kp_process`** — the repo owner's own
+manual test on 2026-10-16. `open_kp_case()` requires
+`proceed_to_kp_process`, and a confirmed screening is immutable, so **that
+complaint can never open a KP case**. The KP demo needs a **fresh**
+complaint. (Re-screening is possible — one open screening per complaint, so
+a second one may be prepared and confirmed — but filing a new complaint is
+the simpler path.)
+
+---
 
 ## Health centre
 
@@ -11082,6 +11430,13 @@ derives her initials from. It is no longer displayed as a label.
   Clearance needs columns the schema does not have — which is now a live
   question rather than a reason to omit the template, since the sheet
   prints `[BUSINESS NAME]` until it is answered.
+- ✅ ~~**A public safety map.**~~ **BUILT** — migration 045 and
+  `/community-safety`; see *The public Community Safety Map (Final
+  Integration)*. What is deliberately **not** built there: any purok
+  polygon or boundary, any rate or per-capita figure, any prediction or
+  risk score, any street or place name, any Tanod or patrol information,
+  and any public analytics over **complaints** — the aggregates are over
+  **incidents** and must stay that way.
 - **The complaint / incident / KP expansion, beyond resident intake.**
   P3-A built the backend, P3-B1 the resident/public frontend,
   ✅ **P3-B2 the official queue, the detail panel and the Secretary's
@@ -11501,6 +11856,45 @@ derives her initials from. It is no longer displayed as a label.
   P2 established there is nothing canonical to reference. There is no
   purok polygon anywhere, `PUROKS` still holds seven values with
   `Purok 7` present, and not one stored purok value was normalised.
+- ⚠️ **`.loading-text` is 4.34:1 on the events section's tinted
+  background**, which fails WCAG AA. `--text-light`/`--text-muted` is
+  `#64748b` and `tokens.css`'s own comment records **4.76:1** — which is
+  true **on white**; the failure is the pairing with `#f1f5f9`. Found by
+  axe while measuring the Home teaser Final Integration added, and
+  **pre-existing**: the token dates from commit `31dcb71` and that phase's
+  Home.css diff adds no colour at all. ⚠️ **Deliberately not fixed** — the
+  class is used by **eight** surfaces, so changing the token is an
+  app-wide colour change rather than a defect fix, and it only shows in a
+  transient loading state. Worth its own pass with every consumer
+  re-measured.
+- ⚠️ **A KP case whose outcome was recorded WITHOUT concluding it cannot
+  then be concluded from that hearing.** `record_kp_hearing_outcome` takes
+  `p_concludes_case` separately, which is right — a human decides whether a
+  case is over — but a recorded outcome is immutable (ONE per hearing), so
+  a second call is refused *"This hearing already has a recorded
+  outcome."* The only paths are scheduling another hearing or ticking the
+  box the first time. Measured in Final Integration's flow trace.
+  ⚠️ **Not changed**: the alternatives are making a recorded outcome
+  editable, which Combined Phase 1 deliberately refuses, or adding a
+  separate conclude-case control, which is a feature. Whether the barangay
+  wants to conclude a case independently of a hearing outcome is theirs to
+  say.
+- ⚠️ **`.section-link` on Home reaches no CSS rule at all.** It is on the
+  *View All E-Services* link and is matched by **zero** selectors in any
+  stylesheet; the link is styled by `.section-header a` instead, which
+  post-X5 already padded above 24px. So it is an inert dead class name
+  rather than an unstyled control — found by scanning every `className` in
+  the changed files against the shipped bundle, the check that earned
+  itself three times (`btn-decline`, `btn-small`, `sr-only`). Pre-existing
+  from commit `300425b`, one token to delete, no behaviour either way.
+- ⚠️ **The public Community Safety Map has never been seen with data.** All
+  six Combined Phase 2 tables and all four KP tables hold **0 rows**, so the
+  zones, the bands, the type bars and the month trend have only ever
+  rendered against fixtures. ⚠️ **And no real Leaflet map has rendered at
+  all** — `leaflet` is mocked in Jest, jsdom has no layout, and this
+  container's browser cannot reach OpenStreetMap, so what is measured is
+  the panel around the canvas and the popup **strings**. The repo owner's
+  own smoke test is what confirms it.
 - **No lint script and no typecheck script** — see *Commands* and
   *Tests* above.
 

@@ -78,14 +78,15 @@ describe('A. the migration', () => {
   // ⚠️ REDEFINED BY COMBINED PHASE 2, which added 044 -- a definition
   // change, not a loosened assertion. What this guard is FOR is that 043
   // stays 043 and stays untouched by a later phase; the "nothing after it"
-  // half moved to 045, so a phase that quietly reaches for a second
-  // migration still fails here.
-  it('is still 043, still in place, and nothing has reached past 044', () => {
+  // half moved to 046 when Final Integration added 045, so a phase that
+  // quietly reaches for a second migration still fails here.
+  it('is still 043, still in place, and nothing has reached past 045', () => {
     const files = fs.readdirSync(DIR).filter((f) => f.endsWith('.sql')).sort()
-    expect(files).toHaveLength(44)
+    expect(files).toHaveLength(45)
     expect(files[42]).toBe('043_kp_case_hearings_summons.sql')
     expect(files[43]).toBe('044_incident_blotter_tanod.sql')
-    expect(files.some((f) => f.startsWith('045'))).toBe(false)
+    expect(files[44]).toBe('045_public_safety_aggregates.sql')
+    expect(files.some((f) => f.startsWith('046'))).toBe(false)
   })
 
   it('leaves 001-042 alone', () => {
