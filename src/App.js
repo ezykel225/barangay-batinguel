@@ -9,6 +9,7 @@ import Reservation from './pages/Reservation'
 import EServices from './pages/EServices'
 import TrackReservation from './pages/TrackReservation'
 import TrackComplaint from './pages/TrackComplaint'
+import CommunitySafety from './pages/CommunitySafety'
 import About from './pages/About'
 import HealthCenter from './pages/HealthCenter'
 import Officials from './pages/Officials'
@@ -49,6 +50,16 @@ function App() {
           {/* ⚠️ Public on purpose: a walk-in complainant has no account.
               The lookup itself is two-factor inside track_complaint(). */}
           <Route path="/track-complaint" element={<TrackComplaint />} />
+          {/* ⚠️ The PUBLIC Community Safety Map, and it is a different
+              data surface from the Official one -- aggregated cells and
+              counts only, never `incident_map_points()`. Public on
+              purpose: a resident reads it from ordinary navigation, so
+              there is no resident-only copy to drift from this one.
+              The route and every link to it landed in one commit,
+              because `path="*"` renders Home -- a navigation entry whose
+              route does not exist yet does not 404, it silently shows
+              the homepage and reads as broken. */}
+          <Route path="/community-safety" element={<CommunitySafety />} />
           <Route path="/about" element={<About />} />
           <Route path="/health-center" element={<HealthCenter />} />
           <Route path="/officials" element={<Officials />} />

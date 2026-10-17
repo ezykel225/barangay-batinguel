@@ -98,6 +98,25 @@ const Navbar = () => {
               Health Center
             </Link>
           </li>
+          {/* ⚠️ A PUBLIC entry, deliberately NOT an E-Services item.
+              E-Services is the transaction catalogue -- every entry in
+              it is something a visitor asks the barangay to DO, and
+              each states an access requirement in words. The
+              Community Safety Map is published information a visitor
+              reads, with no account and nothing to submit, so it takes
+              a navigation slot of its own rather than widening what
+              that catalogue means.
+              It is also why there is no resident-only copy: a resident
+              reaches this from the same public navigation, which is the
+              one public-safe surface. */}
+          <li>
+            <Link
+              to="/community-safety"
+              className={location.pathname === '/community-safety'
+                ? 'active' : ''}>
+              Community Safety
+            </Link>
+          </li>
           {/* ⚠️ This was a `Court Reservation` link. One service does
               not deserve a top-level navigation slot while three others
               have none, so the slot now opens the whole catalogue and
@@ -173,6 +192,11 @@ const Navbar = () => {
         <li>
           <Link to="/health-center" onClick={toggleMenu}>
             Health Center
+          </Link>
+        </li>
+        <li>
+          <Link to="/community-safety" onClick={toggleMenu}>
+            Community Safety
           </Link>
         </li>
         {/* The SAME catalogue the desktop dropdown renders. Neither

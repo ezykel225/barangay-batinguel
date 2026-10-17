@@ -1,0 +1,32 @@
+/* Final Integration — the public Community Safety Map's canvas.
+   Scoped with its own `psm-` prefix so nothing here can restyle the
+   Official Portal's `smap-` surfaces, and vice versa. */
+
+.psm-wrap { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+
+/* ⚠️ Leaflet needs an explicit height on its container or it renders a
+   zero-height map and reports no error. */
+.psm-canvas {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-sm);
+  background: #eef2f7;
+  overflow: hidden;
+}
+
+.psm-alt { font-size: var(--fs-13); color: #5f6775; }
+
+/* ⚠️ A TARGET, NOT DECORATION. A bare summary line is ~18px tall, under
+   WCAG 2.2 SC 2.5.8's 24px minimum. */
+.psm-alt summary {
+  cursor: pointer;
+  padding: 6px 0;
+  min-height: 24px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.psm-alt-list { margin: 6px 0 0; padding-left: 20px; }
+.psm-alt-list li { margin-bottom: 4px; overflow-wrap: anywhere; }
+.psm-empty { margin: 6px 0 0; color: #5f6775; }

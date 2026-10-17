@@ -1,0 +1,268 @@
+/* Final Integration — the PUBLIC Community Safety Map page.
+   Its own `cs-` prefix, so nothing here can restyle the Official Portal's
+   `smap-` surfaces and vice versa -- the same reason the components and the
+   RPCs are separate. */
+
+.cs-page { min-height: 100vh; display: flex; flex-direction: column; }
+.cs-page main { flex: 1; }
+
+.cs-section { padding: 28px 0 56px; background: #f8fafc; }
+
+/* ⚠️ `minmax(0, 1fr)`, never a bare `1fr`. X2's biggest finding: a bare
+   track is `minmax(auto, 1fr)` and cannot shrink below its content's
+   min-content width, so one unbreakable value scrolls the whole document. */
+.cs-container {
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 16px;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.cs-container h2 {
+  margin: 26px 0 8px;
+  font-size: var(--fs-18, 18px);
+  font-weight: 700;
+  color: #1e293b;
+  overflow-wrap: anywhere;
+}
+
+.cs-container h3 {
+  margin: 20px 0 8px;
+  font-size: var(--fs-15, 15px);
+  font-weight: 600;
+  color: #1e293b;
+  overflow-wrap: anywhere;
+}
+
+/* ─── The privacy notice ─────────────────────────────────────────────────── */
+
+.cs-notice {
+  margin: 0 0 20px;
+  padding: 16px 18px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #1d4ed8;
+  border-radius: 8px;
+  min-width: 0;
+}
+
+.cs-notice h2 {
+  margin: 0 0 10px;
+  font-size: var(--fs-15, 15px);
+  font-weight: 700;
+}
+
+.cs-notice ul { margin: 0; padding-left: 20px; }
+
+.cs-notice li {
+  margin-bottom: 7px;
+  font-size: var(--fs-13, 13px);
+  line-height: 1.55;
+  color: #374151;
+  overflow-wrap: anywhere;
+}
+
+.cs-notice p {
+  margin: 10px 0 0;
+  font-size: var(--fs-13, 13px);
+  line-height: 1.55;
+  color: #374151;
+  overflow-wrap: anywhere;
+}
+
+.cs-disclaimer { font-weight: 600; color: #1e293b !important; }
+.cs-notice-last { margin: 28px 0 0; border-left-color: #0f766e; }
+
+.cs-problem {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  background: #fef2f2;
+  border-left: 4px solid #b91c1c;
+  border-radius: 6px;
+  color: #b91c1c;
+  font-size: var(--fs-14, 14px);
+  overflow-wrap: anywhere;
+}
+
+/* ─── Filters ────────────────────────────────────────────────────────────── */
+
+.cs-filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0 0 18px;
+}
+
+.cs-filters label {
+  font-size: var(--fs-13, 13px);
+  font-weight: 600;
+  color: #1e293b;
+}
+
+/* ⚠️ A TARGET, NOT DECORATION. `.filter-select` is the class that carries
+   `align-self: stretch` and `min-height: 24px` -- Combined Phase 2 reused the
+   padded `.filter-select-wrap` without it and shipped six 19px controls,
+   under WCAG 2.2 SC 2.5.8's 24px. This select is not inside a wrapper, so it
+   is given its own box rather than inheriting one. */
+.cs-filters .filter-select {
+  min-height: 40px;
+  padding: 8px 12px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-family: 'Poppins', sans-serif;
+  font-size: var(--fs-13, 13px);
+  color: #374151;
+  cursor: pointer;
+}
+
+/* ─── Stats ──────────────────────────────────────────────────────────────── */
+
+.cs-stats {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 22px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr));
+}
+
+.cs-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  min-width: 0;
+}
+
+.cs-stat-value { font-size: 26px; font-weight: 700; color: #1e293b; }
+
+.cs-stat-label {
+  font-size: var(--fs-12, 12px);
+  color: #5f6775;
+  overflow-wrap: anywhere;
+}
+
+.cs-caption {
+  margin: 0 0 12px;
+  font-size: var(--fs-13, 13px);
+  line-height: 1.55;
+  color: #5f6775;
+  overflow-wrap: anywhere;
+}
+
+.cs-note {
+  margin: 8px 0 0;
+  font-size: var(--fs-12, 12px);
+  line-height: 1.55;
+  color: #5f6775;
+  overflow-wrap: anywhere;
+}
+
+.cs-empty {
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  background: #ffffff;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  color: #5f6775;
+  font-size: var(--fs-13, 13px);
+  overflow-wrap: anywhere;
+}
+
+/* ─── Legend ─────────────────────────────────────────────────────────────── */
+
+.cs-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  font-size: var(--fs-12, 12px);
+  color: #5f6775;
+}
+
+.cs-legend li { display: flex; align-items: center; gap: 6px; }
+
+.cs-key {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid currentColor; flex: 0 0 auto;
+}
+
+.cs-key-low { color: #1d4ed8; }
+.cs-key-medium { color: #b45309; }
+.cs-key-high { color: #b91c1c; }
+
+/* ─── Bars, trend, observations ──────────────────────────────────────────── */
+
+.cs-bars { list-style: none; margin: 0; padding: 0; }
+
+.cs-bars li {
+  display: grid;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  grid-template-columns: minmax(0, 190px) minmax(0, 1fr) auto;
+}
+
+.cs-bar-label {
+  font-size: var(--fs-13, 13px);
+  color: #1e293b;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.cs-bar-track {
+  height: 10px; background: #e2e8f0; border-radius: 5px; overflow: hidden;
+}
+
+.cs-bar-fill {
+  display: block; height: 100%; background: #1d4ed8; border-radius: 5px;
+}
+
+.cs-bar-value { font-size: var(--fs-13, 13px); font-weight: 600; color: #1e293b; }
+
+.cs-trend {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.cs-trend li {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  min-width: 56px;
+}
+
+.cs-trend-bar { width: 22px; background: #0f766e; border-radius: 3px 3px 0 0; }
+.cs-trend-label { font-size: 11px; color: #5f6775; }
+.cs-trend-value { font-size: var(--fs-12, 12px); font-weight: 600; color: #1e293b; }
+
+.cs-observations { list-style: none; margin: 0 0 8px; padding: 0; }
+
+.cs-observations li {
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-left: 3px solid #0f766e;
+  border-radius: 6px;
+  font-size: var(--fs-13, 13px);
+  line-height: 1.5;
+  color: #1e293b;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 600px) {
+  .cs-bars li { grid-template-columns: minmax(0, 1fr) auto; }
+  .cs-bar-track { grid-column: 1 / -1; }
+}
