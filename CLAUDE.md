@@ -65,7 +65,7 @@ banned below: it silences the one check this project has.
 
 ### Tests
 
-Forty-eight suites, 1,376 tests:
+Fifty-eight suites, 1,835 tests:
 
 | File | What it covers |
 |---|---|
@@ -117,6 +117,11 @@ Forty-eight suites, 1,376 tests:
 | `src/complaints/officialComplaints.test.js` | 61 tests over the queue, the detail panel and the walk-in intake as **rendered**. The load-bearing ones: the list is built from `complaint_queue()` and `supabase.from` is **never called** for it; a queue row shows no narrative, party, contact or category **from a fixture that has all four**; the restricted detail renders a neutral sentence with the queue still on screen, **no `role="alert"`** and no SQLSTATE, policy or function name in the document; a withheld contact renders as *"No contact number recorded"* rather than a blank; and the walk-in control is **absent** without the Secretary flag, never disabled, with **no Punong Barangay branch that could render it**. Plus the dashboard holds no complaint state and P1's `Map` fail-safe is intact. ⚠️ The duplicate-submit test **proved nothing in its first version** — it clicked a `disabled` button, so it passed either way; it now submits the FORM, which is also the real case (a keyboard Enter beating the re-render). Five mutations produce **49 / 2 / 1 / 1 / 4** failures. ⚠️ **Nine of these guards were redefined by P4-A**, each at its own site and each a definition change rather than a loosened assertion: the migration count moved from 41 to **42** with `043` asserted absent, the status filter from one status to three, the no-action sentence to the reworded one with the old wording asserted **gone**, the walk-in Punong guard **re-scoped to the control** (the file legitimately gained `isKapitan`, which gates a different control with a different database gate), the KP-vocabulary scan **scoped around the one denial paragraph** per `prototypeCoverage.test.js`'s precedent and then asserted to *be* a denial, and the dashboard tab line given its second prop with the forbidden list **extended** by every screening surface |
 | `src/screening/screeningChecklist.test.js` | 31 tests over the PROVISIONAL checklist as a pure module. The load-bearing ones are absences: **no exported function maps the answer set to a recommendation or an outcome** (eighteen candidate names asserted missing), every item is phrased as a question and ends in `?`, no question states a legal conclusion or names a penalty, day limit or statutory period — **no bare number at all** — and `needsFurtherReview` takes one item and one answer, so its **arity** is the proof it is not a scorer. Plus that `unknown` is deliberately NOT flagged, the four outcomes name no P4-B stage or legal conclusion, and the refusal sentences leak no SQLSTATE, function name, table or policy. ⚠️ Six more **read `complaint_screening_checklist_keys` out of migration 042** and assert the JS list matches exactly, in order and as a set — the same cross-check `reservationWindow.test.js` makes against 020 and `officialAvailability.test.js` against 026. Both directions: renaming one SQL key fails **3**, widening the SQL answer vocabulary fails **1** |
 | `src/screening/screeningMigration.test.js` | 57 **source-reading** guards over migration 042 — the security SHAPE, since only SQL can prove a position gate. Pinned: one new table and **none** of the forbidden ones (`kp_jurisdiction_rules`, `kp_cases`, a capability table), **three** CHECKs widened together to the same three values with `received` kept, no outcome value usable as a status, **no legal rule and no numeric comparison in any CHECK**, the private table's two barriers, the version/actor/timestamp columns with the writing RPC's signature asserted to take **none** of them, the confirmation-complete constraint, the one-open-per-complaint index, the position gate on both RPCs, the self-confirm refusal, the **narrower** screening predicate, `search_path = ''` on all six functions, **PUBLIC and `anon` EXECUTE revoked on all six** with `authenticated` on the five client ones only, that the only two INSERT targets are the screening and the history, that the history note names no outcome, and that `track_complaint`/`complaint_queue`/`complaint_history_for` are **not redefined**. ⚠️ Two of its scans moved to **word boundaries** after reporting `tan` inside `circumstance` and `fine` inside `definer` — the `Badminton`/`admin` trap. Five mutations produce **2 / 1 / 1 / 1 / 1** failures |
+| `src/safetymap/safetyAnalytics.test.js` | 81 tests over the Combined Phase 2 analytics as a pure module. The load-bearing ones are absences: **twenty candidate export names asserted missing** (`riskScore`, `recommendAction`, `predictNext`…), no directive verb in any observation, and no rate, per-capita figure or score anywhere. Plus the `(0, 0)` guard -- `Number(null)` is `0` and `Number.isFinite(0)` is `true`, so a coercing filter would plot a null-coordinate incident in the Gulf of Guinea; ⚠️ **writing this test is what found the missing guard**, in code already written |
+| `src/incidents/incidentMigration.test.js` | 98 **source-reading** guards over migration 044 -- the security SHAPE, since only SQL can prove a position gate. Pinned: committee read nowhere, `full_name` not an authorization key, `is_official` not redefined, no capability table, no `tanod` role, no `profile_id` and no coordinate on `tanod_members`, no puroks table and no polygon, the map reader's exact columns **with no narrative**, 25×PUBLIC revoke, 25×`anon` revoke, 25×`search_path`, the three trigger helpers ungranted, 6×RLS, 6×revoke-all, zero policies, and the INSERT targets being exactly the six new tables. ⚠️ Every "is not used" scan runs over **comment-stripped and whitespace-squished** code -- a literal `toContain` passed for one table and failed for five purely because I had column-aligned the SQL |
+| `src/incidents/incidentsPanel.test.js` | 26 tests over the queue, the record form and the blotter as rendered. The load-bearing ones: the list is built from `incident_queue()` and `supabase.from` is **never called**; records actions are **absent, not disabled**, without the flag, with a neutral sentence naming no position; and a Tanod is submitted **by id**, asserted by checking the name appears nowhere in the payload. ⚠️ The "reads no complaint surface" scan is scoped to **reader names**, not the bare word -- its first version failed on `className="complaint-reference"`, which is §10's design-language reuse doing what it was asked |
+| `src/safetymap/safetyMapPanel.test.js` | 28 tests over the map card and the analytics. ⚠️ **`leaflet` is mocked as a MEASUREMENT, not a stub** -- it records every `bindPopup` string, so the privacy guards read what a marker would actually show. Every fixture plants a narrative and a witness name; the whole document and every popup must contain neither. Plus the escaping check (fed `<img src=x onerror=...>`), the coverage caveat asserted present in **both** directions, counts-not-rates, and ⚠️ the **two-definitions-of-plotted** regression guard, which found a real defect |
+| `src/tanod/tanodPanel.test.js` | 24 tests over the roster and the patrol schedule. The load-bearing ones are absences: no `<label>` asks for an email, password, account, role, latitude or longitude; the modules touch no auth, profile or role surface; and an assignment is scheduled **by Tanod id**. Plus the two on-screen sentences saying a Tanod has no account and is not tracked, and a duplicate-submit guard proved by submitting the **form** |
 | `src/screening/screeningPanel.test.js` | 43 tests over the panel as **rendered**. The load-bearing ones: an ordinary official gets **one neutral sentence** naming no position, policy, function or SQLSTATE; the Secretary gets the prepare form and **no confirm control even with a draft open**; the Punong Barangay gets the confirm control and **no prepare form**; nothing is rendered `disabled` in place of being withheld; the recommendation sent is **the one a human picked** even when all six answers are flagged; a `P0001` naming the position gate is read as the module's own sentence and the RPC's words appear **nowhere**; a confirmed screening renders read-only with no control to change it; and the confirmation dialog names the outcome **in words**, not as an identifier. Plus `supabase.from` is never called, the duplicate-submit guard is proved by submitting the **form**, and the headings are asserted to start at `h4` and skip no level. Six mutations produce **1 / 2 / 3 / 1 / 1 / 2** failures |
 
 Schema and policy changes are still verified by impersonating each role
@@ -204,7 +209,7 @@ src/
                       "8:00 AM - 5:00 PM" straight through and omitted
                       the lunch closure the Home page states.
     Sidebar.jsx       Dashboard nav. Defines the tab lists for all three
-                      roles: official (13), nurse (5), resident (5).
+                      roles: official (16), nurse (5), resident (5).
                       Official was 13 until the Punong Barangay Status
                       tab was folded into the overview -- see *The
                       compact Punong Barangay status*.
@@ -400,13 +405,51 @@ src/
                       its own, no signature, no statutory wording, and
                       factual case data only.
 
+  incidents/          The incident record and the digital blotter
+                      (Combined Phase 2). ⚠️ PROVISIONAL.
+    incidentLabels    The seven NEUTRAL incident types, the five
+                      statuses, the four sources and the blotter
+                      vocabulary. ⚠️ They are not crime
+                      classifications -- "Physical altercation", not
+                      "Assault". Pure.
+    incidentApi       Every incident and blotter call. RPC only; there
+                      is no `supabase.from` in it, because the six
+                      tables carry no client privilege.
+    IncidentsPanel    The queue, the record form and the blotter detail.
+                      ⚠️ ALL incident state lives here;
+                      OfficialDashboard contributes one line.
+
+  tanod/              The Tanod roster and the patrol schedule.
+    tanodLabels       Patrol types, roster state, and the two sentences
+                      that say on screen that a Tanod has NO ACCOUNT and
+                      is NOT TRACKED. Pure.
+    tanodApi          The four Tanod RPCs.
+    TanodPanel        The roster and the assignments. ⚠️ A Tanod is a
+                      record, never an account: no profile link, no
+                      coordinate, no login.
+
+  safetymap/          The INTERNAL safety map and the descriptive
+                      analytics. ⚠️ There is no public map.
+    safetyAnalytics   Hotspot ranking, intensity bands, plottable
+                      points, coverage gaps and the observation
+                      sentence. ⚠️ Holds NO rule mapping anything to a
+                      recommendation, and `isPlottable` rejects a blank
+                      BEFORE coercing -- `Number(null)` is 0, and (0, 0)
+                      is the Gulf of Guinea. Pure.
+    safetyApi         The six map and analytics readers.
+    IncidentMap       Vanilla Leaflet, `circleMarker` only. No marker
+                      PNG, no heat plugin, NO BOUNDARY POLYGON, and a
+                      `<details>` list fallback.
+    SafetyMapPanel    Filters, map, counts, trend, repeated locations
+                      and coverage gaps. ⚠️ Counts, never rates.
+
   supabase/
     supabaseClient.js The single Supabase client. Throws at import time
                       when the env vars are missing.
 
   assets/images/      11 official portraits, page backgrounds, logo.
 
-supabase-migrations/  43 numbered SQL files. A record, not a runner.
+supabase-migrations/  44 numbered SQL files. A record, not a runner.
 supabase/functions/   Edge Function source (notify-reservation-sms).
 docs/                 SETUP.md, TESTING-WALKTHROUGH.pdf + its generator.
 ```
@@ -898,15 +941,16 @@ such row.
 
 ## Database notes
 
-**43 migrations**, `001` through `043`, all applied. ⚠️ 027 is a
+**44 migrations**, `001` through `044`, all applied. ⚠️ 027 is a
 DATA CORRECTION, not a schema change — see *The portrait is lost by the
 RENAME* under *Public E-Services (X5)*.
 
-**30 tables, RLS enabled on every one.** The newest four are
-`kp_cases`, `kp_case_panel`, `kp_hearings` and `kp_hearing_attendance`
-— migration 043, see *KP case, hearings and summons (Combined Phase
-1)* — and all four are PRIVATE, like the five complaint tables before
-them.
+**36 tables, RLS enabled on every one.** The newest six are
+`incidents`, `blotter_entries`, `blotter_entry_history`,
+`tanod_members`, `tanod_assignments` and `incident_tanod` — migration
+044, see *Incident, digital blotter, Tanod, safety map and analytics
+(Combined Phase 2)* — and all six are PRIVATE, like the four KP tables
+and the five complaint tables before them.
 
 | Table | Holds |
 |---|---|
@@ -1210,11 +1254,18 @@ own domain with SPF, DKIM and DMARC.
 
 ### Officials
 
-**Thirteen** sidebar tabs, defined in `Sidebar.jsx` as
+**Sixteen** sidebar tabs, defined in `Sidebar.jsx` as
 `officialNavItems`: Dashboard, Announcements, Events, Reservations,
-Document Requests, **Complaints**, Waste Management, Officials
+Document Requests, **Complaints**, **Incidents & Blotter**, **Tanod
+Operations**, **Safety Map & Analytics**, Waste Management, Officials
 Directory, Residents, Voter Reference List, Reports, Activity Log,
 Settings.
+
+The last three are Combined Phase 2's -- see *Incident, digital blotter,
+Tanod, safety map and analytics*. ⚠️ They are **tabs, not routes**: not
+one of the sixteen has a route of its own, so the single
+`<ProtectedRoute allowedRole="official">` around `/official` gates them
+all and no new role was added.
 
 Complaints is the newest and the only one P3-B2 added -- see *Official
 complaint queue and walk-in intake (P3-B2)*. ⚠️ Since P4-A it also
@@ -10413,6 +10464,394 @@ to fixing that, and the new suite is the guard. Recorded rather than
 done.
 
 
+---
+
+## Incident, digital blotter, Tanod, safety map and analytics (Combined Phase 2) — ⚠️ PROVISIONAL
+
+2026-10-17, on `claude/incident-tanod-map-analytics-mvp`, built on `main`
+after PR #43 merged (`f6423f8`). **One migration, 044, ten new frontend
+files, and one new dependency.**
+
+It makes ONE flow demonstrable end to end:
+
+```
+an official RECORDS an incident
+  -> the incident gets a stable INC- reference
+  -> a BLT- blotter entry is created in the same statement
+  -> a Tanod from the roster can be ATTRIBUTED to it
+  -> a patrol ASSIGNMENT can be scheduled against that Tanod
+  -> the incident's coordinates appear on the INTERNAL map
+  -> the analytics update: by type, by status, by month
+  -> repeated locations surface as HOTSPOTS
+  -> patrol coverage is compared with incident concentration
+```
+
+### ⚠️ THE SYSTEM STILL DECIDES NOTHING
+
+There is no function anywhere -- SQL or JavaScript -- that maps an
+incident, a hotspot or a coverage gap to a conclusion, a recommendation
+or an action. `safetyAnalytics.test.js` asserts the absence **by name**
+across twenty candidates (`riskScore`, `recommendAction`, `severityOf`,
+`predictNext`, …).
+
+⚠️ **An observation reports and asks for a review; it never prescribes.**
+The one sentence the module can produce is
+
+> *"5 traffic incidents recorded at Rizal Street — review for possible
+> local safety intervention."*
+
+and a test scans every rendered observation for `must`, `should`,
+`install`, `build`, `deploy`, `assign more`, `penalt`, `fine`,
+`violation of`, `is unsafe` and `dangerous`.
+
+⚠️ **COUNTS, NEVER RATES.** No per-capita figure, no percentage of
+population, no risk score, no forecast -- there is no population
+denominator in this database, so a rate would be a number this project
+invented. The intensity bands are named by **how many were recorded**
+(`Fewer recorded` / `More recorded` / `Most recorded`), never by danger.
+A test scans the rendered document for fifteen such terms.
+
+### Incident ≠ blotter entry ≠ complaint ≠ KP case
+
+Four distinct lifecycle objects, and 044 keeps them apart.
+⚠️ **Nothing resident-facing changed in this phase at all.** A test
+scans every incident, Tanod and safety-map module for the complaint,
+screening and KP reader names, and the dashboard for incident state.
+
+| Table | Holds |
+|---|---|
+| `incidents` | what happened. `reference` (`INC-2026-AB12CD`), a seven-value `incident_type`, `occurred_at`, narrative, `location_text`, nullable `latitude`/`longitude`, ⚠️ `area_note` -- a **free-text snapshot, deliberately NOT named `purok`** -- a four-value `source`, a five-value `status`, `recorded_by`, timestamps |
+| `blotter_entries` | the internal record. `entry_reference` (`BLT-`), and ⚠️ **`incident_id` is UNIQUE** -- that is the duplicate guard |
+| `blotter_entry_history` | append-only, `created` / `amended`, with the actor from the caller's own uid |
+| `tanod_members` | ⚠️ a **roster, not accounts**: name, active, area note, display order. **No `profile_id`, no auth link, no coordinate column** |
+| `tanod_assignments` | who was scheduled where: date, optional window, `roving`/`static`, area label, active |
+| `incident_tanod` | the join: `reported` / `responded` / `attended`, unique per (incident, tanod, role) |
+
+⚠️ **ALL SIX ARE PRIVATE** -- RLS enabled, **zero policies**, every client
+privilege revoked. 019A's two-barrier pattern, and the reason is the
+map: RLS filters **rows** and cannot restrict **columns**, while the
+map must return a coordinate and **not** the narrative. That is not
+expressible as a row policy. Every direct client read is `42501`, the
+privilege layer, before RLS is consulted. `get_advisors` reports
+`rls_enabled_no_policy` on all six, which is what a private table looks
+like -- as it has for `official_account_links` since migration 030.
+
+### ⚠️ `incident_map_points()` IS THE PRIVACY BOUNDARY
+
+Eight columns: id, reference, type, when, latitude, longitude, location
+text, status. **No narrative, no area note, no recorder, no blotter
+summary, no party and no complaint link.** A marker popup is read by
+whoever is standing at the screen.
+
+It is a **function, not a policy**, for the same reason
+`complaint_queue()` is: "the map without the narrative" is a column
+rule, and RLS is a row tool.
+
+⚠️ **The fixtures in `safetyMapPanel.test.js` plant a narrative and a
+witness name on every row that could carry one**, and the suite asserts
+the whole rendered document and every captured popup string contain
+neither. A popup is built as an HTML string, so the location label is
+escaped -- asserted by feeding it `<img src=x onerror=...>`.
+
+### ⚠️ NO PUROK POLYGON, AND NO PUROK NORMALISATION
+
+P2 remains authoritative: the official purok names and boundaries are
+unconfirmed. So **nothing here draws a barangay or purok outline**, and
+a test scans `IncidentMap.jsx` for `L.polygon`, `L.geoJSON`,
+`L.rectangle`, `.geojson`, `purok` and `boundary`. The map centres on
+Dumaguete as an **opening view**, not an asserted border.
+
+The heat layer is therefore **coordinate-based**: graduated
+`circleMarker` radii and colours computed from counts. ⚠️ **`PUROKS` is
+untouched and still holds seven values with `Purok 7` present**, and not
+one stored purok value was normalised.
+
+### ⚠️ A ROW WITH NO COORDINATES IS COUNTED, NEVER PLOTTED — and the JS trap that nearly broke it
+
+`Number(null)` is **`0`** and `Number.isFinite(0)` is **`true`**, so a
+filter that coerced before checking would pass a row with no latitude
+through as a perfectly valid zero -- and **(0, 0) is a point in the Gulf
+of Guinea, roughly 10,000 km from Dumaguete.**
+
+`isPlottable` rejects a blank **before** coercing, and ⚠️ **a test of my
+own caught the absence of that guard**: writing the test first turned 4
+assertions red against code I had already written and believed correct.
+
+The card says so in words -- *"An incident with no coordinates is still
+recorded and counted; it is not on the map."* -- and the queue carries
+its own count of how many are in that state.
+
+### Who may do what, measured
+
+| caller | record an incident | read the queue / map | administer records | direct table |
+|---|---|---|---|---|
+| **Punong Barangay** | ✅ | ✅ | ✅ | **`42501`** |
+| **Barangay Secretary** | ✅ | ✅ | ✅ | **`42501`** |
+| Barangay Treasurer | ✅ | ✅ | `P0001` | `42501` |
+| Kagawad (**Peace and Order**) | ✅ | ✅ | **`P0001`** | `42501` |
+| resident | `P0001` | **0 rows** | `P0001` | `42501` |
+| nurse | `P0001` | **0 rows** | `P0001` | `42501` |
+| `anon` | **`42501`** | **`42501`** | **`42501`** | **`42501`** |
+
+Two predicates, and the split is the point:
+
+- **`current_official_is_active()`** -- any official who holds a link
+  **and** an active directory row. Narrower than `is_official()`, which
+  reads `profiles.role` alone. ⚠️ **`is_official()` was NOT widened** --
+  it gates eleven policies including three in `storage`.
+- **`current_official_may_administer_records()`** -- the Secretary or the
+  Punong Barangay, via `current_official_holds_position()`.
+
+⚠️ **THE PEACE AND ORDER KAGAWAD GETS NOTHING EXTRA, re-measured in the
+strongest form.** `Arnulfo Abol Catalan` at `display_order` 8 genuinely
+holds `Peace and Order and Appropriation`. In a rolled-back block the
+Kagawad used for impersonation rewrote **his own** `committee` to
+*"Peace and Order and Blotter Records"* -- `rows=1`, confirming P2.5's
+latent finding is still live -- and **still** could not administer
+records, while still reading the queue, which is his genuine access.
+`barangay_officials.committee` is **descriptive data, not authorization
+data**; a test scans 044, comment-stripped, and finds the column read
+nowhere.
+
+⚠️ **A TANOD HAS NO LOGIN, AND NOTHING HERE CREATES ONE.**
+`profiles_role_check` is still `official`/`nurse`/`resident`, there is no
+`tanod_account_links`, `tanod_members` carries no `profile_id`, and the
+panel says both facts on screen. Tests assert the Tanod modules touch no
+auth, profile or role surface, and that no `<label>` asks for an email,
+password, account, role, latitude or longitude.
+
+⚠️ **NO CONTINUOUS GPS.** The only latitude and longitude in this phase
+belong to an **incident**. There is no coordinate column on a Tanod or
+an assignment, and no `navigator.geolocation` anywhere.
+
+⚠️ **NO CAPABILITY TABLE.** The implementation did not need one, its
+grant path is undesigned (an official must not be able to grant
+themselves a capability), and a private table with no reader is dormant
+infrastructure -- the state migration 030 held for exactly one phase and
+the `displayLabels` mistake in another form.
+
+### Recording an incident is ONE call
+
+`record_incident(...)` creates the incident, its blotter entry and the
+first history row **atomically**. A blotter entry that can exist without
+its incident, or an incident whose blotter entry failed, is a record
+nobody can trust; one function means there is no half state. The
+references are stamped by BEFORE INSERT triggers, so neither is a
+parameter.
+
+⚠️ **`INC-` and `BLT-`, deliberately distinct from `BCR-`, `CMP-` and
+`KP-`.** Five reference kinds now, and two sharing a prefix is a hazard
+when somebody reads one out over the phone. Same Crockford base32 with
+I, L, O and U removed; a test asserts the five prefixes are distinct.
+
+⚠️ **A future-dated incident is refused.** `occurred_at` more than an
+hour ahead raises -- a blotter is a record of what happened.
+
+### The function surface, closed at creation
+
+| | |
+|---|---|
+| functions 044 adds | **25**, all SECURITY DEFINER |
+| with `set search_path to ''` | **25 of 25** |
+| bare **PUBLIC** EXECUTE | **0 of 25** |
+| `anon` EXECUTE | **0 of 25** |
+| `authenticated` EXECUTE | the **22** client-facing ones |
+| the 3 trigger helpers | **granted to no client role** |
+
+⚠️ **MASTER-B's lesson applied at creation rather than in a later
+phase.** `pg_default_acl` grants `anon`, `authenticated` and
+`service_role` by name and PostgreSQL's own function default adds a bare
+PUBLIC entry on top, so revoking the named roles alone would leave
+`has_function_privilege('anon', …)` **true** through PUBLIC. That was
+migration 038's whole finding; every revoke in 044 names `public, anon`.
+
+⚠️ **The three reference helpers are granted to nobody, and the triggers
+still fire.** Migration 034 measured that a trigger does not consult the
+caller's EXECUTE privilege; 044 relies on the same fact and the matrix
+confirms it -- a Secretary with no EXECUTE on
+`generate_incident_reference` still received `INC-2026-RTTQZ4`.
+
+**Advisors**: `anon_security_definer_function_executable` **11 --
+unchanged**, and every one of the eleven was listed by name and
+confirmed **not** to be a 044 function (the six policy predicates, the
+four reservation RPCs, and P3-A's `track_complaint`).
+`authenticated_security_definer_function_executable` 36 → **58**, the 22
+client functions exactly as designed. `rls_enabled_no_policy` 9 → **15**.
+`extension_in_public` **still gone**. No new finding class.
+
+### The map: Leaflet, and nothing else
+
+⚠️ **`leaflet` is the ONE dependency this phase adds**, and the
+alternatives were ruled out before any architecture depended on them:
+
+- **`react-leaflet`** is ESM-only, and CRA 5's webpack has a known
+  quarrel with ESM-only packages in `node_modules` that is not worth
+  discovering the night before a demo. Leaflet itself ships UMD, so the
+  binding is one small vanilla file.
+- **`leaflet.heat`** was not added. §8 asks for "heat/hotspot layer **or**
+  intensity visualization"; graduated circles are the second, they cost
+  no second unmaintained plugin, and they are computed by a **pure,
+  unit-tested module** rather than by an opaque canvas.
+- ⚠️ **`circleMarker` also avoids Leaflet's marker-icon trap.** The
+  default `L.marker` loads three PNGs by relative URL, which webpack
+  rewrites and Leaflet then cannot find -- the single most common
+  Leaflet-in-CRA defect. A vector circle has no image to lose.
+
+A test asserts `leaflet` is present and that `react-leaflet`,
+`leaflet.heat`, `leaflet.markercluster`, `mapbox-gl`, `maplibre-gl` and
+two Google wrappers are **absent**.
+
+⚠️ **The map is not the only way to read it.** A `<details>` list gives a
+screen-reader user, and anybody whose tiles do not load, the same facts
+as the markers -- a canvas of coloured circles is not an accessible
+record.
+
+### ⚠️ A COVERAGE GAP CAN MEAN THE WORDING DIFFERS
+
+An assignment area and an incident location are two free-text labels
+typed on two screens, so a "gap" may mean nobody was assigned **or** that
+the patrol area was written differently. The caveat is rendered **with
+the list, always** -- and a test asserts it in **both** directions, with
+a gap and with none, because a list without it reads as a staffing
+failure the data does not establish.
+
+### The Official Portal gained three tabs, and the dashboard gained six lines
+
+Sixteen sidebar entries now. ⚠️ **`OfficialDashboard.jsx` holds no
+incident, Tanod or safety-map state** -- three imports and three switch
+lines, the shape `OfficialComplaints` and `ScreeningPanel` already take.
+A test asserts the dashboard names no RPC from any of the three.
+
+Records actions are **absent, never disabled**, for an official without
+the records flag -- `ActionMenu`'s own rule -- with one neutral sentence
+in their place that names no position, policy or SQLSTATE.
+
+### ⚠️ THREE REAL DEFECTS OF MINE WERE FOUND BY MEASURING, not by reading
+
+- ⚠️ **Two definitions of "plotted" in one card.** The caption read
+  `points.length` -- the rows the reader returned -- while the canvas
+  drew `plottablePoints(points)`. They agree today only because
+  `incident_map_points()` already filters in SQL, so the caption was
+  restating a guarantee made one layer away as a different number. Found
+  by a test whose fixture carried a row the client-side guard rejects.
+  Both now read the same function, the same rule `useNotifications`
+  follows for unread.
+- ⚠️ **Six filter controls were 19px tall**, under WCAG 2.2 SC 2.5.8's
+  24px. `.filter-select-wrap` is a padded **wrapper**; `.filter-select`
+  is what carries `align-self: stretch` and `min-height: 24px`. I reused
+  the wrapper and omitted the control class, so the pointer landed on
+  padding that activates nothing -- *"a padded wrapper is not a target"*,
+  the project's own phrase from PR #24. A regression guard now asserts
+  every control inside a wrapper carries the class.
+- ⚠️ **A heading held an unbreakable reference and the DOCUMENT scrolled
+  to 663px at a 375px viewport.** Headings carry no wrap rule, so the
+  detail card's `<h2>` set a 626px min-content floor. ⚠️ **No element's
+  right edge passed the viewport**, so a bounding-rect probe saw nothing
+  -- it took reading `scrollWidth`. The same defect P3-B1 recorded on the
+  KP preview title.
+
+### ⚠️ And FIVE results were MY HARNESS, not defects
+
+The project's own rule -- *always ask which step produced the result* --
+for the tenth phase running:
+
+- **"KAG rewrites own committee: REFUSED 42501"**, which looked like it
+  contradicted P2.5. My `WHERE` subquery read the **private**
+  `official_account_links` while impersonating `authenticated`. The
+  `42501` was the privacy property working. Hoisted above the
+  impersonation: `rows=1`.
+- **"ANON incident_map_points: NOT REFUSED"**, where the probe before it
+  was refused `42501`. A caught exception rolls back its own
+  subtransaction -- **and a local `set_config` made inside it goes with
+  it** -- so every probe after the first refusal silently ran as the
+  *previous* role. Re-run with the role switch outside each block:
+  **8 of 8 refused**, with a positive control (`get_reservation_slots`,
+  1 row) proving the switch was genuinely in effect.
+- **"the Kagawad's committee was not restored"** -- it reads `Disaster
+  Preparedness`, which is **his real committee since the 2026-05-28
+  seed**. The Peace and Order Kagawad is a **different official**,
+  Catalan at `display_order` 8. My own earlier note had conflated them;
+  both rows match the seed and neither was touched.
+- **Eighteen Tanod tests failing at once** with "found multiple
+  elements" -- a Tanod's name legitimately appears on the roster and
+  once per assignment, and my `findByText` helper could not have passed.
+- **A sabotage class reported as undetected** -- it was detected, and my
+  `tail -30` had cut the first eight failures off the output.
+
+Four more were my own **wording guesses**: tests asserting paraphrases
+of sentences the modules do not use (`assignmentWindow` returns
+`18:00 – 22:00`, not `6:00 PM`; `static` reads `Static post`). Each was
+re-pointed at the shipped string.
+
+### What was measured
+
+| Check | Result |
+|---|---|
+| Role matrix, 7 callers × record / read / administer / direct table | as tabled above, all rolled back |
+| `anon` matrix, 8 surfaces + a positive control | **8 of 8 `42501`**, control 1 row |
+| Committee attack, strongest form | rewrite accepted, authority **unchanged** |
+| **19 mutations** (12 frontend, 7 migration) | **19 of 19 caught**; every file restored byte-identical |
+| Overflow + clipping + 24px targets + label association + one `<h1>` + heading order, **9 states × 5 widths**, plus axe at 375 and 1440 | **288 checks, 0 failures** |
+| axe-core 4.12.1 (WCAG 2.0/2.1 A + AA + best practice) | **0 violations**, all nine states, both widths |
+| Harness proved capable of failing | **7 injected defect classes, all 7 detected** |
+| Jest | **58 suites, 1,837 tests** — from 53 / 1,580, so **+5 suites, +257 tests** |
+| Production build | clean, no ESLint warnings, **301.18 kB** gzipped (+53.82 kB), CSS **34.11 kB** |
+| `git diff --check` | clean |
+| Live residue | **0 rows in all six new tables**, client privileges on them **0**, both Kagawads' committees at their seed values, 11 links, 11/11 active officials, 27 reservations, 1 complaint (the repo owner's manual test, untouched) |
+
+Fixtures were deliberately pathological, per §13: a 68-character
+unbreakable reference, a 97-character location, a 66-character Tanod
+name, a 93-character patrol area and a 518-character narrative.
+
+### ⚠️ What was NOT verified
+
+**No authenticated page was loaded in a browser.** The dashboards are
+behind `ProtectedRoute` and this environment still has **no test
+account**; nothing was done to weaken authentication for a screenshot.
+So what is verified is the real components' output measured against the
+real CSS bundle, 257 unit tests, and the role matrix against the live
+database -- **not** an official recording an incident on a live page,
+and ⚠️ **not a real Leaflet map rendering real tiles**: `leaflet` is
+mocked in Jest and jsdom has no layout, so the measurement covers the
+panel around the canvas and the popup **strings**, not the drawn map.
+Outbound HTTPS from this container cannot reach OpenStreetMap either.
+
+⚠️ **No test incident, blotter entry or Tanod was left.** Every probe ran
+inside a block ending in `RAISE EXCEPTION`, and all six tables are at
+**0 rows** -- so the queue, the map and the analytics have never been
+seen with real data in them.
+
+### Deferred, by decision
+
+- **No Tanod login**, no account, no portal, no `tanod` role.
+- **No continuous GPS**, no live tracking, no device telemetry.
+- **No official purok polygons** and no purok normalisation.
+- **No public incident map and no public analytics page.** Nothing in
+  this phase adds a route; all three surfaces are tabs of `/official`.
+- **No SMS, email or notification.** Widening `activity_log` is a
+  two-gate change (the CHECK **and** `stamp_activity_actor`, migration
+  016's lesson) and belongs in its own migration -- and `activity_log` is
+  readable by **every** official, so an identifying incident subject
+  would breach the rule that no narrative sits in a field they all read.
+- **No AI, no prediction, no scoring, no dispatch.**
+- **No bulk action, export or print** on any of the three surfaces.
+- **No incident attachment or evidence.**
+
+### What the barangay must still confirm
+
+- **Who may record an incident, and who may administer the blotter.**
+  The brief locked Secretary / Punong Barangay for records
+  administration as a workflow decision; it is not a proven legal
+  requirement.
+- **Whether the seven incident types are the seven they want.** They are
+  deliberately neutral -- *"Physical altercation"*, not *"Assault"*;
+  *"Theft or property loss"*, not *"Robbery"* -- because this system
+  records what was reported and classifies no crime.
+- **The real Tanod roster**, and whether patrol areas should be chosen
+  from a list rather than typed. Today they are free text on both
+  screens, which is exactly why the coverage caveat exists.
+- **Whether a blotter entry should ever be printable**, and in what form.
+
 ## Health centre
 
 **Medicine stock is a status, not a quantity** — Available / Low stock /
@@ -10644,13 +11083,22 @@ derives her initials from. It is no longer displayed as a label.
   question rather than a reason to omit the template, since the sheet
   prints `[BUSINESS NAME]` until it is answered.
 - **The complaint / incident / KP expansion, beyond resident intake.**
-  P3-A built the backend, P3-B1 the resident/public frontend and
+  P3-A built the backend, P3-B1 the resident/public frontend,
   ✅ **P3-B2 the official queue, the detail panel and the Secretary's
-  walk-in intake.** Still unbuilt, each deliberately: KP jurisdiction
-  screening and case management (P4), incidents and the digital blotter,
-  the Tanod directory, the safety heatmap and complaint analytics. ⚠️ **The screening phase is blocked on a
-  question only the barangay can answer** — who confirms that a matter is
-  within Katarungang Pambarangay jurisdiction. P2.5 found **no** Lupon,
+  walk-in intake**, ✅ **P4-A the provisional KP review screening**,
+  ✅ **Combined Phase 1 the KP case, its hearings and the summons**, and
+  ✅ **Combined Phase 2 the incident record, the digital blotter, the
+  Tanod roster and patrol schedule, the internal safety map and the
+  descriptive analytics.** Still unbuilt, each deliberately: settlement
+  terms, repudiation, compliance monitoring and the certificate to file
+  action; complaint analytics (the Combined Phase 2 analytics are over
+  **incidents**, and ⚠️ must stay that way — §11 keeps complaint
+  narratives, parties, witnesses, evidence, minor identity and VAWC
+  screening data out of any aggregate); notifications of any kind; and
+  the capability-assignment table, whose grant path is undesigned.
+  ⚠️ **The KP workflow is still PROVISIONAL and the jurisdiction question
+  is still the barangay's** — who confirms that a matter is within
+  Katarungang Pambarangay jurisdiction. P2.5 found **no** Lupon,
   Justice or Katarungan committee stored anywhere, so the system has no
   record to infer it from, and *the system must not make an autonomous legal
   judgment* applies to inventing who is entitled to make it.
@@ -10668,7 +11116,7 @@ derives her initials from. It is no longer displayed as a label.
 - **Source maps ship to production** (~7 MB), so the original JSX is
   publicly reconstructable. `GENERATE_SOURCEMAP=false` in Vercel fixes it.
 - **`public/logo.png` is 984 KB and referenced by nothing.**
-- **Thin automated test coverage.** 1,376 tests in forty-eight suites:
+- **Thin automated test coverage.** 1,837 tests in fifty-eight suites:
   one smoke test over `<App />`, which fails without `.env` because
   `supabaseClient.js` throws at import time, and 886 tests over the
   resident workflow rules, the display labels, the booking window, the
@@ -11033,6 +11481,26 @@ derives her initials from. It is no longer displayed as a label.
   only writers, which is the same shape 040's creation RPCs take. A
   future writer that changes a complaint without going through one of
   them would leave it stale.
+- **The incident, blotter, Tanod, map and analytics surfaces hold NO
+  DATA.** Migration 044 created all six tables and every probe rolled
+  back, so the queue, the map and the analytics have never been seen
+  with real rows in them. ⚠️ And **no real Leaflet map has ever
+  rendered**: `leaflet` is mocked in Jest, jsdom has no layout, and this
+  container's browser cannot reach OpenStreetMap -- so the panel around
+  the canvas and the popup **strings** are measured, and the drawn map is
+  not. The repo owner's own smoke test is what confirms it.
+- ⚠️ **A patrol area and an incident location are two free-text labels
+  typed on two screens**, so the coverage comparison matches on exact
+  wording and nothing else. A "gap" can therefore mean the wording
+  differs rather than that nobody was assigned, which is why the caveat
+  is rendered with the list and why a test asserts the two are never
+  separated. A chosen-from-a-list patrol area would fix it and is the
+  barangay's decision, not this phase's.
+- ⚠️ **`incidents.area_note` is free text and is deliberately NOT a
+  purok reference**, for the same reason `complaints.location_note` is:
+  P2 established there is nothing canonical to reference. There is no
+  purok polygon anywhere, `PUROKS` still holds seven values with
+  `Purok 7` present, and not one stored purok value was normalised.
 - **No lint script and no typecheck script** — see *Commands* and
   *Tests* above.
 
