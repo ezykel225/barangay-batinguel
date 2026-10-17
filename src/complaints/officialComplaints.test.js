@@ -1059,13 +1059,15 @@ describe('L. the architecture the phase committed to', () => {
   // each phase adds AT MOST ONE migration, and the count is asserted
   // rather than the absence, so a phase that quietly reached for a
   // second one still fails here. P3-B2 added none, P4-A added 042 and
-  // Combined Phase 1 added 043 -- one apiece, and 043 is the newest.
-  it('adds at most one migration per phase, and 043 is the newest', () => {
+  // Combined Phase 1 added 043 and Combined Phase 2 added 044 -- one
+  // apiece, and 044 is the newest.
+  it('adds at most one migration per phase, and 044 is the newest', () => {
     const dir = path.join(__dirname, '..', '..', 'supabase-migrations')
     const files = fs.readdirSync(dir).filter((f) => f.endsWith('.sql')).sort()
-    expect(files).toHaveLength(43)
+    expect(files).toHaveLength(44)
     expect(files[41]).toBe('042_kp_screening_foundation.sql')
     expect(files[42]).toBe('043_kp_case_hearings_summons.sql')
-    expect(files.some((f) => f.startsWith('044'))).toBe(false)
+    expect(files[43]).toBe('044_incident_blotter_tanod.sql')
+    expect(files.some((f) => f.startsWith('045'))).toBe(false)
   })
 })

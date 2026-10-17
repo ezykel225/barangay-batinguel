@@ -123,15 +123,23 @@ const drawerItems = (container) => Array.from(
 ).map((button) => button.textContent.trim())
 
 describe('A. role="official"', () => {
-  // ⚠️ THIRTEEN SINCE P3-B2, and the list is written out in full so a
-  // tab cannot be added or lost without this being changed on purpose.
-  // It was twelve from the day the Punong Barangay Status tab was folded
-  // into the overview until Complaints was added.
-  it('renders the thirteen Official destinations', () => {
+  // ⚠️ SIXTEEN SINCE COMBINED PHASE 2, and the list is written out in
+  // full so a tab cannot be added or lost without this being changed on
+  // purpose. It was twelve from the day the Punong Barangay Status tab
+  // was folded into the overview, thirteen with Complaints (P3-B2), and
+  // sixteen with Incidents & Blotter, Tanod Operations and Safety Map &
+  // Analytics.
+  //
+  // ⚠️ A DEFINITION CHANGE, NOT A LOOSENED ASSERTION: the guard still
+  // compares the WHOLE list by equality, so a fourteenth surface added
+  // without a decision still fails here.
+  it('renders the sixteen Official destinations', () => {
     const { container } = renderSidebar('official')
     expect(navItems(container)).toEqual([
       'Dashboard', 'Announcements', 'Events', 'Reservations',
-      'Document Requests', 'Complaints', 'Waste Management',
+      'Document Requests', 'Complaints',
+      'Incidents & Blotter', 'Tanod Operations', 'Safety Map & Analytics',
+      'Waste Management',
       'Officials Directory', 'Residents', 'Voter Reference List',
       'Reports', 'Activity Log', 'Settings',
     ])
@@ -320,13 +328,21 @@ describe('the mobile drawer', () => {
   it('offers the Official destinations to an official', async () => {
     const { container } = renderSidebar('official')
     await openDrawer()
-    expect(drawerItems(container)).toHaveLength(13)
+    expect(drawerItems(container)).toHaveLength(16)
     expect(drawerItems(container)).toContain('Officials Directory')
     // The drawer is the WHOLE of navigation on a phone, so a tab that
     // reaches the rail and not the drawer is unreachable there.
     expect(drawerItems(container)).toContain('Complaints')
+    expect(drawerItems(container)).toContain('Incidents & Blotter')
+    expect(drawerItems(container)).toContain('Tanod Operations')
+    expect(drawerItems(container)).toContain('Safety Map & Analytics')
   })
 
+  // ⚠️ THE PROBE ROLE IS 'tanod', AND COMBINED PHASE 2 MAKES THAT POINTED
+  // RATHER THAN ARBITRARY. That phase adds a Tanod roster, a patrol
+  // schedule and an operations tab -- and NO `tanod` account, no login and
+  // no fourth value in `profiles_role_check`. So a session claiming to be
+  // one is still an unrecognised role, and still gets nothing.
   it('offers ZERO privileged destinations to an unknown role', async () => {
     const { container } = renderSidebar('tanod')
     await openDrawer()
