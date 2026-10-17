@@ -122,3 +122,57 @@ describe('the mobile drawer and the E-Services catalogue', () => {
     })
   })
 })
+
+// ─── Final Integration: the PUBLIC Community Safety entry ───────────────────
+//
+// ⚠️ THE ROUTE AND EVERY LINK TO IT LANDED IN ONE COMMIT, and these tests are
+// why that is not merely tidy. `path="*"` renders `Home`, so a navigation
+// entry whose route does not exist does NOT 404 -- it silently shows the
+// homepage and reads as a service that is broken. P3-B1 recorded the same
+// rule for `/track-complaint`.
+describe('the Community Safety entry', () => {
+  // `openDrawer` is scoped to the catalogue describe above, so this one has
+  // its own.
+  const openDrawer = () => {
+    renderNavbar()
+    fireEvent.click(toggle())
+  }
+
+  it('is in the desktop navigation, pointing at the public route', () => {
+    renderNavbar()
+    const link = screen.getAllByRole('link', { name: 'Community Safety' })
+      .find((l) => l.closest('.navbar-menu'))
+    expect(link).toBeDefined()
+    expect(link).toHaveAttribute('href', '/community-safety')
+  })
+
+  it('is in the mobile drawer too, so a phone is not a second surface', () => {
+    openDrawer()
+    const link = screen.getAllByRole('link', { name: 'Community Safety' })
+      .find((l) => l.closest('.navbar-mobile'))
+    expect(link).toBeDefined()
+    expect(link).toHaveAttribute('href', '/community-safety')
+  })
+
+  // ⚠️ DELIBERATELY NOT AN E-SERVICES ITEM. That catalogue is transactions a
+  // visitor asks the barangay to perform, and every entry in it states an
+  // access requirement in words. The Community Safety Map is published
+  // information read with no account and nothing to submit, so it takes a
+  // navigation slot of its own rather than widening what the catalogue means.
+  it('is NOT an E-Services catalogue entry', () => {
+    expect(E_SERVICES.some((s) => s.to.startsWith('/community-safety'))).toBe(false)
+    openDrawer()
+    const link = screen.getAllByRole('link', { name: 'Community Safety' })
+      .find((l) => l.closest('.navbar-mobile'))
+    expect(link.closest('.navbar-mobile-sublist')).toBeNull()
+  })
+
+  // ⚠️ Not buried in resident-only navigation either: it is rendered by the
+  // PUBLIC Navbar with no session mocked at all -- `useAuth` returns a null
+  // user and a null role above, so this is what an anonymous visitor sees.
+  it('is reachable with no account', () => {
+    renderNavbar()
+    expect(screen.getAllByRole('link', { name: 'Community Safety' }).length)
+      .toBeGreaterThan(0)
+  })
+})

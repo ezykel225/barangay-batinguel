@@ -17,8 +17,18 @@ import './SafetyMap.css'
 //
 // ⚠️ ALL OF THIS IS INTERNAL. Every reader behind it is gated on
 // `current_official_is_active()` and granted to `authenticated` only; `anon`
-// is refused 42501 at the privilege layer. There is no public incident map and
-// no public analytics page, and nothing in this phase adds a route.
+// is refused 42501 at the privilege layer -- measured against all six.
+//
+// ⚠️ THERE IS NOW A PUBLIC MAP, AND IT IS A DIFFERENT DATA SURFACE.
+// `/community-safety` reads migration 045's four aggregate functions:
+// grid-cell centres and counts, published only where two or more incidents
+// share a cell, with no narrative, reference, location label, status or
+// Tanod anywhere in their return types. It does NOT read
+// `incident_map_points()`, and this panel must never be repointed at the
+// public readers either -- an official looking at the operational map needs
+// the precise point and the location label, which is the whole reason the
+// two surfaces are separate rather than one component with a mode flag.
+// See `safetymap/PublicSafetyMap.jsx`.
 //
 // ⚠️ THE NUMBERS ARE COUNTS. No rate, no per-capita figure, no score and no
 // prediction -- see `safetyAnalytics.js` for why, and for the rule that an
