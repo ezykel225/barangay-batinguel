@@ -24,6 +24,9 @@ import {
   FaAngleLeft,
   FaAngleRight,
   FaCommentDots,
+  FaExclamationTriangle,
+  FaUserShield,
+  FaMapMarkedAlt,
 } from 'react-icons/fa'
 import { supabase } from '../supabase/supabaseClient'
 import { useAuth } from '../context/AuthContext'
@@ -248,6 +251,19 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderActio
     // own, so a complaint route would be the only one and the sidebar's
     // own `setActiveTab` navigation could not reach it.
     { id: 'complaints', label: 'Complaints', icon: <FaCommentDots /> },
+    // Combined Phase 2. The three operational surfaces, kept together and
+    // placed after Complaints because an incident is the other thing a
+    // resident brings to the hall. ⚠️ TABS, like every other entry: not one
+    // of these has a route of its own, and adding the only one would leave
+    // the sidebar's own `setActiveTab` navigation unable to reach it.
+    //
+    // ⚠️ `incidents` and `tanod` are the stored ids and the labels are what
+    // a reader sees -- the `registry` / "Voter Reference List" split this
+    // project already draws. The ids are what `activeTab` is matched
+    // against, not something anybody reads.
+    { id: 'incidents', label: 'Incidents & Blotter', icon: <FaExclamationTriangle /> },
+    { id: 'tanod', label: 'Tanod Operations', icon: <FaUserShield /> },
+    { id: 'safety-map', label: 'Safety Map & Analytics', icon: <FaMapMarkedAlt /> },
     { id: 'waste', label: 'Waste Management', icon: <FaTrashAlt /> },
     // ⚠️ There is no `kapitan` tab here any more. The Punong Barangay's
     // status was a whole destination for one value that changes a few

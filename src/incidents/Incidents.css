@@ -1,0 +1,94 @@
+/* Combined Phase 2 — incident and blotter surfaces.
+   Every grid track is minmax(0, 1fr), never a bare 1fr: a bare track is
+   minmax(auto, 1fr) and one unbreakable value sets a floor the whole document
+   then scrolls past. X2's biggest finding. */
+
+.inc-problem {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0 0 16px; padding: 12px 14px;
+  background: #fef2f2; border-left: 4px solid #b91c1c; border-radius: 6px;
+  color: #b91c1c; font-size: 14px;
+}
+
+.inc-hint {
+  display: flex; align-items: flex-start; gap: 8px;
+  margin: 0 0 14px; padding: 10px 12px;
+  background: #f1f5f9; border-radius: 6px;
+  color: #5f6775; font-size: 13px; line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.inc-summary { margin: 0 0 10px; color: #5f6775; font-size: 13px; }
+
+.inc-grid {
+  display: grid; gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+}
+
+.inc-form { margin-bottom: 18px; }
+
+.inc-filters { margin-bottom: 14px; }
+
+/* A long reference is one unbreakable token; without this it sets the cell's
+   min-content floor and widens the whole table. P3-B1 measured a 425px floor
+   from exactly this. */
+.inc-detail .kp-summary dd,
+.dashboard-table td { min-width: 0; overflow-wrap: anywhere; }
+
+.inc-pin { color: #1d4ed8; font-size: 11px; vertical-align: middle; }
+
+.inc-narrative {
+  margin: 0 0 14px; padding: 12px 14px;
+  background: #f8fafc; border-radius: 6px;
+  line-height: 1.6; color: #1e293b; overflow-wrap: anywhere;
+}
+
+.inc-snapshot { border-left: 4px solid #0f766e; }
+
+.inc-history { list-style: none; margin: 0 0 18px; padding: 0; }
+.inc-history li {
+  padding: 10px 0; border-bottom: 1px solid #e2e8f0;
+  font-size: 13px; color: #5f6775; overflow-wrap: anywhere;
+}
+.inc-history li:last-child { border-bottom: none; }
+.inc-history-note { margin-top: 4px; color: #1e293b; }
+
+.inc-tanod-list { margin: 0 0 18px; padding-left: 20px; color: #1e293b; }
+.inc-tanod-list li { margin-bottom: 4px; overflow-wrap: anywhere; }
+
+.inc-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+
+.inc-attribute { max-width: 360px; margin-top: 14px; }
+
+/* ⚠️ A HEADING HOLDS THE REFERENCE, AND A HEADING HAS NO WRAP RULE.
+   `INC-2026-AB12CD` is one unbreakable token, so the detail card's own <h2>
+   set a 626px min-content floor and the DOCUMENT scrolled to 663px at a
+   375px viewport -- measured, not assumed. No element's right edge passed
+   the viewport, so a bounding-rect probe saw nothing; it took reading
+   `scrollWidth`. The same defect P3-B1 recorded on the KP preview title,
+   and `min-width: 0` is needed with it because the card is a flex context
+   where a child's default minimum is its min-content width. */
+.inc-detail > .dashboard-card-header,
+.inc-detail > .dashboard-card-header h2 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* The detail card's headings. Both tags are matched so nothing depends on
+   which level a section uses -- the route X3 took on Announcements. */
+.inc-detail h3, .inc-detail h4 {
+  margin: 18px 0 8px; font-size: 15px; font-weight: 600; color: #1e293b;
+}
+.inc-detail h4 { font-size: 14px; }
+
+/* ⚠️ A TARGET, NOT DECORATION. A bare small button is ~19px tall, under
+   WCAG 2.2 SC 2.5.8's 24px minimum -- the defect X3 found on the footer
+   buttons and the post-X5 pass found again on the mobile drawer. */
+.inc-actions .btn-sm,
+.inc-detail .btn-sm,
+.dashboard-table .btn-sm { min-height: 32px; }
+
+@media (max-width: 600px) {
+  .inc-grid { grid-template-columns: minmax(0, 1fr); }
+  .inc-actions { flex-direction: column; align-items: stretch; }
+}

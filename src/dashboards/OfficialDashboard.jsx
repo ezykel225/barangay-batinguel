@@ -41,6 +41,9 @@ import {
 import { logActivity } from '../utils/activityLog'
 import DocumentPreview from '../documents/DocumentPreview'
 import OfficialComplaints from '../complaints/OfficialComplaints'
+import IncidentsPanel from '../incidents/IncidentsPanel'
+import TanodPanel from '../tanod/TanodPanel'
+import SafetyMapPanel from '../safetymap/SafetyMapPanel'
 import { canGenerate } from '../documents/documentRegistry'
 import {
   actionCellIsEmpty,
@@ -3923,6 +3926,29 @@ const OfficialDashboard = () => {
         {activeTab === 'complaints' && (
           <OfficialComplaints isSecretary={isSecretary} isKapitan={isKapitan} />
         )}
+
+        {/* ── Combined Phase 2: incidents, Tanod and the safety map ──────
+            ⚠️ THREE SWITCH LINES AND NOTHING ELSE. All incident, blotter,
+            Tanod, map and analytics state lives in the three panels; this
+            file holds none of it, exactly as it holds none of the
+            complaint or KP state.
+
+            ⚠️ `canAdminister` decides WHICH CONTROLS ARE PAINTED and
+            nothing more. `record_incident()` requires an active official;
+            the four records functions require the Barangay Secretary or
+            the Punong Barangay, resolved through `official_account_links`
+            -- never a name, and never `committee`. Measured: a Kagawad who
+            rewrote his own committee to "Peace and Order and Blotter
+            Records" was still refused all four. */}
+        {activeTab === 'incidents' && (
+          <IncidentsPanel canAdminister={isSecretary || isKapitan} confirm={confirm} />
+        )}
+
+        {activeTab === 'tanod' && (
+          <TanodPanel canAdminister={isSecretary || isKapitan} />
+        )}
+
+        {activeTab === 'safety-map' && <SafetyMapPanel />}
 
         {activeTab === 'waste' && (
           <div>

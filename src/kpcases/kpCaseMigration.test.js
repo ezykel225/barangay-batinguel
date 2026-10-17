@@ -75,11 +75,17 @@ const fnLower = (name) => fnBody(name).toLowerCase()
 // fails somewhere.
 
 describe('A. the migration', () => {
-  it('is 043, is the newest, and there is no 044', () => {
+  // ⚠️ REDEFINED BY COMBINED PHASE 2, which added 044 -- a definition
+  // change, not a loosened assertion. What this guard is FOR is that 043
+  // stays 043 and stays untouched by a later phase; the "nothing after it"
+  // half moved to 045, so a phase that quietly reaches for a second
+  // migration still fails here.
+  it('is still 043, still in place, and nothing has reached past 044', () => {
     const files = fs.readdirSync(DIR).filter((f) => f.endsWith('.sql')).sort()
-    expect(files).toHaveLength(43)
+    expect(files).toHaveLength(44)
     expect(files[42]).toBe('043_kp_case_hearings_summons.sql')
-    expect(files.some((f) => f.startsWith('044'))).toBe(false)
+    expect(files[43]).toBe('044_incident_blotter_tanod.sql')
+    expect(files.some((f) => f.startsWith('045'))).toBe(false)
   })
 
   it('leaves 001-042 alone', () => {
