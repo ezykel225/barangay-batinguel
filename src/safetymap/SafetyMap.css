@@ -1,0 +1,106 @@
+/* Combined Phase 2 — the internal safety map and analytics. */
+
+.smap-problem {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0 0 16px; padding: 12px 14px;
+  background: #fef2f2; border-left: 4px solid #b91c1c; border-radius: 6px;
+  color: #b91c1c; font-size: 14px;
+}
+
+.smap-note {
+  display: flex; align-items: flex-start; gap: 8px;
+  margin: 0 0 16px; padding: 12px 14px;
+  background: #f1f5f9; border-radius: 6px;
+  color: #5f6775; font-size: 13px; line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.smap-filters { margin-bottom: 14px; }
+
+.smap-wrap { margin-bottom: 12px; }
+
+/* Leaflet needs a measured height; without one the container collapses and
+   the map renders as nothing at all. */
+.smap-canvas {
+  width: 100%; min-height: 260px;
+  border: 1px solid #e2e8f0; border-radius: 8px;
+  background: #eef2f7;
+}
+
+.smap-alt { margin-top: 10px; font-size: 13px; color: #5f6775; }
+.smap-alt summary { cursor: pointer; padding: 6px 0; min-height: 24px; }
+.smap-alt ul { margin: 8px 0 0; padding-left: 20px; }
+.smap-alt li { margin-bottom: 5px; overflow-wrap: anywhere; }
+
+.smap-caption { margin: 0 0 10px; color: #5f6775; font-size: 13px; }
+
+.smap-legend {
+  display: flex; flex-wrap: wrap; gap: 14px;
+  list-style: none; margin: 0; padding: 0;
+  font-size: 12px; color: #5f6775;
+}
+.smap-legend li { display: flex; align-items: center; gap: 6px; }
+.smap-key {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px dashed currentColor; flex: 0 0 auto;
+}
+.smap-key-low { color: #1d4ed8; }
+.smap-key-medium { color: #b45309; }
+.smap-key-high { color: #b91c1c; }
+.smap-key-covered { color: #0f766e; border-style: solid; }
+
+.smap-stats {
+  display: grid; gap: 12px; margin: 0 0 20px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+}
+.smap-stat {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 14px; background: #f8fafc; border-radius: 8px; min-width: 0;
+}
+.smap-stat-value { font-size: 24px; font-weight: 700; color: #1e293b; }
+.smap-stat-label { font-size: 12px; color: #5f6775; overflow-wrap: anywhere; }
+
+.smap-bars { list-style: none; margin: 0 0 20px; padding: 0; }
+.smap-bars li {
+  display: grid; align-items: center; gap: 10px; margin-bottom: 8px;
+  grid-template-columns: minmax(0, 150px) minmax(0, 1fr) auto;
+}
+.smap-bar-label { font-size: 13px; color: #1e293b; overflow-wrap: anywhere; }
+.smap-bar-track { height: 10px; background: #e2e8f0; border-radius: 5px; overflow: hidden; }
+.smap-bar-fill { display: block; height: 100%; background: #1d4ed8; border-radius: 5px; }
+.smap-bar-value { font-size: 13px; font-weight: 600; color: #1e293b; }
+
+.smap-chips {
+  display: flex; flex-wrap: wrap; gap: 12px;
+  list-style: none; margin: 0 0 20px; padding: 0;
+}
+.smap-chips li { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+
+.smap-trend {
+  display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap;
+  list-style: none; margin: 0 0 20px; padding: 0;
+}
+.smap-trend li {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  min-width: 56px;
+}
+.smap-trend-bar { width: 22px; background: #0f766e; border-radius: 3px 3px 0 0; }
+.smap-trend-label { font-size: 11px; color: #5f6775; }
+.smap-trend-value { font-size: 12px; font-weight: 600; color: #1e293b; }
+
+.smap-observations, .smap-gaps {
+  list-style: none; margin: 0 0 18px; padding: 0;
+}
+.smap-observations li, .smap-gaps li {
+  padding: 10px 12px; margin-bottom: 8px; border-radius: 6px;
+  font-size: 13px; line-height: 1.5; overflow-wrap: anywhere;
+}
+.smap-observations li { background: #f8fafc; border-left: 3px solid #0f766e; color: #1e293b; }
+.smap-gaps li { background: #fffbeb; border-left: 3px solid #b45309; color: #1e293b; }
+
+.dashboard-card h3 { margin: 18px 0 10px; font-size: 15px; font-weight: 600; color: #1e293b; }
+
+@media (max-width: 600px) {
+  .smap-bars li { grid-template-columns: minmax(0, 1fr) auto; }
+  .smap-bar-track { grid-column: 1 / -1; }
+}
