@@ -2,7 +2,11 @@ import { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
-import { bandFor, markerRadiusFor } from './safetyAnalytics'
+import {
+  CONCENTRATION_BANDS,
+  ZONE_CELL_DEGREES,
+  concentrationBand,
+} from './publicSafetyLabels'
 import './PublicSafetyMap.css'
 
 // Final Integration — the PUBLIC Community Safety Map's canvas.
@@ -22,10 +26,19 @@ import './PublicSafetyMap.css'
 // construction-over-filtering rule: the same reason `incidents` has no party
 // table and the same reason the public RPCs return integers.
 //
-// ⚠️ What IS shared is `bandFor` and `markerRadiusFor` -- pure count-to-size
-// and count-to-colour functions from `safetyAnalytics.js` that hold no
-// incident data at all. Sharing them is what keeps the two maps from
-// describing the same count with two different words.
+// ─── ⚠️ GRID CELLS, NOT CIRCLES, AND THE SHAPE IS THE POINT ─────────────────
+//
+// Migration 045 floors every coordinate onto a 0.002° grid and publishes the
+// CELL CENTRE. The first version drew a circle there, which reads as "an
+// incident happened about here" -- a point estimate the data does not
+// support. A rectangle drawn on the grid the SQL actually used says the true
+// thing instead: this cell holds this many records, and nothing finer is
+// known about any of them.
+//
+// ⚠️ IT PUBLISHES NO NEW PRECISION. Each corner is the published centre
+// ± half a cell, so every coordinate drawn is already implied by the one the
+// RPC returned. Nothing here reads a latitude the function did not give, and
+// there is still no `points` prop to read one from.
 //
 // ─── ⚠️ STILL NO BOUNDARY POLYGON ───────────────────────────────────────────
 //
@@ -35,7 +48,7 @@ import './PublicSafetyMap.css'
 // asserts nothing about the barangay's geography, which is precisely why the
 // aggregation is a grid and not a made-up polygon.
 
-const BAND_TONE = { low: '#1d4ed8', medium: '#b45309', high: '#b91c1c' }
+const HALF_CELL = ZONE_CELL_DEGREES / 2
 
 // A zone carries only numbers, so there is nothing here that needs escaping
 // against a value a person typed -- but the popup is still built as an HTML
@@ -45,11 +58,21 @@ const safeInt = (value) => {
   return Number.isFinite(n) ? String(Math.trunc(n)) : '0'
 }
 
+const usableZones = (zones) => zones.filter((zone) => (
+  Number.isFinite(Number(zone?.center_latitude))
+  && Number.isFinite(Number(zone?.center_longitude))
+))
+
 const PublicSafetyMap = ({ zones = [], height = 420 }) => {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
   const layerRef = useRef(null)
 
+  // ⚠️ THE BASEMAP IS BUILT ONCE AND DOES NOT DEPEND ON `zones`, which is
+  // what makes it render with none. A map that only appeared once there was
+  // something to draw would leave a reader unable to tell "nothing recorded
+  // here" from "the map failed to load" -- the same objection the Archived
+  // Officials panel answered by rendering even when it finds nothing.
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return undefined
     const map = L.map(containerRef.current, { scrollWheelZoom: false })
@@ -69,35 +92,45 @@ const PublicSafetyMap = ({ zones = [], height = 420 }) => {
     const layer = L.layerGroup().addTo(map)
     layerRef.current = layer
 
-    const peak = zones.reduce((max, z) => Math.max(max, Number(z.total) || 0), 0)
-    const usable = zones.filter((z) => (
-      Number.isFinite(Number(z?.center_latitude))
-      && Number.isFinite(Number(z?.center_longitude))
-    ))
+    const usable = usableZones(zones)
 
     usable.forEach((zone) => {
       const total = Number(zone.total) || 0
-      const band = bandFor(total, peak)
-      L.circleMarker([Number(zone.center_latitude), Number(zone.center_longitude)], {
-        radius: markerRadiusFor(total, peak),
-        color: BAND_TONE[band.key],
-        weight: 2,
-        opacity: 0.9,
-        fillColor: BAND_TONE[band.key],
-        fillOpacity: 0.22,
-      }).bindPopup(
+      // ⚠️ DETERMINISTIC. `concentrationBand` is a fixed-threshold lookup,
+      // not the official panel's peak-relative `bandFor`: the same count
+      // must carry the same shade in every period and on every visit, or a
+      // reader comparing two dates is comparing two scales.
+      const band = concentrationBand(total)
+      const lat = Number(zone.center_latitude)
+      const lng = Number(zone.center_longitude)
+
+      L.rectangle(
+        [[lat - HALF_CELL, lng - HALF_CELL], [lat + HALF_CELL, lng + HALF_CELL]],
+        {
+          color: band.tone,
+          weight: 1,
+          opacity: 0.85,
+          fillColor: band.tone,
+          fillOpacity: 0.45,
+        }
+      ).bindPopup(
         `<strong>${safeInt(total)} incidents recorded</strong><br/>`
         + 'in this area, for the selected period.<br/>'
-        + 'This circle marks the centre of an area about 220 m across,<br/>'
+        + 'This square covers an area about 220 m across,<br/>'
         + 'not the location of any incident.'
       ).addTo(layer)
     })
 
     if (usable.length > 0) {
       map.fitBounds(
-        L.latLngBounds(usable.map((z) => [
-          Number(z.center_latitude), Number(z.center_longitude),
-        ])),
+        L.latLngBounds(usable.flatMap((zone) => {
+          const lat = Number(zone.center_latitude)
+          const lng = Number(zone.center_longitude)
+          return [
+            [lat - HALF_CELL, lng - HALF_CELL],
+            [lat + HALF_CELL, lng + HALF_CELL],
+          ]
+        })),
         { padding: [48, 48], maxZoom: 16 }
       )
     }
@@ -112,9 +145,28 @@ const PublicSafetyMap = ({ zones = [], height = 420 }) => {
         role="application"
         aria-label="Map of areas where incidents have been recorded"
       />
+
+      {/* ⚠️ THE LEGEND IS WORDS, NOT ONLY COLOUR. Four shades of one blue
+          carry no meaning to a reader who cannot tell them apart, and the
+          counts are the actual information -- the swatch is the decoration.
+          Each entry says HOW MANY WERE RECORDED and nothing about danger:
+          there is no "high risk" row here, and a test scans for one. */}
+      <ul className="psm-legend" aria-label="What the shading means">
+        {CONCENTRATION_BANDS.map((band) => (
+          <li key={band.key} className="psm-legend-item">
+            <span
+              className="psm-swatch"
+              style={{ backgroundColor: band.tone }}
+              aria-hidden="true"
+            />
+            {band.label}
+          </li>
+        ))}
+      </ul>
+
       {/* ⚠️ The map is not the only way to read this. A screen-reader user,
           and anybody whose tiles do not load, gets the same counts as a
-          list. A canvas of coloured circles is not an accessible record --
+          list. A canvas of coloured squares is not an accessible record --
           the same reason `IncidentMap` carries its own list. The list shows
           COUNTS AND NOTHING ELSE, because that is all a zone holds. */}
       <details className="psm-alt">

@@ -30,3 +30,34 @@
 .psm-alt-list { margin: 6px 0 0; padding-left: 20px; }
 .psm-alt-list li { margin-bottom: 4px; overflow-wrap: anywhere; }
 .psm-empty { margin: 6px 0 0; color: #5f6775; }
+
+/* ── The key ────────────────────────────────────────────────────────────
+   ⚠️ WORDS, NOT ONLY COLOUR. Four shades of one blue carry no meaning to
+   a reader who cannot tell them apart, so each row states the count it
+   stands for and the swatch is `aria-hidden` decoration beside it. The
+   same three-cues rule the notification bell follows for unread. */
+.psm-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-12);
+  color: #5f6775;
+}
+
+.psm-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.psm-swatch {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border: 1px solid rgba(15, 23, 42, 0.25);
+  border-radius: 2px;
+}

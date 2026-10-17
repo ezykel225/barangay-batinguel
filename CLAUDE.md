@@ -65,7 +65,7 @@ banned below: it silences the one check this project has.
 
 ### Tests
 
-Sixty-one suites, 1,922 tests:
+Sixty-two suites, 1,953 tests:
 
 | File | What it covers |
 |---|---|
@@ -108,7 +108,8 @@ Sixty-one suites, 1,922 tests:
 | `src/utils/officialAvailability.test.js` | 24 tests over per-official consultation hours. The load-bearing one **reads `026_official_availability.sql`** and asserts the four statuses the form offers are exactly the four the CHECK accepts — the same thing `reservationWindow.test.js` does for migration 020 |
 | `src/components/EServicesMenu.test.js` | 15 tests over the E-Services dropdown and the catalogue: the disclosure pattern, Escape and focus restore, that it does **not** use `role="menu"`, and that every service states its access requirement in words |
 | `src/utils/residentTabs.test.js` | 7 tests over `?tab=` resolution — a hint, never authorization |
-| `src/components/Sidebar.test.js` | 61 tests over the Sidebar's ROLE SELECTION, the first this component ever had. The nav and the portal name were ternary chains whose final `else` was the Official one, so **any** unrecognised role — `null`, `undefined`, `''`, a fourth role, `'constructor'` — was handed all twelve Official destinations. Run **both directions**: against the pre-fix source **28 of 61 fail**, and the 33 that pass do so honestly (the three supported roles were already correct; Logout and Back-to-Home already failed safe). Also the drawer, the privileged RPC guard, the `Main Menu` heading both ways, and the ARIA/keyboard behaviour the change could affect |
+| `src/components/Sidebar.test.js` | 66 tests over the Sidebar's ROLE SELECTION, the first this component ever had. The nav and the portal name were ternary chains whose final `else` was the Official one, so **any** unrecognised role — `null`, `undefined`, `''`, a fourth role, `'constructor'` — was handed all twelve Official destinations. Run **both directions**: against the pre-fix source **28 of 61 fail**, and the 33 that pass do so honestly (the three supported roles were already correct; Logout and Back-to-Home already failed safe). Also the drawer, the privileged RPC guard, the `Main Menu` heading both ways, and the ARIA/keyboard behaviour the change could affect |
+| `src/components/actionControls.test.js` | 12 source-reading guards over the Back / Close / section-heading contract across every module the Complaint, Screening, KP, Incident, Tanod and Safety work added. ⚠️ **The geometry is NOT what these check** -- that an icon and its label sit on one line is measured in Chromium against the shipped bundle, because jsdom has no layout. What they pin is the half a measurement would pass just as happily: **which** icon a control carries (a back arrow for navigation, an ✕ for dismissal, and never the other's), that every button declares its `type` so none can submit a form by accident, that the icon is **inside** the button rather than a stacked sibling, that all five button classes carry the inline-flex pattern, and that `.section-heading` is defined **once, globally**, sets no type, and is carried by every icon-bearing heading. ⚠️ Two of these scans were WRONG on their first run and reported accepted CSS as broken -- one read each class's own block while three take `nowrap` from a shared rule, the other stopped at `.sidebar.is-collapsed .sidebar-footer`; both now read **every** rule for the class |
 | `src/complaints/complaintLabels.test.js` | 33 tests over the words a resident reads: the eight categories with no underscore reaching a screen, an unrecognised value returned **exactly as stored** and `constructor` not resolving to a function, that the status map knows **only `received`** and fabricates no future status, the evidence contract mirroring the bucket's four MIME types and 5 MB, that **no video** appears in the picker or the copy, that `complaintDate` constructs **no `Date`** from a date string, and ⚠️ **the tracking miss message**, scanned for seventeen phrasings that would reveal which half of the pair was wrong |
 | `src/complaints/FileComplaintForm.test.js` | 19 tests over the filing form: the eight labels in order, that the **stored** value is submitted, both required fields refusing with an accessible alert, that the form asks for **nothing the server owns**, respondents added and removed with names like `Remove person 2`, no registry or account lookup offered to a resident, the picker constrained and refusing a `.mp4` with a readable reason, ⚠️ **duplicate-submit prevention** proved by holding the promise open and clicking three times (1 call), a neutral failure message with no SQLSTATE, and the emergency notice carrying **no phone number** |
 | `src/complaints/complaintExperience.test.js` | 33 tests over My Complaints, the success panel, the tracking page and the wiring. The load-bearing ones: ⚠️ a respondent's contact renders as *"Contact not shown to you"* from the NULL `complaint_parties_for()` returns, tracking calls `track_complaint` **exactly once and makes no table read after a hit**, a wrong reference and a wrong contact produce **byte-identical** messages, an unreachable system says something **different**, the success panel keeps a valid reference when only an attachment fails, and every catalogue `to:` resolves to a route that exists in `App.js` |
@@ -123,7 +124,7 @@ Sixty-one suites, 1,922 tests:
 | `src/safetymap/safetyMapPanel.test.js` | 28 tests over the map card and the analytics. ⚠️ **`leaflet` is mocked as a MEASUREMENT, not a stub** -- it records every `bindPopup` string, so the privacy guards read what a marker would actually show. Every fixture plants a narrative and a witness name; the whole document and every popup must contain neither. Plus the escaping check (fed `<img src=x onerror=...>`), the coverage caveat asserted present in **both** directions, counts-not-rates, and ⚠️ the **two-definitions-of-plotted** regression guard, which found a real defect |
 | `src/tanod/tanodPanel.test.js` | 24 tests over the roster and the patrol schedule. The load-bearing ones are absences: no `<label>` asks for an email, password, account, role, latitude or longitude; the modules touch no auth, profile or role surface; and an assignment is scheduled **by Tanod id**. Plus the two on-screen sentences saying a Tanod has no account and is not tracked, and a duplicate-submit guard proved by submitting the **form** |
 | `src/safetymap/publicSafetyMigration.test.js` | 29 **source-reading** guards over migration 045 and the three public modules. ⚠️ **The RETURN TYPES are the security boundary**, so these read them out of the SQL rather than trusting a component not to render a column -- a test that only checked the React could pass while the function handed the browser a narrative. Pinned: the five functions created and no table/policy/trigger/view, nothing written at all, no existing reader redefined, 5×`search_path`, the zone reader's exact four columns, the overview's three integers with **no text/uuid/timestamp**, a month key that is `YYYY-MM` and never `YYYY-MM-DD`, no polygon, 5×PUBLIC revoke, the four readers granted to `anon` and the coarsening helper to **neither**, and a 22-term forbidden-column scan. Three load-bearing ones: the threshold `>= 2` exists and has **exactly one home**; the overview counts the ZONE FUNCTION rather than re-deriving the rule, reading `incidents` exactly **once** (for the total, which must include the unmapped); and the published coordinate is the **cell centre**, with `avg(` asserted absent. ⚠️ Two scans are scoped the way `prototypeCoverage.test.js` taught -- the "no rate" scan runs over everything EXCEPT the disclaimer, which must contain "crime rate" to deny it, and a second test asserts the disclaimer **is** a denial; the complaint scan names reader and table names rather than the bare word, because the page legitimately links to "file a complaint" |
-| `src/pages/CommunitySafety.test.js` | 29 tests over the public page as **rendered**, with `leaflet` mocked as a MEASUREMENT so the privacy guards read what a circle would actually say. ⚠️ **Every fixture carries a narrative, a witness name, a reference and a street name** on properties the public RPCs do not return; the document, every attribute and every popup string must contain none of them. The load-bearing ones: each popup carries a count and reads *"not the location of any incident"*; no coordinate is printed anywhere; the four public RPCs are the only ones called and `supabase.from` never is (the mock **throws** on any other RPC name); the three privacy notes and the disclaimer render **in both directions**, with data and with none; the three empty states are three different facts, including "recorded but not mappable", which must never read as "nothing recorded"; a failure names no SQLSTATE or function; the period control carries `.filter-select` (Combined Phase 2 shipped six controls at 19px by reusing the padded WRAPPER class); and the closing notice carries **no three-digit sequence**, so no phone number can creep in |
+| `src/pages/CommunitySafety.test.js` | 38 tests over the public page as **rendered**, with `leaflet` mocked as a MEASUREMENT so the privacy guards read what a circle would actually say. ⚠️ **Every fixture carries a narrative, a witness name, a reference and a street name** on properties the public RPCs do not return; the document, every attribute and every popup string must contain none of them. The load-bearing ones: each popup carries a count and reads *"not the location of any incident"*; no coordinate is printed anywhere; the four public RPCs are the only ones called and `supabase.from` never is (the mock **throws** on any other RPC name); the three privacy notes and the disclaimer render **in both directions**, with data and with none; the three empty states are three different facts, including "recorded but not mappable", which must never read as "nothing recorded"; a failure names no SQLSTATE or function; the period control carries `.filter-select` (Combined Phase 2 shipped six controls at 19px by reusing the padded WRAPPER class); and the closing notice carries **no three-digit sequence**, so no phone number can creep in. ⚠️ **PR #45 added the GRID CANVAS guards**, which read `globalThis.__shapes` — the leaflet mock records every shape, not only every popup — so they assert what the map would actually DRAW: one `L.rectangle` per published area whose four corners are the published centre ± half a cell to ten decimal places, **no `circleMarker`, `marker` or `polygon` in any state**, a shade taken from the fixed band for that cell's own count, and the basemap still on screen with **zero** zones in both empty states. One more redefinition at its own site: the band-label test asserted the page's old `INTENSITY_BANDS` key, which was the OFFICIAL panel's peak-relative scale, and now asserts the deterministic `CONCENTRATION_BANDS` where they now live — with the no-danger scan **scoped around `SHADING_NOTE` and `PUBLIC_DISCLAIMER`**, which must contain the words they exist to deny |
 | `src/screening/screeningPanel.test.js` | 43 tests over the panel as **rendered**. The load-bearing ones: an ordinary official gets **one neutral sentence** naming no position, policy, function or SQLSTATE; the Secretary gets the prepare form and **no confirm control even with a draft open**; the Punong Barangay gets the confirm control and **no prepare form**; nothing is rendered `disabled` in place of being withheld; the recommendation sent is **the one a human picked** even when all six answers are flagged; a `P0001` naming the position gate is read as the module's own sentence and the RPC's words appear **nowhere**; a confirmed screening renders read-only with no control to change it; and the confirmation dialog names the outcome **in words**, not as an identifier. Plus `supabase.from` is never called, the duplicate-submit guard is proved by submitting the **form**, and the headings are asserted to start at `h4` and skip no level. Six mutations produce **1 / 2 / 3 / 1 / 1 / 2** failures |
 
 Schema and policy changes are still verified by impersonating each role
@@ -11339,6 +11340,246 @@ matrix against the live database — **not** the Punong Barangay clicking
 
 ---
 
+## PR #45 final polish — the public grid heatmap, and three layout defects
+
+2026-10-17, on the **existing** `claude/final-integration-professor-demo`
+branch, from the repo owner's own review of the deploy preview.
+**No migration, no SQL, no policy and no RPC** — `git diff` touches
+`supabase-migrations/` not at all, the migration count is still **46**, and
+every number on the public map still comes from migration 045's four
+aggregate readers, unchanged.
+
+### ⚠️ The public map draws GRID SQUARES now, and the shape is the point
+
+Migration 045 floors every coordinate onto a **0.002°** grid and publishes
+the **CELL CENTRE**. The first version drew a `circleMarker` there, which
+reads as *"an incident happened about here"* — a point estimate the data
+does not support and the aggregation exists to remove. A rectangle drawn on
+the grid the SQL actually used says the true thing instead: this cell holds
+this many records, and nothing finer is known about any of them.
+
+⚠️ **IT PUBLISHES NO NEW PRECISION.** Each corner is the published centre
+± half a cell, so every coordinate drawn is already implied by the one the
+RPC returned. A test reads the four corners out of the mocked Leaflet call
+and asserts exactly that, to ten decimal places.
+
+| | |
+|---|---|
+| basemap | a real OpenStreetMap tile layer, **drawn in an effect that does not depend on `zones`** |
+| cells | one `L.rectangle` per published area, `ZONE_CELL_DEGREES` square |
+| suppression | unchanged — **fewer than 2 incidents in a cell is not published**, and the threshold still has its one home in the SQL |
+| points | **none.** No `circleMarker`, no `marker`, no `polygon`; a test asserts all three are never drawn, in any state |
+| popups | a count and *"not the location of any incident"* |
+
+⚠️ **THE MAP NOW RENDERS WHEN THERE IS NOTHING TO DRAW, AND THAT IS A
+FIX.** It used to sit inside the `zones.length > 0` branch, so a quiet
+period showed a sentence where the map had been — and a reader could not
+tell *"nothing to show here"* from *"the map failed to load"*. The same
+objection the Archived Officials panel answered by rendering when it finds
+nothing. The empty answer now reads
+**`No public incident concentrations are available for this period.`**
+with the basemap still on screen, and the three empty states are still
+three different facts.
+
+### ⚠️ Deterministic bands, where the official panel's are peak-relative
+
+`concentrationBand(total)` is a fixed-threshold lookup — **2** · **3–4** ·
+**5–7** · **8+** — and takes **one argument**, which is the proof it is not
+the official panel's `bandFor(total, peak)`. That one scales against the
+busiest cell in the current filter, which is right for an operational view
+and wrong here: a resident comparing last quarter with this one would be
+comparing two scales without being told.
+
+⚠️ **The legend moved INTO the map with the bands it describes.** The page
+drew its own key from `INTENSITY_BANDS` — the *official* scale — so the key
+named bands (`Fewer recorded` / `More recorded` / `Most recorded`) the
+public map's thresholds no longer used. `.cs-legend` and its three `.cs-key-*`
+rules went with it, per X4's removal-only discipline, and a comment records
+why: a dead key that still names *low / medium / high* is worse than dead.
+
+⚠️ **Still counts, never rates**, and still no purok polygon: nothing draws
+`L.polygon`, `L.geoJSON` or `L.rectangle` as a *boundary*, and a test scans
+for all of them plus the words `purok` and `boundary`. The new
+`SHADING_NOTE` says in the reader's own words that stronger shading is a
+**count, not a danger level** — and it is scoped out of the "no danger
+wording" scans the way `prototypeCoverage.test.js` scoped its title scan,
+with a separate test asserting it **is** a denial.
+
+### ⚠️ The stacked icon was a FLEX-ITEM SHRINK, not a missing style
+
+The screenshots showed `✕` above `Back to the queue` and above `Close` —
+one control whose inline run had broken, not two elements.
+
+`.dashboard-card-header` is `display: flex; flex-wrap: wrap`. A `<button>`
+flex item carries the default `flex-shrink: 1`, so beside a long heading it
+is squeezed **below its own content width** and the icon/label run wraps.
+`.btn-approve`, `.btn-deny` and `.btn-add` were already immune — they take
+`white-space: nowrap` from a shared rule 900 lines down the file, which
+keeps the run on one line whatever the width. ⚠️ **`.btn-cancel` and
+`.btn-save` were never given it**, because when they were written they had
+no icon to stack.
+
+Both now carry `inline-flex`, `align-items: center`, `gap`, `nowrap` **and**
+`flex-shrink: 0` — every value **copied from the three classes above rather
+than chosen**, so there is no second button system. Measured against the
+shipped bundle: the pre-fix box reproduces the defect at **all five widths**
+and the fix clears it at all five.
+
+⚠️ **AN ✕ IS NOT A BACK CONTROL.** *"Back to the queue"* reads
+`<FaArrowLeft>` — the walk-in form is a step in a flow with a queue behind
+it, not an overlay on top of one — while *"Close"* keeps its `<FaTimes>`,
+where the ✕ is right. A test asserts each carries its own icon and **not the
+other's**.
+
+### Three more button findings, each with an observed defect behind it
+
+| | |
+|---|---|
+| the incident detail's **Close** | was `btn-deny` — the **destructive** red class Stand down and Remove use — with no icon at all, where the Complaint queue's Close one tab away is `btn-cancel` + ✕. Dismissing a read-only panel destroys nothing |
+| the record form's **toggle** | showed `<FaPlus>` in **both** states, so the open form offered a **plus sign beside the word "Close"** — an icon asserting the opposite of its own label |
+| `MyComplaints`' File a Complaint | was the **one** button in the complaint, screening, KP, incident and Tanod modules with no `type`, and a `<button>` defaults to `submit` |
+
+⚠️ **Nothing else was restyled.** The audit read every icon-bearing control
+in those modules and fixed only what had an observed defect — §3's own
+rule, and X4's.
+
+### ⚠️ The sidebar footer was genuinely UNREACHABLE, and zoom is what showed it
+
+`.sidebar` is `position: fixed; top: 0; min-height: 100vh` **with no
+`height`**. A flex item only has to shrink when its **container** has a
+definite height, so `.sidebar-nav`'s `flex: 1; overflow-y: auto` could
+never engage: the column simply grew past the viewport. And a `position:
+fixed` element does not scroll with the page, so **there was no way to
+reach what fell off the bottom.**
+
+Sixteen official tabs is what made it reachable in practice. Measured
+against the shipped bundle, with the real Sidebar rendered through Jest:
+
+| viewport | before |
+|---|---|
+| 1024x768 @100% | Logout **209px** past the fold, unreachable |
+| 1152x720 (**125% zoom**) | **257px** past |
+| 1280x600 (short laptop window) | **377px** past |
+| 1280x540 | **437px** past |
+
+Fixed with `height: 100vh` plus a `100dvh` line — the `.modal` precedent,
+for a browser whose toolbars make `100vh` taller than the visible area —
+`min-height: 0` on the nav, and `flex-shrink: 0` on the footer.
+⚠️ **No fixed pixel height anywhere**, and the nav now scrolls, which is
+what a sixteen-item menu is supposed to do. Re-measured across six desktop
+sizes and three phone sizes: **189 checks, 0 failures**; against the
+pre-fix state, **29**.
+
+⚠️ **The drawer was already correct and was not "fixed".** Its Logout sits
+at the end of a **scrolling** menu, which is reachable — and my first probe
+reported it as below the fold, because `getBoundingClientRect` returns a
+position inside a scroll container's content, not its clipping box. The
+probe now **scrolls every scrollable ancestor the way a person would** and
+then asks again. The project's own rule: ask which step produced the result.
+
+### ⚠️ A fourth finding the sidebar measurement turned up: the rail avatar
+
+X2 recorded a long name squeezing the 36px account avatar into an ellipse —
+and fixed it as **`.nav-drawer-user .sidebar-user-avatar`**, scoped to the
+**drawer**. The desktop **rail** uses the same two class names outside the
+drawer and was never given the declarations. Measured with a 56-character
+hyphenated name: **18x36 at every width and every zoom**, which is worse
+than the 23x36 X2 recorded in the drawer.
+
+Two unscoped rules at **(0,1,0)**, below the drawer's existing **(0,2,0)**
+ones, which are left exactly as written: the drawer keeps deciding its own
+row, and the rail has an answer where it had none.
+
+### Section headings: one reusable pattern, defined once
+
+`.section-heading` — `display: flex; align-items: center; gap: 8px;
+min-width: 0`, plus `flex-shrink: 0` on its svg — lives in **`index.css`**,
+per the `@keyframes pulse` rule: a pattern several modules share, owned by
+one module's stylesheet, is a pattern only whichever file the bundler emits
+last actually controls. ⚠️ **It sets no font size, weight or colour**, so it
+competes with nothing the existing stylesheets already decide, and a test
+asserts that and that no module stylesheet declares it.
+
+Applied to the **ten** icon-bearing section headings in the new modules —
+Safety Map's three, Incident records, the two Tanod ones, the three KP ones
+and the Complaint queue, plus the resident success panel's — and a test
+walks every heading in those files and fails if an icon-bearing one is
+missing it.
+
+### What was measured
+
+Real component output captured through Jest and rendered against the
+**shipped CSS bundle** in Chromium — the pattern every phase since X2 has
+used — with deliberately pathological fixtures: a 68-character unbreakable
+reference, a 56-character unbreakable name, a 97-character location and a
+520-character note.
+
+| Check | Result |
+|---|---|
+| Overflow + clipping + 24px targets + labels + one `<h1>` + heading order + **icon-above-label** + **heading alignment**, 24 states x 5 widths, plus axe at 375 and 1440 | **983 checks, 6 failures — all one known artifact** |
+| axe-core 4.12.1 (WCAG 2.0/2.1 A + AA + best practice) | **0 violations** on every real state |
+| Sidebar: rail at 1440x900 / 1600x1000 (90%) / 1152x720 (125%) / 1280x600 / 1280x540 / 1024x768, drawer at 320x568 / 375x667 / 375x480 | **189 checks, 0 failures** |
+| Both probes proved capable of failing | the pre-fix CSS produces **15** page failures and **29** sidebar failures |
+| **12 mutations** | **12 of 12 caught**; every file restored **byte-identical**, verified with `cmp` |
+| Jest | **62 suites, 1,953 tests** — from 61 / 1,922, so **+1 suite, +31 tests** |
+| Production build | clean, no ESLint warnings, **304.82 kB** gzipped (+333 B), CSS **35.15 kB** (+48 B) |
+| `git diff --check` | clean |
+| `supabase-migrations/` | **not touched**; 46 files, `047` still absent |
+| The protected mobile table-to-card block | **not edited** — every rule added to `Sidebar.css` sits outside it |
+
+⚠️ **THE SIX REMAINING FAILURES ARE THE HARNESS, AND IT WAS CONFIRMED
+RATHER THAN ASSERTED.** `page-has-heading-one` fires on the three captures
+of `KpCasePanel` **rendered alone**, which has no `<h1>` by construction —
+it renders inside `OfficialComplaints`, which supplies one. The captures of
+that real parent carry the same panel under a proper `h1 → h2 → h3 → h4 →
+h5` tree and report **zero** failures, which is the evidence. The same
+artifact class X3, X6 and PR #24 each recorded.
+
+⚠️ **My own first control for it was a bad control**: I injected an `<h1>`
+directly above the panel and produced a `h1 → h4` skip that does not exist
+in the real tab, because the real tree has an `<h2>` card header and an
+`<h3>` section between them. The parent captures were the right evidence
+and were already in the run.
+
+### ⚠️ Three of my own results were the harness, not defects
+
+The project's own rule, for the eleventh phase running:
+
+- **27 tests failed after the map rewrite** with
+  `L.rectangle is not a function` — the leaflet **measurement mock** only
+  provided `circleMarker`. Fixed by extending the mock and **recording
+  every shape**, so the privacy guards now read the corners a rectangle
+  would actually draw rather than trusting the source.
+- **The drawer's Logout reported as below the fold** — see above; it is at
+  the end of a scrolling menu and is reachable.
+- **Two of my own new guards failed against correct code.** One read each
+  button class's own CSS block and reported three **accepted** classes as
+  missing `white-space: nowrap`, which they take from a shared
+  multi-selector rule; the other stopped at the first `.sidebar-footer`
+  rule it found, which is `.sidebar.is-collapsed .sidebar-footer`. Both
+  scans were wrong, not the CSS — and both now read **every** rule for the
+  class, which is what X2's cascade lesson requires of a scan.
+
+### ⚠️ What this pass does NOT do
+
+- **No SQL.** No migration, no policy, no RPC, no grant. The privacy
+  boundary is migration 045's and is untouched: 0.002° cells, the two-incident
+  threshold, the cell centre, and no exact incident coordinate.
+- **No redesign.** Home, Officials, Health Center, Reservations, Document
+  Requests and every other accepted page are unedited; the only shared file
+  touched is `index.css`, which **gains** one layout-only class.
+- **No new role, workflow, notification, analytic or purok polygon.**
+  `PUROKS` still holds seven values with `Purok 7` present.
+- **No authenticated page was loaded in a browser.** The dashboards are
+  behind `ProtectedRoute` and this environment still has **no test
+  account**; nothing was done to weaken authentication for a screenshot.
+  ⚠️ And **no real Leaflet map has rendered** — `leaflet` is mocked, jsdom
+  has no layout, and this container cannot reach OpenStreetMap, so the
+  panel around the canvas and the popup **strings** are measured and the
+  drawn map is not. The repo owner's own smoke test is what confirms it.
+
+---
+
 ## Health centre
 
 **Medicine stock is a status, not a quantity** — Available / Low stock /
@@ -12019,6 +12260,17 @@ derives her initials from. It is no longer displayed as a label.
   concludable with **no** recorded proceeding outcome at all. It is not: 046
   keeps the pre-existing invariant that a conclusion rests on a recorded
   proceeding, and widening it would be a decision nobody has made.
+- ✅ ~~**The Official Portal's sidebar footer could be unreachable.**~~
+  **CLOSED, PR #45.** `.sidebar` was `position: fixed; min-height: 100vh`
+  with no `height`, so `.sidebar-nav`'s `overflow-y: auto` could never
+  engage and a fixed column simply grew past the viewport. With sixteen
+  tabs, Logout and the signed-in account card were **unreachable** at 125%
+  zoom, at 1024x768, and on a 1280x600 laptop window — measured 209–437px
+  past the fold. ⚠️ **The mobile drawer was never affected**: its Logout
+  sits at the end of a scrolling menu. ⚠️ **And the rail's 36px avatar was
+  squeezed to 18x36 by a long name** — X2 fixed exactly that defect for the
+  **drawer** only, scoping its rules `.nav-drawer-user .sidebar-user-avatar`,
+  and the rail was never given them.
 - ⚠️ **`.section-link` on Home reaches no CSS rule at all.** It is on the
   *View All E-Services* link and is matched by **zero** selectors in any
   stylesheet; the link is styled by `.section-header a` instead, which
@@ -12029,8 +12281,8 @@ derives her initials from. It is no longer displayed as a label.
   from commit `300425b`, one token to delete, no behaviour either way.
 - ⚠️ **The public Community Safety Map has never been seen with data.** All
   six Combined Phase 2 tables and all four KP tables hold **0 rows**, so the
-  zones, the bands, the type bars and the month trend have only ever
-  rendered against fixtures. ⚠️ **And no real Leaflet map has rendered at
+  zones, the **grid squares**, the bands, the type bars and the month trend
+  have only ever rendered against fixtures. ⚠️ **And no real Leaflet map has rendered at
   all** — `leaflet` is mocked in Jest, jsdom has no layout, and this
   container's browser cannot reach OpenStreetMap, so what is measured is
   the panel around the canvas and the popup **strings**. The repo owner's

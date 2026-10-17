@@ -176,28 +176,14 @@
 }
 
 /* ─── Legend ─────────────────────────────────────────────────────────────── */
-
-.cs-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-  list-style: none;
-  margin: 10px 0 0;
-  padding: 0;
-  font-size: var(--fs-12, 12px);
-  color: #5f6775;
-}
-
-.cs-legend li { display: flex; align-items: center; gap: 6px; }
-
-.cs-key {
-  width: 14px; height: 14px; border-radius: 50%;
-  border: 2px solid currentColor; flex: 0 0 auto;
-}
-
-.cs-key-low { color: #1d4ed8; }
-.cs-key-medium { color: #b45309; }
-.cs-key-high { color: #b91c1c; }
+/* ⚠️ REMOVED, NOT MOVED-AND-LEFT. `.cs-legend`, `.cs-key` and the three
+   `.cs-key-*` tones drew a key from `INTENSITY_BANDS` -- the OFFICIAL
+   panel's peak-relative scale, which the public map no longer uses. The
+   key now lives in `PublicSafetyMap` beside the fixed bands it actually
+   describes, so these six selectors reach no DOM node. X4's
+   removal-only discipline: a class with no element is dead CSS, and a
+   dead key that still names "low / medium / high" is worse than dead --
+   a later reader would take it for the live vocabulary. */
 
 /* ─── Bars, trend, observations ──────────────────────────────────────────── */
 

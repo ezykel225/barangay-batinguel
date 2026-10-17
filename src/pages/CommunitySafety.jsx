@@ -5,15 +5,15 @@ import { FaShieldAlt } from 'react-icons/fa'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import PublicSafetyMap from '../safetymap/PublicSafetyMap'
-import { INTENSITY_BANDS, monthLabel, trendSeries } from '../safetymap/safetyAnalytics'
+import { monthLabel, trendSeries } from '../safetymap/safetyAnalytics'
 import {
   loadPublicMonthly, loadPublicOverview, loadPublicTypeCounts, loadPublicZones,
 } from '../safetymap/publicSafetyApi'
 import {
   AGGREGATION_NOTE, CONCENTRATION_LABEL, EMPTY_NOTHING_MAPPED,
   EMPTY_NOTHING_RECORDED, NO_LOCATION_NAMES_NOTE, PAGE_INTRO, PAGE_TITLE,
-  PUBLIC_DISCLAIMER, SAFETY_ERRORS, THRESHOLD_NOTE, coverageSentence,
-  incidentTypeLabel, publicObservation,
+  EMPTY_NO_ZONES, PUBLIC_DISCLAIMER, SAFETY_ERRORS, SHADING_NOTE,
+  THRESHOLD_NOTE, coverageSentence, incidentTypeLabel, publicObservation,
 } from '../safetymap/publicSafetyLabels'
 import './PageIntro.css'
 import './CommunitySafety.css'
@@ -129,6 +129,11 @@ const CommunitySafety = () => {
               <ul>
                 <li>{AGGREGATION_NOTE}</li>
                 <li>{THRESHOLD_NOTE}</li>
+                {/* ⚠️ What the shading MEANS, beside the other three
+                    rules rather than only in the key: a reader who has
+                    not scrolled to the legend still needs to know that a
+                    darker square is a bigger COUNT and not a verdict. */}
+                <li>{SHADING_NOTE}</li>
                 <li>{NO_LOCATION_NAMES_NOTE}</li>
               </ul>
               <p className="cs-disclaimer">{PUBLIC_DISCLAIMER}</p>
@@ -172,25 +177,38 @@ const CommunitySafety = () => {
                 <h2>{CONCENTRATION_LABEL}</h2>
                 <p className="cs-caption">{coverageSentence(mapped, total)}</p>
 
+                {/* ⚠️ THE MAP RENDERS UNCONDITIONALLY, AND THAT IS A FIX.
+                    It used to be inside the `zones.length > 0` branch, so a
+                    period with nothing publishable showed a sentence where
+                    the map had been -- and a reader could not tell "nothing
+                    to show here" from "the map failed to load". The basemap
+                    is the context that makes the empty answer legible, which
+                    is the same reason the Archived Officials panel renders
+                    when it finds nothing.
+                    ⚠️ Passing `zones` empty is safe by construction: the
+                    canvas builds its basemap in an effect that does not
+                    depend on `zones` at all. */}
+                <PublicSafetyMap zones={zones} />
+
+                {/* ⚠️ THREE DIFFERENT FACTS, STILL NOT COLLAPSED. "Nothing
+                    recorded", "recorded but nothing reaches the threshold"
+                    and "nothing publishable in this period" are separate
+                    answers, and the map is on screen for all three. */}
                 {total === 0 ? (
                   <p className="cs-empty">{EMPTY_NOTHING_RECORDED}</p>
                 ) : zones.length === 0 ? (
-                  <p className="cs-empty">{EMPTY_NOTHING_MAPPED}</p>
+                  <>
+                    <p className="cs-empty">{EMPTY_NO_ZONES}</p>
+                    <p className="cs-caption">{EMPTY_NOTHING_MAPPED}</p>
+                  </>
                 ) : (
                   <>
-                    <PublicSafetyMap zones={zones} />
-                    <ul className="cs-legend">
-                      {INTENSITY_BANDS.map((band) => (
-                        <li key={band.key}>
-                          <span
-                            className={`cs-key cs-key-${band.key}`}
-                            aria-hidden="true"
-                          />
-                          {band.label}
-                        </li>
-                      ))}
-                    </ul>
-
+                    {/* ⚠️ The legend moved INTO the map component with the
+                        bands it describes. It used to be drawn here from
+                        `INTENSITY_BANDS`, which is the official panel's
+                        PEAK-RELATIVE scale -- so the key named a band the
+                        public map's fixed thresholds no longer used. One
+                        home for the bands, beside the thing they colour. */}
                     <h3>What the areas show</h3>
                     <ul className="cs-observations">
                       {zones.slice(0, 5).map((zone, index) => (

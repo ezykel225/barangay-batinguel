@@ -27,6 +27,8 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
+import fs from 'fs'
+import path from 'path'
 import Sidebar from './Sidebar'
 
 jest.mock('../supabase/supabaseClient', () => ({
@@ -427,5 +429,93 @@ describe('accessibility in the unsupported-role state', () => {
   it('leaves the three supported portals\' landmark names unchanged', () => {
     renderSidebar('official')
     expect(screen.getByRole('complementary', { name: 'Official Portal sidebar' })).toBeInTheDocument()
+  })
+})
+
+// ─── ⚠️ PR #45 §5 — the footer stays REACHABLE ─────────────────────────────
+//
+// The defect was a layout one and is measured in Chromium against the
+// shipped bundle: `.sidebar` is `position: fixed; min-height: 100vh` with
+// no `height`, so the column grew past the viewport and `overflow-y: auto`
+// on `.sidebar-nav` could never engage -- a flex item only has to shrink
+// when its CONTAINER has a definite height. A fixed element does not
+// scroll with the page, so the account card and Logout were unreachable at
+// 125% zoom, on a 1280x600 laptop window and at 1024x768. Measured before
+// and after: 29 failures against the pre-fix state, 0 after.
+//
+// jsdom has no layout, so these cannot see that. What they pin is the
+// STRUCTURE the fix depends on, and the CSS contract behind it -- the half
+// a measurement would pass just as happily if the markup were rearranged.
+
+describe('the sidebar footer is reachable by construction', () => {
+  it('keeps the account card and Logout in the footer, outside the nav', () => {
+    const { container } = renderSidebar('official')
+    const footer = container.querySelector('.sidebar-footer')
+    expect(footer).not.toBeNull()
+    expect(footer.querySelector('.sidebar-user')).not.toBeNull()
+    expect(footer.querySelector('.sidebar-logout')).not.toBeNull()
+    // ⚠️ NOT inside the scrolling nav. A footer inside the nav would
+    // scroll away with sixteen tabs above it.
+    expect(container.querySelector('#sidebar-nav .sidebar-user')).toBeNull()
+    expect(container.querySelector('#sidebar-nav .sidebar-logout')).toBeNull()
+  })
+
+  // ⚠️ EVERY rule for the class, not the first one found. These files
+  // append later rules deliberately -- X2's cascade lesson -- so a scan
+  // that stopped at the first block would report an accepted declaration
+  // as missing. Mine did, twice, before this helper.
+  const rules = (css, sel) => (
+    css.match(new RegExp(`(^|\\n|,)\\s*\\${sel}\\s*(,[^{]*)?\\{[^}]*\\}`, 'g')) || []
+  ).join('\n')
+
+  it('gives the column a definite height so the nav can scroll', () => {
+    const css = fs.readFileSync(path.join(__dirname, 'Sidebar.css'), 'utf8')
+    const rule = (sel) => rules(css, sel)
+
+    const sidebar = rule('.sidebar')
+    // ⚠️ `min-height` ALONE WAS THE DEFECT. It lets the column grow; a
+    // definite `height` is what makes `flex: 1` on the nav mean "take
+    // what is left" rather than "take as much as you want".
+    expect(sidebar).toMatch(/height:\s*100vh/)
+    // The `.modal` precedent: a browser whose toolbars make 100vh taller
+    // than the visible area, and one that does not know the unit and
+    // ignores the line.
+    expect(sidebar).toMatch(/height:\s*100dvh/)
+
+    // ⚠️ A flex item's default `min-height` is `auto`, which is its
+    // CONTENT height -- so without this the nav refuses to shrink and
+    // `overflow-y: auto` never engages, whatever the container does.
+    const nav = rule('.sidebar-nav')
+    expect(nav).toMatch(/min-height:\s*0/)
+    expect(nav).toMatch(/overflow-y:\s*auto/)
+
+    // And the footer must not be the thing that gives instead.
+    expect(rule('.sidebar-footer')).toMatch(/flex-shrink:\s*0/)
+  })
+
+  it('does the same for the mobile drawer', () => {
+    const css = fs.readFileSync(path.join(__dirname, 'Sidebar.css'), 'utf8')
+    const nav = rules(css, '.nav-drawer-nav')
+    expect(nav).toMatch(/min-height:\s*0/)
+    expect(nav).toMatch(/overflow-y:\s*auto/)
+  })
+
+  it('holds the 36px avatar against a long name, on the rail as well as the drawer', () => {
+    const css = fs.readFileSync(path.join(__dirname, 'Sidebar.css'), 'utf8')
+    // ⚠️ X2 fixed this for the DRAWER only -- its rules are written
+    // `.nav-drawer-user .sidebar-user-avatar` -- and the rail kept the
+    // defect: measured at 18x36, an ellipse, at every width and zoom.
+    expect(rules(css, '.sidebar-user-avatar')).toMatch(/flex:\s*0 0 auto/)
+    expect(rules(css, '.sidebar-user-info')).toMatch(/min-width:\s*0/)
+  })
+
+  // ⚠️ P1's fail-safe, re-asserted beside the layout change because the
+  // footer is what an unrecognised role still gets. The 61 tests above
+  // own the nav; this one owns the footer.
+  it('still gives an unrecognised role a footer and no privileged nav', () => {
+    const { container } = renderSidebar('tanod')
+    expect(container.querySelector('.sidebar-footer .sidebar-logout')).not.toBeNull()
+    expect(screen.getByRole('button', { name: 'Logout' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Officials Directory' })).toBeNull()
   })
 })

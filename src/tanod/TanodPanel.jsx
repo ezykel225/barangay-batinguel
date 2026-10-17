@@ -109,7 +109,7 @@ const TanodPanel = ({ canAdminister = false }) => {
 
       <div className="dashboard-card">
         <div className="dashboard-card-header">
-          <h2><FaUserShield aria-hidden="true" /> Tanod roster</h2>
+          <h2 className="section-heading"><FaUserShield aria-hidden="true" /> Tanod roster</h2>
         </div>
 
         {loading ? (
@@ -197,7 +197,7 @@ const TanodPanel = ({ canAdminister = false }) => {
 
       <div className="dashboard-card">
         <div className="dashboard-card-header">
-          <h2><FaShieldAlt aria-hidden="true" /> Patrol assignments</h2>
+          <h2 className="section-heading"><FaShieldAlt aria-hidden="true" /> Patrol assignments</h2>
         </div>
 
         {loading ? (

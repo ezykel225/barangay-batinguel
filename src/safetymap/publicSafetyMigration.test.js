@@ -332,10 +332,81 @@ describe('the public frontend modules', () => {
     expect(MAP_CODE).not.toContain('isPlottable')
   })
 
-  it('the map draws no polygon layer', () => {
-    ;['L.polygon', 'L.geoJSON', 'L.rectangle', '.geojson', 'L.marker(']
-      .forEach((term) => expect(MAP_CODE).not.toContain(term))
-    expect(MAP_CODE).toContain('L.circleMarker')
+  // ⚠️ REDEFINED BY THE GRID HEATMAP, at its own site and as a definition
+  // change rather than a loosened assertion. `L.rectangle` used to be in
+  // the forbidden list beside `L.polygon` -- it is now the grid CELL, and
+  // the property this guard exists for is unchanged: nothing may draw a
+  // barangay or purok OUTLINE, because P2 says those boundaries are
+  // unconfirmed. A rectangle on a 0.002° grid asserts nothing about the
+  // barangay's geography; a polygon would.
+  it('the map draws no boundary polygon', () => {
+    ;['L.polygon', 'L.geoJSON', '.geojson', 'L.marker(', 'purok', 'boundary']
+      .forEach((term) => expect(MAP_CODE.toLowerCase())
+        .not.toContain(term.toLowerCase()))
+  })
+
+  // ⚠️ THE RECTANGLE IS THE CELL THE SQL ALREADY DEFINED, and that is what
+  // keeps it from publishing precision the RPC withheld. Every corner is
+  // the published centre ± HALF the grid step, so the only latitudes drawn
+  // are ones the centre already implies. A cell drawn any smaller would be
+  // a narrower claim than the aggregation supports.
+  it('draws grid cells sized from the migration 045 grid step', () => {
+    const { ZONE_CELL_DEGREES } = require('./publicSafetyLabels')
+    expect(ZONE_CELL_DEGREES).toBe(0.002)
+    expect(MAP_CODE).toContain('L.rectangle')
+    expect(MAP_CODE).toContain('ZONE_CELL_DEGREES / 2')
+    // the corners are centre ± half a cell, in both axes
+    expect(MAP_CODE).toContain('lat - HALF_CELL')
+    expect(MAP_CODE).toContain('lat + HALF_CELL')
+    expect(MAP_CODE).toContain('lng - HALF_CELL')
+    expect(MAP_CODE).toContain('lng + HALF_CELL')
+  })
+
+  // ⚠️ DETERMINISTIC, NOT PEAK-RELATIVE. The official panel's `bandFor`
+  // scales against the busiest cell in the current filter, so the SAME
+  // count changes colour when the period changes -- fine for a staff tool
+  // comparing one period with itself, misleading on a public page a
+  // resident visits twice. A test both directions: the fixed-threshold
+  // function is used and the peak-relative one is not.
+  it('shades by a fixed threshold, never by the busiest cell', () => {
+    expect(MAP_CODE).toContain('concentrationBand')
+    expect(MAP_CODE).not.toContain('bandFor')
+    expect(MAP_CODE).not.toContain('markerRadiusFor')
+    expect(MAP_CODE).not.toContain('peak')
+  })
+
+  it('maps counts to bands the same way on every visit', () => {
+    const { concentrationBand } = require('./publicSafetyLabels')
+    // the brief's four bands, by count
+    expect(concentrationBand(2).key).toBe('lowest')
+    expect(concentrationBand(3).key).toBe('moderate')
+    expect(concentrationBand(4).key).toBe('moderate')
+    expect(concentrationBand(5).key).toBe('high')
+    expect(concentrationBand(7).key).toBe('high')
+    expect(concentrationBand(8).key).toBe('highest')
+    expect(concentrationBand(400).key).toBe('highest')
+    // ⚠️ the same count twice is the same band -- the whole point of a
+    // fixed threshold, and the thing a peak-relative scale cannot promise
+    expect(concentrationBand(5).tone).toBe(concentrationBand(5).tone)
+    // ⚠️ and a junk value resolves rather than throwing: the map never
+    // receives one, so a crash here would be an unreachable branch that a
+    // later caller could still trip over
+    expect(concentrationBand(null).key).toBe('lowest')
+    expect(concentrationBand('x').key).toBe('lowest')
+  })
+
+  // ⚠️ The bands name HOW MANY WERE RECORDED. Not danger, not risk, not
+  // severity -- those are findings this system has not made.
+  it('names every band by a count and never by danger', () => {
+    const { CONCENTRATION_BANDS } = require('./publicSafetyLabels')
+    expect(CONCENTRATION_BANDS).toHaveLength(4)
+    CONCENTRATION_BANDS.forEach((band) => {
+      expect(band.label.toLowerCase()).toContain('recorded')
+      ;['danger', 'risk', 'unsafe', 'severe', 'crime', 'hot', 'threat']
+        .forEach((word) => expect(band.label.toLowerCase()).not.toContain(word))
+    })
+    // the lowest band starts at the published threshold, not at 1
+    expect(CONCENTRATION_BANDS[0].min).toBe(2)
   })
 
   // ⚠️ SCOPED AROUND THE DISCLAIMER, which is the one string that must
@@ -344,15 +415,31 @@ describe('the public frontend modules', () => {
   // permit number, and P4-A followed it for the KP vocabulary. So the scan
   // runs over everything EXCEPT the disclaimer, and the next test asserts
   // the disclaimer is a denial rather than a claim.
+  // ⚠️ `SHADING_NOTE` JOINED THE EXCEPTED SET for the same reason the
+  // disclaimer is in it: it has to say "not a danger level" in order to
+  // deny being one, and a scan that flags it reports the denial as the
+  // thing it denies. The next test asserts it IS a denial, exactly as the
+  // disclaimer's own does.
   it('publishes no rate, per-capita figure or risk score', () => {
-    const { PUBLIC_DISCLAIMER } = require('./publicSafetyLabels')
-    const scanned = PUBLIC_CODE.split(PUBLIC_DISCLAIMER).join(' ').toLowerCase()
+    const { PUBLIC_DISCLAIMER, SHADING_NOTE } = require('./publicSafetyLabels')
+    const scanned = PUBLIC_CODE
+      .split(PUBLIC_DISCLAIMER).join(' ')
+      .split(SHADING_NOTE).join(' ')
+      .toLowerCase()
     ;['per capita', 'percapita', 'per 1,000', 'per 1000', 'crime rate',
       'riskscore', 'risk_score', 'severity', 'danger', 'predict', 'forecast',
       'likelihood', 'probability', 'score']
       .forEach((term) => {
         expect(scanned).not.toContain(term)
       })
+  })
+
+  it('and the shading note that contains "danger" IS a denial', () => {
+    const { SHADING_NOTE } = require('./publicSafetyLabels')
+    expect(SHADING_NOTE).toMatch(/not a danger level/i)
+    // it says what the shading IS, not only what it is not
+    expect(SHADING_NOTE).toMatch(/more incidents were recorded/i)
+    expect(SHADING_NOTE).toMatch(/\bcount\b/i)
   })
 
   it('and the disclaimer that contains those words IS a denial', () => {
