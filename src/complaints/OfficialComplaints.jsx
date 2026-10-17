@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import {
-  FaCommentDots, FaSearch, FaPlus, FaTimes, FaPaperclip,
+  FaCommentDots, FaSearch, FaPlus, FaTimes, FaPaperclip, FaArrowLeft,
   FaLock, FaCheckCircle, FaExclamationTriangle,
 } from 'react-icons/fa'
 
@@ -258,8 +258,17 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
               is already declared in Complaints.css at the same
               specificity as the h3 rule, so this is pixel-identical. */}
           <h2>Record a walk-in complaint</h2>
+          {/* ⚠️ A BACK ARROW, NOT AN ✕, AND THE DISTINCTION IS SEMANTIC.
+              This control does not dismiss the walk-in form over
+              something else -- it LEAVES it and returns to the queue
+              behind it. An ✕ says "close this overlay"; a left arrow
+              says "go back one step", and offering the first for the
+              second teaches a reader that the two are the same control.
+              `type="button"` matters just as much: this sits inside a
+              card that holds a form, and a bare <button> defaults to
+              `submit`. */}
           <button type="button" className="btn-cancel btn-sm" onClick={() => setEncoding(false)}>
-            <FaTimes aria-hidden="true" /> Back to the queue
+            <FaArrowLeft aria-hidden="true" /> Back to the queue
           </button>
         </div>
         <WalkInComplaintForm
@@ -281,7 +290,7 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
 
       <div className="dashboard-card">
         <div className="dashboard-card-header">
-          <h2><FaCommentDots aria-hidden="true" /> Complaint queue</h2>
+          <h2 className="section-heading"><FaCommentDots aria-hidden="true" /> Complaint queue</h2>
           {/* ⚠️ RENDERED FOR THE BARANGAY SECRETARY ONLY, because
               `encode_walk_in_complaint()` refuses everybody else with
               `P0001` -- the PUNONG BARANGAY INCLUDED, measured, even
@@ -508,6 +517,8 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
               Complaint{' '}
               <span className="complaint-reference">{selected?.reference || ''}</span>
             </h2>
+            {/* ⚠️ The ✕ is RIGHT here and wrong above: this dismisses the
+                detail panel, which is the one thing an ✕ means. */}
             <button type="button" className="btn-cancel btn-sm" onClick={closeDetail}>
               <FaTimes aria-hidden="true" /> Close
             </button>

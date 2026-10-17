@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   FaClipboardList, FaExclamationTriangle, FaInfoCircle, FaLock, FaMapMarkerAlt, FaPlus,
+  FaTimes,
 } from 'react-icons/fa'
 
 import {
@@ -202,7 +203,7 @@ const IncidentsPanel = ({ canAdminister = false, confirm }) => {
 
       <div className="dashboard-card">
         <div className="dashboard-card-header">
-          <h2><FaClipboardList aria-hidden="true" /> Incident records</h2>
+          <h2 className="section-heading"><FaClipboardList aria-hidden="true" /> Incident records</h2>
           <button
             type="button"
             className="btn-add"
@@ -210,7 +211,13 @@ const IncidentsPanel = ({ canAdminister = false, confirm }) => {
             aria-expanded={showForm}
             aria-controls="inc-record-form"
           >
-            <FaPlus aria-hidden="true" /> {showForm ? 'Close form' : 'Record Incident'}
+            {/* ⚠️ THE ICON FOLLOWS THE LABEL. This was `<FaPlus>` in both
+                states, so the open form offered a PLUS sign beside the word
+                "Close" -- an icon asserting the opposite of its own label,
+                which is the same fault as an ✕ used for navigation. */}
+            {showForm
+              ? <><FaTimes aria-hidden="true" /> Close form</>
+              : <><FaPlus aria-hidden="true" /> Record Incident</>}
           </button>
         </div>
 
@@ -428,8 +435,13 @@ const IncidentsPanel = ({ canAdminister = false, confirm }) => {
         <div className="dashboard-card inc-detail">
           <div className="dashboard-card-header">
             <h2>{detail.reference}</h2>
-            <button type="button" className="btn-deny btn-sm" onClick={() => setDetail(null)}>
-              Close
+            {/* ⚠️ `btn-cancel`, NOT `btn-deny`. Dismissing a read-only
+                detail panel destroys nothing, and the red class is what
+                Stand down and Remove use -- so this read as a dangerous
+                action and looked unlike the Complaint queue's own Close,
+                which is the same control one tab away. */}
+            <button type="button" className="btn-cancel btn-sm" onClick={() => setDetail(null)}>
+              <FaTimes aria-hidden="true" /> Close
             </button>
           </div>
 

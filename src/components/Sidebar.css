@@ -3,9 +3,29 @@
    Barangay Batinguel E-System
 ================================ */
 
+/* ⚠️ `height`, NOT ONLY `min-height`, AND THAT IS THE WHOLE DEFECT.
+   `min-height: 100vh` on a `position: fixed` column lets the element
+   GROW past the viewport, and a fixed element does not scroll with the
+   page -- so once the official nav reached sixteen items the account
+   card and Logout sat below the fold with no way to reach them. The
+   `flex: 1; overflow-y: auto` on `.sidebar-nav` could not help: a flex
+   item only has to shrink when its CONTAINER has a definite height, and
+   this one never did.
+   `height` gives it one, so the nav becomes the part that scrolls and
+   the footer is pinned where it was drawn. ⚠️ No fixed pixel height
+   anywhere -- the footer keeps its own content height and the nav takes
+   whatever is left.
+   `min-height` is kept on the line before, so a viewport TALLER than the
+   content still fills to the bottom exactly as it did.
+   ⚠️ The `100dvh` line is the mobile-browser pair `.modal` already
+   carries: a phone's `100vh` includes the retracting toolbars, so the
+   last rows would sit under them. A browser that does not know the unit
+   ignores that declaration and keeps the `100vh` above it. */
 .sidebar {
   width: 260px;
   min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
   background: linear-gradient(180deg,
       #1e3a8a,
       #1e40af);
@@ -170,8 +190,14 @@
 }
 
 /* Sidebar Navigation */
+/* ⚠️ `min-height: 0` is what makes `overflow-y: auto` reachable at all.
+   A flex item's default `min-height` is `auto`, which is its CONTENT
+   height -- so even with a definite container height this would refuse
+   to shrink and would push the footer out of the box rather than
+   scrolling. The pair is the fix; neither half works alone. */
 .sidebar-nav {
   flex: 1;
+  min-height: 0;
   padding: 16px 0;
   overflow-y: auto;
 }
@@ -280,7 +306,11 @@
 }
 
 /* Sidebar Footer */
+/* ⚠️ The footer is the one part that must never shrink: it is what the
+   nav is scrolling to keep reachable. Without this it would be the
+   flexible item beside a nav that cannot shrink, i.e. exactly backwards. */
 .sidebar-footer {
+  flex-shrink: 0;
   padding: 16px 20px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
@@ -314,6 +344,35 @@
   font-size: var(--fs-12);
   color: #bfdbfe;
 }
+
+/* ⚠️ (PR #45) THE SAME TWO DECLARATIONS X2 GAVE THE DRAWER, which the
+   DESKTOP RAIL never received. X2's fix was written as
+   `.nav-drawer-user .sidebar-user-avatar`, scoped to the drawer, so the
+   rail kept the defect it describes: the 36px avatar is a flex item free
+   to shrink, `.sidebar-user-info` has no sizing of its own, and a long
+   unbreakable name sets a min-content floor the avatar is the only thing
+   able to give against.
+
+   Measured on the rail with a 56-character hyphenated name, against the
+   shipped bundle, at 1440x900 / 1600x1000 (90% zoom) / 1152x720 (125%) /
+   1280x600 / 1280x540 / 1024x768: the avatar came back **18x36** at every
+   one -- an ellipse, which is exactly what X2 recorded in the drawer as
+   23x36. Afterwards it is 36x36 at all six.
+
+   ⚠️ These are UNSCOPED and sit at (0,1,0), BELOW the drawer's existing
+   (0,2,0) rules, which are left exactly as written. The drawer keeps
+   deciding its own row; the rail now has an answer where it had none.
+   One home would have been better still, but moving X2's rules to get it
+   would edit an accepted file for no behaviour a reader could see. */
+.sidebar-user-avatar { flex: 0 0 auto; }
+
+.sidebar-user-info {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* A long name wraps instead of pushing the rail's fixed 260px sideways. */
+.sidebar-user-info span { overflow-wrap: anywhere; }
 
 .sidebar-logout {
   display: flex;
@@ -722,7 +781,40 @@
   margin-top: 24px;
 }
 
+/* ⚠️ `inline-flex` HERE IS A DEFECT FIX, NOT A RESTYLE, and the missing
+    three declarations are the whole of it.
+
+    `.btn-approve`, `.btn-deny` and `.btn-add` above already carry
+    `display: inline-flex` + `align-items: center` + `gap` + (further
+    down) `white-space: nowrap`. These two did not, because when they
+    were written they were modal buttons with no icon, and a bare
+    `<button>` lays an icon and a label out inline perfectly well on its
+    own.
+
+    What broke them is that the new modules put an icon INSIDE them and
+    placed them in `.dashboard-card-header`, which is
+    `display: flex; flex-wrap: wrap`. A `<button>` flex item has
+    `flex-shrink: 1`, so beside a long heading it is squeezed below its
+    own content width and the inline run breaks -- putting the icon on
+    line one and the label on line two:
+
+        x
+        Back to the queue
+
+    Measured in Chromium before the fix: 36x58 (two lines) at 1024 and
+    below. `flex-shrink: 0` is what stops the squeeze and
+    `white-space: nowrap` is what stops the break; `inline-flex` and the
+    gap are what make the pair sit together once it no longer wraps.
+
+    ⚠️ NO SECOND BUTTON SYSTEM. Every value here is copied from the three
+    classes above rather than chosen, so the five share one appearance. */
 .btn-cancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-shrink: 0;
+  white-space: nowrap;
   padding: 10px 20px;
   border: 2px solid #e5e7eb;
   border-radius: var(--radius-sm);
@@ -735,6 +827,12 @@
 }
 
 .btn-save {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-shrink: 0;
+  white-space: nowrap;
   padding: 10px 20px;
   border: none;
   border-radius: var(--radius-sm);
@@ -744,6 +842,18 @@
   font-weight: 600;
   cursor: pointer;
   font-family: 'Poppins', sans-serif;
+}
+
+/* ⚠️ An icon inside any of the five must never be the thing that
+    shrinks. Without this a narrow card squashes the glyph to an ellipse
+    rather than wrapping the row -- the same defect the drawer's 36px
+    avatar had, recorded under *Responsive layout (X2)*. */
+.btn-approve svg,
+.btn-deny svg,
+.btn-add svg,
+.btn-cancel svg,
+.btn-save svg {
+  flex-shrink: 0;
 }
 
 /* Responsive */
@@ -826,9 +936,17 @@
 }
 
 /* The list scrolls on its own when a role has more destinations than the
-   screen is tall -- the Official portal has thirteen. */
+   screen is tall -- the Official portal has SIXTEEN since Combined Phase
+   2, which is three more than when this comment was written.
+   ⚠️ `min-height: 0` for the reason `.sidebar-nav` needs it: a flex
+   item's default `min-height: auto` is its content height, so without
+   this the list refuses to shrink and `overflow-y: auto` never engages,
+   pushing the account row and Logout past the bottom of the drawer. The
+   drawer itself already has a definite `height: 100%`, so this pair is
+   all that was missing. */
 .nav-drawer-nav {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 12px 0 24px;
 }
@@ -1453,6 +1571,11 @@
 .btn-add {
   white-space: nowrap;
 }
+
+/* ⚠️ `.btn-cancel` and `.btn-save` carry their own `white-space: nowrap`
+   beside their own `display`, rather than joining the list above. Both
+   are declared ~700 lines earlier, and a property split across two
+   distant blocks is how the pair came to disagree in the first place. */
 
 /* In card mode the value must be complete -- that is the whole point of
    the card conversion -- so the truncation is released and the address

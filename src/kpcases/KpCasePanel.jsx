@@ -448,7 +448,7 @@ const KpCasePanel = ({
               powered positions rather than showing them greyed. */}
           {isKapitan && mayOpenCase ? (
             <form className="kp-form" onSubmit={handleOpenCase}>
-              <h4><FaBalanceScale aria-hidden="true" /> Open a KP case</h4>
+              <h4 className="section-heading"><FaBalanceScale aria-hidden="true" /> Open a KP case</h4>
               <p className="kp-hint">
                 A case can be opened only when this complaint's latest
                 review was confirmed and says to proceed with the KP
@@ -507,7 +507,7 @@ const KpCasePanel = ({
           )}
 
           {/* ── The recorded panel ───────────────────────────────── */}
-          <h4><FaUsers aria-hidden="true" /> Recorded panel</h4>
+          <h4 className="section-heading"><FaUsers aria-hidden="true" /> Recorded panel</h4>
           <p className="kp-provisional" role="note">
             <FaInfoCircle aria-hidden="true" /> {KP_PANEL_PROVISIONAL_NOTE}
           </p>
@@ -562,7 +562,7 @@ const KpCasePanel = ({
           )}
 
           {/* ── Proceedings ──────────────────────────────────────── */}
-          <h4><FaCalendarPlus aria-hidden="true" /> Proceedings</h4>
+          <h4 className="section-heading"><FaCalendarPlus aria-hidden="true" /> Proceedings</h4>
           {hearings.length === 0 ? (
             <p className="kp-empty">No proceeding scheduled yet.</p>
           ) : (

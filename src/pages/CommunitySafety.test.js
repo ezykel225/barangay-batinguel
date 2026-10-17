@@ -20,6 +20,12 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 
 globalThis.__popups = []
+// ⚠️ EVERY SHAPE THE MAP DRAWS IS RECORDED TOO, not just its popup. The
+// canvas now draws grid RECTANGLES, and a rectangle carries four
+// coordinates where a circle carried one -- so the "no exact coordinate"
+// guard has to be able to read the corners it was handed, or it would be
+// asserting about a shape it never saw.
+globalThis.__shapes = []
 
 jest.mock('../supabase/supabaseClient', () => ({
   supabase: { from: jest.fn(), rpc: jest.fn(), storage: { from: jest.fn() } },
@@ -40,9 +46,24 @@ jest.mock('leaflet', () => {
       map: () => ({
         remove: () => {}, setView: () => {}, fitBounds: () => {},
       }),
-      tileLayer: () => layer(),
+      tileLayer: () => { globalThis.__shapes.push({ kind: 'tileLayer' }); return layer() },
       layerGroup: () => layer(),
-      circleMarker: () => layer(),
+      circleMarker: (latlng, opts) => {
+        globalThis.__shapes.push({ kind: 'circleMarker', latlng, opts })
+        return layer()
+      },
+      rectangle: (bounds, opts) => {
+        globalThis.__shapes.push({ kind: 'rectangle', bounds, opts })
+        return layer()
+      },
+      polygon: (pts, opts) => {
+        globalThis.__shapes.push({ kind: 'polygon', pts, opts })
+        return layer()
+      },
+      marker: (latlng, opts) => {
+        globalThis.__shapes.push({ kind: 'marker', latlng, opts })
+        return layer()
+      },
       latLngBounds: (v) => v,
     },
   }
@@ -129,6 +150,7 @@ const ready = async () => {
 
 beforeEach(() => {
   globalThis.__popups = []
+  globalThis.__shapes = []
   respond()
 })
 
@@ -273,6 +295,104 @@ describe('what the public page can never show', () => {
   })
 })
 
+// ─── ⚠️ The grid canvas itself ─────────────────────────────────────────────
+//
+// These read `globalThis.__shapes`, which the leaflet mock records, so they
+// assert what the map would actually DRAW rather than what the source looks
+// like. A component that stopped calling `L.rectangle` and started calling
+// `L.circleMarker` again would read almost identically and would fail here.
+
+describe('the grid canvas', () => {
+  const HALF = LABELS.ZONE_CELL_DEGREES / 2
+  const kinds = () => globalThis.__shapes.map((shape) => shape.kind)
+  const rects = () => globalThis.__shapes.filter((shape) => shape.kind === 'rectangle')
+
+  it('draws one square per published area, on the grid the SQL used', async () => {
+    show()
+    await ready()
+    expect(rects()).toHaveLength(ZONES.length)
+    rects().forEach((rect, index) => {
+      const [[south, west], [north, east]] = rect.bounds
+      const zone = ZONES[index]
+      expect(north - south).toBeCloseTo(LABELS.ZONE_CELL_DEGREES, 10)
+      expect(east - west).toBeCloseTo(LABELS.ZONE_CELL_DEGREES, 10)
+      // ⚠️ EVERY CORNER IS THE PUBLISHED CENTRE ± HALF A CELL, so the square
+      // publishes no coordinate the RPC did not already imply. A rectangle
+      // whose corners came from anywhere else would be new precision.
+      expect(south).toBeCloseTo(zone.center_latitude - HALF, 10)
+      expect(north).toBeCloseTo(zone.center_latitude + HALF, 10)
+      expect(west).toBeCloseTo(zone.center_longitude - HALF, 10)
+      expect(east).toBeCloseTo(zone.center_longitude + HALF, 10)
+    })
+  })
+
+  // ⚠️ THE DEFECT THIS EXISTS FOR. A point marker says "an incident happened
+  // about here", which is precisely the claim migration 045 coarsens away.
+  // The component has no `points` prop to draw one from -- this asserts the
+  // consequence rather than trusting the prop list.
+  it('draws no point marker of any kind, in any state', async () => {
+    show()
+    await ready()
+    expect(kinds()).not.toContain('circleMarker')
+    expect(kinds()).not.toContain('marker')
+    expect(kinds()).not.toContain('polygon')
+  })
+
+  it('shades each square by the fixed band for its own count', async () => {
+    show()
+    await ready()
+    rects().forEach((rect, index) => {
+      const band = LABELS.concentrationBand(ZONES[index].total)
+      expect(rect.opts.color).toBe(band.tone)
+      expect(rect.opts.fillColor).toBe(band.tone)
+    })
+    // the 5-incident area and the 2-incident area must not look alike
+    expect(rects()[0].opts.fillColor).not.toBe(rects()[1].opts.fillColor)
+  })
+
+  // ⚠️ THE MAP IS THE CONTEXT THAT MAKES AN EMPTY ANSWER LEGIBLE. It used to
+  // live inside the `zones.length > 0` branch, so a quiet period showed a
+  // sentence where the map had been -- and a reader could not tell "nothing
+  // to show" from "it failed to load". Run for all three empty states.
+  it.each([
+    ['nothing recorded at all', { total_incidents: 0, mapped_incidents: 0, zone_count: 0 }],
+    ['recorded but nothing mappable', { total_incidents: 4, mapped_incidents: 0, zone_count: 0 }],
+  ])('keeps the basemap on screen when %s', async (_name, overview) => {
+    respond({ overview, zones: [], types: [], monthly: [] })
+    show()
+    await ready()
+    expect(screen.getByRole('application', { name: /Map of areas/i })).toBeInTheDocument()
+    expect(kinds()).toContain('tileLayer')
+    expect(rects()).toHaveLength(0)
+  })
+
+  it('says so in words when nothing is publishable for the period', async () => {
+    respond({ overview: { total_incidents: 4, mapped_incidents: 0, zone_count: 0 }, zones: [] })
+    show()
+    await ready()
+    expect(screen.getByText(LABELS.EMPTY_NO_ZONES)).toBeInTheDocument()
+    expect(LABELS.EMPTY_NO_ZONES).toMatch(/no public incident concentrations/i)
+  })
+
+  // The key is part of the map, so it travels with it rather than being
+  // rendered by one page that happens to use it.
+  it('carries its key even with nothing drawn', async () => {
+    respond({ overview: { total_incidents: 0, mapped_incidents: 0, zone_count: 0 },
+      zones: [], types: [], monthly: [] })
+    show()
+    await ready()
+    const key = screen.getByRole('list', { name: /What the shading means/i })
+    expect(within(key).getAllByRole('listitem'))
+      .toHaveLength(LABELS.CONCENTRATION_BANDS.length)
+  })
+
+  it('draws a real OpenStreetMap basemap, not a blank canvas', async () => {
+    show()
+    await ready()
+    expect(kinds().filter((k) => k === 'tileLayer')).toHaveLength(1)
+  })
+})
+
 // ─── ⚠️ The aggregation rule is ON THE PAGE ─────────────────────────────────
 
 describe('the aggregation rule is stated to the reader', () => {
@@ -394,13 +514,53 @@ describe('the period filter', () => {
 // ─── Counts, bands and observations ────────────────────────────────────────
 
 describe('what the numbers say', () => {
-  it('labels the intensity bands by how many were recorded, not by danger', async () => {
+  // ⚠️ REDEFINED, NOT LOOSENED. This used to assert the page's own key --
+  // `Fewer recorded` / `More recorded` / `Most recorded` -- which was drawn
+  // from `INTENSITY_BANDS`, the OFFICIAL panel's peak-relative scale. The
+  // public map now carries its own fixed-threshold bands beside the squares
+  // they colour, so the key is asserted where it now lives and against the
+  // vocabulary it now uses. The property the test exists for is unchanged
+  // and is checked harder: every band is named by a COUNT, and none of them
+  // names danger.
+  it('labels the concentration bands by how many were recorded, not by danger', async () => {
     show()
     await ready()
-    expect(screen.getByText('Fewer recorded')).toBeInTheDocument()
-    expect(screen.getByText('More recorded')).toBeInTheDocument()
-    expect(screen.getByText('Most recorded')).toBeInTheDocument()
-    expect(document.body.textContent).not.toMatch(/high risk|low risk|unsafe|safe zone/i)
+    const key = screen.getByRole('list', { name: /What the shading means/i })
+    LABELS.CONCENTRATION_BANDS.forEach((band) => {
+      expect(within(key).getByText(band.label)).toBeInTheDocument()
+      expect(band.label).toMatch(/recorded/i)
+    })
+    // ⚠️ SCOPED AROUND THE PAGE'S OWN DENIALS, the way
+    // `prototypeCoverage.test.js` scoped its title scan: `SHADING_NOTE`
+    // has to say "not a danger level" and `PUBLIC_DISCLAIMER` has to say
+    // "not a crime rate" IN ORDER TO DENY THEM, so a whole-document scan
+    // for those phrases flags the two sentences that exist to rule them
+    // out. They are removed first; that each one IS a denial is asserted
+    // separately, in `publicSafetyMigration.test.js`.
+    const prose = document.body.textContent
+      .replace(LABELS.SHADING_NOTE, '')
+      .replace(LABELS.PUBLIC_DISCLAIMER, '')
+    expect(prose)
+      .not.toMatch(/high risk|low risk|unsafe|safe zone|danger level|crime rate/i)
+  })
+
+  // ⚠️ THE SAME COUNT MUST CARRY THE SAME SHADE IN EVERY PERIOD. The
+  // official panel scales its bands against the busiest cell in the current
+  // filter, which is right for an operational view and wrong here: a
+  // resident comparing last quarter with this one would be comparing two
+  // scales without being told. These are the thresholds the brief fixed.
+  it('maps a count to a band deterministically, never against the busiest cell', () => {
+    const { concentrationBand } = LABELS
+    expect(concentrationBand(2).key).toBe('lowest')
+    expect(concentrationBand(3).key).toBe('moderate')
+    expect(concentrationBand(4).key).toBe('moderate')
+    expect(concentrationBand(5).key).toBe('high')
+    expect(concentrationBand(7).key).toBe('high')
+    expect(concentrationBand(8).key).toBe('highest')
+    expect(concentrationBand(400).key).toBe('highest')
+    // Takes ONE argument. A scale that needed the peak would need a second,
+    // so the arity is the proof, the same way `needsFurtherReview`'s is.
+    expect(concentrationBand.length).toBe(1)
   })
 
   it('shows the incident types in the same words an official reads', async () => {

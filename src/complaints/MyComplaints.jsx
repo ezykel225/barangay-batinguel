@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { FaPlus, FaPaperclip, FaCheckCircle } from 'react-icons/fa'
+import { FaPlus, FaPaperclip, FaCheckCircle, FaTimes } from 'react-icons/fa'
 import { useModalA11y } from '../components/useModalA11y'
 import FileComplaintForm from './FileComplaintForm'
 import {
@@ -119,7 +119,7 @@ const MyComplaints = () => {
 
       {filed && (
         <div className="complaint-success" role="status">
-          <h2>
+          <h2 className="section-heading">
             <FaCheckCircle aria-hidden="true" /> Complaint received
           </h2>
           {/* ⚠️ "Received for barangay review", not "accepted" and not
@@ -154,8 +154,10 @@ const MyComplaints = () => {
             </p>
           )}
 
+          {/* The same Close the official detail panel uses, so a resident
+              and an official are not shown two spellings of one control. */}
           <button type="button" className="btn-cancel" onClick={() => setFiled(null)}>
-            Close
+            <FaTimes aria-hidden="true" /> Close
           </button>
         </div>
       )}
@@ -163,7 +165,11 @@ const MyComplaints = () => {
       <div className="dashboard-card">
         <div className="dashboard-card-header">
           <h2>My Complaints</h2>
+          {/* ⚠️ `type="button"` EXPLICITLY. A <button> defaults to
+              `submit`, and this was the one control in the complaint,
+              screening, KP, incident and Tanod modules without it. */}
           <button
+            type="button"
             className="btn-add"
             ref={newButtonRef}
             onClick={() => setShowForm(true)}

@@ -107,7 +107,7 @@ const SafetyMapPanel = () => {
 
       <div className="dashboard-card">
         <div className="dashboard-card-header">
-          <h2><FaMapMarkedAlt aria-hidden="true" /> Incident map</h2>
+          <h2 className="section-heading"><FaMapMarkedAlt aria-hidden="true" /> Incident map</h2>
         </div>
 
         <div className="resident-filter-bar smap-filters">
@@ -154,7 +154,7 @@ const SafetyMapPanel = () => {
 
       <div className="dashboard-card">
         <div className="dashboard-card-header">
-          <h2><FaChartBar aria-hidden="true" /> Incident summary</h2>
+          <h2 className="section-heading"><FaChartBar aria-hidden="true" /> Incident summary</h2>
         </div>
 
         <p className="smap-note" role="note">
@@ -236,7 +236,7 @@ const SafetyMapPanel = () => {
 
       <div className="dashboard-card">
         <div className="dashboard-card-header">
-          <h2><FaShieldAlt aria-hidden="true" /> Repeated locations and patrol coverage</h2>
+          <h2 className="section-heading"><FaShieldAlt aria-hidden="true" /> Repeated locations and patrol coverage</h2>
         </div>
 
         {hotspots.length === 0 ? (

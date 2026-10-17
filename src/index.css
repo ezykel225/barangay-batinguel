@@ -254,3 +254,47 @@ a[href^="tel:"] {
   min-height: 24px;
   padding: 2px 0;
 }
+
+/* ================================
+   SECTION HEADING WITH AN ICON
+   ================================
+   ⚠️ ONE PATTERN, NOT A SEVENTH COPY. Six of the new modules write the
+   same shape -- `<h2><Icon /> Section title</h2>` -- and every one of
+   them was relying on the browser's default inline layout for it. That
+   is correct until the heading has to wrap, and then the icon keeps
+   line one to itself while the words drop to line two:
+
+       [icon]
+       Repeated locations and patrol coverage
+
+   Measured in Chromium at 1024 and below, where `.dashboard-card-header`
+   squeezes its heading beside a control. An inline svg also sits on the
+   TEXT BASELINE rather than the cap height, so even unwrapped it reads a
+   pixel or two low against a 16px bold title.
+
+   `flex` + `align-items: center` fixes both: the icon is centred against
+   the first line and the words wrap beside it as a block, never under
+   it. `flex-shrink: 0` on the glyph is what stops a narrow card
+   squashing a circular icon into an ellipse -- the drawer avatar's own
+   defect, recorded under *Responsive layout (X2)*.
+
+   ⚠️ IT LIVES HERE, GLOBALLY, FOR THE REASON `@keyframes pulse` DOES.
+   Complaints, Screening, KP, Incidents, Tanod, the Safety Map and the
+   public Community Safety page all render it; owned by any one of their
+   stylesheets it would be a global dressed up as local, and the next
+   module to need it would declare a second copy that silently wins or
+   loses on emission order.
+
+   ⚠️ It sets NO font size, weight or colour. Each heading keeps whatever
+   its own level and stylesheet already gave it, so this cannot restyle a
+   title -- it only changes how the icon and the words are arranged. */
+.section-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.section-heading svg {
+  flex-shrink: 0;
+}
