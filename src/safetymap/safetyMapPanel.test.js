@@ -147,6 +147,33 @@ const mount = () => render(<SafetyMapPanel />)
 const ready = () => screen.findByText(/incidents? plotted/)
 const caption = () => screen.getByText(/incidents? plotted/).textContent
 
+describe('most common type ties', () => {
+  it('displays both demo ties and avoids attributing all incidents to a winner', async () => {
+    install({ incident_location_frequency: [
+      { ...LOCATIONS[0], location_label: 'Demo eight', total: 8, top_type: 'disturbance / traffic_accident' },
+      { ...LOCATIONS[1], location_label: 'Demo five', total: 5, top_type: 'disturbance / traffic_accident' },
+      { ...LOCATIONS[2], location_label: 'Clear winner', total: 4, top_type: 'traffic_accident' },
+    ] })
+    mount()
+    await ready()
+    for (const name of ['Demo eight', 'Demo five']) {
+      const row = screen.getAllByText(name).find((el) => el.closest('tr')).closest('tr')
+      expect(within(row).getByText('Disturbance / Traffic accident (tie)')).toBeInTheDocument()
+    }
+    const winner = screen.getAllByText('Clear winner').find((el) => el.closest('tr')).closest('tr')
+    expect(within(winner).getByText('Traffic accident')).toBeInTheDocument()
+    expect(screen.getByText(/8 incidents recorded at Demo eight/)).toBeInTheDocument()
+    expect(screen.getByText(/5 incidents recorded at Demo five/)).toBeInTheDocument()
+  })
+
+  it('displays three tied types without choosing a single winner', async () => {
+    install({ incident_location_frequency: [{ ...LOCATIONS[0], top_type: 'disturbance / public_safety_hazard / traffic_accident' }] })
+    mount()
+    await ready()
+    expect(screen.getByText('Multiple types (tie)')).toBeInTheDocument()
+  })
+})
+
 // ── A. What reaches the screen ───────────────────────────────────────────────
 
 describe('A. the map and analytics reads', () => {
@@ -415,7 +442,7 @@ describe('H. when a reader fails', () => {
 
 describe('I. the wiring', () => {
   const read = (p) => fs.readFileSync(path.join(__dirname, '..', p), 'utf8')
-  const code = (p) => read(p).split('\n')
+  const code = (p) => read(p).split(/\r?\n/)
     .map((l) => l.replace(/\/\/.*$/, '')).join('\n')
     .replace(/\/\*[\s\S]*?\*\//g, '')
 

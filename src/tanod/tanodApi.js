@@ -49,6 +49,16 @@ export const addTanodMember = async ({ fullName, areaNote, displayOrder }) => {
   return data
 }
 
+export const updateTanodMember = async ({ tanodId, fullName, areaNote, displayOrder }) => {
+  const { error } = await supabase.rpc('update_tanod_member', {
+    p_tanod_id: tanodId,
+    p_full_name: String(fullName ?? '').trim(),
+    p_area_note: String(areaNote ?? '').trim() || null,
+    p_display_order: Number(displayOrder) || 0,
+  })
+  if (error) { logFailure('Edit Tanod', error); throw tanodError(error, 'updateFailed') }
+}
+
 export const setTanodActive = async ({ tanodId, active }) => {
   const { error } = await supabase.rpc('set_tanod_member_active', {
     p_tanod_id: tanodId, p_active: active,

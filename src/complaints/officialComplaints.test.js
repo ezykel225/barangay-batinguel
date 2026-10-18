@@ -39,7 +39,7 @@ const read = (p) => fs.readFileSync(path.join(SRC, p), 'utf8')
 // ⚠️ Comment-stripped. Both files discuss `getPublicUrl`, `category`,
 // every P4 verb and the word "case" at length precisely to record that
 // none is used.
-const code = (p) => read(p).split('\n')
+const code = (p) => read(p).split(/\r?\n/)
   .map((l) => l.replace(/\/\/.*$/, ''))
   .join('\n')
   .replace(/\/\*[\s\S]*?\*\//g, '')
@@ -1061,15 +1061,18 @@ describe('L. the architecture the phase committed to', () => {
   // second one still fails here. P3-B2 added none, P4-A added 042 and
   // Combined Phase 1 added 043, Combined Phase 2 added 044 and Final
   // Integration added 045 -- one apiece, and 045 is the newest.
-  it('adds at most one migration per phase, and 046 is the newest', () => {
+  it('lists the expected migrations through 049', () => {
     const dir = path.join(__dirname, '..', '..', 'supabase-migrations')
     const files = fs.readdirSync(dir).filter((f) => f.endsWith('.sql')).sort()
-    expect(files).toHaveLength(46)
+    expect(files).toHaveLength(49)
     expect(files[41]).toBe('042_kp_screening_foundation.sql')
     expect(files[42]).toBe('043_kp_case_hearings_summons.sql')
     expect(files[43]).toBe('044_incident_blotter_tanod.sql')
     expect(files[44]).toBe('045_public_safety_aggregates.sql')
     expect(files[45]).toBe('046_kp_conclude_case.sql')
-    expect(files.some((f) => f.startsWith('047'))).toBe(false)
+    expect(files[46]).toBe('047_edit_tanod_member.sql')
+    expect(files[47]).toBe('048_location_type_ties.sql')
+    expect(files[48]).toBe('049_public_zone_type_counts.sql')
+    expect(files.some((f) => f.startsWith('050'))).toBe(false)
   })
 })

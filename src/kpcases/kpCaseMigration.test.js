@@ -30,7 +30,7 @@ const FILE = path.join(DIR, '043_kp_case_hearings_summons.sql')
 const raw = fs.readFileSync(FILE, 'utf8')
 
 // `--` comments removed.
-const code = raw.split('\n').map((l) => l.replace(/--.*$/, '')).join('\n')
+const code = raw.split(/\r?\n/).map((l) => l.replace(/--.*$/, '')).join('\n')
 
 // ⚠️ AND `COMMENT ON ... IS '...'` STRINGS REMOVED TOO, for every "is not
 // used" scan. That is my own stripper corrected rather than a weakened
@@ -79,15 +79,18 @@ describe('A. the migration', () => {
   // definition change at its own site, not a loosened assertion. What this
   // guard is FOR is that 043 stays 043 and stays untouched by a later
   // phase, and that holds: 046 adds ONE function and alters nothing in
-  // this file. The "nothing after it" half moves to 047.
-  it('is still 043, still in place, and nothing has reached past 046', () => {
+  // this file. After Tanod editing (047), type ties (048), and public type buckets (049), next is 050.
+  it('is still 043, still in place, with only the expected later migrations', () => {
     const files = fs.readdirSync(DIR).filter((f) => f.endsWith('.sql')).sort()
-    expect(files).toHaveLength(46)
+    expect(files).toHaveLength(49)
     expect(files[42]).toBe('043_kp_case_hearings_summons.sql')
     expect(files[43]).toBe('044_incident_blotter_tanod.sql')
     expect(files[44]).toBe('045_public_safety_aggregates.sql')
     expect(files[45]).toBe('046_kp_conclude_case.sql')
-    expect(files.some((f) => f.startsWith('047'))).toBe(false)
+    expect(files[46]).toBe('047_edit_tanod_member.sql')
+    expect(files[47]).toBe('048_location_type_ties.sql')
+    expect(files[48]).toBe('049_public_zone_type_counts.sql')
+    expect(files.some((f) => f.startsWith('050'))).toBe(false)
   })
 
   it('leaves 001-042 alone', () => {

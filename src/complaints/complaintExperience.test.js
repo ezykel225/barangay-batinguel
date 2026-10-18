@@ -32,7 +32,7 @@ const read = (p) => fs.readFileSync(path.join(SRC, p), 'utf8')
 // Comment-stripped, because these files discuss `getPublicUrl`, `*/*`
 // and "video" at length precisely to record that none is used -- the
 // A5 trap of a scan failing on the prose that documents the absence.
-const code = (p) => read(p).split('\n')
+const code = (p) => read(p).split(/\r?\n/)
   .map((l) => l.replace(/\/\/.*$/, ''))
   .join('\n')
   .replace(/\/\*[\s\S]*?\*\//g, '')

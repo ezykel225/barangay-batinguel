@@ -40,7 +40,7 @@ const IDENTITY = OFFICIAL.slice(
 // name join at length, and a scan that counted those would report the
 // very thing the change removed.
 const codeOnly = (block) => block
-  .split('\n')
+  .split(/\r?\n/)
   .filter((line) => {
     const t = line.trim()
     return t && !t.startsWith('//') && !t.startsWith('*') && !t.startsWith('/*')

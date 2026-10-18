@@ -282,7 +282,7 @@ describe('H. it is pure', () => {
   const fs = require('fs')
   const path = require('path')
   const source = fs.readFileSync(path.join(__dirname, 'safetyAnalytics.js'), 'utf8')
-  const code = source.split('\n').map((l) => l.replace(/\/\/.*$/, '')).join('\n')
+  const code = source.split(/\r?\n/).map((l) => l.replace(/\/\/.*$/, '')).join('\n')
 
   it('imports nothing at all', () => {
     expect(code).not.toMatch(/\bimport\b/)

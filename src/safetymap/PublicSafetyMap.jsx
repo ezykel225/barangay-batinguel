@@ -6,6 +6,7 @@ import {
   CONCENTRATION_BANDS,
   ZONE_CELL_DEGREES,
   concentrationBand,
+  incidentTypeLabel,
 } from './publicSafetyLabels'
 import './PublicSafetyMap.css'
 
@@ -20,11 +21,8 @@ import './PublicSafetyMap.css'
 // resident and an officer's note -- and a later edit to the official map
 // would silently be an edit to the public one.
 //
-// This component accepts ZONES ONLY. It has no `points` prop, no reference
-// field, no type field, no date field and no label field, so there is no
-// code path here that could render one. That is the project's
-// construction-over-filtering rule: the same reason `incidents` has no party
-// table and the same reason the public RPCs return integers.
+// This component accepts zones and SQL-suppressed aggregate type counts.
+// It receives no individual incident records or identifying fields.
 //
 // ─── ⚠️ GRID CELLS, NOT CIRCLES, AND THE SHAPE IS THE POINT ─────────────────
 //
@@ -40,19 +38,11 @@ import './PublicSafetyMap.css'
 // RPC returned. Nothing here reads a latitude the function did not give, and
 // there is still no `points` prop to read one from.
 //
-// ─── ⚠️ STILL NO BOUNDARY POLYGON ───────────────────────────────────────────
-//
-// P2 remains authoritative: the barangay's own purok names and boundaries are
-// unconfirmed. Nothing here draws an outline, and the view centres on
-// Dumaguete as an OPENING VIEW rather than an asserted border. A grid cell
-// asserts nothing about the barangay's geography, which is precisely why the
-// aggregation is a grid and not a made-up polygon.
+// No barangay outline is drawn; the map shows published aggregate cells.
 
 const HALF_CELL = ZONE_CELL_DEGREES / 2
 
-// A zone carries only numbers, so there is nothing here that needs escaping
-// against a value a person typed -- but the popup is still built as an HTML
-// string, so the numbers are coerced and bounded rather than interpolated raw.
+// Popup numbers are coerced; aggregate category labels are escaped below.
 const safeInt = (value) => {
   const n = Number(value)
   return Number.isFinite(n) ? String(Math.trunc(n)) : '0'
@@ -63,7 +53,11 @@ const usableZones = (zones) => zones.filter((zone) => (
   && Number.isFinite(Number(zone?.center_longitude))
 ))
 
-const PublicSafetyMap = ({ zones = [], height = 420 }) => {
+const bucketLabel = (type) => type === null ? 'Other recorded incidents' : incidentTypeLabel(type)
+const escapeHtml = (value) => String(value ?? '').replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+
+const PublicSafetyMap = ({ zones = [], zoneTypes = [], height = 420 }) => {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
   const layerRef = useRef(null)
@@ -94,7 +88,7 @@ const PublicSafetyMap = ({ zones = [], height = 420 }) => {
 
     const usable = usableZones(zones)
 
-    usable.forEach((zone) => {
+    usable.forEach((zone, index) => {
       const total = Number(zone.total) || 0
       // ⚠️ DETERMINISTIC. `concentrationBand` is a fixed-threshold lookup,
       // not the official panel's peak-relative `bandFor`: the same count
@@ -104,7 +98,7 @@ const PublicSafetyMap = ({ zones = [], height = 420 }) => {
       const lat = Number(zone.center_latitude)
       const lng = Number(zone.center_longitude)
 
-      L.rectangle(
+      const rectangle = L.rectangle(
         [[lat - HALF_CELL, lng - HALF_CELL], [lat + HALF_CELL, lng + HALF_CELL]],
         {
           color: band.tone,
@@ -112,13 +106,30 @@ const PublicSafetyMap = ({ zones = [], height = 420 }) => {
           opacity: 0.85,
           fillColor: band.tone,
           fillOpacity: 0.45,
+          interactive: true,
         }
       ).bindPopup(
         `<strong>${safeInt(total)} incidents recorded</strong><br/>`
+        + zoneTypes.filter((row) => row.zone_key === zone.zone_key)
+          .map((row) => `${escapeHtml(bucketLabel(row.incident_type))} &mdash; ${safeInt(row.total)}<br/>`).join('')
         + 'in this area, for the selected period.<br/>'
         + 'This square covers an area about 220 m across,<br/>'
         + 'not the location of any incident.'
-      ).addTo(layer)
+      )
+      rectangle.on('add', () => {
+        const element = rectangle.getElement()
+        if (!element) return
+        element.setAttribute('tabindex', '0')
+        element.setAttribute('role', 'button')
+        element.setAttribute('aria-label', `Area ${index + 1}: ${safeInt(total)} recorded incidents. Show type breakdown.`)
+        element.onkeydown = (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault()
+            rectangle.openPopup()
+          }
+        }
+      })
+      rectangle.addTo(layer)
     })
 
     if (usable.length > 0) {
@@ -134,7 +145,7 @@ const PublicSafetyMap = ({ zones = [], height = 420 }) => {
         { padding: [48, 48], maxZoom: 16 }
       )
     }
-  }, [zones])
+  }, [zones, zoneTypes])
 
   return (
     <div className="psm-wrap">
@@ -168,7 +179,7 @@ const PublicSafetyMap = ({ zones = [], height = 420 }) => {
           and anybody whose tiles do not load, gets the same counts as a
           list. A canvas of coloured squares is not an accessible record --
           the same reason `IncidentMap` carries its own list. The list shows
-          COUNTS AND NOTHING ELSE, because that is all a zone holds. */}
+          aggregate counts and the same safe type buckets as the popup. */}
       <details className="psm-alt">
         <summary>Recorded areas as a list</summary>
         {zones.length === 0 ? (
@@ -176,9 +187,15 @@ const PublicSafetyMap = ({ zones = [], height = 420 }) => {
         ) : (
           <ol className="psm-alt-list">
             {zones.map((zone, index) => (
-              <li key={zone.zone_key || index}>
-                Area {index + 1} &mdash; <strong>{Number(zone.total) || 0}</strong>
-                {' '}incidents recorded
+              <li key={zone.zone_key || index} className="psm-area">
+                <h3 className="psm-area-heading">Area {index + 1} &mdash; {Number(zone.total) || 0} incidents recorded</h3>
+                <ul className="psm-area-types">
+                  {zoneTypes.filter((row) => row.zone_key === zone.zone_key).map((row) => (
+                    <li key={row.incident_type ?? 'suppressed'}>
+                      {bucketLabel(row.incident_type)} &mdash; {Number(row.total) || 0}
+                    </li>
+                  ))}
+                </ul>
               </li>
             ))}
           </ol>

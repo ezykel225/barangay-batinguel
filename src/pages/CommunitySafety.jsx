@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { FaShieldAlt } from 'react-icons/fa'
 
@@ -7,7 +7,7 @@ import Footer from '../components/Footer'
 import PublicSafetyMap from '../safetymap/PublicSafetyMap'
 import { monthLabel, trendSeries } from '../safetymap/safetyAnalytics'
 import {
-  loadPublicMonthly, loadPublicOverview, loadPublicTypeCounts, loadPublicZones,
+  loadPublicMonthly, loadPublicOverview, loadPublicTypeCounts, loadPublicZones, loadPublicZoneTypeCounts,
 } from '../safetymap/publicSafetyApi'
 import {
   AGGREGATION_NOTE, CONCENTRATION_LABEL, EMPTY_NOTHING_MAPPED,
@@ -44,60 +44,88 @@ import './CommunitySafety.css'
 // are absent because the FUNCTIONS DO NOT RETURN THEM, not because this
 // component filters them out -- so no edit here can expose one.
 
-const PERIODS = Object.freeze([
-  { key: 'all', label: 'All recorded' },
-  { key: '12m', label: 'Last 12 months', months: 12 },
-  { key: '3m', label: 'Last 3 months', months: 3 },
-])
-
-// ⚠️ Date-only arithmetic on the characters, built from explicit numbers --
-// `monthGrid.js`'s rule. Nothing here constructs a Date from a date string.
-const monthsAgoKey = (months) => {
-  const now = new Date()
-  const d = new Date(now.getFullYear(), now.getMonth() - months, now.getDate())
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const dd = String(d.getDate()).padStart(2, '0')
-  return `${d.getFullYear()}-${mm}-${dd}`
+export const communityPeriods = (now = new Date()) => {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Manila', year: 'numeric', month: 'numeric',
+  }).formatToParts(now)
+  const year = Number(parts.find((part) => part.type === 'year').value)
+  const month = Number(parts.find((part) => part.type === 'month').value)
+  const options = [0, 1, 2].map((offset) => {
+    const start = new Date(Date.UTC(year, month - 1 - offset, 1))
+    const end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0))
+    const from = start.toISOString().slice(0, 10)
+    return {
+      key: offset === 0 ? 'current' : from.slice(0, 7),
+      label: offset === 0 ? 'This month' : new Intl.DateTimeFormat('en-US', {
+        timeZone: 'UTC', month: 'long', year: 'numeric',
+      }).format(start),
+      monthName: new Intl.DateTimeFormat('en-US', {
+        timeZone: 'UTC', month: 'long', year: 'numeric',
+      }).format(start),
+      from, to: end.toISOString().slice(0, 10),
+    }
+  })
+  return [...options, { key: 'all', label: 'All recorded' }]
 }
 
 const CommunitySafety = () => {
-  const [period, setPeriod] = useState('all')
+  const [period, setPeriod] = useState('current')
+  const [periods, setPeriods] = useState(() => communityPeriods())
+  const chosen = periods.find((option) => option.key === period) || periods[0]
+  const { from, to } = chosen
   const [overview, setOverview] = useState({
     total_incidents: 0, mapped_incidents: 0, zone_count: 0,
   })
   const [zones, setZones] = useState([])
+  const [zoneTypes, setZoneTypes] = useState([])
   const [types, setTypes] = useState([])
   const [monthly, setMonthly] = useState([])
   const [loading, setLoading] = useState(true)
   const [problem, setProblem] = useState('')
 
-  const fetchAll = useCallback(async () => {
-    setLoading(true)
-    setProblem('')
-    const chosen = PERIODS.find((p) => p.key === period)
-    const opts = chosen?.months ? { from: monthsAgoKey(chosen.months) } : {}
-    try {
-      const [o, z, t, m] = await Promise.all([
-        loadPublicOverview(opts),
-        loadPublicZones(opts),
-        loadPublicTypeCounts(opts),
-        loadPublicMonthly(opts),
-      ])
-      setOverview(o); setZones(z); setTypes(t); setMonthly(m)
-    } catch (err) {
-      setProblem(SAFETY_ERRORS.loadFailed)
-    } finally {
-      setLoading(false)
-    }
-  }, [period])
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const next = communityPeriods()
+      setPeriods((previous) => previous[0].from === next[0].from ? previous : next)
+      setPeriod((previous) => next.some((option) => option.key === previous) ? previous : 'current')
+    }, 60000)
+    return () => clearInterval(timer)
+  }, [])
 
-  useEffect(() => { fetchAll() }, [fetchAll])
+  useEffect(() => {
+    let cancelled = false
+    const fetchAll = async () => {
+      setLoading(true)
+      setProblem('')
+      const opts = { from, to }
+      try {
+        const [o, z, t, m, zt] = await Promise.all([
+          loadPublicOverview(opts),
+          loadPublicZones(opts),
+          loadPublicTypeCounts(opts),
+          loadPublicMonthly(),
+          loadPublicZoneTypeCounts(opts),
+        ])
+        if (cancelled) return
+        setOverview(o); setZones(z); setTypes(t); setMonthly(m)
+        setZoneTypes(zt)
+      } catch (err) {
+        if (!cancelled) setProblem(SAFETY_ERRORS.loadFailed)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    fetchAll()
+    return () => { cancelled = true }
+  }, [from, to])
 
   const total = Number(overview.total_incidents) || 0
   const mapped = Number(overview.mapped_incidents) || 0
   const zoneCount = Number(overview.zone_count) || 0
   const typeTotal = types.reduce((sum, row) => sum + (Number(row.total) || 0), 0)
   const trend = trendSeries(monthly)
+  const selectedMonth = from?.slice(0, 7)
+  const selectedMonthTotal = trend.rows.find((row) => row.monthKey === selectedMonth)?.total ?? 0
 
   return (
     <div className="cs-page">
@@ -107,7 +135,6 @@ const CommunitySafety = () => {
         <section className="cs-section">
           <div className="cs-container">
             <div className="page-intro">
-              <Link to="/" className="back-link">&larr; Back to Home</Link>
               <div className="page-intro-row">
                 <div className="page-intro-main">
                   <span className="page-intro-icon" aria-hidden="true">
@@ -125,8 +152,13 @@ const CommunitySafety = () => {
                 HEADER. A map that coarsens its data without saying so invites
                 the reader to believe a circle is a place. */}
             <div className="cs-notice" role="note">
-              <h2>How this map is put together</h2>
-              <ul>
+              <h2>How to use this map</h2>
+              <p>This map shows general areas where incidents have been recorded in Barangay Batinguel. Darker colors mean more reports were recorded in that area.</p>
+              <p>Tap or click a colored area to see the types of incidents reported. Exact incident locations and personal information are not shown.</p>
+              <p>You can also read the same information in “Recorded areas as a list” below the map.</p>
+              <details className="cs-privacy">
+                <summary>How does this map protect privacy?</summary>
+                <ul>
                 <li>{AGGREGATION_NOTE}</li>
                 <li>{THRESHOLD_NOTE}</li>
                 {/* ⚠️ What the shading MEANS, beside the other three
@@ -135,8 +167,9 @@ const CommunitySafety = () => {
                     darker square is a bigger COUNT and not a verdict. */}
                 <li>{SHADING_NOTE}</li>
                 <li>{NO_LOCATION_NAMES_NOTE}</li>
-              </ul>
-              <p className="cs-disclaimer">{PUBLIC_DISCLAIMER}</p>
+                </ul>
+                <p className="cs-disclaimer">{PUBLIC_DISCLAIMER}</p>
+              </details>
             </div>
 
             {problem && (
@@ -149,7 +182,7 @@ const CommunitySafety = () => {
                 id="cs-period" className="filter-select" value={period}
                 onChange={(e) => setPeriod(e.target.value)}
               >
-                {PERIODS.map((p) => (
+                {periods.map((p) => (
                   <option key={p.key} value={p.key}>{p.label}</option>
                 ))}
               </select>
@@ -157,7 +190,7 @@ const CommunitySafety = () => {
 
             {loading ? (
               <p className="cs-empty">Loading the community safety map...</p>
-            ) : (
+            ) : problem ? null : (
               <>
                 <div className="cs-stats">
                   <div className="cs-stat">
@@ -175,7 +208,10 @@ const CommunitySafety = () => {
                 </div>
 
                 <h2>{CONCENTRATION_LABEL}</h2>
-                <p className="cs-caption">{coverageSentence(mapped, total)}</p>
+                <p className="cs-caption" aria-live="polite">
+                  {chosen.monthName ? `Showing recorded incidents for ${chosen.monthName}. ` : 'Showing all recorded incidents. '}
+                  <span>{coverageSentence(mapped, total)}</span>
+                </p>
 
                 {/* ⚠️ THE MAP RENDERS UNCONDITIONALLY, AND THAT IS A FIX.
                     It used to be inside the `zones.length > 0` branch, so a
@@ -188,7 +224,7 @@ const CommunitySafety = () => {
                     ⚠️ Passing `zones` empty is safe by construction: the
                     canvas builds its basemap in an effect that does not
                     depend on `zones` at all. */}
-                <PublicSafetyMap zones={zones} />
+                <PublicSafetyMap zones={zones} zoneTypes={zoneTypes} />
 
                 {/* ⚠️ THREE DIFFERENT FACTS, STILL NOT COLLAPSED. "Nothing
                     recorded", "recorded but nothing reaches the threshold"
@@ -254,12 +290,19 @@ const CommunitySafety = () => {
                 </p>
 
                 <h2>Recorded incidents by month</h2>
+                <p className="cs-note" aria-live="polite">
+                  {selectedMonth
+                    ? `${chosen.monthName} selected — ${selectedMonthTotal} recorded incident${selectedMonthTotal === 1 ? '' : 's'}.`
+                    : 'All recorded months, for comparison.'}
+                </p>
                 {trend.rows.length === 0 ? (
                   <p className="cs-empty">{EMPTY_NOTHING_RECORDED}</p>
                 ) : (
                   <ul className="cs-trend">
                     {trend.rows.map((row) => (
-                      <li key={row.monthKey}>
+                      <li key={row.monthKey}
+                        className={selectedMonth ? (row.monthKey === selectedMonth ? 'cs-trend-selected' : 'cs-trend-other') : undefined}
+                        aria-current={row.monthKey === selectedMonth ? 'true' : undefined}>
                         <span
                           className="cs-trend-bar"
                           style={{
@@ -272,6 +315,7 @@ const CommunitySafety = () => {
                           {row.label || monthLabel(row.monthKey)}
                         </span>
                         <span className="cs-trend-value">{row.total}</span>
+                        <span className="cs-trend-selection">{row.monthKey === selectedMonth ? 'Selected' : null}</span>
                       </li>
                     ))}
                   </ul>

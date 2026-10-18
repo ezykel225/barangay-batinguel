@@ -28,7 +28,7 @@ const RAW_SQL = fs.readFileSync(MIGRATION_PATH, 'utf8')
 // as the comment strip: Combined Phase 2 had a literal `toContain` pass for
 // one table and fail for five purely because the SQL was column-aligned.
 const stripSql = (sql) => sql
-  .split('\n')
+  .split(/\r?\n/)
   .map((line) => line.replace(/--.*$/, ''))
   .join('\n')
   .replace(/\s+/g, ' ')
@@ -62,7 +62,7 @@ const returnColumns = (name) => {
 }
 
 const stripJs = (src) => src
-  .split('\n')
+  .split(/\r?\n/)
   .map((line) => line.replace(/\/\/.*$/, ''))
   .join('\n')
   .replace(/\/\*[\s\S]*?\*\//g, '')
@@ -279,14 +279,14 @@ describe('the public frontend modules', () => {
 
   // Both directions: the four public names must be PRESENT in the api module,
   // so this cannot pass by the api module having no RPC calls at all.
-  it('calls exactly the four public RPCs', () => {
+  it('calls only the original public readers plus the safe zone breakdown', () => {
     PUBLIC_FUNCTIONS.forEach((fn) => {
       expect(API_CODE).toContain(fn)
     })
     const called = [...API_CODE.matchAll(/supabase\.rpc\(\s*'([a-z0-9_]+)'/g)]
       .map((m) => m[1])
     const literal = [...API_CODE.matchAll(/'(public_safety_[a-z_]+)'/g)].map((m) => m[1])
-    expect(literal.sort()).toEqual([...PUBLIC_FUNCTIONS].sort())
+    expect(literal.sort()).toEqual([...PUBLIC_FUNCTIONS, 'public_safety_zone_type_counts'].sort())
     // the single `call` helper takes the name as an argument
     expect(called.length).toBeLessThanOrEqual(1)
   })

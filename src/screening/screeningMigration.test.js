@@ -33,7 +33,7 @@ const DIR = path.join(__dirname, '..', '..', 'supabase-migrations')
 const FILE = path.join(DIR, '042_kp_screening_foundation.sql')
 
 const raw = fs.readFileSync(FILE, 'utf8')
-const code = raw.split('\n').map((l) => l.replace(/--.*$/, '')).join('\n')
+const code = raw.split(/\r?\n/).map((l) => l.replace(/--.*$/, '')).join('\n')
 const lower = code.toLowerCase()
 
 const fn = (name) => {

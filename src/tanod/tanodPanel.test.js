@@ -7,7 +7,7 @@
 // ⚠️ CRA 5's preset sets `resetMocks: true`, so every implementation is
 // installed in `beforeEach` rather than in the factory.
 
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import fs from 'fs'
 import path from 'path'
@@ -64,6 +64,97 @@ const mount = (props = {}) => render(<TanodPanel {...props} />)
 // this helper used `findByText` and failed 18 tests with "found multiple
 // elements", which reads as the panel being broken and was the helper.
 const ready = () => screen.findAllByText('Probe Tanod One')
+
+describe('Tanod editing', () => {
+  it('updates only editable details using the existing ID and refreshes the roster', async () => {
+    mount({ canAdminister: true })
+    await ready()
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Probe Tanod Two' }))
+    expect(screen.getByLabelText('Name')).toHaveValue('Probe Tanod Two')
+    await userEvent.clear(screen.getByLabelText('Name'))
+    await userEvent.type(screen.getByLabelText('Name'), '  Updated Tanod  ')
+    await userEvent.type(screen.getByLabelText('Usual area (optional)'), '  Hall  ')
+    await userEvent.clear(screen.getByLabelText('Display order'))
+    await userEvent.type(screen.getByLabelText('Display order'), '3')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: /Add Tanod/ })).toBeInTheDocument())
+    expect(rpcCalls.find(([fn]) => fn === 'update_tanod_member')[1]).toEqual({
+      p_tanod_id: 't2', p_full_name: 'Updated Tanod', p_area_note: 'Hall', p_display_order: 3,
+    })
+    expect(fnNames().filter((fn) => fn === 'tanod_roster')).toHaveLength(2)
+    expect(fnNames()).not.toContain('add_tanod_member')
+    expect(fnNames()).not.toContain('set_tanod_member_active')
+  })
+
+  it('cancels without writing and hides Edit from read-only officials', async () => {
+    const { unmount } = mount({ canAdminister: true })
+    await ready()
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Probe Tanod One' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.getByLabelText('Name')).toHaveValue('')
+    expect(fnNames()).not.toContain('update_tanod_member')
+    unmount()
+    mount()
+    await ready()
+    expect(screen.queryByRole('button', { name: /^Edit / })).not.toBeInTheDocument()
+  })
+
+  it('rejects a whitespace-only name', async () => {
+    const { container } = mount({ canAdminister: true })
+    await ready()
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Probe Tanod One' }))
+    await userEvent.clear(screen.getByLabelText('Name'))
+    await userEvent.type(screen.getByLabelText('Name'), '   ')
+    fireEvent.submit(container.querySelector('#tnd-member-form'))
+    expect(screen.getByRole('alert')).toHaveTextContent(/name/i)
+    expect(fnNames()).not.toContain('update_tanod_member')
+  })
+
+  it('prevents duplicate saves while the RPC is pending', async () => {
+    let release
+    const held = new Promise((resolve) => { release = resolve })
+    const { container } = mount({ canAdminister: true })
+    await ready()
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Probe Tanod One' }))
+    supabase.rpc.mockImplementation((fn, args) => {
+      rpcCalls.push([fn, args])
+      if (fn === 'update_tanod_member') return held
+      return Promise.resolve({ data: fn === 'tanod_roster' ? ROSTER : ASSIGNMENTS, error: null })
+    })
+    const form = container.querySelector('#tnd-member-form')
+    fireEvent.submit(form); fireEvent.submit(form); fireEvent.submit(form)
+    expect(fnNames().filter((fn) => fn === 'update_tanod_member')).toHaveLength(1)
+    expect(screen.getByRole('button', { name: /Saving/ })).toBeDisabled()
+    await act(async () => { release({ data: null, error: null }) })
+    expect(screen.getByRole('button', { name: /Add Tanod/ })).toBeInTheDocument()
+  })
+
+  it('retains the edit form when authorization is refused', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {})
+    mount({ canAdminister: true })
+    await ready()
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Probe Tanod One' }))
+    supabase.rpc.mockResolvedValue({ data: null, error: {
+      message: 'Only the Barangay Secretary or the Punong Barangay can manage the Tanod roster.',
+    } })
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(/records staff/i)
+    expect(screen.getByLabelText('Name')).toHaveValue('Probe Tanod One')
+    warn.mockRestore()
+  })
+
+  it('uses Reactivate with a normal style and keeps Stand down destructive', async () => {
+    mount({ canAdminister: true })
+    await ready()
+    const reactivate = screen.getByRole('button', { name: 'Reactivate Probe Tanod Two' })
+    expect(reactivate).toHaveTextContent('Reactivate')
+    expect(reactivate).toHaveClass('btn-add')
+    expect(reactivate).not.toHaveClass('btn-deny')
+    expect(screen.getByRole('button', { name: 'Stand down Probe Tanod One' })).toHaveClass('btn-deny')
+    await userEvent.click(reactivate)
+    await waitFor(() => expect(rpcCalls).toContainEqual(['set_tanod_member_active', { p_tanod_id: 't2', p_active: true }]))
+  })
+})
 
 // ── A. The roster ────────────────────────────────────────────────────────────
 
@@ -259,9 +350,9 @@ describe('D. the patrol schedule', () => {
     await ready()
     await userEvent.type(screen.getByLabelText('Name'), 'Probe Tanod Three')
     const form = container.querySelector('#tnd-member-form')
-    form.requestSubmit(); form.requestSubmit(); form.requestSubmit()
+    act(() => { form.requestSubmit(); form.requestSubmit(); form.requestSubmit() })
     expect(calls).toBe(1)
-    release()
+    await act(async () => { release() })
   })
 })
 
@@ -297,7 +388,7 @@ describe('E. when a write is refused', () => {
 
 describe('F. the wiring', () => {
   const read = (p) => fs.readFileSync(path.join(__dirname, '..', p), 'utf8')
-  const code = (p) => read(p).split('\n')
+  const code = (p) => read(p).split(/\r?\n/)
     .map((l) => l.replace(/\/\/.*$/, '')).join('\n')
     .replace(/\/\*[\s\S]*?\*\//g, '')
 

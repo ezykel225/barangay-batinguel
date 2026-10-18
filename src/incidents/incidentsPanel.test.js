@@ -341,7 +341,7 @@ describe('E. Tanod on an incident', () => {
 
 describe('F. the wiring', () => {
   const read = (p) => fs.readFileSync(path.join(__dirname, '..', p), 'utf8')
-  const code = (p) => read(p).split('\n')
+  const code = (p) => read(p).split(/\r?\n/)
     .map((l) => l.replace(/\/\/.*$/, '')).join('\n')
     .replace(/\/\*[\s\S]*?\*\//g, '')
 

@@ -432,7 +432,7 @@ describe('H. what concluding does not touch', () => {
 
 describe('I. the wiring', () => {
   const read = (p) => fs.readFileSync(path.join(__dirname, p), 'utf8')
-  const stripped = (p) => read(p).split('\n')
+  const stripped = (p) => read(p).split(/\r?\n/)
     .map((l) => l.replace(/\/\/.*$/, ''))
     .join('\n')
     .replace(/\/\*[\s\S]*?\*\//g, '')
