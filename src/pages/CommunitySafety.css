@@ -6,6 +6,58 @@
 .cs-page { min-height: 100vh; display: flex; flex-direction: column; }
 .cs-page main { flex: 1; }
 
+/* Match the Officials / Health Center hero proportions and breakpoints. */
+.cs-hero {
+  background: linear-gradient(to right, rgba(15, 23, 80, 0.90), rgba(30, 64, 175, 0.65)),
+    url('../assets/images/community-safety-hero.jpg');
+  background-size: cover;
+  background-position: right 60%;
+  min-height: 500px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  padding: 60px 40px;
+  color: #ffffff;
+}
+.cs-hero-container { width: 100%; max-width: 1200px; margin: 0 auto; min-width: 0; }
+.cs-hero-badge {
+  display: inline-block;
+  padding: 7px 16px;
+  margin-bottom: 16px;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-13, 13px);
+  font-weight: 500;
+}
+.cs-hero h1 {
+  margin: 0 0 16px;
+  max-width: 680px;
+  font-size: var(--fs-48);
+  font-weight: 700;
+  line-height: 1.15;
+  color: #ffffff;
+  overflow-wrap: anywhere;
+}
+.cs-hero h1 span { display: block; }
+.cs-hero p {
+  margin: 0;
+  max-width: 520px;
+  color: #bfdbfe;
+  font-size: var(--fs-16, 16px);
+  line-height: 1.7;
+}
+@media (max-width: 768px) {
+  .cs-hero { min-height: 460px; padding: 42px 20px; }
+  .cs-hero h1 { font-size: var(--fs-34); }
+}
+@media (max-width: 480px) {
+  .cs-hero { min-height: auto; padding: 32px 16px; }
+  .cs-hero h1 { font-size: var(--fs-26); }
+  .cs-hero p { font-size: var(--fs-14); }
+  .cs-hero h1 span { display: inline; }
+}
+
 .cs-page summary:focus-visible,
 .cs-page select:focus-visible {
   outline: 3px solid #1d4ed8;
@@ -22,7 +74,7 @@
 }
 .cs-privacy[open] summary { margin-bottom: 6px; }
 
-.cs-section { padding: 28px 0 56px; background: #f8fafc; }
+.cs-section { padding: 18px 0 56px; background: #f8fafc; }
 
 /* ⚠️ `minmax(0, 1fr)`, never a bare `1fr`. X2's biggest finding: a bare
    track is `minmax(auto, 1fr)` and cannot shrink below its content's

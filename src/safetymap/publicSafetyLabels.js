@@ -24,8 +24,8 @@ export { incidentTypeLabel, INCIDENT_TYPES }
 // operational category the barangay records; it is not an offence code, no
 // court has found anything, and the public page must not read as a crime
 // statistic.
-export const PAGE_TITLE = 'Community Safety Map'
-export const PAGE_INTRO = 'Where incidents have been recorded across Barangay Batinguel, shown as general areas rather than exact places.'
+export const PAGE_TITLE = 'Community Safety & Incident Trends'
+export const PAGE_INTRO = 'View privacy-protected incident patterns and recorded trends across Barangay Batinguel. Exact incident locations and personal information are not shown.'
 
 export const CONCENTRATION_LABEL = 'Recorded incident concentration'
 

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { FaShieldAlt } from 'react-icons/fa'
 
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
@@ -11,11 +10,10 @@ import {
 } from '../safetymap/publicSafetyApi'
 import {
   AGGREGATION_NOTE, CONCENTRATION_LABEL, EMPTY_NOTHING_MAPPED,
-  EMPTY_NOTHING_RECORDED, NO_LOCATION_NAMES_NOTE, PAGE_INTRO, PAGE_TITLE,
+  EMPTY_NOTHING_RECORDED, NO_LOCATION_NAMES_NOTE, PAGE_INTRO,
   EMPTY_NO_ZONES, PUBLIC_DISCLAIMER, SAFETY_ERRORS, SHADING_NOTE,
   THRESHOLD_NOTE, coverageSentence, incidentTypeLabel, publicObservation,
 } from '../safetymap/publicSafetyLabels'
-import './PageIntro.css'
 import './CommunitySafety.css'
 
 // Final Integration — the PUBLIC Community Safety Map.
@@ -132,22 +130,15 @@ const CommunitySafety = () => {
       <Navbar />
 
       <main id="main-content" tabIndex={-1}>
+        <section className="cs-hero" aria-labelledby="cs-title">
+          <div className="cs-hero-container">
+            <span className="cs-hero-badge">PUBLIC SAFETY INFORMATION</span>
+            <h1 id="cs-title"><span>Community Safety &</span>{' '}<span>Incident Trends</span></h1>
+            <p>{PAGE_INTRO}</p>
+          </div>
+        </section>
         <section className="cs-section">
           <div className="cs-container">
-            <div className="page-intro">
-              <div className="page-intro-row">
-                <div className="page-intro-main">
-                  <span className="page-intro-icon" aria-hidden="true">
-                    <FaShieldAlt />
-                  </span>
-                  <div className="page-intro-text">
-                    <h1>{PAGE_TITLE}</h1>
-                    <p>{PAGE_INTRO}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
             {/* ⚠️ THE PRIVACY RULE IS ON THE PAGE, NOT ONLY IN A MIGRATION
                 HEADER. A map that coarsens its data without saying so invites
                 the reader to believe a circle is a place. */}

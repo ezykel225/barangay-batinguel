@@ -239,6 +239,11 @@ describe('the page itself', () => {
     const h1s = screen.getAllByRole('heading', { level: 1 })
     expect(h1s).toHaveLength(1)
     expect(h1s[0]).toHaveTextContent(LABELS.PAGE_TITLE)
+    expect(h1s[0]).toHaveTextContent('Community Safety & Incident Trends')
+    expect(h1s[0].closest('section')).toHaveClass('cs-hero')
+    expect(screen.getByText('PUBLIC SAFETY INFORMATION')).toBeInTheDocument()
+    expect(screen.getByText('View privacy-protected incident patterns and recorded trends across Barangay Batinguel. Exact incident locations and personal information are not shown.')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Community Safety Map' })).not.toBeInTheDocument()
   })
 
   it('omits the redundant Back to Home link and keeps the page heading', async () => {
