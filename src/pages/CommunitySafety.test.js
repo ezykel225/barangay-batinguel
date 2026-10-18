@@ -15,7 +15,7 @@
 // ⚠️ CRA 5's preset sets `resetMocks: true`, so every implementation is
 // installed in `beforeEach` rather than in the factory.
 
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 
@@ -33,10 +33,15 @@ jest.mock('../supabase/supabaseClient', () => ({
 
 jest.mock('leaflet', () => {
   const layer = () => {
+    let added
+    const element = globalThis.document.createElement('div')
     const self = {
-      addTo: () => self,
+      addTo: () => { if (added) added(); return self },
       remove: () => self,
       bindPopup: (html) => { globalThis.__popups.push(html); return self },
+      on: (event, callback) => { if (event === 'add') added = callback; return self },
+      getElement: () => { globalThis.__cellElements.push(element); return element },
+      openPopup: () => { globalThis.__opened = true; return self },
     }
     return self
   }
@@ -119,7 +124,7 @@ const MONTHLY = [
 const OVERVIEW = { total_incidents: 9, mapped_incidents: 7, zone_count: 2 }
 
 const respond = ({
-  overview = OVERVIEW, zones = DIRTY_ZONES, types = TYPES, monthly = MONTHLY,
+  overview = OVERVIEW, zones = DIRTY_ZONES, types = TYPES, monthly = MONTHLY, zoneTypes = [],
 } = {}) => {
   supabase.rpc.mockImplementation((fn) => {
     const table = {
@@ -127,6 +132,7 @@ const respond = ({
       public_safety_zones: zones,
       public_safety_type_counts: types,
       public_safety_monthly: monthly,
+      public_safety_zone_type_counts: zoneTypes,
     }
     if (!(fn in table)) {
       throw new Error(`the public page called a non-public RPC: ${fn}`)
@@ -135,8 +141,43 @@ const respond = ({
   })
 }
 
-// The page renders `<Link>`s of its own (Back to Home, and the closing
-// notice's complaint link), so it needs a Router exactly as
+describe('privacy-safe cell type breakdown', () => {
+  it.each([
+    [8, [['disturbance',3],['traffic_accident',3],['public_safety_hazard',2]], ['Disturbance — 3','Traffic accident — 3','Public safety hazard — 2']],
+    [5, [['disturbance',2],['traffic_accident',2],[null,1]], ['Disturbance — 2','Traffic accident — 2','Other recorded incidents — 1']],
+    [2, [[null,2]], ['Other recorded incidents — 2']],
+    [2, [['traffic_accident',2]], ['Traffic accident — 2']],
+  ])('shows the safe breakdown for a %s-incident cell in popup and list', async (total, buckets, labels) => {
+    respond({ zones: [{ ...DIRTY_ZONES[0], total }], types: [], zoneTypes: buckets.map(([incident_type, count]) => ({
+      zone_key: ZONES[0].zone_key, incident_type, total: count,
+      narrative: NARRATIVE, reference: REFERENCE, location_text: STREET, full_name: WITNESS, evidence: 'secret-evidence.jpg',
+    })) })
+    show()
+    await ready()
+    const list = screen.getByText('Recorded areas as a list').parentElement
+    labels.forEach((label) => expect(list).toHaveTextContent(label))
+    const popup = globalThis.__popups.join(' ').replace(/&mdash;/g, '—')
+    labels.forEach((label) => expect(popup).toContain(label))
+    for (const secret of [NARRATIVE, REFERENCE, STREET, WITNESS, 'secret-evidence.jpg']) {
+      expect(list.textContent + popup).not.toContain(secret)
+    }
+    if (buckets.every(([type]) => type === null)) {
+      expect(list.textContent + popup).not.toMatch(/Disturbance|Traffic accident|Public safety hazard/)
+    }
+  })
+
+  it('makes grid rectangles keyboard-focusable and opens their popup with Enter', async () => {
+    show()
+    await ready()
+    const element = globalThis.__cellElements[0]
+    expect(element).toHaveAttribute('tabindex', '0')
+    expect(element).toHaveAttribute('role', 'button')
+    fireEvent.keyDown(element, { key: 'Enter' })
+    expect(globalThis.__opened).toBe(true)
+  })
+})
+
+// The page renders the closing notice's complaint link, so it needs a Router exactly as
 // `Announcements.test.js` gives one to its page component.
 const show = () => render(
   <MemoryRouter><CommunitySafety /></MemoryRouter>
@@ -151,12 +192,47 @@ const ready = async () => {
 beforeEach(() => {
   globalThis.__popups = []
   globalThis.__shapes = []
+  globalThis.__cellElements = []
+  globalThis.__opened = false
   respond()
 })
 
 // ─── What it renders at all ─────────────────────────────────────────────────
 
 describe('the page itself', () => {
+  it('provides short guidance with privacy details behind a native disclosure', async () => {
+    show()
+    await ready()
+    expect(screen.getByRole('heading', { name: 'How to use this map' })).toBeInTheDocument()
+    expect(screen.getByText(/Tap or click a colored area/)).toHaveTextContent('Exact incident locations and personal information are not shown.')
+    const summary = screen.getByText('How does this map protect privacy?')
+    const details = summary.closest('details')
+    expect(details).not.toHaveAttribute('open')
+    await userEvent.click(summary)
+    expect(details).toHaveAttribute('open')
+    for (const text of [LABELS.AGGREGATION_NOTE, LABELS.THRESHOLD_NOTE, LABELS.NO_LOCATION_NAMES_NOTE, LABELS.PUBLIC_DISCLAIMER]) {
+      expect(within(details).getByText(text)).toBeVisible()
+    }
+    await userEvent.click(summary)
+    expect(details).not.toHaveAttribute('open')
+  })
+
+  it('gives each recorded area a clear heading above its complete safe breakdown', async () => {
+    respond({ zoneTypes: [
+      { zone_key: ZONES[0].zone_key, incident_type: 'disturbance', total: 2 },
+      { zone_key: ZONES[0].zone_key, incident_type: 'traffic_accident', total: 2 },
+      { zone_key: ZONES[0].zone_key, incident_type: null, total: 1 },
+    ] })
+    show()
+    await ready()
+    await userEvent.click(screen.getByText('Recorded areas as a list'))
+    const heading = screen.getByRole('heading', { name: 'Area 1 — 5 incidents recorded' })
+    const card = heading.closest('li')
+    expect(within(card).getByText('Disturbance — 2')).toBeInTheDocument()
+    expect(within(card).getByText('Traffic accident — 2')).toBeInTheDocument()
+    expect(within(card).getByText('Other recorded incidents — 1')).toBeInTheDocument()
+  })
+
   it('renders one h1, and it is the page title', async () => {
     show()
     await ready()
@@ -165,11 +241,11 @@ describe('the page itself', () => {
     expect(h1s[0]).toHaveTextContent(LABELS.PAGE_TITLE)
   })
 
-  it('offers a Back to Home link, so a resident needs no account to leave', async () => {
+  it('omits the redundant Back to Home link and keeps the page heading', async () => {
     show()
     await ready()
-    const back = screen.getByRole('link', { name: /Back to Home/i })
-    expect(back).toHaveAttribute('href', '/')
+    expect(screen.queryByRole('link', { name: /Back to Home/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: LABELS.PAGE_TITLE })).toBeInTheDocument()
   })
 
   it('reads the four public RPCs and nothing else', async () => {
@@ -180,6 +256,7 @@ describe('the page itself', () => {
       'public_safety_monthly',
       'public_safety_overview',
       'public_safety_type_counts',
+      'public_safety_zone_type_counts',
       'public_safety_zones',
     ])
     expect(supabase.from).not.toHaveBeenCalled()
@@ -477,6 +554,72 @@ describe('the empty states', () => {
 // ─── The period filter ─────────────────────────────────────────────────────
 
 describe('the period filter', () => {
+  it('marks the selected month with text and restores the normal all-recorded comparison', async () => {
+    const choices = require('./CommunitySafety').communityPeriods()
+    respond({ monthly: choices.slice(0, 3).map((option, index) => ({ month_key: option.from.slice(0, 7), total: [6, 12, 4][index] })) })
+    show()
+    await ready()
+    expect(screen.getByText(`${choices[0].monthName} selected — 6 recorded incidents.`)).toBeInTheDocument()
+    expect(screen.getByText('Selected').closest('li')).toHaveAttribute('aria-current', 'true')
+    await userEvent.selectOptions(screen.getByLabelText('Period'), choices[1].key)
+    await ready()
+    expect(screen.getByText(`${choices[1].monthName} selected — 12 recorded incidents.`)).toBeInTheDocument()
+    expect(screen.getByText('Selected').closest('li')).toHaveClass('cs-trend-selected')
+    expect(screen.getAllByText('Selected')).toHaveLength(1)
+    await userEvent.selectOptions(screen.getByLabelText('Period'), 'all')
+    await ready()
+    expect(screen.getByText('All recorded months, for comparison.')).toBeInTheDocument()
+    expect(screen.queryByText('Selected')).not.toBeInTheDocument()
+    expect(globalThis.document.querySelectorAll('.cs-trend-selected, .cs-trend-other')).toHaveLength(0)
+  })
+
+  it('reports zero when the selected month has no recorded history row', async () => {
+    const choices = require('./CommunitySafety').communityPeriods()
+    respond({ monthly: [] })
+    show()
+    await ready()
+    expect(screen.getByText(`${choices[0].monthName} selected — 0 recorded incidents.`)).toBeInTheDocument()
+  })
+
+  it.each([0, 1, 2, 3])('updates the complete safety view for calendar option %s', async (index) => {
+    const choices = require('./CommunitySafety').communityPeriods()
+    const counts = [6, 5, 4, 18]
+    supabase.rpc.mockImplementation((fn, args) => {
+      const optionIndex = args.p_from === null ? 3 : choices.findIndex((option) => option.from === args.p_from)
+      const total = counts[optionIndex]
+      const incident_type = optionIndex === 2 ? null : 'disturbance'
+      const table = {
+        public_safety_overview: [{ total_incidents: total, mapped_incidents: total, zone_count: 1 }],
+        public_safety_zones: [{ ...ZONES[0], total }],
+        public_safety_zone_type_counts: [{ zone_key: ZONES[0].zone_key, incident_type, total }],
+        public_safety_type_counts: [{ incident_type: 'disturbance', total }],
+        public_safety_monthly: ['2026-08', '2026-09', '2026-10'].map((month_key) => ({ month_key, total: 6 })),
+      }
+      return Promise.resolve({ data: table[fn], error: null })
+    })
+    show()
+    await ready()
+    if (index > 0) {
+      await userEvent.selectOptions(screen.getByLabelText('Period'), choices[index].key)
+      await ready()
+    }
+    const total = counts[index]
+    expect(screen.getByText('Incidents recorded').closest('.cs-stat')).toHaveTextContent(String(total))
+    expect(screen.getByText('Areas shown on the map').closest('.cs-stat')).toHaveTextContent('1')
+    const list = screen.getByText('Recorded areas as a list', { selector: 'summary' }).parentElement
+    expect(list).toHaveTextContent(`Area 1 — ${total} incidents recorded`)
+    expect(list).toHaveTextContent(`${index === 2 ? 'Other recorded incidents' : 'Disturbance'} — ${total}`)
+    const popup = globalThis.__popups[globalThis.__popups.length - 1]
+    expect(popup).toContain(`${total} incidents recorded`)
+    expect(popup).toContain(index === 2 ? 'Other recorded incidents' : 'Disturbance')
+    if (index === 2) expect(popup).not.toContain('Disturbance')
+    const bars = screen.getByRole('heading', { name: 'Recorded incidents by type' }).nextElementSibling
+    expect(bars).toHaveTextContent(`Disturbance${total}`)
+    expect(screen.getByText('Aug 2026')).toBeInTheDocument()
+    expect(screen.getByText('Sep 2026')).toBeInTheDocument()
+    expect(screen.getByText('Oct 2026')).toBeInTheDocument()
+  })
+
   it('is a labelled control carrying the shared filter class', async () => {
     show()
     await ready()
@@ -489,20 +632,43 @@ describe('the period filter', () => {
     expect(select).toHaveClass('filter-select')
   })
 
-  it('re-reads all four RPCs with a date bound when a period is chosen', async () => {
+  it.each([0, 1, 2])('uses the full calendar month for option %s and keeps history unfiltered', async (index) => {
     show()
     await ready()
-    supabase.rpc.mockClear()
-    await userEvent.selectOptions(screen.getByLabelText('Period'), '3m')
-    await waitFor(() => expect(supabase.rpc).toHaveBeenCalledTimes(4))
-    supabase.rpc.mock.calls.forEach(([, args]) => {
-      expect(args.p_from).toMatch(/^\d{4}-\d{2}-\d{2}$/)
-      expect(args.p_to).toBeNull()
+    const choices = require('./CommunitySafety').communityPeriods()
+    const chosen = choices[index]
+    if (index > 0) {
+      supabase.rpc.mockClear()
+      await userEvent.selectOptions(screen.getByLabelText('Period'), chosen.key)
+      await ready()
+    }
+    expect(screen.getByLabelText('Period')).toHaveValue(chosen.key)
+    expect(supabase.rpc.mock.calls).toHaveLength(5)
+    supabase.rpc.mock.calls.forEach(([fn, args]) => {
+      expect(args).toEqual(fn === 'public_safety_monthly'
+        ? { p_from: null, p_to: null }
+        : { p_from: chosen.from, p_to: chosen.to })
     })
+    expect(screen.getByText(new RegExp(`Showing recorded incidents for ${chosen.monthName}`))).toBeInTheDocument()
+    expect(screen.getByText('Sep 2026')).toBeInTheDocument()
+    expect(screen.getByText('Oct 2026')).toBeInTheDocument()
+  })
+
+  it('calculates Manila months across UTC rollover, year boundaries and leap years', () => {
+    const { communityPeriods } = require('./CommunitySafety')
+    const options = communityPeriods(new Date('2026-09-30T16:30:00Z'))
+    expect(options.map((o) => o.label)).toEqual(['This month', 'September 2026', 'August 2026', 'All recorded'])
+    expect(options[0]).toMatchObject({ from: '2026-10-01', to: '2026-10-31' })
+    const january = communityPeriods(new Date('2026-01-01T00:00:00Z'))
+    expect(january[1]).toMatchObject({ label: 'December 2025', from: '2025-12-01', to: '2025-12-31' })
+    expect(communityPeriods(new Date('2024-03-01T00:00:00Z'))[1].to).toBe('2024-02-29')
   })
 
   it('sends no date bound for All recorded', async () => {
     show()
+    await ready()
+    supabase.rpc.mockClear()
+    await userEvent.selectOptions(screen.getByLabelText('Period'), 'all')
     await ready()
     supabase.rpc.mock.calls.forEach(([, args]) => {
       expect(args.p_from).toBeNull()
@@ -604,7 +770,7 @@ describe('what the numbers say', () => {
   it('gives the map an accessible list fallback of counts only', async () => {
     show()
     await ready()
-    const summary = screen.getByText(/Recorded areas as a list/i)
+    const summary = screen.getByText('Recorded areas as a list', { selector: 'summary' })
     const list = summary.parentElement
     expect(within(list).getAllByRole('listitem')).toHaveLength(ZONES.length)
     expect(list.textContent).not.toContain(STREET)

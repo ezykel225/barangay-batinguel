@@ -1,4 +1,4 @@
-// Final Integration — the PUBLIC Community Safety Map's four reads.
+// The PUBLIC Community Safety Map's aggregate reads.
 //
 // ⚠️ THIS MODULE MUST NEVER CALL AN OFFICIAL READER. The four RPCs below are
 // migration 045's, and they are the only functions in this project that read
@@ -38,6 +38,10 @@ export const loadPublicOverview = async (opts) => {
 
 export const loadPublicZones = (opts) => call(
   'public_safety_zones', range(opts), 'Public zones'
+)
+
+export const loadPublicZoneTypeCounts = (opts) => call(
+  'public_safety_zone_type_counts', range(opts), 'Public zone type counts'
 )
 
 export const loadPublicTypeCounts = (opts) => call(

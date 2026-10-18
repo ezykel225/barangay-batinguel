@@ -15,20 +15,37 @@
   overflow: hidden;
 }
 
-.psm-alt { font-size: var(--fs-13); color: #5f6775; }
+.psm-alt { font-size: var(--fs-16, 16px); line-height: 1.6; color: #374151; }
 
 /* ⚠️ A TARGET, NOT DECORATION. A bare summary line is ~18px tall, under
    WCAG 2.2 SC 2.5.8's 24px minimum. */
 .psm-alt summary {
   cursor: pointer;
-  padding: 6px 0;
-  min-height: 24px;
+  padding: 10px 0;
+  min-height: 44px;
   font-weight: 600;
   color: #1e293b;
 }
 
-.psm-alt-list { margin: 6px 0 0; padding-left: 20px; }
-.psm-alt-list li { margin-bottom: 4px; overflow-wrap: anywhere; }
+.psm-alt-list { margin: 8px 0 0; padding: 0; list-style: none; }
+.psm-area {
+  margin-bottom: 10px;
+  padding: 12px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: var(--radius-sm, 6px);
+  background: #ffffff;
+  overflow-wrap: anywhere;
+}
+.cs-container .psm-area-heading {
+  margin: 0 0 6px;
+  font-size: var(--fs-16, 16px);
+  line-height: 1.5;
+  font-weight: 700;
+  color: #1e293b;
+}
+.psm-area-types { margin: 0; padding-left: 20px; }
+.psm-area-types li { margin: 2px 0; overflow-wrap: anywhere; }
+.psm-alt summary:focus-visible { outline: 3px solid #1d4ed8; outline-offset: 3px; }
 .psm-empty { margin: 6px 0 0; color: #5f6775; }
 
 /* ── The key ────────────────────────────────────────────────────────────
@@ -43,7 +60,7 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  font-size: var(--fs-12);
+  font-size: var(--fs-14, 14px);
   color: #5f6775;
 }
 

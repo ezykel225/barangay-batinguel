@@ -43,7 +43,7 @@ const read = (p) => fs.readFileSync(path.join(SRC, p), 'utf8')
 // ⚠️ Comment-stripped. These files discuss `committee`, `full_name`,
 // every forbidden verb and the whole authorization model at length
 // precisely to record what is NOT read.
-const code = (p) => read(p).split('\n')
+const code = (p) => read(p).split(/\r?\n/)
   .map((l) => l.replace(/\/\/.*$/, ''))
   .join('\n')
   .replace(/\/\*[\s\S]*?\*\//g, '')

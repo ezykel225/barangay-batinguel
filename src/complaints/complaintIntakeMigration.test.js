@@ -29,7 +29,7 @@ const RAW_041 = fs.readFileSync(path.join(DIR, '041_complaint_evidence_storage.s
 // assertion that the dashboard contains no `.eq('full_name', …)` failed on
 // the comment quoting the expression it documented removing.
 const code = (raw) => raw
-  .split('\n')
+  .split(/\r?\n/)
   .map((line) => line.replace(/--.*$/, ''))
   .join('\n')
 
@@ -40,7 +40,7 @@ const CODE_BOTH = `${CODE_040}\n${CODE_041}`
 // Collapses hard-wrapped SQL comment prose into one string, so an assertion
 // is about the sentence rather than about where a line happens to break.
 const prose = (raw) => raw
-  .split('\n')
+  .split(/\r?\n/)
   .filter((line) => line.trim().startsWith('--'))
   .map((line) => line.replace(/^\s*--\s?/, ''))
   .join(' ')

@@ -6,6 +6,22 @@
 .cs-page { min-height: 100vh; display: flex; flex-direction: column; }
 .cs-page main { flex: 1; }
 
+.cs-page summary:focus-visible,
+.cs-page select:focus-visible {
+  outline: 3px solid #1d4ed8;
+  outline-offset: 3px;
+}
+
+.cs-privacy { margin-top: 12px; }
+.cs-privacy summary {
+  min-height: 44px;
+  padding: 10px 0;
+  cursor: pointer;
+  color: #1e3a8a;
+  font-weight: 600;
+}
+.cs-privacy[open] summary { margin-bottom: 6px; }
+
 .cs-section { padding: 28px 0 56px; background: #f8fafc; }
 
 /* ⚠️ `minmax(0, 1fr)`, never a bare `1fr`. X2's biggest finding: a bare
@@ -233,6 +249,18 @@
 .cs-trend-label { font-size: 11px; color: #5f6775; }
 .cs-trend-value { font-size: var(--fs-12, 12px); font-weight: 600; color: #1e293b; }
 
+.cs-trend .cs-trend-selected .cs-trend-bar {
+  outline: 2px solid #1e293b;
+  outline-offset: 3px;
+}
+.cs-trend .cs-trend-other .cs-trend-bar { opacity: 0.6; }
+.cs-trend-selection {
+  min-height: 1.5em;
+  font-size: var(--fs-14, 14px);
+  font-weight: 600;
+  color: #1e293b;
+}
+
 .cs-observations { list-style: none; margin: 0 0 8px; padding: 0; }
 
 .cs-observations li {
@@ -252,3 +280,24 @@
   .cs-bars li { grid-template-columns: minmax(0, 1fr) auto; }
   .cs-bar-track { grid-column: 1 / -1; }
 }
+
+/* Readable help and data labels using the site's existing typography. */
+.cs-page .page-intro-text p,
+.cs-page .cs-notice p,
+.cs-page .cs-notice li,
+.cs-page .cs-notice h2,
+.cs-page .cs-filters label,
+.cs-page .cs-filters .filter-select,
+.cs-page .cs-caption,
+.cs-page .cs-note,
+.cs-page .cs-empty,
+.cs-page .cs-observations li,
+.cs-page .cs-bar-label,
+.cs-page .cs-bar-value {
+  font-size: var(--fs-16, 16px);
+  line-height: 1.6;
+}
+.cs-page .cs-filters .filter-select { min-height: 44px; }
+.cs-page .cs-stat-label,
+.cs-page .cs-trend-label,
+.cs-page .cs-trend-value { font-size: var(--fs-14, 14px); }

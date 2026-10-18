@@ -31,7 +31,7 @@ const read = (p) => fs.readFileSync(path.join(SRC, p), 'utf8')
 // ⚠️ Comment-stripped. These files discuss `committee`, `supabase.from`,
 // settlement and every deferred stage at length precisely to record that
 // none is used.
-const code = (p) => read(p).split('\n')
+const code = (p) => read(p).split(/\r?\n/)
   .map((l) => l.replace(/\/\/.*$/, ''))
   .join('\n')
   .replace(/\/\*[\s\S]*?\*\//g, '')

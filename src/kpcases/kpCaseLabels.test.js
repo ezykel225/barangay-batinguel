@@ -53,12 +53,12 @@ const raw = fs.readFileSync(MIGRATION, 'utf8')
 // scan that counted those sentences would report the file's own
 // documentation as the defect it documents avoiding. The
 // `complaintIntakeMigration.test.js` precedent.
-const sql = raw.split('\n')
+const sql = raw.split(/\r?\n/)
   .map((line) => line.replace(/--.*$/, ''))
   .join('\n')
 
 const labelFile = fs.readFileSync(path.join(__dirname, 'kpCaseLabels.js'), 'utf8')
-const labelCode = labelFile.split('\n')
+const labelCode = labelFile.split(/\r?\n/)
   .map((line) => line.replace(/\/\/.*$/, ''))
   .join('\n')
   .replace(/\/\*[\s\S]*?\*\//g, '')

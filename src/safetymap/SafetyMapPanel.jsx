@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { FaChartBar, FaInfoCircle, FaMapMarkedAlt, FaShieldAlt } from 'react-icons/fa'
 
-import { INCIDENT_TYPE_KEYS, incidentStatusLabel, incidentTypeLabel } from '../incidents/incidentLabels'
+import { INCIDENT_TYPE_KEYS, commonTypeLabel, incidentStatusLabel, incidentTypeLabel } from '../incidents/incidentLabels'
 import IncidentMap from './IncidentMap'
 import {
   COVERAGE_CAVEAT, OBSERVATION_DISCLAIMER, bandFor, coverageGaps, coverageTotals,
@@ -259,7 +259,7 @@ const SafetyMapPanel = () => {
                     <tr key={spot.key}>
                       <td data-label="Location">{spot.location_label}</td>
                       <td data-label="Recorded">{spot.total}</td>
-                      <td data-label="Most common type">{incidentTypeLabel(spot.top_type)}</td>
+                      <td data-label="Most common type">{commonTypeLabel(spot.top_type)}</td>
                       <td data-label="Band">{bandFor(spot.total, peak).label}</td>
                       <td data-label="On the map">
                         {Number(spot.with_coordinates) > 0
@@ -276,7 +276,7 @@ const SafetyMapPanel = () => {
             <ul className="smap-observations">
               {hotspots.slice(0, 5).map((spot) => (
                 <li key={spot.key}>
-                  {observationFor(spot, incidentTypeLabel(spot.top_type))}
+                  {observationFor(spot, spot.top_type?.includes(' / ') ? '' : incidentTypeLabel(spot.top_type))}
                 </li>
               ))}
             </ul>

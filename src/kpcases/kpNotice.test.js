@@ -22,7 +22,7 @@ import { DOCUMENT_TEMPLATE_MODE, SIGNATORY_PLACEHOLDER } from '../documents/docu
 
 const SRC = path.join(__dirname, '..')
 const code = (p) => fs.readFileSync(path.join(SRC, p), 'utf8')
-  .split('\n').map((l) => l.replace(/\/\/.*$/, '')).join('\n')
+  .split(/\r?\n/).map((l) => l.replace(/\/\/.*$/, '')).join('\n')
   .replace(/\/\*[\s\S]*?\*\//g, '')
 
 const KP_CASE = {

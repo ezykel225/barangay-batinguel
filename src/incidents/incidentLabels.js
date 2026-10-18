@@ -34,6 +34,14 @@ export const INCIDENT_TYPE_KEYS = Object.freeze(Object.keys(INCIDENT_TYPES))
 // which is the rule the Activity Log already follows.
 export const incidentTypeLabel = (value) => lookup(INCIDENT_TYPES, value, value ?? '')
 
+// The location reader keeps a single key for a winner and joins tied keys.
+export const commonTypeLabel = (value) => {
+  const types = String(value ?? '').split(' / ').filter(Boolean)
+  if (types.length > 2) return 'Multiple types (tie)'
+  const label = types.map(incidentTypeLabel).join(' / ')
+  return types.length === 2 ? `${label} (tie)` : label
+}
+
 export const INCIDENT_TYPE_DISCLAIMER = 'These categories describe what the barangay was called about. They are not offence classifications and they assign no fault.'
 
 export const INCIDENT_STATUSES = Object.freeze({

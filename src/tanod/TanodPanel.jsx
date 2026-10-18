@@ -8,7 +8,7 @@ import {
 } from './tanodLabels'
 import {
   addTanodMember, loadTanodAssignments, loadTanodRoster, scheduleAssignment,
-  setAssignmentActive, setTanodActive, tanodMessage,
+  setAssignmentActive, setTanodActive, tanodMessage, updateTanodMember,
 } from './tanodApi'
 import './Tanod.css'
 
@@ -33,6 +33,7 @@ const TanodPanel = ({ canAdminister = false }) => {
   const [busy, setBusy] = useState('')
 
   const [member, setMember] = useState(blankMember)
+  const [editingId, setEditingId] = useState(null)
   const [assignment, setAssignment] = useState(blankAssignment)
 
   const inFlight = useRef(false)
@@ -76,9 +77,18 @@ const TanodPanel = ({ canAdminister = false }) => {
 
   const handleAddMember = async (event) => {
     event.preventDefault()
-    if (!String(member.fullName).trim()) return
-    const ok = await run('member', () => addTanodMember(member), 'addFailed')
-    if (ok) setMember(blankMember())
+    if (!canAdminister) return
+    if (!String(member.fullName).trim()) {
+      setProblem(tanodMessage({ kind: 'nameRequired' }))
+      return
+    }
+    const ok = await run('member', () => editingId
+      ? updateTanodMember({ ...member, tanodId: editingId })
+      : addTanodMember(member), editingId ? 'updateFailed' : 'addFailed')
+    if (ok) {
+      setMember(blankMember())
+      setEditingId(null)
+    }
   }
 
   const handleSchedule = async (event) => {
@@ -139,12 +149,22 @@ const TanodPanel = ({ canAdminister = false }) => {
                     {canAdminister && (
                       <td data-label="Action">
                         <button
-                          type="button" className="btn-deny btn-sm" disabled={Boolean(busy)}
-                          aria-label={`${t.active ? 'Stand down' : 'Return to roster'} ${t.full_name}`}
+                          type="button" className="btn-add btn-sm" disabled={Boolean(busy)}
+                          aria-label={`Edit ${t.full_name}`}
+                          onClick={() => {
+                            setEditingId(t.id)
+                            setMember({ fullName: t.full_name, areaNote: t.area_note || '', displayOrder: t.display_order })
+                            setProblem('')
+                            document.getElementById('tnd-name')?.focus()
+                          }}
+                        >Edit</button>
+                        <button
+                          type="button" className={`${t.active ? 'btn-deny' : 'btn-add'} btn-sm`} disabled={Boolean(busy)}
+                          aria-label={`${t.active ? 'Stand down' : 'Reactivate'} ${t.full_name}`}
                           onClick={() => run('toggle',
                             () => setTanodActive({ tanodId: t.id, active: !t.active }), 'updateFailed')}
                         >
-                          {t.active ? 'Stand down' : 'Return'}
+                          {t.active ? 'Stand down' : 'Reactivate'}
                         </button>
                       </td>
                     )}
@@ -157,7 +177,8 @@ const TanodPanel = ({ canAdminister = false }) => {
 
         {canAdminister ? (
           <form id="tnd-member-form" className="kp-form tnd-form" onSubmit={handleAddMember}>
-            <h3>Add a Tanod</h3>
+            <h3>{editingId ? 'Edit Tanod' : 'Add a Tanod'}</h3>
+            <fieldset disabled={Boolean(busy)} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
             <div className="tnd-grid">
               <div className="modal-form-group">
                 <label className="modal-form-label" htmlFor="tnd-name">Name</label>
@@ -186,9 +207,16 @@ const TanodPanel = ({ canAdminister = false }) => {
             </div>
             <div className="modal-actions">
               <button type="submit" className="btn-add" disabled={Boolean(busy)}>
-                <FaPlus aria-hidden="true" /> {busy === 'member' ? 'Adding...' : 'Add Tanod'}
+                {!editingId && <FaPlus aria-hidden="true" />} {busy === 'member' ? (editingId ? 'Saving...' : 'Adding...') : (editingId ? 'Save' : 'Add Tanod')}
               </button>
+              {editingId && (
+                <button type="button" className="btn-cancel" disabled={Boolean(busy)}
+                  onClick={() => { setEditingId(null); setMember(blankMember()); setProblem('') }}>
+                  Cancel
+                </button>
+              )}
             </div>
+            </fieldset>
           </form>
         ) : (
           <p className="complaint-no-actions" role="note">{TANOD_RESTRICTED_NOTE}</p>

@@ -26,7 +26,7 @@ const read = (p) => fs.readFileSync(path.join(SRC, p), 'utf8')
 // every P4 status at length precisely to record that none is used, so a
 // scan over the raw text would fail on the prose documenting the
 // absence -- the A5 trap, which has now caught four phases running.
-const code = (p) => read(p).split('\n')
+const code = (p) => read(p).split(/\r?\n/)
   .map((l) => l.replace(/\/\/.*$/, ''))
   .join('\n')
   .replace(/\/\*[\s\S]*?\*\//g, '')
