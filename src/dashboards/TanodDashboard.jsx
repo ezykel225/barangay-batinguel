@@ -10,19 +10,30 @@ import TanodFollowups from '../tanod/TanodFollowups'
 import TanodDutySchedule from '../tanod/TanodDutySchedule'
 import { portalAttendanceTime, portalDutyDate, portalShiftWindow, portalShiftLabel } from '../tanod/tanodPresentation'
 import Sidebar from '../components/Sidebar'
+import TanodSettings from '../tanod/TanodSettings'
+import TanodArea from '../tanod/TanodArea'
+import { compactTanodName, loadTanodProfile } from '../tanod/tanodProfile'
 import { FaClock, FaMapMarkerAlt, FaClipboardList, FaShieldAlt, FaSyncAlt, FaCalendarAlt, FaInfoCircle, FaCheckCircle, FaFilter, FaCommentAlt } from 'react-icons/fa'
 import './ResidentDashboard.css'
 import '../tanod/TanodPortal.css'
 
 const blankReport = () => ({ incidentType: 'traffic_accident', occurredAt: manilaInputNow(), narrative: '', locationText: '', latitude: '', longitude: '' })
 const statusTone = (label) => label === 'Currently on duty' ? 'on' : label === 'Check-out needed' ? 'warning' : label === 'Completed' ? 'completed' : 'scheduled'
-const tabs = [['overview','Overview'],['duty','My Duty'],['report','Report Incident'],['reports','My Reports']]
+const tabs = [['overview','Overview'],['duty','My Duty'],['report','Report Incident'],['reports','My Reports'],['settings','Settings']]
 
 export default function TanodDashboard() {
-  const { logout } = useAuth()
+  const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [tab, setTab] = useState('overview')
   const [identity, setIdentity] = useState(null)
+  const [profile, setProfile] = useState(null)
+  const userId = user?.id
+  useEffect(() => {
+    let live = true
+    setProfile(null)
+    if (userId) loadTanodProfile(userId).then(value => { if (live) setProfile(value) }).catch(() => {})
+    return () => { live = false }
+  }, [userId])
   const [duties, setDuties] = useState([])
   const [reports, setReports] = useState([])
   const [loading, setLoading] = useState(true)
@@ -75,7 +86,7 @@ export default function TanodDashboard() {
   const visibleReports = reports.filter((r) => filter === 'all' || (filter === 'submitted' ? r.submitted_by_me : r.assigned_to_me))
   const dutyCard = (d, options = {}) => <article className={"dashboard-card td-card td-duty-card td-duty-" + statusTone(dutyState(d,clock))} key={d.assignment_id}>
     <div className="td-duty-kicker"><span><FaShieldAlt aria-hidden="true" /> {options.label || (d.assignment_date === today ? "Today's Duty" : 'Duty Details')}</span><span className={`td-state td-state-${statusTone(dutyState(d,clock))}`}>{dutyState(d,clock)}</span></div>
-    <div className="td-duty-heading"><h3><FaMapMarkerAlt aria-hidden="true" /> {d.area_label}</h3></div>
+    <div className="td-duty-heading"><h3><TanodArea>{d.area_label}</TanodArea></h3></div>
     <dl className="td-duty-info"><div><dt><FaCalendarAlt aria-hidden="true" /> Date</dt><dd>{portalDutyDate(d.assignment_date)}</dd></div><div><dt><FaClock aria-hidden="true" /> Shift</dt><dd><span title="Demonstration shift label based on stored times; actual times are authoritative.">{portalShiftLabel(d, duties)}</span>{portalShiftLabel(d, duties) && ' \u00b7 '}{portalShiftWindow(d)}</dd></div></dl>
     {(d.checked_in_at || d.checked_out_at) && <div className="td-attendance-group"><h4>Attendance</h4><dl className="td-attendance">
       {d.checked_in_at && <div><dt>Checked in</dt><dd><time dateTime={d.checked_in_at}>{portalAttendanceTime(d.checked_in_at, d)}</time></dd></div>}
@@ -88,23 +99,23 @@ export default function TanodDashboard() {
   const hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Manila', hour: '2-digit', hourCycle: 'h23' }).format(clock))
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
   return <div className="dashboard-layout tanod-portal">
-    <Sidebar role="tanod" activeTab={tab} setActiveTab={setTab} tanodName={identity?.display_name || ''}
+    <Sidebar role="tanod" activeTab={tab} setActiveTab={setTab} tanodName={identity ? compactTanodName(profile, identity.display_name) : ''} tanodPhoto={profile?.photo_url || ''}
       onTanodLogout={async () => { await logout(); navigate('/login', { replace: true }) }} />
     <main id="main-content" className="dashboard-main" tabIndex={-1}><div className="td-content">
       <header className="resident-dashboard-header td-page-header">
         <div>
-        <h1>{tab === 'overview' && identity ? greeting + ', ' + identity.display_name : tabs.find(([key]) => key === tab)[1]}</h1>
-        <p>{tab === 'overview' ? 'Here is your duty information for today.' : tab === 'duty' ? 'Your schedules, attendance and recent duty history.' : tab === 'report' ? 'Record an operational incident encountered during duty.' : 'Review your submitted and assigned incidents.'}</p>
-        </div><button className="td-refresh" type="button" disabled={Boolean(busy)} onClick={refresh} aria-label="Refresh my information"><FaSyncAlt aria-hidden="true" /> Refresh</button>
+        <h1>{tab === 'overview' && identity ? greeting + ', ' + compactTanodName(profile, identity.display_name) : tabs.find(([key]) => key === tab)[1]}</h1>
+        <p>{tab === 'overview' ? 'Here is your duty information for today.' : tab === 'duty' ? 'Your schedules, attendance and recent duty history.' : tab === 'report' ? 'Record an operational incident encountered during duty.' : tab === 'settings' ? 'Manage your profile photo, account details and password.' : 'Review your submitted and assigned incidents.'}</p>
+        </div><button className="td-refresh" type="button" disabled={Boolean(busy)} onClick={() => { refresh(); if (userId) loadTanodProfile(userId).then(setProfile).catch(() => {}) }} aria-label="Refresh my information"><FaSyncAlt aria-hidden="true" /> Refresh</button>
       </header>
       {problem && <p className="td-error" role="alert">{problem}</p>}
       {loading ? <p role="status">Loading your duty information…</p> : !identity ? <p>No operational information is shown until your active account link can be confirmed.</p> : <>
         {tab === 'overview' && <>
           <section className="td-summary-grid" aria-label="Duty summary">
-            <article className="dashboard-card td-summary"><span className="td-icon"><FaShieldAlt aria-hidden="true" /></span><div><span>Duty status</span><strong><span className={'td-state td-state-' + (todayDuty ? statusTone(dutyState(todayDuty,clock)) : 'scheduled')}>{todayDuty ? dutyState(todayDuty,clock) : 'Off duty today'}</span></strong></div></article>
-            <article className="dashboard-card td-summary"><span className="td-icon"><FaClock aria-hidden="true" /></span><div><span>{summaryShift && (attendanceOpen(summaryShift) || shiftIsCurrent(summaryShift,clock)) ? 'Current shift' : 'Next shift'}</span>{summaryShift && <span className="td-summary-shift">{portalShiftLabel(summaryShift, duties)}</span>}<strong>{summaryShift ? portalShiftWindow(summaryShift) : 'No upcoming shift'}</strong>{summaryShift && <span>{portalDutyDate(summaryShift.assignment_date)}</span>}</div></article>
-            <article className="dashboard-card td-summary"><span className="td-icon"><FaMapMarkerAlt aria-hidden="true" /></span><div><span>Patrol area</span><strong>{next?.area_label || identity.usual_area || 'No assignment recorded'}</strong></div></article>
-            <article className="dashboard-card td-summary"><span className="td-icon"><FaClipboardList aria-hidden="true" /></span><div><span>Reports today</span><strong className="td-report-count">{identity.reports_today}</strong><span>{identity.reports_today} {Number(identity.reports_today) === 1 ? 'report' : 'reports'} submitted today</span></div></article>
+            <article className="dashboard-card td-summary"><span className="td-icon"><FaShieldAlt aria-hidden="true" /></span><div className="td-summary-body"><span>Duty status</span><strong><span className={'td-state td-state-' + (todayDuty ? statusTone(dutyState(todayDuty,clock)) : 'scheduled')}>{todayDuty ? dutyState(todayDuty,clock) : 'Off duty today'}</span></strong></div></article>
+            <article className="dashboard-card td-summary"><span className="td-icon"><FaClock aria-hidden="true" /></span><div className="td-summary-body"><span>{summaryShift && (attendanceOpen(summaryShift) || shiftIsCurrent(summaryShift,clock)) ? 'Current shift' : 'Next shift'}</span>{summaryShift && <span className="td-summary-shift">{portalShiftLabel(summaryShift, duties)}</span>}<strong>{summaryShift ? portalShiftWindow(summaryShift) : 'No upcoming shift'}</strong>{summaryShift && <span>{portalDutyDate(summaryShift.assignment_date)}</span>}</div></article>
+            <article className="dashboard-card td-summary"><span className="td-icon"><FaMapMarkerAlt aria-hidden="true" /></span><div className="td-summary-body"><span>Patrol area</span><strong>{next?.area_label || identity.usual_area || 'No assignment recorded'}</strong></div></article>
+            <article className="dashboard-card td-summary"><span className="td-icon"><FaClipboardList aria-hidden="true" /></span><div className="td-summary-body"><span>Reports today</span><strong className="td-report-count">{identity.reports_today}</strong><span>{identity.reports_today} {Number(identity.reports_today) === 1 ? 'report' : 'reports'} submitted today</span></div></article>
           </section>
           <div className="td-overview-duty-grid">
             <section aria-labelledby="td-today-duty-heading"><h2 id="td-today-duty-heading">Today's Duty</h2>
@@ -143,13 +154,14 @@ export default function TanodDashboard() {
             </div><button className="btn-add td-submit" type="submit">{busy === 'report' ? 'Submitting…' : 'Submit incident report'}</button>
           </fieldset></form>
         </section>}
+        {tab === 'settings' && <TanodSettings userId={userId} profile={profile} rosterName={identity.display_name} onProfileChange={setProfile} />}
         {tab === 'reports' && <div className="td-reports"><div className="td-filter-toolbar filter-select-wrap"><FaFilter aria-hidden="true" /><label>Show reports<select className="filter-select" value={filter} onChange={(e) => setFilter(e.target.value)}><option value="all">All</option><option value="submitted">Submitted by me</option><option value="assigned">Assigned to me</option></select></label></div>
           <p className="td-help td-reports-help">Showing up to 100 relevant reports. Restricted case details remain visible only to authorized staff.</p>
           {!visibleReports.length ? <div className="dashboard-card td-card td-empty"><FaClipboardList aria-hidden="true" /><h3>No reports found</h3><p>Incidents you submit or that are assigned to you will appear here.</p></div> : visibleReports.map((r) => <article className="dashboard-card td-card td-report-card" key={r.incident_id}>
             <header className="td-report-header"><h2>{r.reference}</h2><span className="td-state">{incidentStatusLabel(r.status)}</span></header>
             <p className="td-report-type">{incidentTypeLabel(r.incident_type)}</p><p className="td-meta"><FaClock aria-hidden="true" /><time dateTime={r.occurred_at}>{dutyTime(r.occurred_at)}</time></p>
             <p className="td-meta"><FaMapMarkerAlt aria-hidden="true" />{r.general_location}</p>
-            <div className="td-report-chips">{r.submitted_by_me && <span>Submitted by me</span>}{r.assigned_to_me && <span>Assigned to me</span>}<p>{r.kp_linked ? 'KP case linked — contact authorized case staff for details.' : 'No KP case linked'}</p></div>
+            <div className="td-report-chips">{r.submitted_by_me && <span>Submitted by me</span>}{r.assigned_to_me && <span>Assigned to me</span>}<span>{r.kp_linked ? 'KP case linked — contact authorized case staff for details.' : 'No KP case linked'}</span></div>
             <TanodFollowups incidentId={r.incident_id} />
           </article>)}</div>}
       </>}

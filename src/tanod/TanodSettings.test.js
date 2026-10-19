@@ -1,0 +1,77 @@
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import TanodSettings from './TanodSettings'
+import { saveTanodDetails, saveTanodPhoto } from './tanodProfile'
+import { supabase } from '../supabase/supabaseClient'
+
+jest.mock('./tanodProfile', () => ({ saveTanodDetails: jest.fn(), saveTanodPhoto: jest.fn() }))
+jest.mock('../supabase/supabaseClient', () => ({ supabase: { auth: { updateUser: jest.fn() } } }))
+const profile = { id:'account-id',role:'tanod',first_name:'Carlo',middle_name:'M.',last_name:'Abellanosa',full_name:'Carlo M. Abellanosa' }
+const changed = jest.fn()
+const show = (person = profile) => render(<TanodSettings userId="account-id" profile={person} rosterName="Official Roster Name" onProfileChange={changed} />)
+beforeEach(() => { jest.clearAllMocks(); saveTanodDetails.mockResolvedValue(profile); saveTanodPhoto.mockResolvedValue({...profile,photo_url:'https://example.test/avatar.png'}); supabase.auth.updateUser.mockResolvedValue({error:null}) })
+test('loads structured profile fields with read-only roster/link status and saves only the profile', async () => {
+  show()
+  expect(screen.getByLabelText('First Name')).toHaveValue('Carlo')
+  const detailsCard = screen.getByRole('region',{name:'My Details'})
+  const photoCard = screen.getByRole('region',{name:'Profile Photo'})
+  expect(detailsCard.closest('.td-settings-main')).toContainElement(photoCard)
+  expect(screen.getByRole('region',{name:'Change Password'}).closest('.td-settings-side')).not.toContainElement(photoCard)
+
+  const account = screen.getByRole('region',{name:'Account / Tanod Status'})
+  expect(within(account).getByText('Official Roster Name')).toBeInTheDocument()
+  expect(account.querySelector('input,button,select')).toBeNull()
+  await userEvent.clear(screen.getByLabelText('First Name')); await userEvent.type(screen.getByLabelText('First Name'),'Carlos')
+  await userEvent.click(screen.getByRole('button',{name:'Save Details'}))
+  await screen.findByText('Profile details updated.')
+  expect(saveTanodDetails).toHaveBeenCalledWith('account-id',expect.objectContaining({first_name:'Carlos'}))
+  expect(changed).toHaveBeenCalledWith(profile)
+})
+test('non-Tanod or mismatched profiles cannot expose editable settings', () => {
+  const {rerender} = show({...profile,role:'resident'})
+  expect(screen.queryByRole('button',{name:'Save Details'})).toBeNull()
+  rerender(<TanodSettings userId="other-id" profile={profile} />)
+  expect(screen.queryByLabelText('New Password')).toBeNull()
+})
+test('photo input reuses supported image types, shows preview and surfaces upload errors', async () => {
+  show({...profile,photo_url:'https://example.test/current.png'})
+  expect(screen.getByRole('img')).toHaveAttribute('src','https://example.test/current.png')
+  const input = screen.getByLabelText('Change Photo')
+  expect(input).toHaveAttribute('accept','image/jpeg,image/png,image/webp')
+  const file = new File(['photo'],'avatar.png',{type:'image/png'})
+  fireEvent.change(input,{target:{files:[file]}})
+  await screen.findByText('Profile photo updated.')
+  expect(saveTanodPhoto).toHaveBeenCalledWith('account-id',file,'https://example.test/current.png')
+  saveTanodPhoto.mockRejectedValue(new Error('Choose a JPG, PNG or WebP image.'))
+  fireEvent.change(input,{target:{files:[new File(['pdf'],'x.pdf',{type:'application/pdf'})]}})
+  expect(await screen.findByRole('alert')).toHaveTextContent('Choose a JPG')
+})
+test.each([['','','both password fields'],['secret','different','do not match'],['short','short','at least 6']])('validates password and confirmation before Auth update', async (password,confirmation,error) => {
+  show()
+  fireEvent.change(screen.getByLabelText('New Password'),{target:{value:password}})
+  fireEvent.change(screen.getByLabelText('Confirm New Password'),{target:{value:confirmation}})
+  await userEvent.click(screen.getByRole('button',{name:'Save Password'}))
+  expect(await screen.findByRole('alert')).toHaveTextContent(error)
+  expect(supabase.auth.updateUser).not.toHaveBeenCalled()
+})
+test('password reveal is accessible and valid updates use existing Auth API, then clear fields', async () => {
+  show()
+  await userEvent.type(screen.getByLabelText('New Password'),'new-secret')
+  await userEvent.type(screen.getByLabelText('Confirm New Password'),'new-secret')
+  await userEvent.click(screen.getByRole('button',{name:'Show new password'}))
+  expect(screen.getByLabelText('New Password')).toHaveAttribute('type','text')
+  expect(screen.getByRole('button',{name:'Hide new password'})).toHaveAttribute('aria-pressed','true')
+  await userEvent.click(screen.getByRole('button',{name:'Save Password'}))
+  await screen.findByText('Password updated successfully.')
+  expect(supabase.auth.updateUser).toHaveBeenCalledWith({password:'new-secret'})
+  expect(screen.getByLabelText('New Password')).toHaveValue('')
+})
+test('Auth errors leave settings available without reporting success', async () => {
+  supabase.auth.updateUser.mockResolvedValue({error:new Error('denied')})
+  show()
+  fireEvent.change(screen.getByLabelText('New Password'),{target:{value:'new-secret'}})
+  fireEvent.change(screen.getByLabelText('Confirm New Password'),{target:{value:'new-secret'}})
+  await userEvent.click(screen.getByRole('button',{name:'Save Password'}))
+  expect(await screen.findByRole('alert')).toHaveTextContent('could not be updated')
+  await waitFor(() => expect(screen.getByRole('button',{name:'Save Password'})).toBeEnabled())
+})

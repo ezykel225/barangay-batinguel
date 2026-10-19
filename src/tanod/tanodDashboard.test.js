@@ -30,11 +30,11 @@ beforeEach(() => {
 })
 afterEach(() => { jest.useRealTimers() })
 const show = () => render(<MemoryRouter><TanodDashboard /></MemoryRouter>)
-const ready = async () => { await screen.findByRole('heading', { name: 'Good evening, Sample Tanod' }) }
-test('shows four focused navigation choices and never infers attendance from a schedule', async () => {
+const ready = async () => { await screen.findByRole('heading', { name: 'Good evening, Sample T.' }) }
+test('shows five focused navigation choices and never infers attendance from a schedule', async () => {
   show(); await ready()
   const nav = screen.getByRole('navigation', { name: 'Tanod dashboard' })
-  expect(within(nav).getAllByRole('button')).toHaveLength(4)
+  expect(within(nav).getAllByRole('button')).toHaveLength(5)
   expect(screen.getAllByText('Scheduled').length).toBeGreaterThan(0)
   expect(screen.queryByText('Currently on duty')).toBeNull()
   expect(screen.getByText('2 reports submitted today')).toBeInTheDocument()
@@ -417,4 +417,43 @@ test.each([
   api.loadMyDuty.mockResolvedValue([{ ...shift, shift_start: '2026-10-19T' + start + ':00+08:00', shift_end: endDate + 'T' + end + ':00+08:00' }])
   show(); await ready()
   expect(within(screen.getByRole('region', { name: "Today's Duty" })).getByText(label)).toBeInTheDocument()
+})
+
+
+test('Settings opens for the linked Tanod with structured compact identity and shared avatar', async () => {
+  const person = {id:'account-id',role:'tanod',first_name:'Carlo',middle_name:'M.',last_name:'Abellanosa',full_name:'Carlo M. Abellanosa',photo_url:'https://example.test/avatar.png'}
+  require('../context/AuthContext').useAuth.mockReturnValue({user:{id:'account-id'},role:'tanod',logout:jest.fn()})
+  const query = {select:jest.fn(),eq:jest.fn(),single:jest.fn().mockResolvedValue({data:person,error:null})}
+  query.select.mockReturnValue(query); query.eq.mockReturnValue(query)
+  require('../supabase/supabaseClient').supabase.from.mockReturnValue(query)
+  show()
+  expect(await screen.findByRole('heading',{name:'Good evening, Carlo A.'})).toBeInTheDocument()
+  expect(screen.queryByRole('heading',{name:/Carlo M\./})).toBeNull()
+  await userEventClickSettings()
+  expect(screen.getByRole('heading',{name:'Settings',level:1})).toBeInTheDocument()
+  expect(screen.getByLabelText('First Name')).toHaveValue('Carlo')
+  expect(screen.getByRole('region',{name:'Account / Tanod Status'})).toHaveTextContent('Sample Tanod')
+  expect(query.eq).toHaveBeenCalledWith('id','account-id')
+  expect(api.setAccountLink).not.toHaveBeenCalled()
+})
+async function userEventClickSettings() { fireEvent.click(screen.getByRole('button',{name:'Settings',exact:true})) }
+
+test('duty areas share icon/text wrapper and report metadata shares one aligned container', async () => {
+  const {container} = show(); await ready()
+  const summaries = container.querySelectorAll('.td-summary-grid > article')
+  expect(summaries).toHaveLength(4)
+  summaries.forEach(card => {
+    expect(card.children[0]).toHaveClass('td-icon')
+    expect(card.children[0].querySelector('svg')).toBeTruthy()
+    expect(card.children[1]).toHaveClass('td-summary-body')
+  })
+  expect(container.querySelectorAll('.td-area-row').length).toBeGreaterThan(0)
+  container.querySelectorAll('.td-area-row').forEach(row => { expect(row.querySelector('svg')).toHaveAttribute('aria-hidden','true'); expect(row.querySelector('span')).toBeTruthy() })
+  fireEvent.click(screen.getByRole('button',{name:'My Reports',exact:true}))
+  await screen.findByText('INC-OWN')
+  const card = screen.getByText('INC-OWN').closest('article')
+  const chips = card.querySelector('.td-report-chips')
+  expect(chips).toHaveTextContent('Submitted by me')
+  expect(chips).toHaveTextContent('No KP case linked')
+  expect([...chips.children].every(child => child.tagName === 'SPAN')).toBe(true)
 })

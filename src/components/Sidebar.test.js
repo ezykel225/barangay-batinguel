@@ -51,7 +51,7 @@ test('Tanod portal uses its linked identity and only its four operational destin
   expect(screen.getByText('Linked Tanod')).toBeInTheDocument()
   expect(screen.getByText('Barangay Tanod')).toBeInTheDocument()
   const nav = screen.getByRole('navigation', { name: 'Tanod dashboard' })
-  expect(nav.querySelectorAll('button')).toHaveLength(4)
+  expect(nav.querySelectorAll('button')).toHaveLength(5)
   expect(screen.queryByText('Document Requests')).toBeNull()
   expect(screen.queryByText('Residents')).toBeNull()
   expect(supabase.from).not.toHaveBeenCalled()

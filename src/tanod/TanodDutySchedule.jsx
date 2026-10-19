@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { FaCalendarAlt, FaList, FaClock, FaMapMarkerAlt } from 'react-icons/fa'
+import { FaCalendarAlt, FaList, FaClock } from 'react-icons/fa'
+import TanodArea from './TanodArea'
 import MonthCalendar from '../components/MonthCalendar'
 import { groupByDateKey, monthOf, parseDateKey } from '../utils/monthGrid'
 import { dutyState, dutyTime } from './tanodDuty'
@@ -46,7 +47,7 @@ export default function TanodDutySchedule({ duties, today, now }) {
           {selectedRows.map((d) => <article className="mcal-day-item td-schedule-item" key={d.assignment_id}>
             <header><strong>{portalShiftLabel(d, duties) || 'Recorded assignment'}</strong><span className="td-state">{dutyState(d, now)}</span></header>
             <p className="td-meta"><FaClock aria-hidden="true" />{portalShiftWindow(d)}</p>
-            <p className="td-meta"><FaMapMarkerAlt aria-hidden="true" />{d.area_label}</p>
+            <p className="td-meta"><TanodArea>{d.area_label}</TanodArea></p>
             {attendance(d)}
           </article>)}
         </div>}
@@ -59,7 +60,7 @@ export default function TanodDutySchedule({ duties, today, now }) {
         </time>
         <div className="td-schedule-body"><strong>{portalShiftLabel(d, duties) || 'Recorded assignment'}</strong>
           <p className="td-meta"><FaClock aria-hidden="true" />{portalShiftWindow(d)}</p>
-          <p className="td-meta"><FaMapMarkerAlt aria-hidden="true" />{d.area_label}</p>
+          <p className="td-meta"><TanodArea>{d.area_label}</TanodArea></p>
           {(d.checked_in_at || d.checked_out_at) && <dl className="td-schedule-attendance">
             {d.checked_in_at && <div><dt>Check in</dt><dd><time dateTime={d.checked_in_at}>{portalAttendanceTime(d.checked_in_at, d)}</time></dd></div>}
             {d.checked_out_at && <div><dt>Check out</dt><dd><time dateTime={d.checked_out_at}>{portalAttendanceTime(d.checked_out_at, d)}</time></dd></div>}
