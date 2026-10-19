@@ -79,10 +79,10 @@ describe('A. the migration', () => {
   // definition change at its own site, not a loosened assertion. What this
   // guard is FOR is that 043 stays 043 and stays untouched by a later
   // phase, and that holds: 046 adds ONE function and alters nothing in
-  // this file. After Tanod editing (047), type ties (048), and public type buckets (049), next is 050.
+  // this file. After Tanod editing (047), type ties (048), and public type buckets (049), case support continues in 050-051.
   it('is still 043, still in place, with only the expected later migrations', () => {
     const files = fs.readdirSync(DIR).filter((f) => f.endsWith('.sql')).sort()
-    expect(files).toHaveLength(49)
+    expect(files).toHaveLength(51)
     expect(files[42]).toBe('043_kp_case_hearings_summons.sql')
     expect(files[43]).toBe('044_incident_blotter_tanod.sql')
     expect(files[44]).toBe('045_public_safety_aggregates.sql')
@@ -90,7 +90,9 @@ describe('A. the migration', () => {
     expect(files[46]).toBe('047_edit_tanod_member.sql')
     expect(files[47]).toBe('048_location_type_ties.sql')
     expect(files[48]).toBe('049_public_zone_type_counts.sql')
-    expect(files.some((f) => f.startsWith('050'))).toBe(false)
+    expect(files[49]).toBe('050_case_evidence_support.sql')
+    expect(files[50]).toBe('051_case_review_support.sql')
+    expect(files.some((f) => f.startsWith('052'))).toBe(false)
   })
 
   it('leaves 001-042 alone', () => {

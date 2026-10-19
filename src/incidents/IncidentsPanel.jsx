@@ -1,3 +1,4 @@
+import IncidentKpLink from '../casesupport/IncidentKpLink'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   FaClipboardList, FaExclamationTriangle, FaInfoCircle, FaLock, FaMapMarkerAlt, FaPlus,
@@ -472,6 +473,7 @@ const IncidentsPanel = ({ canAdminister = false, confirm }) => {
           </dl>
 
           <h3>What happened</h3>
+          {canAdminister && <IncidentKpLink key={detail.id} incidentId={detail.id} />}
           <p className="inc-narrative">{detail.narrative}</p>
 
           <h3>Blotter entry {detail.blotter_reference}</h3>

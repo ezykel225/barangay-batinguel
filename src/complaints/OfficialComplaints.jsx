@@ -1,7 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import PartyLink from '../casesupport/PartyLink'
+import EvidenceActions from '../casesupport/EvidenceActions'
+import SupportHistory from '../casesupport/SupportHistory'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import {
-  FaCommentDots, FaSearch, FaPlus, FaTimes, FaPaperclip, FaArrowLeft,
+  FaCommentDots, FaSearch, FaPlus, FaTimes, FaImage, FaVideo, FaFileAlt, FaArrowLeft,
   FaLock, FaCheckCircle, FaExclamationTriangle,
 } from 'react-icons/fa'
 
@@ -98,6 +101,8 @@ import './Complaints.css'
 // Nothing in this file reads it.
 
 const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
+  const activeDetail = useRef(null)
+  const detailRequest = useRef(0)
   // ⚠️ The shared confirmation dialog, because confirming a screening is
   // the one action in this phase that records a barangay decision and
   // cannot afterwards be edited. It brings the focus trap, Escape,
@@ -164,12 +169,15 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
 
   useEffect(() => { fetchQueue() }, [fetchQueue])
 
-  const openDetail = async (id) => {
+  const openDetail = async (id, refresh = false) => {
+    if (refresh && activeDetail.current !== id) return
+    activeDetail.current = id
+    const request = ++detailRequest.current
     setSelectedId(id)
-    setDetail(null)
+    if (!refresh) setDetail(null)
     setDetailRestricted(false)
     setDetailError('')
-    setDetailLoading(true)
+    if (!refresh) setDetailLoading(true)
     try {
       // The full row and the three detail RPCs together. Each is gated
       // on the same one predicate, so they agree by construction rather
@@ -178,8 +186,10 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
         loadOfficialComplaintRow(id),
         loadComplaintDetail(id),
       ])
+      if (request !== detailRequest.current) return
 
       if (rowResult.restricted) {
+        setDetail(null)
         // ⚠️ Zero rows, no error. The sentence names no position as the
         // gate and states no policy: an ordinary Kagawad cannot grant
         // themselves records access, and telling them which position
@@ -189,13 +199,15 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
         setDetail({ row: rowResult.row, ...parts })
       }
     } catch {
-      setDetailError(COMPLAINT_ERRORS.detailLoadFailed)
+      if (request === detailRequest.current) setDetailError(COMPLAINT_ERRORS.detailLoadFailed)
     } finally {
-      setDetailLoading(false)
+      if (request === detailRequest.current) setDetailLoading(false)
     }
   }
 
   const closeDetail = () => {
+    activeDetail.current = null
+    detailRequest.current += 1
     setSelectedId(null)
     setDetail(null)
     setDetailRestricted(false)
@@ -511,7 +523,7 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
 
       {/* ── The detail panel ──────────────────────────────────────── */}
       {selectedId && (
-        <div className="dashboard-card">
+        <div className="dashboard-card complaint-detail-panel">
           <div className="dashboard-card-header">
             <h2>
               Complaint{' '}
@@ -542,6 +554,8 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
 
           {!detailLoading && detail?.row && (
             <>
+              <section className="complaint-section" aria-label="Complaint information">
+              <h3>Complaint details</h3>
               <dl className="complaint-detail-list">
                 <div className="complaint-detail-row">
                   <dt>What it is about</dt>
@@ -582,6 +596,8 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
               <h3>What was reported</h3>
               <p className="complaint-detail-narrative">{detail.row.narrative}</p>
 
+              </section>
+              <section className="complaint-section" aria-label="People involved">
               <h3>People involved</h3>
               {detail.parties.length === 0 ? (
                 <p className="complaint-empty">No parties were recorded.</p>
@@ -591,6 +607,7 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
                     <li key={party.id} className="complaint-party">
                       <span className="complaint-party-role">{party.party_role}</span>
                       <span className="complaint-party-name">{party.full_name_snapshot}</span>
+                      <PartyLink party={party} onChanged={() => openDetail(detail.row.id)} />
                       {/* ⚠️ A NULL CONTACT IS RENDERED AS A STATEMENT,
                           NOT AS A BLANK. `complaint_parties_for()`
                           returns it as NULL for a caller who may not
@@ -610,17 +627,23 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
                 </ul>
               )}
 
-              <h3>Evidence</h3>
+              </section>
+              <section className="complaint-section complaint-evidence-card" aria-label="Evidence">
+              <div className="complaint-section-heading"><h3>Evidence</h3><span className="complaint-private-label"><FaLock aria-hidden="true" /> Private evidence</span></div>
+              <EvidenceActions complaintId={detail.row.id} attachments={detail.attachments} onChanged={() => openDetail(detail.row.id, true)}>
+              <div className="complaint-evidence-block"><h4>Attached evidence</h4>
               {detail.attachments.length === 0 ? (
                 <p className="complaint-empty">No files were attached.</p>
               ) : (
                 <ul className="complaint-file-list">
                   {detail.attachments.map((file) => (
                     <li key={file.id} className="complaint-file">
-                      <FaPaperclip aria-hidden="true" />
+                      {file.media_kind === 'photo' ? <FaImage className="complaint-evidence-icon" aria-hidden="true" />
+                        : file.media_kind === 'video' ? <FaVideo className="complaint-evidence-icon" aria-hidden="true" />
+                          : <FaFileAlt className="complaint-evidence-icon" aria-hidden="true" />}
                       <span className="complaint-file-name">{file.display_filename}</span>
                       <span className="complaint-file-meta">
-                        {mediaKindFor(file.mime_type)} · {formatBytes(file.byte_size)}
+                        {file.mime_type === 'text/plain' ? 'Witness statement' : mediaKindFor(file.mime_type)} · {formatBytes(file.byte_size)}
                       </span>
                       <button
                         type="button"
@@ -635,6 +658,11 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
                 </ul>
               )}
 
+              </div>
+              </EvidenceActions>
+              <SupportHistory complaintId={detail.row.id} version={detail} attachments={detail.attachments} />
+              </section>
+              <section className="complaint-section complaint-history-card" aria-label="Complaint history">
               <h3>History</h3>
               {/* ⚠️ NO ACTOR IS SHOWN, because
                   `complaint_history_for()` does not return one -- it
@@ -684,6 +712,8 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
                   ⚠️ It renders only inside the AUTHORIZED detail branch,
                   so an official who cannot read the complaint at all
                   never reaches it. */}
+              </section>
+              <section className="complaint-section complaint-screening-card" aria-label="KP review screening">
               <h3>KP review screening</h3>
               <ScreeningPanel
                 complaintId={detail.row.id}
@@ -725,14 +755,18 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
                   so an official who cannot read the complaint at all
                   never reaches it, and no resident or public surface
                   renders it at any point. */}
+              </section>
+              <section className="complaint-section" aria-label="KP case">
               <h3>KP case</h3>
               <KpCasePanel
                 complaintId={detail.row.id}
+                complaint={detail.row}
                 isSecretary={isSecretary}
                 isKapitan={isKapitan}
                 confirm={confirm}
                 screeningSignal={screeningSignal}
               />
+              </section>
             </>
           )}
         </div>

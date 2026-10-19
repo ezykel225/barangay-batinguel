@@ -1,3 +1,4 @@
+import ClearanceWarning from '../casesupport/ClearanceWarning'
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   FaClipboardList,
@@ -3843,7 +3844,9 @@ const OfficialDashboard = () => {
                           }) ? 'row-no-actions' : undefined}
                         >
                           <td data-label="Resident">{req.full_name}</td>
-                          <td data-label="Document">{req.document_type}</td>
+                          <td data-label="Document">{req.document_type}
+                            {(isSecretary || isKapitan) && req.document_type === 'Barangay Clearance' && <ClearanceWarning requestId={req.id} />}
+                          </td>
                           <td data-label="Purpose">{req.purpose}</td>
                           <td data-label="Contact">{req.contact_number || '—'}</td>
                           <td data-label="Status">

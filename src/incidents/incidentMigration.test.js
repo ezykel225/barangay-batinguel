@@ -41,14 +41,16 @@ describe('A. the migration file', () => {
   // not a loosened assertion.
   it('is still 044, still in place, with only the expected later migrations', () => {
     const files = fs.readdirSync(DIR).filter((f) => f.endsWith('.sql')).sort()
-    expect(files).toHaveLength(49)
+    expect(files).toHaveLength(51)
     expect(files[43]).toBe(FILE)
     expect(files[44]).toBe('045_public_safety_aggregates.sql')
     expect(files[45]).toBe('046_kp_conclude_case.sql')
     expect(files[46]).toBe('047_edit_tanod_member.sql')
     expect(files[47]).toBe('048_location_type_ties.sql')
     expect(files[48]).toBe('049_public_zone_type_counts.sql')
-    expect(files.some((f) => f.startsWith('050'))).toBe(false)
+    expect(files[49]).toBe('050_case_evidence_support.sql')
+    expect(files[50]).toBe('051_case_review_support.sql')
+    expect(files.some((f) => f.startsWith('052'))).toBe(false)
   })
 
   it('records in its header that it was applied, and how', () => {

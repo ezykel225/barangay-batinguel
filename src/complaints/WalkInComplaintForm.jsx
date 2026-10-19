@@ -364,19 +364,14 @@ const WalkInComplaintForm = ({ onEncoded, onCancel }) => {
 
       <fieldset className="complaint-fieldset">
         <legend>Supporting files (optional)</legend>
-        {/* ⚠️ The same four MIME types and the same ceiling the resident
-            form states, because it is the same bucket and the same
-            CHECK. No video: `video/quicktime` does not play in a
-            browser `<video>` on every platform and a few seconds of
-            phone video exceeds 5 MB, so offering it would produce a
-            failure at the counter that nobody could explain. */}
+        {/* Shared private evidence limits; migration 050 is required. */}
         <p className="field-note" id="walkin-files-note">
           {EVIDENCE_TYPES_LABEL}, up to {EVIDENCE_MAX_LABEL} each, up to{' '}
-          {EVIDENCE_MAX_FILES} files. <strong>Video is not supported yet.</strong>
+          {EVIDENCE_MAX_FILES} files. <strong>Videos: MP4 or WebM. Witness statements: PDF or plain text.</strong>
         </p>
 
         <label htmlFor="walkin-files" className="modal-form-label">
-          Attach photos or a PDF
+          Attach photos or a PDF, video or witness statement
         </label>
         <input
           id="walkin-files"

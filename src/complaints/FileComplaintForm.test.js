@@ -138,21 +138,21 @@ describe('attachments', () => {
     expect(accept).not.toContain('*')
     expect(accept).toContain('image/jpeg')
     expect(accept).toContain('application/pdf')
-    expect(accept).not.toContain('video')
+    expect(accept).toContain('video/mp4')
   })
 
   it('tells the truth about video, in words', () => {
     renderForm()
-    expect(screen.getByText(/Video is not supported yet/i)).toBeInTheDocument()
-    expect(screen.getByText(/5 MB/)).toBeInTheDocument()
+    expect(screen.getByText(/Videos: MP4 or WebM/i)).toBeInTheDocument()
+    expect(screen.getByText(/25 MB/)).toBeInTheDocument()
   })
 
-  it('refuses a video file with a readable reason', async () => {
+  it('refuses an unsupported video file with a readable reason', async () => {
     renderForm()
-    const file = new File(['x'], 'clip.mp4', { type: 'video/mp4' })
+    const file = new File(['x'], 'clip.mov', { type: 'video/quicktime' })
     await userEvent.upload(screen.getByLabelText(/Attach photos or a PDF/i), file)
     expect(await screen.findByRole('alert')).toHaveTextContent(/not a supported type/i)
-    expect(screen.queryByText('clip.mp4')).toBeNull()
+    expect(screen.queryByText('clip.mov')).toBeNull()
   })
 
   it('lists an accepted file with its name, kind and size, and removes it', async () => {

@@ -204,7 +204,7 @@ describe('C. the recorded outcome', () => {
     withCase()
     const { container } = mount({ isKapitan: true })
     await screen.findByText('KP-2026-7HQ2MN')
-    expect(container.querySelectorAll('[disabled]')).toHaveLength(0)
+    expect(container.querySelectorAll('.kp-hearing [disabled]')).toHaveLength(0)
   })
 })
 

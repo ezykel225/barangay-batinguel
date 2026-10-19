@@ -523,6 +523,101 @@
   overflow-wrap: anywhere;
 }
 
+/* Official detail only: preserve resident intake and shared dashboard styles. */
+.complaint-detail-panel .complaint-section {
+  min-width: 0;
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid var(--grey-200, #e5e7eb);
+  border-radius: 10px;
+  background: #fff;
+}
+.complaint-detail-panel .complaint-section > h3,
+.complaint-detail-panel .complaint-section-heading h3 { margin: 0 0 14px; }
+.complaint-detail-panel .complaint-section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.complaint-detail-panel .complaint-private-label {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  color: #475569;
+  font-size: var(--fs-13);
+}
+.complaint-detail-panel .complaint-evidence-block {
+  min-width: 0;
+  margin: 0 0 16px;
+  padding: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+.complaint-detail-panel .complaint-evidence-block h4 { margin: 0 0 10px; color: #1e3a8a; }
+.complaint-detail-panel .complaint-evidence-block legend { font-weight: 600; padding: 0 6px; color: #1e3a8a; }
+.complaint-detail-panel .complaint-evidence-block label,
+.complaint-detail-panel .complaint-resident-link label { display: block; margin: 10px 0; font-weight: 500; }
+.complaint-detail-panel .complaint-evidence-block input,
+.complaint-detail-panel .complaint-evidence-block select { display: block; width: 100%; min-width: 0; margin-top: 6px; }
+.complaint-detail-panel input[type='file']::file-selector-button {
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-right: 10px;
+  background: #fff;
+  color: #1e3a8a;
+  cursor: pointer;
+  font: inherit;
+}
+.complaint-detail-panel button { min-height: 40px; }
+.complaint-detail-panel button:disabled,
+.complaint-detail-panel input:disabled,
+.complaint-detail-panel select:disabled {
+  background: #e2e8f0;
+  color: #64748b;
+  border-color: #cbd5e1;
+  opacity: 1;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+.complaint-detail-panel :is(button, input, select, summary):focus-visible { outline: 3px solid #2563eb; outline-offset: 3px; }
+.complaint-detail-panel .complaint-file {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 10px;
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+}
+.complaint-detail-panel .complaint-evidence-icon { grid-row: 1 / 3; color: #2563eb; }
+.complaint-detail-panel .complaint-file-name { grid-column: 2; font-weight: 600; overflow-wrap: anywhere; }
+.complaint-detail-panel .complaint-file-meta { grid-column: 2; }
+.complaint-detail-panel .complaint-file button { grid-column: 3; grid-row: 1 / 3; }
+.complaint-detail-panel .complaint-audit { border-top: 1px solid #e2e8f0; padding-top: 14px; }
+.complaint-detail-panel summary { cursor: pointer; padding: 10px 0; font-weight: 600; }
+.complaint-detail-panel .complaint-link-badge { display: inline-block; padding: 4px 8px; border-radius: 6px; background: #f1f5f9; color: #475569; font-size: var(--fs-13); }
+.complaint-detail-panel .complaint-link-badge.is-linked { background: #ecfdf5; color: #166534; }
+.complaint-detail-panel .complaint-link-manage { display: inline-block; margin-left: 8px; color: #1e40af; font-size: var(--fs-13); }
+.complaint-detail-panel :is(.complaint-audit-timeline, .complaint-history-list) { list-style: none; margin: 10px 0 0 7px; padding: 0 0 0 20px; border-left: 2px solid #cbd5e1; }
+.complaint-detail-panel :is(.complaint-audit-timeline, .complaint-history-list) > li { position: relative; display: flex; align-items: stretch; flex-direction: column; gap: 5px; margin-bottom: 16px; padding: 0 0 10px; overflow-wrap: anywhere; }
+.complaint-detail-panel :is(.complaint-audit-timeline, .complaint-history-list) > li::before { content: ''; position: absolute; left: -26px; top: 5px; width: 10px; height: 10px; border: 2px solid #fff; border-radius: 50%; background: #2563eb; }
+.complaint-detail-panel .complaint-audit-timeline time { font-size: var(--fs-13); color: #64748b; }
+.complaint-detail-panel .complaint-audit-timeline p { margin: 0; white-space: pre-wrap; }
+.complaint-detail-panel .complaint-screening-card { border-top: 3px solid #93c5fd; background: #f8fafc; }
+@media (max-width: 600px) {
+  .complaint-detail-panel .complaint-section { padding: 12px; }
+  .complaint-detail-panel .complaint-evidence-block { padding: 10px; }
+  .complaint-detail-panel .complaint-file { grid-template-columns: 20px minmax(0, 1fr); }
+  .complaint-detail-panel .complaint-file button { grid-column: 2; grid-row: auto; justify-self: start; margin-top: 6px; }
+}
+
 /* Says that no action exists here, rather than leaving a blank where a
    reader expects one. `complaints_status_check` permits exactly
    `received`, so there is nothing to act with. */

@@ -145,6 +145,60 @@ beforeEach(() => {
 })
 
 const renderQueue = (props = {}) => render(<OfficialComplaints {...props} />)
+
+test('uploaded active evidence refreshes both the file list and withdrawal selector; withdrawal requires a reason', async () => {
+  let active = []
+  const audit = []
+  supabase.rpc.mockImplementation(async (fn, args) => {
+    if (fn === 'complaint_queue') return { data: QUEUE, error: null }
+    if (fn === 'complaint_parties_for') return { data: PARTIES, error: null }
+    if (fn === 'complaint_history_for') return { data: HISTORY, error: null }
+    if (fn === 'complaint_attachments_for') return { data: active, error: null }
+    if (fn === 'case_support_history') return { data: [...audit], error: null }
+    if (fn === 'record_complaint_attachment') {
+      active = [{ id: 'fresh-evidence', object_path: args.p_object_path, display_filename: args.p_display_filename,
+        media_kind: 'photo', mime_type: args.p_mime_type, byte_size: args.p_byte_size }]
+      audit.push({ id: 'uploaded', event_kind: 'evidence_uploaded', created_at: '2026-10-18T10:59:00Z', detail: { attachment_id: 'fresh-evidence' } })
+      return { data: 'fresh-evidence', error: null }
+    }
+    if (fn === 'withdraw_complaint_evidence') {
+      active = []
+      audit.push({ id: 'withdrawn', event_kind: 'evidence_withdrawn', created_at: '2026-10-18T11:00:00Z', detail: { attachment_id: args.p_attachment_id, reason: args.p_reason } })
+      return { data: null, error: null }
+    }
+    return { data: [], error: null }
+  })
+  renderQueue({ isSecretary: true })
+  await screen.findByText('CMP-2026-AB12CD')
+  await userEvent.click(screen.getByRole('button', { name: /View complaint CMP-2026-AB12CD/ }))
+  const withdraw = await screen.findByRole('button', { name: 'Withdraw evidence' })
+  expect(withdraw).toBeDisabled()
+  expect(screen.getByLabelText('Reason')).toBeDisabled()
+  await userEvent.upload(screen.getByLabelText('Additional evidence'), new File(['photo'], 'fresh-photo.jpg', { type: 'image/jpeg' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Upload evidence' }))
+  await screen.findByRole('button', { name: 'Open fresh-photo.jpg' })
+  expect(screen.getByRole('option', { name: 'fresh-photo.jpg' })).toHaveValue('fresh-evidence')
+  await userEvent.selectOptions(screen.getByLabelText('File'), 'fresh-evidence')
+  expect(screen.getByLabelText('Reason')).toBeEnabled()
+  expect(withdraw).toBeDisabled()
+  await userEvent.type(screen.getByLabelText('Reason'), '   ')
+  expect(withdraw).toBeDisabled()
+  expect(supabase.rpc.mock.calls.filter(([fn]) => fn === 'withdraw_complaint_evidence')).toHaveLength(0)
+  await userEvent.clear(screen.getByLabelText('Reason'))
+  await userEvent.type(screen.getByLabelText('Reason'), 'Sample evidence withdrawn.')
+  expect(withdraw).toBeEnabled()
+  await userEvent.click(withdraw)
+  await waitFor(() => expect(screen.queryByRole('option', { name: 'fresh-photo.jpg' })).not.toBeInTheDocument())
+  expect(supabase.rpc).toHaveBeenCalledWith('withdraw_complaint_evidence', { p_attachment_id: 'fresh-evidence', p_reason: 'Sample evidence withdrawn.' })
+  await userEvent.click(screen.getByText('Evidence and case-support audit'))
+  expect(await screen.findByText('Evidence uploaded')).toBeInTheDocument()
+  expect(screen.getByText('Evidence withdrawn')).toBeInTheDocument()
+  expect(screen.getByText('Reason: Sample evidence withdrawn.')).toBeInTheDocument()
+  expect(screen.getByText(/18 Oct 2026.*6:59 PM/)).toBeInTheDocument()
+  expect(document.querySelector('.complaint-audit pre')).toBeNull()
+  expect(document.querySelector('.complaint-audit')).not.toHaveTextContent('attachment_id')
+  expect(document.querySelector('.complaint-audit')).not.toHaveTextContent('fresh-evidence')
+})
 const rowsOnScreen = () => screen.getAllByRole('row').slice(1)
 
 // ── A. The queue reads complaint_queue() and only its safe output ─────
@@ -491,7 +545,7 @@ describe('F. evidence access', () => {
     renderQueue()
     await screen.findByText('CMP-2026-AB12CD')
     await userEvent.click(screen.getByRole('button', { name: /View complaint CMP-2026-AB12CD/ }))
-    await screen.findByText('photo.jpg')
+    await screen.findByRole('button', { name: 'Open photo.jpg' })
     await userEvent.click(screen.getByRole('button', { name: 'Open photo.jpg' }))
 
     await waitFor(() => expect(createSignedUrl).toHaveBeenCalledWith('c1/photo.jpg', 60))
@@ -677,19 +731,19 @@ describe('H. the walk-in form', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/describe what happened/i)
   })
 
-  it('constrains the file picker to the four accepted types, never a wildcard', async () => {
+  it('constrains the file picker to the supported evidence types, never a wildcard', async () => {
     await openForm()
     const picker = screen.getByLabelText(/Attach photos or a PDF/i)
     const accept = picker.getAttribute('accept')
     expect(accept).toContain('image/jpeg')
     expect(accept).toContain('application/pdf')
     expect(accept).not.toContain('*/*')
-    expect(accept).not.toContain('video')
+    expect(accept).toContain('video/mp4')
   })
 
-  it('says video is not supported rather than offering it', async () => {
+  it('describes supported video and witness statements', async () => {
     await openForm()
-    expect(screen.getByText(/Video is not supported yet/i)).toBeInTheDocument()
+    expect(screen.getByText(/Videos: MP4 or WebM/i)).toBeInTheDocument()
   })
 
   // ⚠️ The consequence is permanent and invisible otherwise:
@@ -1061,10 +1115,10 @@ describe('L. the architecture the phase committed to', () => {
   // second one still fails here. P3-B2 added none, P4-A added 042 and
   // Combined Phase 1 added 043, Combined Phase 2 added 044 and Final
   // Integration added 045 -- one apiece, and 045 is the newest.
-  it('lists the expected migrations through 049', () => {
+  it('lists the expected migrations through 051', () => {
     const dir = path.join(__dirname, '..', '..', 'supabase-migrations')
     const files = fs.readdirSync(dir).filter((f) => f.endsWith('.sql')).sort()
-    expect(files).toHaveLength(49)
+    expect(files).toHaveLength(51)
     expect(files[41]).toBe('042_kp_screening_foundation.sql')
     expect(files[42]).toBe('043_kp_case_hearings_summons.sql')
     expect(files[43]).toBe('044_incident_blotter_tanod.sql')
@@ -1073,6 +1127,8 @@ describe('L. the architecture the phase committed to', () => {
     expect(files[46]).toBe('047_edit_tanod_member.sql')
     expect(files[47]).toBe('048_location_type_ties.sql')
     expect(files[48]).toBe('049_public_zone_type_counts.sql')
-    expect(files.some((f) => f.startsWith('050'))).toBe(false)
+    expect(files[49]).toBe('050_case_evidence_support.sql')
+    expect(files[50]).toBe('051_case_review_support.sql')
+    expect(files.some((f) => f.startsWith('052'))).toBe(false)
   })
 })
