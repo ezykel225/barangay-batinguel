@@ -1,16 +1,6 @@
 // Combined Phase 2 — the Tanod roster and patrol vocabulary. Pure.
-//
-// ─── ⚠️ A TANOD IS NOT AN ACCOUNT ───────────────────────────────────────────
-//
-// `tanod_members` is a roster of people the barangay deploys. There is no
-// `profile_id` on it, no auth link, no login, no password and no portal.
-// `profiles_role_check` still permits exactly official / nurse / resident, and
-// nothing in this phase asks it to permit a fourth.
-//
-// ⚠️ AND THERE IS NO TRACKING. No Tanod carries a coordinate column, no
-// position is ever stored for one, and nothing polls a device. The only
-// latitude and longitude in this phase belong to an INCIDENT -- a place
-// something happened, recorded once by the official writing it down.
+// Roster identity remains stable. Auth accounts are provisioned separately and
+// linked by ID; assignments do not imply check-in or device tracking.
 
 const lookup = (map, value, fallback) => (
   Object.prototype.hasOwnProperty.call(map, value) ? map[value] : fallback
@@ -31,7 +21,7 @@ export const TANOD_STATE = Object.freeze({
 
 export const tanodStateLabel = (active) => (active ? TANOD_STATE.active : TANOD_STATE.inactive)
 
-export const TANOD_NO_LOGIN_NOTE = 'Tanod members are a roster the barangay keeps. They do not have system accounts and cannot sign in.'
+export const TANOD_NO_LOGIN_NOTE = 'Tanod roster membership is separate from account access. Authorized administration provisions and links Tanod accounts.'
 
 export const TANOD_NO_TRACKING_NOTE = 'Assignments record who was scheduled where. The system does not track anyone’s location.'
 
@@ -48,7 +38,7 @@ export const TANOD_ERRORS = Object.freeze({
 
 export const TANOD_RESTRICTED_NOTE = 'The Tanod roster and patrol schedule are managed by the barangay records staff.'
 
-export const PATROL_AREA_HINT = 'Free text. This is matched to incident locations by exact wording only, so write it the same way the location is written.'
+export const PATROL_AREA_HINT = 'Free text. This is matched to incident locations by exact wording only, so write it the same way the location is written. Use a general, public-safe area: active shift area labels appear on Community Safety. Do not enter household addresses, patrol routes, personal contacts or internal notes.'
 
 export const assignmentWindow = (startTime, endTime) => {
   if (!startTime || !endTime) return 'No time recorded'

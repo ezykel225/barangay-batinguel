@@ -1,3 +1,5 @@
+import OfficialTanodNotes from '../tanod/OfficialTanodNotes'
+import DeviceLocation from './DeviceLocation'
 import IncidentKpLink from '../casesupport/IncidentKpLink'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
@@ -326,6 +328,7 @@ const IncidentsPanel = ({ canAdminister = false, confirm }) => {
               </div>
             </div>
 
+            <DeviceLocation onLocation={(coordinates) => setForm((current) => ({ ...current, ...coordinates }))} />
             <p className="field-note" id="inc-coord-hint">{COORDINATES_HINT}</p>
 
             <div className="modal-form-group">
@@ -473,7 +476,7 @@ const IncidentsPanel = ({ canAdminister = false, confirm }) => {
           </dl>
 
           <h3>What happened</h3>
-          {canAdminister && <IncidentKpLink key={detail.id} incidentId={detail.id} />}
+          {canAdminister && <><IncidentKpLink key={detail.id} incidentId={detail.id} /><OfficialTanodNotes key={`notes-${detail.id}`} incidentId={detail.id} /></>}
           <p className="inc-narrative">{detail.narrative}</p>
 
           <h3>Blotter entry {detail.blotter_reference}</h3>

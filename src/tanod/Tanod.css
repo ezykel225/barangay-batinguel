@@ -33,3 +33,110 @@
 @media (max-width: 600px) {
   .tnd-grid { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Official operations: compact local views, scoped away from the Tanod portal. */
+.tnd-operations { min-width: 0; }
+.tnd-summary { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; margin-bottom: 16px; }
+.tnd-summary .dashboard-card { padding: 16px; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.tnd-summary span { color: #64748b; font-size: 13px; }
+.tnd-summary strong { color: #1e3a8a; font-size: 22px; }
+.tnd-tabs { margin-bottom: 16px; }
+.tnd-operations .dashboard-card-header { gap: 12px; flex-wrap: wrap; }
+.tnd-subline { display: block; color: #64748b; font-size: 13px; margin-top: 4px; overflow-wrap: anywhere; }
+.tnd-management { padding: 16px; margin-top: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; }
+.tnd-management h3 { margin: 0 0 12px; }
+.tnd-operations .tnd-accounts { padding: 16px 0 0; margin-top: 14px; background: transparent; border: 0; box-shadow: none; border-top: 1px solid #e2e8f0; }
+.tnd-operations .tnd-accounts p { font-size: 13px; color: #475569; }
+.tnd-operations .tnd-accounts label { display: block; margin: 12px 0; }
+.tnd-operations .tnd-form { padding: 16px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; margin-bottom: 18px; }
+.tnd-toolbar { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; margin: 12px 0; }
+.tnd-toolbar label { min-width: 0; }
+.tnd-calendar-layout { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 18px; align-items: start; }
+.tnd-calendar-layout > * { min-width: 0; }
+.tnd-calendar-layout .mcal-day-panel { margin-top: 0; }
+.tnd-shift-group { border-top: 1px solid #e2e8f0; padding-block: 12px; }
+.tnd-shift-group header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
+.tnd-shift-group h4 { margin: 0; color: #1e3a8a; }
+.tnd-shift-group header span { color: #475569; font-size: 14px; }
+.tnd-shift-group ul { list-style: none; padding: 0; margin: 8px 0 0; }
+.tnd-shift-group li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f1f5f9; overflow-wrap: anywhere; }
+.tnd-shift-group li > div { min-width: 0; }
+.tnd-assignment-state { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+.tnd-list-day { margin-block: 16px; padding: 14px 16px; border: 1px solid #e2e8f0; border-radius: 8px; }
+.tnd-list-day h3 { margin: 0 0 8px; font-size: 16px; }
+.tnd-list-day:hover { background: #f8fafc; }
+.tnd-operations :is(button,input,select):focus-visible { outline: 3px solid #2563eb; outline-offset: 3px; }
+.tnd-operations button { min-height: 44px; }
+.tnd-operations .table-wrapper { max-width: 100%; overflow-x: auto; }
+@media(max-width: 900px) { .tnd-calendar-layout { grid-template-columns: minmax(0,1fr); } .tnd-summary { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media(max-width: 600px) {
+  .tnd-operations .tnd-grid { grid-template-columns: minmax(0,1fr); }
+  .tnd-operations .view-toggle { display: flex; flex-wrap: wrap; }
+  .tnd-operations .view-toggle button { flex: 1; }
+  .tnd-management, .tnd-operations .tnd-form { padding: 12px; }
+  .tnd-shift-group li { flex-wrap: wrap; }
+  .tnd-assignment-state { flex-direction: row; align-items: center; flex-wrap: wrap; }
+  .tnd-toolbar > label { flex: 1 1 160px; }
+}
+
+/* Manage stays above the roster, with scrolling contained inside the dialog. */
+.tnd-modal-backdrop { position: fixed; inset: 0; z-index: 2000; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgb(15 23 42 / 60%); }
+.tnd-manage-dialog { width: 100%; max-width: 640px; max-height: 85vh; display: flex; flex-direction: column; min-width: 0; background: #fff; color: #1e293b; border-radius: 12px; box-shadow: 0 24px 70px rgb(15 23 42 / 28%); overflow: hidden; }
+.tnd-manage-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 22px 24px; border-bottom: 1px solid #dbeafe; background: #f4f8ff; }
+.tnd-manage-header > div { min-width: 0; overflow-wrap: anywhere; }
+.tnd-manage-header h2 { margin: 0; font-size: 26px; font-weight: 800; line-height: 1.25; color: #1e3a8a; }
+.tnd-manage-header p { margin: 10px 0 12px; font-size: 18px; font-weight: 600; }
+.tnd-manage-header > button { flex-shrink: 0; min-width: 44px; font-size: 22px; }
+.tnd-manage-header .tnd-toolbar { margin: 0; gap: 8px; }
+.tnd-manage-header .kp-badge { padding: 4px 8px; font-size: 12px; line-height: 1.4; }
+.tnd-manage-body { padding: 20px 24px; overflow-y: auto; overscroll-behavior: contain; min-height: 0; overflow-wrap: anywhere; }
+.tnd-manage-summary { display: grid; grid-template-columns: minmax(0,2fr) minmax(0,1fr); gap: 16px; margin: 0 0 22px; }
+.tnd-manage-summary > div { padding: 14px 16px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; }
+.tnd-manage-summary dt { color: #64748b; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.tnd-manage-summary dd { font-weight: 700; margin: 12px 0 0; color: #1e293b; line-height: 1.5; }
+.tnd-manage-dialog .tnd-accounts { margin: 22px 0 0; padding: 16px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; box-shadow: none; }
+.tnd-manage-dialog :is(input,select) { min-width: 0; width: 100%; box-sizing: border-box; }
+.tnd-danger-actions { border-top: 1px solid #fecaca; background: #fffafa; margin-top: 20px; padding: 16px 0 0; display: flex; flex-wrap: wrap; gap: 10px; }
+.tnd-danger-actions h4 { flex-basis: 100%; color: #64748b; margin: 0 0 2px; font-size: 13px; }
+.tnd-manage-footer { display: flex; justify-content: flex-end; padding: 14px 24px; border-top: 1px solid #e2e8f0; }
+@media(max-width: 600px) {
+  .tnd-manage-header, .tnd-manage-body { padding: 16px; }
+  .tnd-manage-summary { grid-template-columns: minmax(0,1fr); }
+  .tnd-danger-actions { flex-direction: column; }
+  .tnd-danger-actions h4 { flex-basis: auto; }
+}
+
+/* Visual hierarchy scoped to Manage; other operations retain their styling. */
+.tnd-manage-dialog .tnd-accounts h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 17px; font-weight: 700; color: #1e3a8a; }
+.tnd-manage-dialog .tnd-accounts p { line-height: 1.55; }
+.tnd-manage-dialog .tnd-accounts .tnd-account-note { font-size: 12px; color: #64748b; padding: 10px 12px; background: #f8fafc; border-radius: 6px; margin-block: 16px; }
+.tnd-manage-dialog .tnd-form, .tnd-manage-dialog #tnd-link-fields { margin-top: 16px; padding: 16px; border: 1px solid #dbeafe; border-radius: 8px; background: #f8fbff; }
+.tnd-manage-dialog .tnd-danger-actions { margin-top: 22px; padding: 14px; border: 1px solid #f1d8dc; border-radius: 8px; background: #fff8f9; }
+.tnd-manage-dialog .tnd-danger-actions h4 { display: flex; align-items: center; gap: 6px; font-weight: 600; color: #7f4753; }
+.tnd-manage-dialog .btn-add { background: #2563eb; color: #fff; }
+.tnd-manage-dialog .btn-add:hover:not(:disabled) { background: #1d4ed8; }
+.tnd-manage-dialog .btn-cancel { border: 1px solid #cbd5e1; background: #fff; color: #475569; }
+.tnd-manage-dialog button:disabled { opacity: .55; cursor: not-allowed; }
+.tnd-manage-dialog .tnd-accounts > p[role="status"]:empty { margin: 0; }
+@media(max-width: 600px) {
+  .tnd-manage-dialog .modal-actions { flex-wrap: wrap; }
+  .tnd-manage-dialog .modal-actions > button { flex: 1 1 100%; }
+  .tnd-manage-dialog .tnd-accounts, .tnd-manage-dialog .tnd-form, .tnd-manage-dialog #tnd-link-fields { padding: 12px; }
+}
+
+/* Profile-style Manage header; all body sections keep their existing layout. */
+.tnd-manage-header { display: block; }
+.tnd-manage-topline { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; }
+.tnd-manage-topline h2 { font-size: 18px; font-weight: 700; }
+.tnd-manage-topline > button { flex-shrink: 0; width: 44px; font-size: 22px; }
+.tnd-profile-header { display: grid; grid-template-columns: 68px minmax(0,1fr) auto; gap: 16px; align-items: center; }
+.tnd-profile-avatar { width: 68px; height: 68px; display: grid; place-items: center; border-radius: 50%; background: #dbeafe; color: #1e40af; font-size: 24px; font-weight: 800; }
+.tnd-profile-info { min-width: 0; }
+.tnd-manage-header .tnd-profile-info p { margin: 0 0 6px; font-size: 21px; font-weight: 700; color: #1e293b; line-height: 1.3; }
+.tnd-profile-role { display: block; color: #64748b; font-size: 13px; margin-bottom: 10px; }
+.tnd-profile-edit button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; }
+@media(max-width: 600px) {
+  .tnd-profile-header { grid-template-columns: 68px minmax(0,1fr); gap: 12px; }
+  .tnd-profile-edit { grid-column: 1 / -1; }
+  .tnd-profile-edit button { width: 100%; }
+}

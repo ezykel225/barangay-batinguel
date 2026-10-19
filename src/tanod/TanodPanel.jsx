@@ -1,9 +1,14 @@
+import TanodAccounts from './TanodAccounts'
+import TanodManageDialog from './TanodManageDialog'
+import OfficialTanodSchedule from './OfficialTanodSchedule'
+import { loadAccountStates } from './tanodPortalApi'
+import { dutyDate } from './tanodDuty'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { FaInfoCircle, FaLock, FaPlus, FaShieldAlt, FaUserShield } from 'react-icons/fa'
+import { FaInfoCircle, FaLock, FaPlus, FaEdit, FaShieldAlt, FaUserShield } from 'react-icons/fa'
 
 import {
   PATROL_AREA_HINT, PATROL_TYPE_KEYS, TANOD_NO_LOGIN_NOTE, TANOD_NO_TRACKING_NOTE,
-  TANOD_RESTRICTED_NOTE, assignmentDateLabel, assignmentWindow, patrolTypeLabel,
+  TANOD_RESTRICTED_NOTE, patrolTypeLabel,
   tanodStateLabel,
 } from './tanodLabels'
 import {
@@ -12,12 +17,8 @@ import {
 } from './tanodApi'
 import './Tanod.css'
 
-// Combined Phase 2 — the Tanod roster and the patrol schedule.
-//
-// ⚠️ NO LOGIN AND NO TRACKING, and both are said on screen rather than only
-// in a migration header. A Tanod is a person on a roster: no account, no
-// password, no portal, and no coordinate column anywhere on them. The only
-// latitude and longitude in this phase belong to an incident.
+// Existing official roster and schedule management. Account linking is separate
+// from roster membership; assignments never imply attendance or live tracking.
 
 const blankMember = () => ({ fullName: '', areaNote: '', displayOrder: '' })
 const blankAssignment = () => ({
@@ -26,6 +27,11 @@ const blankAssignment = () => ({
 })
 
 const TanodPanel = ({ canAdminister = false }) => {
+  const [tab, setTab] = useState('roster')
+  const [managedId, setManagedId] = useState(null)
+  const [memberOpen, setMemberOpen] = useState(false)
+  const [scheduleOpen, setScheduleOpen] = useState(false)
+  const [accountStates, setAccountStates] = useState(null)
   const [roster, setRoster] = useState([])
   const [assignments, setAssignments] = useState([])
   const [loading, setLoading] = useState(true)
@@ -42,10 +48,12 @@ const TanodPanel = ({ canAdminister = false }) => {
     setLoading(true)
     setProblem('')
     try {
-      const [people, shifts] = await Promise.all([
+      const [people, shifts, links] = await Promise.all([
         loadTanodRoster({ includeInactive: true }),
         loadTanodAssignments({}),
+        canAdminister ? loadAccountStates().catch(() => null) : Promise.resolve(null),
       ])
+      setAccountStates(links)
       setRoster(people)
       setAssignments(shifts)
     } catch (err) {
@@ -53,7 +61,7 @@ const TanodPanel = ({ canAdminister = false }) => {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [canAdminister])
 
   useEffect(() => { fetchAll() }, [fetchAll])
 
@@ -88,6 +96,7 @@ const TanodPanel = ({ canAdminister = false }) => {
     if (ok) {
       setMember(blankMember())
       setEditingId(null)
+      setMemberOpen(false)
     }
   }
 
@@ -95,87 +104,21 @@ const TanodPanel = ({ canAdminister = false }) => {
     event.preventDefault()
     if (!assignment.tanodId || !assignment.assignmentDate || !String(assignment.areaLabel).trim()) return
     const ok = await run('assign', () => scheduleAssignment(assignment), 'scheduleFailed')
-    if (ok) setAssignment(blankAssignment())
+    if (ok) { setAssignment(blankAssignment()); setScheduleOpen(false) }
   }
 
   const activeRoster = roster.filter((t) => t.active)
-
-  return (
-    <div>
-      <div className="official-dashboard-header">
-        <h1>Tanod Operations</h1>
-        <p>Who is on the roster, and which areas are covered.</p>
-      </div>
-
-      {problem && (
-        <p className="tnd-problem" role="alert">
-          <FaInfoCircle aria-hidden="true" /> {problem}
-        </p>
-      )}
-
-      <p className="tnd-note" role="note">
-        <FaLock aria-hidden="true" /> {TANOD_NO_LOGIN_NOTE} {TANOD_NO_TRACKING_NOTE}
-      </p>
-
-      <div className="dashboard-card">
-        <div className="dashboard-card-header">
-          <h2 className="section-heading"><FaUserShield aria-hidden="true" /> Tanod roster</h2>
-        </div>
-
-        {loading ? (
-          <p className="complaint-empty">Loading roster...</p>
-        ) : roster.length === 0 ? (
-          <p className="complaint-empty">No Tanod members on the roster yet.</p>
-        ) : (
-          <div className="table-wrapper">
-            <table className="dashboard-table">
-              <thead>
-                <tr>
-                  <th>Name</th><th>Usual area</th><th>State</th>
-                  <th>Active assignments</th>{canAdminister && <th>Action</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {roster.map((t) => (
-                  <tr key={t.id}>
-                    <td data-label="Name">{t.full_name}</td>
-                    <td data-label="Usual area">{t.area_note || 'Not recorded'}</td>
-                    <td data-label="State">
-                      <span className={`kp-badge kp-badge-${t.active ? 'open' : 'concluded'}`}>
-                        {tanodStateLabel(t.active)}
-                      </span>
-                    </td>
-                    <td data-label="Active assignments">{t.assignment_count}</td>
-                    {canAdminister && (
-                      <td data-label="Action">
-                        <button
-                          type="button" className="btn-add btn-sm" disabled={Boolean(busy)}
-                          aria-label={`Edit ${t.full_name}`}
-                          onClick={() => {
-                            setEditingId(t.id)
-                            setMember({ fullName: t.full_name, areaNote: t.area_note || '', displayOrder: t.display_order })
-                            setProblem('')
-                            document.getElementById('tnd-name')?.focus()
-                          }}
-                        >Edit</button>
-                        <button
-                          type="button" className={`${t.active ? 'btn-deny' : 'btn-add'} btn-sm`} disabled={Boolean(busy)}
-                          aria-label={`${t.active ? 'Stand down' : 'Reactivate'} ${t.full_name}`}
-                          onClick={() => run('toggle',
-                            () => setTanodActive({ tanodId: t.id, active: !t.active }), 'updateFailed')}
-                        >
-                          {t.active ? 'Stand down' : 'Reactivate'}
-                        </button>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {canAdminister ? (
+  const managed = roster.find((t) => t.id === managedId)
+  const today = dutyDate()
+  const todayAssignments = assignments.filter((a) => a.active && a.assignment_date === today)
+  const coverage = new Set(todayAssignments.filter((a) => a.start_time && a.end_time).map((a) => a.start_time + '/' + a.end_time)).size
+  const beginEdit = (t) => {
+    setEditingId(t.id)
+    setMember({ fullName: t.full_name, areaNote: t.area_note || '', displayOrder: t.display_order })
+    setMemberOpen(true); setProblem('')
+  }
+  const closeManagement = () => { setManagedId(null); setEditingId(null); setMemberOpen(false); setMember(blankMember()); setProblem('') }
+  const memberForm = (
           <form id="tnd-member-form" className="kp-form tnd-form" onSubmit={handleAddMember}>
             <h3>{editingId ? 'Edit Tanod' : 'Add a Tanod'}</h3>
             <fieldset disabled={Boolean(busy)} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
@@ -211,69 +154,54 @@ const TanodPanel = ({ canAdminister = false }) => {
               </button>
               {editingId && (
                 <button type="button" className="btn-cancel" disabled={Boolean(busy)}
-                  onClick={() => { setEditingId(null); setMember(blankMember()); setProblem('') }}>
+                  onClick={() => { setEditingId(null); setMember(blankMember()); setMemberOpen(false); setProblem('') }}>
                   Cancel
                 </button>
               )}
             </div>
             </fieldset>
           </form>
-        ) : (
-          <p className="complaint-no-actions" role="note">{TANOD_RESTRICTED_NOTE}</p>
-        )}
+  )
+  return <div className="tnd-operations">
+    <div className="official-dashboard-header"><h1>Tanod Operations</h1><p>Manage the Tanod roster, account access, and patrol schedules.</p></div>
+    {problem && !managed && <p className="tnd-problem" role="alert"><FaInfoCircle aria-hidden="true" /> {problem}</p>}
+    <div className="tnd-summary" aria-label="Tanod operations summary">
+      {[["Total Tanods", loading ? 'Loading' : roster.length], ['Accounts Linked', loading ? 'Loading' : accountStates === null ? 'Unavailable' : roster.filter((t) => accountStates.some((a) => a.tanod_id === t.id && a.profile_id)).length], ['Scheduled Today', loading ? 'Loading' : todayAssignments.length], ['Shift Coverage', loading ? 'Loading' : coverage + ' shifts today']].map(([label,value]) => <div className="dashboard-card" key={label}><span>{label}</span><strong>{value}</strong></div>)}
+    </div>
+    <p className="tnd-note" role="note"><FaLock aria-hidden="true" /> {TANOD_NO_LOGIN_NOTE} {TANOD_NO_TRACKING_NOTE}</p>
+    <div className="view-toggle tnd-tabs" role="group" aria-label="Tanod operations view">
+      <button type="button" aria-pressed={tab === 'roster'} onClick={() => setTab('roster')}>Roster &amp; Accounts</button>
+      <button type="button" aria-pressed={tab === 'schedule'} onClick={() => setTab('schedule')}>Patrol Schedule</button>
+    </div>
+    {tab === 'roster' ? <section className="dashboard-card" aria-labelledby="tnd-roster-heading">
+      <div className="dashboard-card-header"><h2 id="tnd-roster-heading" className="section-heading"><FaUserShield aria-hidden="true" /> Roster &amp; Accounts</h2>
+        {canAdminister && <button type="button" className="btn-add" disabled={Boolean(busy)} aria-expanded={memberOpen && !editingId} aria-controls="tnd-member-form" onClick={() => { setMemberOpen(!memberOpen || Boolean(editingId)); setEditingId(null); setMember(blankMember()) }}><FaPlus aria-hidden="true" /> {memberOpen && !editingId ? 'Close Add form' : 'Add Tanod'}</button>}
       </div>
-
-      <div className="dashboard-card">
-        <div className="dashboard-card-header">
-          <h2 className="section-heading"><FaShieldAlt aria-hidden="true" /> Patrol assignments</h2>
-        </div>
-
-        {loading ? (
-          <p className="complaint-empty">Loading assignments...</p>
-        ) : assignments.length === 0 ? (
-          <p className="complaint-empty">No patrol assignments recorded yet.</p>
-        ) : (
-          <div className="table-wrapper">
-            <table className="dashboard-table">
-              <thead>
-                <tr>
-                  <th>Date</th><th>Tanod</th><th>Area</th>
-                  <th>Patrol</th><th>Window</th><th>State</th>{canAdminister && <th>Action</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {assignments.map((a) => (
-                  <tr key={a.id}>
-                    <td data-label="Date">{assignmentDateLabel(a.assignment_date)}</td>
-                    <td data-label="Tanod">{a.tanod_name}</td>
-                    <td data-label="Area">{a.area_label}</td>
-                    <td data-label="Patrol">{patrolTypeLabel(a.patrol_type)}</td>
-                    <td data-label="Window">{assignmentWindow(a.start_time, a.end_time)}</td>
-                    <td data-label="State">
-                      <span className={`kp-badge kp-badge-${a.active ? 'open' : 'concluded'}`}>
-                        {a.active ? 'Active' : 'Stood down'}
-                      </span>
-                    </td>
-                    {canAdminister && (
-                      <td data-label="Action">
-                        <button
-                          type="button" className="btn-deny btn-sm" disabled={Boolean(busy)}
-                          aria-label={`${a.active ? 'Stand down' : 'Reactivate'} assignment for ${a.tanod_name} on ${assignmentDateLabel(a.assignment_date)}`}
-                          onClick={() => run('toggleAssign',
-                            () => setAssignmentActive({ assignmentId: a.id, active: !a.active }), 'updateFailed')}
-                        >
-                          {a.active ? 'Stand down' : 'Reactivate'}
-                        </button>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {canAdminister && (
+      {loading ? <p role="status">Loading roster...</p> : !roster.length ? <p className="complaint-empty">No Tanod members on the roster yet.</p> : <div className="table-wrapper"><table className="dashboard-table">
+        <thead><tr><th scope="col">Tanod</th><th scope="col">Account</th><th scope="col">State</th><th scope="col">Active assignments</th>{canAdminister && <th scope="col">Actions</th>}</tr></thead>
+        <tbody>{roster.map((t) => <tr key={t.id}>
+          <td data-label="Tanod"><strong>{t.full_name}</strong><small className="tnd-subline">{t.area_note || 'Not recorded'}</small></td>
+          <td data-label="Account"><span className="kp-badge">{accountStates === null ? 'Not confirmed' : accountStates.some((a) => a.tanod_id === t.id && a.profile_id) ? 'Linked' : 'Not linked'}</span></td>
+          <td data-label="State"><span className={'kp-badge kp-badge-' + (t.active ? 'open' : 'concluded')}>{tanodStateLabel(t.active)}</span></td>
+          <td data-label="Active assignments">{t.assignment_count}</td>
+          {canAdminister && <td data-label="Actions"><button type="button" className="btn-add btn-sm" disabled={Boolean(busy)} id={'tnd-manage-' + t.id} aria-haspopup="dialog" aria-label={'Manage ' + t.full_name} aria-expanded={managedId === t.id} aria-controls="tnd-management-dialog" onClick={() => { setManagedId(managedId === t.id ? null : t.id); setMemberOpen(false); setEditingId(null) }}>Manage</button></td>}
+        </tr>)}</tbody>
+      </table></div>}
+      {canAdminister && managed && <TanodManageDialog member={managed} linked={accountStates === null ? null : accountStates.some((a) => a.tanod_id === managed.id && a.profile_id)} onClose={closeManagement}
+        editAction={<button type="button" className="btn-add btn-sm" disabled={Boolean(busy)} aria-label={'Edit ' + managed.full_name} aria-expanded={memberOpen && editingId === managed.id} aria-controls="tnd-member-form" onClick={() => beginEdit(managed)}><FaEdit aria-hidden="true" /> Edit Tanod</button>}>
+        {problem && <p className="tnd-problem" role="alert"><FaInfoCircle aria-hidden="true" /> {problem}</p>}
+        <dl className="tnd-manage-summary"><div><dt>Usual Area</dt><dd>{managed.area_note || 'Not recorded'}</dd></div><div><dt>Active Assignments</dt><dd>{managed.assignment_count}</dd></div></dl>
+        {memberOpen && editingId === managed.id && memberForm}
+        <TanodAccounts key={managed.id} roster={roster} selectedMember={managed} accountStates={accountStates} onStatesChange={setAccountStates}
+          rosterAction={<button type="button" className={(managed.active ? 'btn-deny' : 'btn-add') + ' btn-sm'} disabled={Boolean(busy)} aria-label={(managed.active ? 'Stand down ' : 'Reactivate ') + managed.full_name} onClick={() => run('toggle', () => setTanodActive({ tanodId: managed.id, active: !managed.active }), 'updateFailed')}>{managed.active ? 'Stand down Tanod' : 'Reactivate Tanod'}</button>} />
+      </TanodManageDialog>}
+      {canAdminister && memberOpen && !managed && memberForm}
+      {!canAdminister && <p className="complaint-no-actions" role="note">{TANOD_RESTRICTED_NOTE}</p>}
+    </section> : <section className="dashboard-card" aria-labelledby="tnd-schedule-heading">
+      <div className="dashboard-card-header"><h2 id="tnd-schedule-heading" className="section-heading"><FaShieldAlt aria-hidden="true" /> Patrol Schedule</h2>
+        {canAdminister && <button type="button" className="btn-add" disabled={Boolean(busy)} aria-expanded={scheduleOpen} aria-controls="tnd-assign-form" onClick={() => setScheduleOpen(!scheduleOpen)}><FaPlus aria-hidden="true" /> {scheduleOpen ? 'Close schedule form' : 'Schedule Patrol'}</button>}
+      </div>
+      {canAdminister && scheduleOpen && (
           <form id="tnd-assign-form" className="kp-form tnd-form" onSubmit={handleSchedule}>
             <h3>Schedule a patrol</h3>
             <div className="tnd-grid">
@@ -340,10 +268,9 @@ const TanodPanel = ({ canAdminister = false }) => {
               </button>
             </div>
           </form>
-        )}
-      </div>
-    </div>
-  )
+      )}
+      {loading ? <p role="status">Loading assignments...</p> : <OfficialTanodSchedule assignments={assignments} canAdminister={canAdminister} busy={busy} onToggle={(a) => run('toggleAssign', () => setAssignmentActive({ assignmentId: a.id, active: !a.active }), 'updateFailed')} />}
+    </section>}
+  </div>
 }
-
 export default TanodPanel

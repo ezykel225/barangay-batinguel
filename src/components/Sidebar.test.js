@@ -45,6 +45,18 @@ jest.mock('react-hot-toast', () => ({
 const { supabase } = require('../supabase/supabaseClient')
 const { useAuth } = require('../context/AuthContext')
 
+test('Tanod portal uses its linked identity and only its four operational destinations', () => {
+  render(<MemoryRouter><Sidebar role="tanod" activeTab="overview" setActiveTab={jest.fn()} tanodName="Linked Tanod" /></MemoryRouter>)
+  expect(screen.getByRole('complementary', { name: 'Tanod Portal sidebar' })).toBeInTheDocument()
+  expect(screen.getByText('Linked Tanod')).toBeInTheDocument()
+  expect(screen.getByText('Barangay Tanod')).toBeInTheDocument()
+  const nav = screen.getByRole('navigation', { name: 'Tanod dashboard' })
+  expect(nav.querySelectorAll('button')).toHaveLength(4)
+  expect(screen.queryByText('Document Requests')).toBeNull()
+  expect(screen.queryByText('Residents')).toBeNull()
+  expect(supabase.from).not.toHaveBeenCalled()
+})
+
 // ⚠️ The implementations are installed per test, not in the factory.
 // CRA 5's Jest preset sets `resetMocks: true`, so an implementation
 // given inside `jest.mock` is wiped before the first test runs and
@@ -215,7 +227,7 @@ const unsupported = [
   ['E. null', null],
   ['F. undefined', undefined],
   ['G. the empty string', ''],
-  ['H. "tanod" -- a future fourth role', 'tanod'],
+  ['H. an unsupported future role', 'unsupported-role'],
   ['I. "constructor" -- an inherited property name', 'constructor'],
 ]
 
@@ -295,7 +307,7 @@ describe('the privileged identity lookup', () => {
   })
 
   it('is not attempted for an unsupported role', async () => {
-    renderSidebar('tanod')
+    renderSidebar('unsupported-role')
     await screen.findByText('Dashboard navigation is unavailable for this account.')
     expect(supabase.rpc).not.toHaveBeenCalled()
   })
@@ -310,7 +322,7 @@ describe('the Main Menu heading', () => {
   })
 
   it('is absent when there are none, rather than heading an empty list', () => {
-    renderSidebar('tanod')
+    renderSidebar('unsupported-role')
     expect(screen.queryByText('Main Menu')).toBeNull()
   })
 })
@@ -340,25 +352,22 @@ describe('the mobile drawer', () => {
     expect(drawerItems(container)).toContain('Safety Map & Analytics')
   })
 
-  // ⚠️ THE PROBE ROLE IS 'tanod', AND COMBINED PHASE 2 MAKES THAT POINTED
-  // RATHER THAN ARBITRARY. That phase adds a Tanod roster, a patrol
-  // schedule and an operations tab -- and NO `tanod` account, no login and
-  // no fourth value in `profiles_role_check`. So a session claiming to be
-  // one is still an unrecognised role, and still gets nothing.
+  // Tanod is now a supported portal. Keep the unknown-role guard tested
+  // using a separate unsupported value; unknown roles still get no tabs.
   it('offers ZERO privileged destinations to an unknown role', async () => {
-    const { container } = renderSidebar('tanod')
+    const { container } = renderSidebar('unsupported-role')
     await openDrawer()
     expect(drawerItems(container)).toEqual([])
   })
 
   it('keeps Logout reachable in the drawer for an unknown role', async () => {
-    const { container } = renderSidebar('tanod')
+    const { container } = renderSidebar('unsupported-role')
     await openDrawer()
     expect(container.querySelector('.nav-drawer-logout')).not.toBeNull()
   })
 
   it('shows the explanatory empty state in the drawer too', async () => {
-    renderSidebar('tanod')
+    renderSidebar('unsupported-role')
     await openDrawer()
     // Once in the rail, once in the drawer -- both are mounted, and the
     // rail is hidden by CSS rather than unmounted.
@@ -380,13 +389,13 @@ describe('the mobile drawer', () => {
 
 describe('accessibility in the unsupported-role state', () => {
   it('still exposes the complementary landmark, with a neutral name', () => {
-    renderSidebar('tanod')
+    renderSidebar('unsupported-role')
     const rail = screen.getByRole('complementary', { name: 'Dashboard sidebar' })
     expect(rail).toBeInTheDocument()
   })
 
   it('keeps the collapse toggle pointing at an element that EXISTS', () => {
-    const { container } = renderSidebar('tanod')
+    const { container } = renderSidebar('unsupported-role')
     const toggle = container.querySelector('.sidebar-collapse-toggle')
     const id = toggle.getAttribute('aria-controls')
     expect(id).toBe('sidebar-nav')
@@ -396,7 +405,7 @@ describe('accessibility in the unsupported-role state', () => {
   })
 
   it('keeps Logout focusable, outside the nav', () => {
-    const { container } = renderSidebar('tanod')
+    const { container } = renderSidebar('unsupported-role')
     const logout = screen.getByRole('button', { name: 'Logout' })
     logout.focus()
     expect(document.activeElement).toBe(logout)
@@ -406,7 +415,7 @@ describe('accessibility in the unsupported-role state', () => {
   })
 
   it('opens the drawer, closes it on Escape and restores focus', async () => {
-    renderSidebar('tanod')
+    renderSidebar('unsupported-role')
     const menu = screen.getByRole('button', { name: 'Open navigation menu' })
     await userEvent.click(menu)
 
@@ -419,7 +428,7 @@ describe('accessibility in the unsupported-role state', () => {
   })
 
   it('tracks the menu button\'s aria-expanded', async () => {
-    renderSidebar('tanod')
+    renderSidebar('unsupported-role')
     const menu = screen.getByRole('button', { name: 'Open navigation menu' })
     expect(menu).toHaveAttribute('aria-expanded', 'false')
     await userEvent.click(menu)
@@ -513,7 +522,7 @@ describe('the sidebar footer is reachable by construction', () => {
   // footer is what an unrecognised role still gets. The 61 tests above
   // own the nav; this one owns the footer.
   it('still gives an unrecognised role a footer and no privileged nav', () => {
-    const { container } = renderSidebar('tanod')
+    const { container } = renderSidebar('unsupported-role')
     expect(container.querySelector('.sidebar-footer .sidebar-logout')).not.toBeNull()
     expect(screen.getByRole('button', { name: 'Logout' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Officials Directory' })).toBeNull()

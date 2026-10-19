@@ -24,6 +24,7 @@ import './MonthCalendar.css'
 //   renderDay(cell) -> {
 //     tone,      // 'default' | 'has' | 'warn' | 'muted'
 //     count,     // a number to show as an indicator, or 0
+//     marker,    // optional visible text in that indicator; count still controls its presence
 //     disabled,  // not selectable
 //     label,     // what assistive technology hears IN ADDITION to the
 //                // date, e.g. "3 slots available"
@@ -115,7 +116,7 @@ const MonthCalendar = ({
           }
 
           const day = (renderDay ? renderDay(cell) : null) || {}
-          const { tone = 'default', count = 0, disabled = false, label = '' } = day
+          const { tone = 'default', count = 0, disabled = false, label = '', marker = null } = day
           const isSelected = selectedDate === cell.key
 
           // Built here so every consumer gives the same shape of name:
@@ -148,7 +149,7 @@ const MonthCalendar = ({
                   meaning in either case. */}
               {count > 0 && (
                 <span className="mcal-dot" aria-hidden="true">
-                  {count > 1 ? count : ''}
+                  {marker ?? (count > 1 ? count : '')}
                 </span>
               )}
             </button>

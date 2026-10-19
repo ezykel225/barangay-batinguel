@@ -1,3 +1,4 @@
+import PublicTanodDuty from '../tanod/PublicTanodDuty'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
@@ -35,12 +36,12 @@ import './CommunitySafety.css'
 //
 // ─── ⚠️ WHAT THIS PAGE CAN NEVER SHOW ───────────────────────────────────────
 //
-// No narrative, no reference, no street or place name, no date finer than a
-// month, no status, no incident id, no complainant, respondent or witness,
+// Incident analytics expose no narrative, reference, street/place name or incident
+// date finer than a month; no incident status/id, complainant, respondent or witness,
 // no contact number, no evidence, no complaint, no KP screening, no KP case,
-// no blotter content, and nothing whatever about a Tanod or a patrol. Those
-// are absent because the FUNCTIONS DO NOT RETURN THEM, not because this
-// component filters them out -- so no edit here can expose one.
+// no blotter content. Those details are absent because the analytics FUNCTIONS
+// DO NOT RETURN THEM, not because React filters them out. A separate public duty
+// reader supplies only staff display names, general areas and shift information.
 
 export const communityPeriods = (now = new Date()) => {
   const parts = new Intl.DateTimeFormat('en-US', {
@@ -166,6 +167,8 @@ const CommunitySafety = () => {
             {problem && (
               <p className="cs-problem" role="alert">{problem}</p>
             )}
+
+            <PublicTanodDuty />
 
             <div className="cs-filters">
               <label htmlFor="cs-period">Period</label>

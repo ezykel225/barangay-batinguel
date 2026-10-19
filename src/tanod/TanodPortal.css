@@ -1,0 +1,216 @@
+.tanod-portal { min-height: 100vh; background: #f1f5f9; color: #1f2937; }
+.td-page-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.td-page-header > div { min-width: 0; }
+.td-page-header h1 { overflow-wrap: anywhere; }
+.td-page-header .td-refresh { flex-shrink: 0; }
+.tanod-portal .td-summary .td-icon { display: grid; place-items: center; width: 42px; height: 42px; flex: 0 0 42px; background: #eff6ff; border-radius: var(--radius-sm); color: #1e40af; font-size: var(--fs-20); }
+.td-summary { transition: box-shadow .15s ease; }
+.td-summary:hover { box-shadow: 0 4px 14px rgb(30 58 138 / 9%); }
+.tanod-portal .td-summary .td-state { font-size: var(--fs-13); }
+.tanod-portal .td-summary .td-report-count { font-size: var(--fs-28); color: #1e3a8a; }
+.tanod-portal .td-summary .td-summary-shift { font-weight: 600; color: #1e3a8a; }
+.tanod-portal .td-state-scheduled { background: #eff6ff; color: #1e40af; }
+.tanod-portal .td-state-warning { background: #fef3c7; color: #92400e; }
+.tanod-portal .td-state-completed { background: #f0fdf4; color: #166534; }
+.tanod-portal .td-duty-card { border-left: 4px solid #3b82f6; }
+.td-duty-kicker { display: flex; justify-content: space-between; gap: 12px; padding-bottom: 12px; margin-bottom: 16px; border-bottom: 1px solid #dbeafe; color: #1e40af; font-size: var(--fs-13); font-weight: 600; }
+.td-duty-kicker > span:first-child, .td-meta { display: flex; align-items: center; gap: 8px; }
+.td-meta { color: #475569; overflow-wrap: anywhere; }
+.td-meta svg { flex-shrink: 0; color: #64748b; }
+.td-duty-heading { margin-bottom: 16px; }
+.td-duty-heading h3 svg { color: #1e40af; margin-right: 4px; }
+.tanod-portal .td-duty-completed { border-left-color: #86b99a; }
+.tanod-portal .td-duty-warning { border-left-color: #d97706; }
+.td-attendance { display: flex; flex-wrap: wrap; gap: 16px 32px; padding: 12px 0; margin: 12px 0; border-block: 1px solid #e2e8f0; }
+.td-attendance dt { font-size: var(--fs-13); color: #475569; }
+.td-attendance dd { margin: 4px 0 0; font-weight: 600; }
+.td-info, .td-success { display: flex; gap: 12px; padding: 16px; border-radius: var(--radius-sm); background: #eff6ff; color: #1e3a8a; border: 1px solid #dbeafe; }
+.td-info > svg, .td-success > svg { flex-shrink: 0; margin-top: 3px; }
+.td-info p, .td-success p { margin: 4px 0 0; font-size: var(--fs-14); line-height: 1.6; }
+.td-success { background: #f0fdf4; color: #166534; border-color: #bbf7d0; margin: 16px 0; overflow-wrap: anywhere; }
+.td-success > div { min-width: 0; }
+.td-section-title, .tanod-portal legend { display: flex; align-items: center; gap: 8px; color: #1e3a8a; }
+.tanod-portal .td-location-panel { padding: 16px; border: 1px solid #dbeafe; border-radius: var(--radius-sm); background: #f8fafc; }
+.td-section-title { padding-bottom: 10px; border-bottom: 1px solid #e2e8f0; font-size: var(--fs-16); }
+.td-submit { display: inline-flex; align-items: center; justify-content: center; padding: 12px 24px; font-weight: 600; }
+.td-report-header { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.tanod-portal .td-report-header h2 { margin: 0; }
+.td-report-type { font-weight: 600; }
+.td-report-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+.td-report-chips > :is(span,p) { margin: 0; padding: 6px 10px; border-radius: var(--radius-sm); background: #f1f5f9; color: #475569; font-size: var(--fs-13); }
+.td-filter-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; padding: 12px 16px; background: white; border: 1px solid #e2e8f0; border-radius: var(--radius-sm); color: #475569; }
+.tanod-portal .td-filter-toolbar label { margin: 0; flex: 1; max-width: 320px; font-size: var(--fs-14); }
+.td-empty { text-align: center; }
+.td-empty > svg { font-size: var(--fs-28); color: #64748b; margin: 8px 0 12px; }
+.tanod-portal .td-followups { margin-top: 16px; border-top: 1px solid #e2e8f0; }
+.tanod-portal .td-followups summary { font-weight: 600; color: #1e3a8a; }
+.td-followups summary svg { margin-right: 6px; }
+.td-note-empty { color: #475569; padding: 12px; background: #f8fafc; border-radius: var(--radius-sm); }
+.td-note-empty > svg { margin-right: 8px; }
+.td-note-empty p { font-size: var(--fs-14); }
+.td-note-timeline { list-style: none; padding-left: 16px; border-left: 2px solid #dbeafe; }
+.td-note-timeline li { padding: 8px 0; overflow-wrap: anywhere; }
+.td-note-timeline time { color: #475569; font-size: var(--fs-13); }
+@media(max-width: 480px) {
+  .td-page-header { flex-wrap: wrap; }
+  .td-report-header, .td-duty-heading { flex-direction: column; }
+  .tanod-portal .td-duty-card > button, .tanod-portal .td-submit { width: 100%; }
+  .td-summary .td-icon { align-self: flex-start; }
+}
+.tanod-portal .dashboard-main h2 { font-size: var(--fs-18); margin: 24px 0 12px; }
+.td-refresh { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: #475569; font: inherit; cursor: pointer; }
+.td-refresh:hover { background: #e2e8f0; color: #1e3a8a; }
+.td-empty h3 { margin-top: 0; }
+.td-empty p { color: #475569; }
+.td-summary-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 16px; }
+.td-summary { display: flex; align-items: flex-start; gap: 14px; min-width: 0; }
+.td-summary div { min-width: 0; display: flex; flex-direction: column; gap: 6px; overflow-wrap: anywhere; }
+.td-summary span { color: #475569; font-size: var(--fs-14); }
+.td-summary strong { font-size: var(--fs-18); line-height: 1.5; }
+.td-duty-heading { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.td-duty-heading h3 { margin: 0; font-size: var(--fs-18); }
+.td-shift { display: inline-flex; align-items: center; gap: 8px; color: #475569; }
+.td-form-section { margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid #e2e8f0; }
+.tanod-portal legend { font-size: var(--fs-18); font-weight: 600; }
+.tanod-portal .td-card { min-width: 0; margin: 16px 0; overflow-wrap: anywhere; }
+.td-card p { margin: 10px 0; }
+.td-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.td-state { display: inline-block; padding: 6px 10px; border-radius: 6px; background: #e2e8f0; color: #334155; font-weight: 600; }
+.td-state-on { background: #dcfce7; color: #166534; }
+.td-error { padding: 14px; color: #991b1b; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; }
+.td-help { color: #475569; font-size: var(--fs-13); line-height: 1.6; }
+.tanod-portal .td-help { font-size: var(--fs-14); }
+.tanod-portal label, .tnd-accounts label { display: block; margin: 14px 0; font-weight: 600; }
+.tanod-portal :is(input,select,textarea) { display: block; width: 100%; min-width: 0; max-width: 100%; margin-top: 6px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 12px; background: white; color: #1f2937; font: inherit; }
+.tanod-portal fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
+.tanod-portal textarea { resize: vertical; }
+.tanod-portal button, .public-tanod-duty button { min-height: 44px; }
+.tanod-portal button:disabled { background: #e2e8f0; color: #64748b; cursor: not-allowed; }
+.tanod-portal :is(button,a,input,select,textarea,summary):focus-visible, .public-tanod-duty button:focus-visible { outline: 3px solid #2563eb; outline-offset: 3px; }
+.tanod-portal summary { cursor: pointer; padding: 12px 0; }
+.td-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.public-tanod-duty { margin: 0 0 24px; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; }
+.public-tanod-duty h2 { margin-top: 0; }
+.public-tanod-list { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,240px),1fr)); gap: 12px; }
+.public-tanod-list li { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 14px; border: 1px solid #e2e8f0; border-radius: 8px; overflow-wrap: anywhere; }
+.tnd-accounts { margin-top: 20px; }
+.tnd-account-list { padding: 0; list-style: none; }
+.tnd-account-list li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 10px 0; border-bottom: 1px solid #e2e8f0; }
+@media(max-width: 1100px) { .td-summary-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media(max-width: 480px) { .td-grid, .td-summary-grid { grid-template-columns: minmax(0,1fr); } .td-card { padding: 14px; } }
+
+/* Tanod main-content composition; shared sidebar and public duty styles are unchanged. */
+.td-content { max-width: 1160px; margin-inline: auto; min-width: 0; }
+.tanod-portal .td-page-header { margin-bottom: 20px; }
+.tanod-portal .td-summary { padding: 18px; gap: 10px; }
+.tanod-portal .td-summary div > span:first-child { font-size: var(--fs-12); text-transform: uppercase; letter-spacing: .04em; }
+.tanod-portal .td-summary strong { font-size: var(--fs-16); }
+.tanod-portal .td-summary .td-report-count { font-size: var(--fs-28); }
+.tanod-portal .td-card { padding: 20px; }
+.td-duty-info { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; margin: 12px 0; }
+.td-duty-info dt { display: flex; align-items: center; gap: 6px; color: #64748b; font-size: var(--fs-13); }
+.td-duty-info dd { margin: 5px 0 0; font-weight: 600; overflow-wrap: anywhere; }
+.tanod-portal .td-attendance { border: 0; padding: 8px 0; margin: 8px 0; }
+.tanod-portal .td-info { padding: 12px 16px; max-width: 900px; }
+.td-history-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.tanod-portal .td-history-list .td-card { margin: 0; border-left-width: 1px; }
+.tanod-portal .td-empty { max-width: 680px; margin-inline: auto; padding: 20px; }
+.tanod-portal .td-report-form { width: 100%; max-width: none; margin-top: 0; }
+.td-form-inner, .td-report-form > .td-success { width: 100%; max-width: none; margin-inline: 0; }
+.tanod-portal .td-report-form { padding: 28px; }
+.tanod-portal .td-location-panel { width: 100%; box-sizing: border-box; }
+.tanod-portal .td-duty-history-empty { width: 100%; max-width: none; margin-inline: 0; background: #f8fafc; }
+.td-form-details { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0 16px; }
+.td-field-wide { grid-column: 1 / -1; }
+.tanod-portal .td-form-section { margin-bottom: 16px; padding-bottom: 0; border: 0; }
+.tanod-portal .td-section-title, .tanod-portal legend { background: #eff6ff; border: 0; border-radius: var(--radius-sm); padding: 10px 12px; width: 100%; margin-bottom: 12px; font-size: var(--fs-16); }
+.tanod-portal .td-submit { display: flex; margin-left: auto; }
+.td-success button { margin-top: 12px; }
+.td-reports { max-width: 900px; }
+.tanod-portal .td-filter-toolbar { display: inline-flex; max-width: 100%; gap: 8px; padding: 4px 8px; margin-bottom: 2px; background: #f9fafb; }
+.tanod-portal .td-filter-toolbar label { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-weight: 500; }
+.tanod-portal .td-filter-toolbar select { width: auto; max-width: 100%; margin: 0; padding: 6px 8px; border: 0; background: transparent; }
+.tanod-portal .td-report-card { margin: 12px 0; }
+.tanod-portal .td-report-header { justify-content: space-between; align-items: center; gap: 8px 16px; }
+.tanod-portal .td-report-header h2 { font-size: var(--fs-18); font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+.tanod-portal .td-report-header > .td-state { flex-shrink: 0; }
+.tanod-portal .td-reports-help { font-size: var(--fs-13); margin: 6px 0 10px; color: #64748b; }
+.tanod-portal .td-report-card p { margin: 8px 0; }
+.tanod-portal .td-report-chips { margin: 12px 0; }
+.tanod-portal .td-followups { margin: 12px -20px -20px; padding: 0 20px; background: #f8fafc; border-radius: 0 0 var(--radius-md) var(--radius-md); }
+.tanod-portal .td-followups summary { padding: 12px 0; font-size: var(--fs-14); }
+.td-followups form { padding-block: 8px 16px; border-top: 1px solid #e2e8f0; }
+@media(max-width: 768px) { .td-history-list { grid-template-columns: minmax(0,1fr); } }
+@media(max-width: 480px) {
+  .td-duty-info, .td-form-details { grid-template-columns: minmax(0,1fr); }
+  .tanod-portal .td-card { padding: 16px; }
+  .tanod-portal .td-followups { margin-inline: -16px; margin-bottom: -16px; padding-inline: 16px; }
+  .tanod-portal .td-submit { width: 100%; }
+}
+
+/* Compact report metadata and a single native-details footer action. */
+.tanod-portal .td-report-card { margin-block: 10px; }
+.tanod-portal .td-report-card p { margin-block: 6px; }
+.tanod-portal .td-report-chips { margin-block: 10px; gap: 6px; }
+.tanod-portal .td-followups summary { display: flex; align-items: center; gap: 10px; list-style: none; margin-inline: -20px; padding: 12px 20px; min-height: 48px; }
+.tanod-portal .td-followups summary::-webkit-details-marker { display: none; }
+.tanod-portal .td-followups summary::marker { content: ''; }
+.tanod-portal .td-followups summary svg { flex-shrink: 0; margin: 0; }
+.tanod-portal .td-followups summary span { min-width: 0; }
+.tanod-portal .td-followups summary:hover { background: #eff6ff; }
+.tanod-portal .td-followups summary:focus-visible { outline-offset: -3px; background: #eff6ff; }
+.td-followups[open] .td-followup-chevron { transform: rotate(90deg); }
+@media(max-width: 480px) { .tanod-portal .td-followups summary { margin-inline: -16px; padding-inline: 16px; } }
+@media(max-width: 768px) { .tanod-portal .td-report-form { padding: 24px; } }
+@media(max-width: 480px) { .tanod-portal .td-report-form { padding: 16px; } }
+@media(max-width: 480px) { .tanod-portal .td-report-header { align-items: flex-start; } }
+/* All Events proportions and breakpoint, scoped to the Tanod schedule. */
+.td-duty-calendar-layout { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 18px; align-items: start; }
+.td-duty-calendar-layout > * { min-width: 0; }
+.td-duty-calendar-layout .mcal-day-panel { margin-top: 0; }
+.td-schedule-item { flex-direction: column; align-items: stretch; gap: 6px; }
+.td-schedule-item header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; }
+.td-schedule-item p { margin: 4px 0; }
+.td-duty-schedule .dashboard-card-header { margin: 20px 0 8px; }
+.td-duty-schedule .table-wrapper { overflow-x: auto; max-width: 100%; }
+.td-duty-schedule td { overflow-wrap: anywhere; }
+@media(max-width: 900px) { .td-duty-calendar-layout { grid-template-columns: minmax(0,1fr); } }
+@media(max-width: 480px) {
+  .td-duty-schedule .view-toggle { display: flex; width: 100%; }
+  .td-duty-schedule .view-toggle button { flex: 1; justify-content: center; padding-inline: 10px; }
+}
+
+/* Compact duty rows and grouped operational attendance. */
+.td-schedule-list { list-style: none; padding: 0; margin: 12px 0; display: grid; gap: 10px; }
+.td-schedule-row { display: grid; grid-template-columns: 64px minmax(0,1fr) auto; gap: 16px; align-items: start; padding: 16px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; overflow-wrap: anywhere; }
+.td-schedule-row:hover { background: #f8fafc; }
+.td-date-tile { display: flex; flex-direction: column; align-items: center; padding: 8px; border-radius: 8px; background: #eff6ff; color: #1e40af; }
+.td-date-tile span { text-transform: uppercase; font-size: var(--fs-12); font-weight: 600; }
+.td-date-tile strong { font-size: var(--fs-24); line-height: 1.2; }
+.td-date-tile small { font-size: var(--fs-12); }
+.td-schedule-body { min-width: 0; }
+.td-schedule-body p { margin: 6px 0; }
+.td-schedule-attendance { display: flex; flex-wrap: wrap; gap: 12px 24px; margin: 10px 0 0; }
+.td-schedule-attendance dt { color: #64748b; font-size: var(--fs-13); }
+.td-schedule-attendance dd { margin: 2px 0 0; font-weight: 600; }
+.tanod-portal .td-duty-kicker { align-items: center; flex-wrap: wrap; margin-bottom: 12px; padding-bottom: 10px; }
+.tanod-portal .td-duty-kicker > .td-state { text-transform: none; }
+.tanod-portal .td-duty-info { padding: 12px; border-radius: 8px; background: #f8fafc; gap: 12px 24px; }
+.tanod-portal .td-duty-info dt, .td-attendance-group h4 { text-transform: uppercase; letter-spacing: .04em; font-size: var(--fs-12); color: #64748b; }
+.td-attendance-group { border-top: 1px solid #e2e8f0; padding-top: 12px; }
+.td-attendance-group h4 { margin: 0; }
+.tanod-portal .td-attendance-group .td-attendance { margin: 0; padding: 8px 0; }
+@media(max-width: 600px) {
+  .td-schedule-row { grid-template-columns: minmax(0,1fr) auto; gap: 12px; padding: 14px; }
+  .td-date-tile { flex-direction: row; justify-content: flex-start; gap: 6px; width: fit-content; }
+  .td-date-tile strong { font-size: var(--fs-18); }
+  .td-schedule-body { grid-row: 2; grid-column: 1 / -1; }
+  .td-schedule-row > .td-state { grid-row: 1; grid-column: 2; }
+}
+
+/* Overview only: keep today's record separate from the next loaded assignment. */
+.td-overview-duty-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; align-items: start; }
+.td-overview-duty-grid > section { min-width: 0; }
+.td-overview-duty-grid .td-duty-info { grid-template-columns: minmax(0,1fr); gap: 10px; }
+.td-overview-duty-grid .td-duty-empty { display: flex; align-items: center; gap: 12px; color: #64748b; background: #f8fafc; }
+@media(max-width: 768px) { .td-overview-duty-grid { grid-template-columns: minmax(0,1fr); } }

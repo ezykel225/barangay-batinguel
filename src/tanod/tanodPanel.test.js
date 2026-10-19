@@ -69,6 +69,7 @@ describe('Tanod editing', () => {
   it('updates only editable details using the existing ID and refreshes the roster', async () => {
     mount({ canAdminister: true })
     await ready()
+    await userEvent.click(screen.getByRole('button', { name: 'Manage Probe Tanod Two' }))
     await userEvent.click(screen.getByRole('button', { name: 'Edit Probe Tanod Two' }))
     expect(screen.getByLabelText('Name')).toHaveValue('Probe Tanod Two')
     await userEvent.clear(screen.getByLabelText('Name'))
@@ -89,9 +90,10 @@ describe('Tanod editing', () => {
   it('cancels without writing and hides Edit from read-only officials', async () => {
     const { unmount } = mount({ canAdminister: true })
     await ready()
+    await userEvent.click(screen.getByRole('button', { name: 'Manage Probe Tanod One' }))
     await userEvent.click(screen.getByRole('button', { name: 'Edit Probe Tanod One' }))
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
-    expect(screen.getByLabelText('Name')).toHaveValue('')
+    expect(screen.queryByLabelText('Name')).not.toBeInTheDocument()
     expect(fnNames()).not.toContain('update_tanod_member')
     unmount()
     mount()
@@ -102,10 +104,11 @@ describe('Tanod editing', () => {
   it('rejects a whitespace-only name', async () => {
     const { container } = mount({ canAdminister: true })
     await ready()
+    await userEvent.click(screen.getByRole('button', { name: 'Manage Probe Tanod One' }))
     await userEvent.click(screen.getByRole('button', { name: 'Edit Probe Tanod One' }))
     await userEvent.clear(screen.getByLabelText('Name'))
     await userEvent.type(screen.getByLabelText('Name'), '   ')
-    fireEvent.submit(container.querySelector('#tnd-member-form'))
+    fireEvent.submit(screen.getByLabelText('Name').closest('form'))
     expect(screen.getByRole('alert')).toHaveTextContent(/name/i)
     expect(fnNames()).not.toContain('update_tanod_member')
   })
@@ -115,13 +118,14 @@ describe('Tanod editing', () => {
     const held = new Promise((resolve) => { release = resolve })
     const { container } = mount({ canAdminister: true })
     await ready()
+    await userEvent.click(screen.getByRole('button', { name: 'Manage Probe Tanod One' }))
     await userEvent.click(screen.getByRole('button', { name: 'Edit Probe Tanod One' }))
     supabase.rpc.mockImplementation((fn, args) => {
       rpcCalls.push([fn, args])
       if (fn === 'update_tanod_member') return held
       return Promise.resolve({ data: fn === 'tanod_roster' ? ROSTER : ASSIGNMENTS, error: null })
     })
-    const form = container.querySelector('#tnd-member-form')
+    const form = screen.getByLabelText('Name').closest('form')
     fireEvent.submit(form); fireEvent.submit(form); fireEvent.submit(form)
     expect(fnNames().filter((fn) => fn === 'update_tanod_member')).toHaveLength(1)
     expect(screen.getByRole('button', { name: /Saving/ })).toBeDisabled()
@@ -133,6 +137,7 @@ describe('Tanod editing', () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {})
     mount({ canAdminister: true })
     await ready()
+    await userEvent.click(screen.getByRole('button', { name: 'Manage Probe Tanod One' }))
     await userEvent.click(screen.getByRole('button', { name: 'Edit Probe Tanod One' }))
     supabase.rpc.mockResolvedValue({ data: null, error: {
       message: 'Only the Barangay Secretary or the Punong Barangay can manage the Tanod roster.',
@@ -146,11 +151,14 @@ describe('Tanod editing', () => {
   it('uses Reactivate with a normal style and keeps Stand down destructive', async () => {
     mount({ canAdminister: true })
     await ready()
+    await userEvent.click(screen.getByRole('button', { name: 'Manage Probe Tanod One' }))
+    expect(screen.getByRole('button', { name: 'Stand down Probe Tanod One' })).toHaveClass('btn-deny')
+    await userEvent.click(screen.getByRole('button', { name: 'Close', exact: true }))
+    await userEvent.click(screen.getByRole('button', { name: 'Manage Probe Tanod Two' }))
     const reactivate = screen.getByRole('button', { name: 'Reactivate Probe Tanod Two' })
     expect(reactivate).toHaveTextContent('Reactivate')
     expect(reactivate).toHaveClass('btn-add')
     expect(reactivate).not.toHaveClass('btn-deny')
-    expect(screen.getByRole('button', { name: 'Stand down Probe Tanod One' })).toHaveClass('btn-deny')
     await userEvent.click(reactivate)
     await waitFor(() => expect(rpcCalls).toContainEqual(['set_tanod_member_active', { p_tanod_id: 't2', p_active: true }]))
   })
@@ -201,16 +209,16 @@ describe('A. the roster', () => {
 
 // ── B. A Tanod is a record, never an account ─────────────────────────────────
 
-describe('B. no login and no tracking', () => {
+describe('B. separate roster and account provisioning, no tracking', () => {
   // ⚠️ §1 and §5: "Tanod has NO login", "No continuous GPS". Both are stated
   // on screen so nobody at the demo infers a portal that does not exist.
   // ⚠️ ASSERTED AGAINST THE SHIPPED SENTENCES. The first version of this
   // test matched wording the module does not use and failed for that reason
   // alone -- which is why it reads the real strings now.
-  it('says in words that a Tanod has no account and is not tracked', async () => {
+  it('explains separate authorized account provisioning and no tracking', async () => {
     mount()
     await ready()
-    const note = screen.getByText(/do not have system accounts and cannot sign in/i)
+    const note = screen.getByText(/roster membership is separate from account access/i)
     expect(note).toBeInTheDocument()
     expect(note.textContent).toMatch(/does not track anyone/i)
   })
@@ -218,7 +226,8 @@ describe('B. no login and no tracking', () => {
   it('asks for no email, password, account or role when adding a Tanod', async () => {
     const { container } = mount({ canAdminister: true })
     await ready()
-    const labels = [...container.querySelectorAll('label')].map((l) => l.textContent.toLowerCase())
+    await userEvent.click(screen.getByRole('button', { name: 'Add Tanod' }))
+    const labels = [...container.querySelectorAll('#tnd-member-form label')].map((l) => l.textContent.toLowerCase())
     ;['email', 'password', 'account', 'role', 'username', 'sign in', 'login']
       .forEach((term) => labels.forEach((l) => expect(l).not.toContain(term)))
   })
@@ -226,6 +235,8 @@ describe('B. no login and no tracking', () => {
   it('asks for no coordinate anywhere on a Tanod or a patrol', async () => {
     const { container } = mount({ canAdminister: true })
     await ready()
+    await userEvent.click(screen.getByRole('button', { name: 'Patrol Schedule', exact: true }))
+    await userEvent.click(screen.getByRole('button', { name: 'Schedule Patrol', exact: true }))
     const labels = [...container.querySelectorAll('label')].map((l) => l.textContent.toLowerCase())
     ;['latitude', 'longitude', 'gps', 'coordinate', 'track']
       .forEach((term) => labels.forEach((l) => expect(l).not.toContain(term)))
@@ -234,6 +245,7 @@ describe('B. no login and no tracking', () => {
   it('sends no account field, coordinate or server-owned value to the RPC', async () => {
     mount({ canAdminister: true })
     await ready()
+    await userEvent.click(screen.getByRole('button', { name: 'Add Tanod' }))
     await userEvent.type(screen.getByLabelText('Name'), 'Probe Tanod Three')
     await userEvent.click(screen.getByRole('button', { name: /Add Tanod/i }))
 
@@ -271,8 +283,9 @@ describe('C. who may administer the roster', () => {
   it('offers the controls with the flag', async () => {
     mount({ canAdminister: true })
     await ready()
+    await userEvent.click(screen.getByRole('button', { name: 'Add Tanod' }))
     expect(screen.getByLabelText('Name')).toBeInTheDocument()
-    expect(screen.getByLabelText('Patrol area')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Manage Probe Tanod One' }))
     expect(screen.getByRole('button', { name: 'Stand down Probe Tanod One' }))
       .toBeInTheDocument()
   })
@@ -284,14 +297,20 @@ describe('D. the patrol schedule', () => {
   it('shows the window when there is one and says so when there is not', async () => {
     mount()
     await ready()
-    expect(screen.getByText(/18:00/)).toBeInTheDocument()
-    expect(screen.getByText(/22:00/)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Patrol Schedule', exact: true }))
+    await userEvent.click(screen.getByRole('button', { name: 'List', exact: true }))
+    fireEvent.change(screen.getByLabelText('Schedule month'), { target: { value: '2026-10' } })
+    expect(screen.getByText(/6:00 PM/)).toBeInTheDocument()
+    expect(screen.getByText(/10:00 PM/)).toBeInTheDocument()
     expect(screen.getByText('No time recorded')).toBeInTheDocument()
   })
 
   it('reads the patrol type as words rather than as a stored value', async () => {
     mount()
     await ready()
+    await userEvent.click(screen.getByRole('button', { name: 'Patrol Schedule', exact: true }))
+    await userEvent.click(screen.getByRole('button', { name: 'List', exact: true }))
+    fireEvent.change(screen.getByLabelText('Schedule month'), { target: { value: '2026-10' } })
     expect(screen.getByText('Roving')).toBeInTheDocument()
     expect(screen.getByText('Static post')).toBeInTheDocument()
     expect(screen.queryByText('roving')).not.toBeInTheDocument()
@@ -303,6 +322,8 @@ describe('D. the patrol schedule', () => {
   it('schedules against the Tanod ID, never the name on screen', async () => {
     mount({ canAdminister: true })
     await ready()
+    await userEvent.click(screen.getByRole('button', { name: 'Patrol Schedule', exact: true }))
+    await userEvent.click(screen.getByRole('button', { name: 'Schedule Patrol', exact: true }))
     await userEvent.selectOptions(screen.getByLabelText('Tanod'), 't1')
     await userEvent.type(screen.getByLabelText('Date'), '2026-10-20')
     await userEvent.type(screen.getByLabelText('Patrol area'), 'Perdices Street')
@@ -312,11 +333,15 @@ describe('D. the patrol schedule', () => {
     const [, args] = rpcCalls.find(([fn]) => fn === 'schedule_tanod_assignment')
     expect(args.p_tanod_id).toBe('t1')
     expect(JSON.stringify(args)).not.toContain('Probe Tanod One')
+    await waitFor(() => expect(screen.queryByLabelText('Patrol area')).toBeNull())
+    expect(screen.getByRole('button', { name: 'Schedule Patrol', exact: true })).toHaveAttribute('aria-expanded', 'false')
   })
 
   it('offers only the Tanod still on the roster for a new patrol', async () => {
     mount({ canAdminister: true })
     await ready()
+    await userEvent.click(screen.getByRole('button', { name: 'Patrol Schedule', exact: true }))
+    await userEvent.click(screen.getByRole('button', { name: 'Schedule Patrol', exact: true }))
     const picker = screen.getByLabelText('Tanod')
     expect(within(picker).getByRole('option', { name: 'Probe Tanod One' })).toBeInTheDocument()
     expect(within(picker).queryByRole('option', { name: 'Probe Tanod Two' }))
@@ -326,6 +351,8 @@ describe('D. the patrol schedule', () => {
   it('writes nothing when the area is blank', async () => {
     mount({ canAdminister: true })
     await ready()
+    await userEvent.click(screen.getByRole('button', { name: 'Patrol Schedule', exact: true }))
+    await userEvent.click(screen.getByRole('button', { name: 'Schedule Patrol', exact: true }))
     await userEvent.selectOptions(screen.getByLabelText('Tanod'), 't1')
     await userEvent.type(screen.getByLabelText('Date'), '2026-10-20')
     await userEvent.click(screen.getByRole('button', { name: /Schedule patrol/i }))
@@ -348,8 +375,9 @@ describe('D. the patrol schedule', () => {
     })
     const { container } = mount({ canAdminister: true })
     await ready()
+    await userEvent.click(screen.getByRole('button', { name: 'Add Tanod' }))
     await userEvent.type(screen.getByLabelText('Name'), 'Probe Tanod Three')
-    const form = container.querySelector('#tnd-member-form')
+    const form = screen.getByLabelText('Name').closest('form')
     act(() => { form.requestSubmit(); form.requestSubmit(); form.requestSubmit() })
     expect(calls).toBe(1)
     await act(async () => { release() })
@@ -372,6 +400,7 @@ describe('E. when a write is refused', () => {
     })
     const { container } = mount({ canAdminister: true })
     await ready()
+    await userEvent.click(screen.getByRole('button', { name: 'Add Tanod' }))
     await userEvent.type(screen.getByLabelText('Name'), 'Probe Tanod Three')
     await userEvent.click(screen.getByRole('button', { name: /Add Tanod/i }))
 
@@ -432,4 +461,187 @@ describe('F. the wiring', () => {
         .forEach((term) => expect(lower).not.toContain(term))
     })
   })
+})
+
+
+describe('compact operations views', () => {
+  it('collapses creation and account forms until explicitly requested', async () => {
+    mount({ canAdminister: true }); await ready()
+    expect(screen.getByRole('button', { name: 'Roster & Accounts' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByLabelText('Name')).toBeNull()
+    expect(screen.queryByLabelText('Provisioned Tanod profile UUID')).toBeNull()
+    expect(screen.queryByLabelText('Patrol area')).toBeNull()
+    const add = screen.getByRole('button', { name: 'Add Tanod' })
+    expect(add).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(add)
+    expect(screen.getByLabelText('Name')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Close Add form' })).toHaveAttribute('aria-expanded', 'true')
+    fireEvent.click(screen.getByRole('button', { name: 'Close Add form' }))
+    expect(screen.queryByLabelText('Name')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Patrol Schedule', exact: true }))
+    expect(screen.getByRole('button', { name: 'Calendar', exact: true })).toHaveAttribute('aria-pressed', 'true')
+    const schedule = screen.getByRole('button', { name: 'Schedule Patrol', exact: true })
+    expect(schedule).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(schedule)
+    expect(screen.getByLabelText('Patrol area')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Close schedule form' }))
+    expect(screen.queryByLabelText('Patrol area')).toBeNull()
+  })
+
+  it('loads account states once and keeps UUID controls scoped to the managed member', async () => {
+    const profileId = '00000000-0000-4000-8000-000000000001'
+    install({ tanod_account_states: [{ tanod_id: 't1', profile_id: profileId, account_state: 'Linked' }] })
+    mount({ canAdminister: true }); await ready()
+    expect(screen.getByText('Linked')).toBeInTheDocument()
+    expect(screen.queryByText(profileId)).toBeNull()
+    const calls = fnNames().filter((fn) => fn === 'tanod_account_states').length
+    fireEvent.click(screen.getByRole('button', { name: 'Manage Probe Tanod Two' }))
+    expect(fnNames().filter((fn) => fn === 'tanod_account_states')).toHaveLength(calls)
+    expect(screen.queryByLabelText('Tanod member')).toBeNull()
+    expect(screen.queryByLabelText('Provisioned Tanod profile UUID')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Link account', exact: true }))
+    const profile = screen.getByLabelText('Provisioned Tanod profile UUID')
+    fireEvent.change(profile, { target: { value: 'not-a-uuid' } })
+    expect(screen.getByRole('button', { name: 'Link account' })).toBeDisabled()
+    fireEvent.change(profile, { target: { value: profileId } })
+    fireEvent.click(screen.getByRole('button', { name: 'Link account' }))
+    await waitFor(() => expect(rpcCalls).toContainEqual(['set_tanod_account_link', { p_tanod_id: 't2', p_profile_id: profileId }]))
+    await screen.findByText('Tanod account link saved.')
+    fireEvent.click(screen.getByRole('button', { name: 'Close', exact: true }))
+    fireEvent.click(screen.getByRole('button', { name: 'Manage Probe Tanod One' }))
+    expect(screen.queryByLabelText('Provisioned Tanod profile UUID')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Change account link' }))
+    expect(screen.getByLabelText('Provisioned Tanod profile UUID')).toHaveValue('')
+    fireEvent.click(screen.getByRole('button', { name: 'Remove account link' }))
+    await waitFor(() => expect(rpcCalls).toContainEqual(['set_tanod_account_link', { p_tanod_id: 't1', p_profile_id: null }]))
+    expect(supabase.from).not.toHaveBeenCalled()
+  })
+
+  it('summaries derive today coverage only from active loaded assignments', async () => {
+    const today = require('./tanodDuty').dutyDate()
+    install({ tanod_account_states: [{ tanod_id: 't1', profile_id: 'linked' }], tanod_assignments_for: [
+      { ...ASSIGNMENTS[0], assignment_date: today, start_time: '06:00:00', end_time: '14:00:00' },
+      { ...ASSIGNMENTS[0], id: 'a3', assignment_date: today, start_time: '14:00:00', end_time: '22:00:00' },
+      { ...ASSIGNMENTS[1], assignment_date: today },
+    ] })
+    mount({ canAdminister: true }); await ready()
+    const summary = screen.getByLabelText('Tanod operations summary')
+    expect(within(summary).getByText('Accounts Linked').nextElementSibling).toHaveTextContent('1')
+    expect(within(summary).getByText('Scheduled Today').nextElementSibling).toHaveTextContent('2')
+    expect(within(summary).getByText('Shift Coverage').nextElementSibling).toHaveTextContent('2 shifts today')
+  })
+
+  it('does not query account administration without permission', async () => {
+    mount(); await ready()
+    expect(fnNames()).not.toContain('tanod_account_states')
+    expect(screen.queryByRole('button', { name: /^Manage / })).toBeNull()
+  })
+
+  it('retains assignment stand-down and refreshes through the existing RPC', async () => {
+    mount({ canAdminister: true }); await ready()
+    fireEvent.click(screen.getByRole('button', { name: 'Patrol Schedule', exact: true }))
+    fireEvent.click(screen.getByRole('button', { name: 'List', exact: true }))
+    fireEvent.change(screen.getByLabelText('Schedule month'), { target: { value: '2026-10' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Stand down assignment for Probe Tanod One on 18 Oct 2026' }))
+    await waitFor(() => expect(rpcCalls).toContainEqual(['set_tanod_assignment_active', { p_assignment_id: 'a1', p_active: false }]))
+    await waitFor(() => expect(fnNames().filter((fn) => fn === 'tanod_assignments_for')).toHaveLength(2))
+  })
+})
+
+
+describe('Manage Tanod dialog', () => {
+  it('opens one centered dialog with the correct summary while leaving the roster unchanged', async () => {
+    const { container } = mount({ canAdminister: true }); await ready()
+    const table = container.querySelector('table')
+    await userEvent.click(screen.getByRole('button', { name: 'Manage Probe Tanod One' }))
+    const dialog = screen.getByRole('dialog', { name: 'Manage Tanod Probe Tanod One' })
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    expect(dialog).toHaveAttribute('aria-modal', 'true')
+    expect(within(dialog).getByText('Rizal Street')).toBeInTheDocument()
+    expect(within(dialog).getByText('Active Assignments').nextElementSibling).toHaveTextContent('2')
+    expect(within(dialog).getByText('On the roster')).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Edit Probe Tanod One' })).toBeInTheDocument()
+    expect(container.querySelector('table')).toBe(table)
+    expect(container.querySelector('.tnd-management')).toBeNull()
+    expect(container.querySelector('[role="dialog"]')).toBeNull()
+    expect(within(dialog).queryByLabelText('Provisioned Tanod profile UUID')).toBeNull()
+    expect(within(dialog).queryByText('t1')).toBeNull()
+    expect(document.body.style.overflow).toBe('hidden')
+  })
+
+  it('moves focus in, traps both Tab directions, closes with Escape and restores the opener', async () => {
+    mount({ canAdminister: true }); await ready()
+    const opener = screen.getByRole('button', { name: 'Manage Probe Tanod One' })
+    await userEvent.click(opener)
+    const dialog = screen.getByRole('dialog')
+    const first = within(dialog).getByRole('button', { name: 'Close Manage Tanod' })
+    const last = within(dialog).getByRole('button', { name: 'Close', exact: true })
+    expect(first).toHaveFocus()
+    fireEvent.keyDown(first, { key: 'Tab', shiftKey: true })
+    expect(last).toHaveFocus()
+    fireEvent.keyDown(last, { key: 'Tab' })
+    expect(first).toHaveFocus()
+    opener.focus()
+    expect(first).toHaveFocus()
+    fireEvent.keyDown(first, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(opener).toHaveFocus()
+    expect(document.body.style.overflow).toBe('')
+  })
+
+  it.each(['Close Manage Tanod', 'Close'])('explicit %s closes and restores focus', async (name) => {
+    mount({ canAdminister: true }); await ready()
+    const opener = screen.getByRole('button', { name: 'Manage Probe Tanod Two' })
+    await userEvent.click(opener)
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name, exact: true }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(opener).toHaveFocus()
+  })
+
+  it('edits inside the same dialog and restores focus to a refreshed roster row when closed', async () => {
+    mount({ canAdminister: true }); await ready()
+    await userEvent.click(screen.getByRole('button', { name: 'Manage Probe Tanod One' }))
+    const dialog = screen.getByRole('dialog')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Edit Probe Tanod One' }))
+    expect(within(dialog).getByLabelText('Name')).toHaveValue('Probe Tanod One')
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save', exact: true }))
+    await waitFor(() => expect(within(dialog).queryByLabelText('Name')).toBeNull())
+    expect(fnNames()).toContain('update_tanod_member')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Close', exact: true }))
+    expect(screen.getByRole('button', { name: 'Manage Probe Tanod One' })).toHaveFocus()
+  })
+
+  it('keeps stand-down inside the dialog danger area and calls the same stable ID', async () => {
+    mount({ canAdminister: true }); await ready()
+    await userEvent.click(screen.getByRole('button', { name: 'Manage Probe Tanod One' }))
+    const action = within(screen.getByRole('dialog')).getByRole('button', { name: 'Stand down Probe Tanod One' })
+    expect(action.closest('.tnd-danger-actions')).toBeInTheDocument()
+    await userEvent.click(action)
+    await waitFor(() => expect(rpcCalls).toContainEqual(['set_tanod_member_active', { p_tanod_id: 't1', p_active: false }]))
+  })
+
+  it('contains scrolling and keeps phone dialogs floating above the page', () => {
+    const css = fs.readFileSync(path.join(__dirname, 'Tanod.css'), 'utf8').replace(/\r\n/g, '\n')
+    expect(css).toMatch(/\.tnd-modal-backdrop \{[^}]*position: fixed/)
+    expect(css).toMatch(/\.tnd-manage-dialog \{[^}]*max-width: 640px;[^}]*max-height: 85vh/)
+    expect(css).toMatch(/\.tnd-manage-body \{[^}]*overflow-y: auto/)
+    expect(css).toMatch(/@media\(max-width: 600px\).*?\.tnd-manage-summary \{ grid-template-columns: minmax\(0,1fr\)/s)
+  })
+})
+
+test('Manage profile header derives initials and contains the only Edit Tanod action', async () => {
+  install({ tanod_roster: [{ ...ROSTER[0], full_name: 'Carlo M. Abellanosa' }] })
+  mount({ canAdminister: true })
+  await userEvent.click(await screen.findByRole('button', { name: 'Manage Carlo M. Abellanosa' }))
+  const dialog = screen.getByRole('dialog')
+  const header = dialog.querySelector('.tnd-profile-header')
+  expect(within(header).getByText('CA')).toHaveAttribute('aria-hidden', 'true')
+  expect(within(header).getByText('Carlo M. Abellanosa')).toBeInTheDocument()
+  expect(within(header).getByText('Barangay Tanod')).toBeInTheDocument()
+  const edit = within(header).getByRole('button', { name: 'Edit Carlo M. Abellanosa' })
+  expect(within(dialog).getAllByRole('button', { name: 'Edit Carlo M. Abellanosa' })).toHaveLength(1)
+  expect(dialog.querySelector('.tnd-manage-body')).not.toContainElement(edit)
+  await userEvent.click(edit)
+  expect(within(dialog).getByLabelText('Name')).toHaveValue('Carlo M. Abellanosa')
 })

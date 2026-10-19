@@ -72,7 +72,7 @@ const DESKTOP_QUERY = '(min-width: 769px)'
 // notification bell; the nurse passes nothing, because there is
 // deliberately no nurse bell (see Notifications in CLAUDE.md), and the
 // header simply has brand + menu.
-const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderAction = null }) => {
+const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderAction = null, tanodName = '', onTanodLogout = null }) => {
   const navigate = useNavigate()
   const { user } = useAuth()
   const [profileName, setProfileName] = useState('')
@@ -152,8 +152,8 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderActio
   }, [user, role])
 
   useEffect(() => {
-    if (user?.id) fetchProfile()
-  }, [user, fetchProfile])
+    if (role !== 'tanod' && user?.id) fetchProfile()
+  }, [user, fetchProfile, role])
 
   const toggleCollapsed = () => {
     setCollapsed((previous) => {
@@ -230,6 +230,7 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderActio
   }, [drawerOpen])
 
   const handleLogout = async () => {
+    if (role === 'tanod' && onTanodLogout) return onTanodLogout()
     const { error } = await supabase.auth.signOut()
     if (error) {
       toast.error('Error logging out!')
@@ -334,6 +335,12 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderActio
   // so there is nothing left to guard; `Sidebar.test.js` covers
   // 'constructor' either way.
   const portalsByRole = new Map([
+    ['tanod', { navItems: [
+      { id: 'overview', label: 'Overview', icon: <FaTachometerAlt /> },
+      { id: 'duty', label: 'My Duty', icon: <FaCalendarAlt /> },
+      { id: 'report', label: 'Report Incident', icon: <FaExclamationTriangle /> },
+      { id: 'reports', label: 'My Reports', icon: <FaClipboardList /> },
+    ], portalName: 'Tanod Portal' }],
     ['official', { navItems: officialNavItems, portalName: 'Official Portal' }],
     ['nurse', { navItems: nurseNavItems, portalName: 'Health Center Portal' }],
     ['resident', { navItems: residentNavItems, portalName: 'Resident Portal' }],
@@ -365,15 +372,15 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderActio
     <>
       <div className="sidebar-user-avatar">
         <PersonAvatar
-          name={profileName}
+          name={role === 'tanod' ? tanodName : profileName}
           photoUrl={profilePhoto}
           fallbackIcon={role === 'nurse' ? <FaHeartbeat /> : <FaUser />}
           className="sidebar-user-photo"
         />
       </div>
       <div className="sidebar-user-info">
-        <span>{profileName || 'Loading...'}</span>
-        <span>{profilePosition || '...'}</span>
+        <span>{(role === 'tanod' ? tanodName : profileName) || 'Loading...'}</span>
+        <span>{role === 'tanod' ? 'Barangay Tanod' : profilePosition || '...'}</span>
       </div>
     </>
   )
@@ -381,7 +388,7 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderActio
   // The collapsed rail hides the two lines above, so without this the
   // only thing left is a generic icon -- while every nav item beside it
   // does get a tooltip. Same text, so nothing is invented for it.
-  const identityTitle = [profileName, profilePosition].filter(Boolean).join(' — ')
+  const identityTitle = (role === 'tanod' ? [tanodName, 'Barangay Tanod'] : [profileName, profilePosition]).filter(Boolean).join(' — ')
 
   return (
     <>
@@ -471,7 +478,7 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderActio
           </button>
         </div>
 
-        <nav className="sidebar-nav" id="sidebar-nav">
+        <nav className="sidebar-nav" id="sidebar-nav" aria-label={role === 'tanod' ? 'Tanod dashboard' : undefined}>
           {/* ⚠️ No "Main Menu" heading when there are no destinations
               under it. A heading with nothing beneath reads as a list
               that failed to load -- the same defect the mobile cards'

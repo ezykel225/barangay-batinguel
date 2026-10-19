@@ -17,6 +17,7 @@ import Footer from '../components/Footer'
 import './Login.css'
 import { useModalA11y } from '../components/useModalA11y'
 import { safeReturnTo } from '../utils/returnTo'
+import { dashboardForRole, isSupportedRole } from '../utils/authRoles'
 import {
   BARANGAY_CONTACT,
   BARANGAY_OFFICE_HOURS,
@@ -65,10 +66,10 @@ const AUDIENCES = [
   },
   {
     id: 'staff',
-    label: 'Barangay Staff',
-    heading: 'Staff sign in',
-    help: 'For barangay officials and health centre staff. '
-      + 'Staff accounts are created by the barangay, not by signing up.',
+    label: 'Barangay Personnel',
+    heading: 'Personnel sign in',
+    help: 'Sign in using your authorized barangay personnel account. '
+      + 'Official, nurse and Tanod accounts are provisioned by authorized administration.',
   },
 ]
 
@@ -83,7 +84,7 @@ const Login = () => {
   // them here asked for somewhere. ⚠️ Resolved through the allowlist in
   // utils/returnTo.js, never used raw -- see that file's header for why
   // a `next` parameter is the classic open-redirect shape.
-  const nextPath = safeReturnTo(params.get('next'), '/')
+  const nextPath = safeReturnTo(params.get('next'), '/resident')
   const [audience, setAudience] = useState('resident')
   const [systemId, setSystemId] = useState('')
   const [securityKey, setSecurityKey] = useState('')
@@ -173,6 +174,12 @@ const Login = () => {
       // succeeded, so it never kept anybody out of anything -- RLS did
       // and still does -- and what it produced was a correct password
       // reported as "Invalid role selected."
+      if (!isSupportedRole(profile.role)) {
+        setError('This account has no supported portal role. Please contact barangay administration.')
+        await supabase.auth.signOut()
+        setLoading(false)
+        return
+      }
       toast.success('Signed in.')
 
       // ⚠️ `next` is honoured for a RESIDENT only. A staff member
@@ -180,16 +187,7 @@ const Login = () => {
       // resident-portal path that ProtectedRoute immediately bounces,
       // which reads as a broken login rather than as a wrong link.
       // Staff always go to their own portal.
-      const destination = profile.role === 'official'
-        ? '/official'
-        : profile.role === 'nurse'
-          ? '/nurse'
-          // Residents are citizens browsing a public site who happen to
-          // have an account -- not staff logging in to use an internal
-          // tool. Home unless a link asked for somewhere else, and the
-          // navbar shows their profile button in place of "Login" so
-          // they can reach their dashboard whenever they want it.
-          : nextPath
+      const destination = profile.role === 'resident' ? nextPath : dashboardForRole(profile.role)
 
       if (audience === 'staff' && profile.role === 'resident') {
         toast('This is a resident account, so you are signed in as a resident.')
