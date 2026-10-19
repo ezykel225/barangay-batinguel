@@ -1,4 +1,4 @@
-import ClearanceWarning from '../casesupport/ClearanceWarning'
+import DocumentRequestDetails from '../documents/DocumentRequestDetails'
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   FaClipboardList,
@@ -476,6 +476,7 @@ const OfficialDashboard = () => {
   // rather than an id means the preview renders from the same object
   // the queue already fetched -- no second read, and nothing the
   // official could not already see under the SELECT policy.
+  const [viewedDocumentRequestId, setViewedDocumentRequestId] = useState(null)
   const [documentRequestToPrint, setDocumentRequestToPrint] = useState(null)
   const [declineNotes, setDeclineNotes] = useState('')
   const [registryEntries, setRegistryEntries] = useState([])
@@ -1744,6 +1745,8 @@ const OfficialDashboard = () => {
     icon: DOC_ACTION_ICONS[item.key],
     onSelect: () => docActionHandlers[item.key]?.(req),
   }))
+
+  const viewedDocumentRequest = documentRequests.find((request) => request.id === viewedDocumentRequestId)
 
   const reservationMenuItems = (res) => reservationActions({
     status: res.status,
@@ -3843,9 +3846,8 @@ const OfficialDashboard = () => {
                             noteShown: !isSecretary,
                           }) ? 'row-no-actions' : undefined}
                         >
-                          <td data-label="Resident">{req.full_name}</td>
+                          <td data-label="Resident"><button type="button" className="dr-request-open" aria-label={`View document request from ${req.full_name} for ${req.document_type}`} onClick={() => setViewedDocumentRequestId(req.id)}><strong>{req.full_name}</strong></button></td>
                           <td data-label="Document">{req.document_type}
-                            {(isSecretary || isKapitan) && req.document_type === 'Barangay Clearance' && <ClearanceWarning requestId={req.id} />}
                           </td>
                           <td data-label="Purpose">{req.purpose}</td>
                           <td data-label="Contact">{req.contact_number || '—'}</td>
@@ -5500,6 +5502,17 @@ const OfficialDashboard = () => {
           can serve any future caller, and the two hooks never run at
           once -- the dashboard's sees `false` while the preview is
           open, because no dashboard modal is. */}
+      {viewedDocumentRequest && <DocumentRequestDetails key={viewedDocumentRequest.id}
+        request={viewedDocumentRequest} resident={residentsList.find((resident) => resident.id === viewedDocumentRequest.resident_id)}
+        canReviewCase={isSecretary || isKapitan} isSecretary={isSecretary}
+        actions={docRequestMenuItems(viewedDocumentRequest)} busy={processingDocRequestIds.has(viewedDocumentRequest.id)}
+        onClose={() => setViewedDocumentRequestId(null)}
+        onAction={(action) => {
+          // Existing confirmation, decline and print dialogs take over; never trap focus in two dialogs.
+          if (['decline', 'claimed', 'generate'].includes(action.key)) setViewedDocumentRequestId(null)
+          action.onSelect()
+        }} />}
+
       <DocumentPreview
         request={documentRequestToPrint}
         open={Boolean(documentRequestToPrint)}

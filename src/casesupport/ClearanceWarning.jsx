@@ -11,7 +11,7 @@ export default function ClearanceWarning({ requestId }) {
       .catch(() => { if (live) setFailed(true) })
     return () => { live = false }
   }, [requestId])
-  return <p className="field-note" role="status">{failed ? 'Case check unavailable — review manually according to barangay policy.'
+  return <p className="field-note" data-review-state={failed ? 'unavailable' : result === null ? 'loading' : result ? 'warning' : 'clear'} role="status">{failed ? 'Case check unavailable — review manually according to barangay policy.'
     : result ? 'Unresolved case on record — review according to barangay policy. Informational only; approval is an official decision.'
       : result === false ? 'No unresolved case found through linked resident profiles. Unlinked parties require manual review.' : 'Checking linked case record…'}</p>
 }
