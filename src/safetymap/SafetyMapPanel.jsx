@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { FaChartBar, FaInfoCircle, FaMapMarkedAlt, FaShieldAlt } from 'react-icons/fa'
 
 import { INCIDENT_TYPE_KEYS, commonTypeLabel, incidentStatusLabel, incidentTypeLabel } from '../incidents/incidentLabels'
@@ -8,9 +8,9 @@ import {
   locationKey, observationFor, plottablePoints, rankHotspots, totalFrom, trendSeries,
 } from './safetyAnalytics'
 import {
-  SAFETY_ERRORS, loadCountsByStatus, loadCountsByType, loadCoverageSummary,
-  loadLocationFrequency, loadMapPoints, loadMonthlyTrend,
+  SAFETY_ERRORS, loadCoverageSummary, loadSafetyIncidents,
 } from './safetyApi'
+import { filterSafetyIncidents, safetyAnalyticsFor } from './officialIncidentAnalytics'
 import './SafetyMap.css'
 
 // Combined Phase 2 — the internal safety map and the descriptive analytics.
@@ -39,40 +39,31 @@ const SafetyMapPanel = () => {
   const [to, setTo] = useState('')
   const [type, setType] = useState('')
 
-  const [points, setPoints] = useState([])
-  const [byType, setByType] = useState([])
-  const [byStatus, setByStatus] = useState([])
-  const [monthly, setMonthly] = useState([])
-  const [locations, setLocations] = useState([])
-  const [coverage, setCoverage] = useState([])
-
+  const [incidents, setIncidents] = useState([])
+  const [coverageResult, setCoverage] = useState(null)
+  const [coverageProblem, setCoverageProblem] = useState('')
   const [loading, setLoading] = useState(true)
   const [problem, setProblem] = useState('')
-
-  const fetchAll = useCallback(async () => {
-    setLoading(true)
-    setProblem('')
-    const range = { from, to }
-    try {
-      const [p, t, s, m, l, c] = await Promise.all([
-        loadMapPoints({ ...range, type }),
-        loadCountsByType(range),
-        loadCountsByStatus(range),
-        loadMonthlyTrend(range),
-        loadLocationFrequency(range),
-        loadCoverageSummary(range),
-      ])
-      setPoints(p); setByType(t); setByStatus(s)
-      setMonthly(m); setLocations(l); setCoverage(c)
-    } catch (err) {
-      setProblem(SAFETY_ERRORS.loadFailed)
-    } finally {
-      setLoading(false)
-    }
-  }, [from, to, type])
-
-  useEffect(() => { fetchAll() }, [fetchAll])
-
+  useEffect(() => {
+    let live = true
+    loadSafetyIncidents().then(rows => { if (live) setIncidents(rows) })
+      .catch(() => { if (live) setProblem(SAFETY_ERRORS.loadFailed) })
+      .finally(() => { if (live) setLoading(false) })
+    return () => { live = false }
+  }, [])
+  // Patrol assignments retain their independent date semantics. A late response
+  // must never overwrite the coverage for a newer date selection.
+  useEffect(() => {
+    let live = true
+    setCoverage(null)
+    setCoverageProblem('')
+    loadCoverageSummary({ from, to }).then(rows => { if (live) setCoverage({ from, to, rows }) })
+      .catch(() => { if (live) setCoverageProblem(SAFETY_ERRORS.analyticsFailed) })
+    return () => { live = false }
+  }, [from, to])
+  const filteredIncidents = useMemo(() => filterSafetyIncidents(incidents, { type, from, to }), [incidents, type, from, to])
+  const { points, byType, byStatus, monthly, locations, mapHotspots } = useMemo(() => safetyAnalyticsFor(filteredIncidents), [filteredIncidents])
+  const coverage = coverageResult?.from === from && coverageResult?.to === to ? coverageResult.rows : []
   const total = totalFrom(byType)
   const hotspots = rankHotspots(locations)
   const gaps = coverageGaps(locations, coverage)
@@ -81,16 +72,8 @@ const SafetyMapPanel = () => {
   const peak = hotspots.reduce((max, h) => Math.max(max, Number(h.total) || 0), 0)
   const coveredKeys = coverage.map((row) => row.area_key || locationKey(row.area_label))
 
-  // ⚠️ ONE DEFINITION OF "PLOTTED", AND A TEST CAUGHT THE SECOND ONE. This
-  // read `points.length` -- the number of rows the reader returned -- while
-  // `IncidentMap` draws `plottablePoints(points)`. The two agree today only
-  // because `incident_map_points()` already filters to rows carrying both
-  // coordinates, so the caption was relying on a guarantee made in SQL one
-  // layer away and restating it as a different number. A row the client-side
-  // guard rejects and the database does not would have been counted as on the
-  // map while not being on it. Same rule as `useNotifications`' one definition
-  // of unread: the card and the canvas read the same function.
   const plotted = plottablePoints(points).length
+  const unmapped = filteredIncidents.length - plotted
 
   return (
     <div>
@@ -99,9 +82,9 @@ const SafetyMapPanel = () => {
         <p>Where incidents were recorded, how often, and which areas have patrols.</p>
       </div>
 
-      {problem && (
+      {(problem || coverageProblem) && (
         <p className="smap-problem" role="alert">
-          <FaInfoCircle aria-hidden="true" /> {problem}
+          <FaInfoCircle aria-hidden="true" /> {problem || coverageProblem}
         </p>
       )}
 
@@ -131,16 +114,17 @@ const SafetyMapPanel = () => {
             <input id="smap-to" className="filter-select" type="date" value={to}
               onChange={(e) => setTo(e.target.value)} />
           </div>
+          <button type="button" className="btn-cancel" onClick={() => { setType(''); setFrom(''); setTo('') }}>Reset filters</button>
         </div>
 
         {loading ? (
           <p className="complaint-empty">Loading the map...</p>
         ) : (
           <>
-            <IncidentMap points={points} hotspots={hotspots} coveredKeys={coveredKeys} />
+            <IncidentMap points={points} hotspots={mapHotspots} coveredKeys={coveredKeys} />
             <p className="smap-caption">
               {plotted} incident{plotted === 1 ? '' : 's'} plotted.
-              {' '}An incident with no coordinates is still recorded and counted; it is not on the map.
+              {filteredIncidents.length === 0 ? ' No recorded incidents match these filters.' : unmapped > 0 ? ` ${unmapped} matching incident${unmapped === 1 ? ' has' : 's have'} no usable coordinates and ${unmapped === 1 ? 'is' : 'are'} not on the map; ${unmapped === 1 ? 'it is' : 'they are'} still recorded and counted.` : ''}
             </p>
             <ul className="smap-legend">
               <li><span className="smap-key smap-key-low" aria-hidden="true" /> Fewer recorded</li>
@@ -293,7 +277,7 @@ const SafetyMapPanel = () => {
         </p>
         {gaps.length === 0 ? (
           <p className="complaint-empty">
-            Every repeated location has a patrol area with matching wording.
+            {hotspots.length ? 'Every repeated location has a patrol area with matching wording.' : 'No repeated locations to match for these filters.'}
           </p>
         ) : (
           <ul className="smap-gaps">

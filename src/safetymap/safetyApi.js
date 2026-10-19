@@ -30,6 +30,24 @@ export const loadMapPoints = ({ from, to, type } = {}) => call(
   'Load map points'
 )
 
+// The map reader intentionally omits non-coordinate records. Reuse the existing
+// authorized queue reader to include them, projecting immediately to map-safe fields.
+export const loadSafetyIncidents = async () => {
+  const [points, records] = await Promise.all([
+    loadMapPoints(),
+    call('incident_queue', { p_from: null, p_to: null, p_type: null }, 'Load incident records'),
+  ])
+  const coordinates = new Map(points.map(point => [point.id, point]))
+  const rows = new Map(points.map(point => [point.id, point]))
+  records.forEach(record => rows.set(record.id, record))
+  return [...rows.values()].map(row => ({
+    id: row.id, reference: row.reference, incident_type: row.incident_type,
+    occurred_at: row.occurred_at, location_text: row.location_text, status: row.status,
+    latitude: coordinates.get(row.id)?.latitude ?? null,
+    longitude: coordinates.get(row.id)?.longitude ?? null,
+  }))
+}
+
 export const loadCountsByType = ({ from, to } = {}) => call(
   'incident_counts_by_type', { p_from: from || null, p_to: to || null }, 'Counts by type'
 )
