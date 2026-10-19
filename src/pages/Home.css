@@ -952,3 +952,17 @@
   flex-shrink: 0;
   color: #1e3a8a;
 }
+
+.home-safety-teaser, .home-about-teaser { padding: 28px 24px; }
+.home-safety-teaser-container, .home-about-teaser-container { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: minmax(0,1fr) 240px; gap: 24px; align-items: center; }
+.home-safety-teaser-container h2, .home-about-teaser-container h2 { font-size: 26px; margin: 0 0 10px; text-align: left; }
+.home-safety-teaser-container p, .home-about-teaser-container p { max-width: 760px; margin: 0; line-height: 1.65; }
+.home-safety-teaser-container .home-about-teaser-btn, .home-about-teaser-container .home-about-teaser-btn { justify-self: end; }
+@media(max-width: 768px) {
+ .home-safety-teaser-container, .home-about-teaser-container { grid-template-columns: minmax(0,1fr); gap: 16px; }
+ .home-safety-teaser-container .home-about-teaser-btn, .home-about-teaser-container .home-about-teaser-btn { justify-self: start; }
+}
+
+@media(min-width: 1100px) { .home-services-grid { grid-template-columns: repeat(5,minmax(0,1fr)); } }
+
+.home-services, .home-safety-teaser, .home-about-teaser { scroll-margin-top: 100px; }

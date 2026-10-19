@@ -691,3 +691,12 @@
   .walkin-modal .modal-actions { padding-inline: 16px; display: flex; flex-wrap: wrap; gap: 10px; }
   .walkin-modal .modal-actions > button { flex: 1 1 120px; }
 }
+
+/* Resident filing: one body scrollbar within a fixed header/footer shell. */
+.resident-filing-dialog .confirm-dialog { width: 100%; max-width: 800px; max-height: 88vh; display: flex; flex-direction: column; overflow: hidden; padding: 0; }
+.resident-filing-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex: 0 0 auto; padding: 18px 24px; background: #f4f8ff; border-bottom: 1px solid #dbeafe; }
+.resident-filing-header h2 { margin: 0; font-size: 24px; font-weight: 700; color: #1e3a8a; }
+.resident-filing-dialog .complaint-form { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; overflow: hidden; }
+.resident-filing-dialog .complaint-form-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 20px 24px; }
+.resident-filing-dialog .modal-actions { flex: 0 0 auto; margin: 0; padding: 16px 24px; border-top: 1px solid #e2e8f0; background: #fff; }
+@media(max-width: 600px) { .resident-filing-header, .resident-filing-dialog .complaint-form-body, .resident-filing-dialog .modal-actions { padding: 16px; } .resident-filing-header h2 { font-size: 21px; } }

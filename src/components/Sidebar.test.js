@@ -176,10 +176,10 @@ describe('A. role="official"', () => {
 })
 
 describe('B. role="nurse"', () => {
-  it('renders the five Health Center destinations', () => {
+  it('renders the six Health Center destinations', () => {
     const { container } = renderSidebar('nurse')
     expect(navItems(container)).toEqual([
-      'Dashboard', 'Medicines', 'Availability', 'Health Events', 'Settings',
+      'Dashboard', 'Medical Programs', 'Medicines', 'Availability', 'Health Events', 'Settings',
     ])
   })
 

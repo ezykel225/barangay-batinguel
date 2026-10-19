@@ -11,12 +11,6 @@ import { E_SERVICES, SERVICE_ACCESS } from '../constants/eServices'
 import {
   BARANGAY_PROFILE,
 } from '../constants/about'
-// The teaser takes its words from the page it leads to, so the two
-// cannot describe the map differently.
-import {
-  PAGE_INTRO as PUBLIC_SAFETY_INTRO,
-  PAGE_TITLE as PUBLIC_SAFETY_TITLE,
-} from '../safetymap/publicSafetyLabels'
 import { upcomingEvents } from '../utils/eventCalendar'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
@@ -158,7 +152,7 @@ const Home = () => {
               Health Center stays secondary, unchanged. */}
           <div className="hero-buttons">
             <Link to="/e-services" className="hero-btn-primary">
-              Explore E-Services
+              View E-Services
             </Link>
             <Link to="/health-center" className="hero-btn-secondary">
               Health Center
@@ -180,14 +174,14 @@ const Home = () => {
       <section className="home-services">
         <div className="home-services-container">
           <div className="section-header">
-            <h2>Barangay E-Services</h2>
+            <h2>Popular E-Services</h2>
             <Link to="/e-services" className="section-link">
-              All E-Services →
+              View All E-Services →
             </Link>
           </div>
 
           <div className="home-services-grid">
-            {E_SERVICES.map((service) => (
+            {E_SERVICES.filter(service => ['court-reservation', 'track-reservation', 'file-complaint', 'track-complaint', 'request-document'].includes(service.key)).map((service) => (
               <Link
                 key={service.key}
                 to={service.to}
@@ -221,11 +215,11 @@ const Home = () => {
       <section className="home-safety-teaser">
         <div className="home-safety-teaser-container">
           <div>
-            <h2>{PUBLIC_SAFETY_TITLE}</h2>
-            <p>{PUBLIC_SAFETY_INTRO}</p>
+            <h2>Community Safety</h2>
+            <p>View privacy-protected incident patterns across Barangay Batinguel.</p>
           </div>
           <Link to="/community-safety" className="home-about-teaser-btn">
-            View the Community Safety Map
+            View Safety Map
           </Link>
         </div>
       </section>
@@ -241,7 +235,7 @@ const Home = () => {
             <p>{BARANGAY_PROFILE.intro}</p>
           </div>
           <Link to="/about" className="home-about-teaser-btn">
-            Read more about the barangay
+            About the Barangay
           </Link>
         </div>
       </section>

@@ -287,6 +287,7 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderActio
 
   const nurseNavItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <FaTachometerAlt /> },
+    { id: 'medical-programs', label: 'Medical Programs', icon: <FaNotesMedical /> },
     { id: 'medicines', label: 'Medicines', icon: <FaPills /> },
     { id: 'availability', label: 'Availability', icon: <FaHeartbeat /> },
     { id: 'health-events', label: 'Health Events', icon: <FaNotesMedical /> },

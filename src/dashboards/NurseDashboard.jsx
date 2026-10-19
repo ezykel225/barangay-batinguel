@@ -14,6 +14,8 @@ import {
 import { supabase } from '../supabase/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
+import PortalDetailsDialog from '../components/PortalDetailsDialog'
+import { countByStatus, filterMedicines } from '../utils/medicineFilter'
 import Sidebar from '../components/Sidebar'
 import { useModalA11y } from '../components/useModalA11y'
 import { HEALTH_NURSE_NAME, HEALTH_NURSE_ROLE } from '../constants/barangay'
@@ -71,6 +73,10 @@ const NurseDashboard = () => {
   const [healthMonth, setHealthMonth] = useState(() => monthOf(manilaToday()))
   // Null when adding, the row when editing. One modal serves both.
   const [editingHealthEvent, setEditingHealthEvent] = useState(null)
+  const [managedHealthEvent, setManagedHealthEvent] = useState(null)
+  const [medicineQuery, setMedicineQuery] = useState('')
+  const [medicineStatus, setMedicineStatus] = useState('all')
+  const [medicineCategory, setMedicineCategory] = useState('all')
   const [activeTab, setActiveTab] = useState('dashboard')
   const [healthEvents, setHealthEvents] = useState([])
   const [nurseAvailability, setNurseAvailability] = useState([])
@@ -866,7 +872,7 @@ const NurseDashboard = () => {
               <div className="bakuna-calendar-card">
                 <div className="bakuna-calendar-header">
                   <h3>💉 Upcoming Health Events</h3>
-                  <button className="btn-add" onClick={() => setShowEventModal(true)}>Manage</button>
+                  <button className="btn-add" onClick={() => setActiveTab('health-events')}>View all events</button>
                 </div>
                 {loading ? (
                   <p className="loading-text">Loading...</p>
@@ -895,6 +901,58 @@ const NurseDashboard = () => {
               </div>
 
               {/* Active Medical Programs — now backed by the medical_programs table */}
+              <div className="programs-card">
+                <div className="programs-card-header"><h3>Active Medical Programs</h3><button type="button" className="btn-add" onClick={() => setActiveTab('medical-programs')}>View all programs</button></div>
+                <p className="programs-subtitle">Recurring services and published schedules</p>
+                {medicalPrograms.length ? medicalPrograms.slice(0, 3).map(program => <div className="program-item" key={program.id}><strong>{program.title}</strong><p>{program.schedule_label} {program.time_label}</p></div>) : <p>No programs set up yet.</p>}
+              </div>
+
+              {/* My Status — now saves to Supabase */}
+              <div className="nurse-my-status-card">
+                <h3>My Status</h3>
+                <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '12px' }}>
+                  Updates live on the Officials and Health Center pages.
+                </p>
+                <div className="nurse-status-options">
+                  {[
+                    { value: 'available', label: '✅ Available Today' },
+                    // For an unscheduled break. The lunch break in the
+                    // weekly schedule already shows itself on the public
+                    // page from the clock, so nobody has to press this
+                    // at noon every day.
+                    { value: 'on-break', label: '🍽️ On Break' },
+                    { value: 'on-leave', label: '🏖️ On Leave' },
+                    { value: 'unavailable', label: '❌ Not Available Today' },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      className={`nurse-status-option-btn ${nurseStatus === option.value ? 'active' : 'inactive'}`}
+                      onClick={() => handleStatusChange(option.value)}
+                      disabled={savingStatus}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+                {savingStatus && (
+                  <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '8px' }}>Saving...</p>
+                )}
+              </div>
+
+              <section className="nurse-stock-card" aria-labelledby="nurse-stock-heading">
+                <div className="programs-card-header"><h3 id="nurse-stock-heading">Medicine Stock</h3><button type="button" className="btn-add" onClick={() => setActiveTab('medicines')}>View medicines</button></div>
+                <div className="nurse-stock-counts">{Object.entries(MEDICINE_STATUS).map(([key,meta]) => <div className={meta.className} key={key}><strong>{countByStatus(medicines)[key]}</strong><span>{meta.label}</span></div>)}</div>
+                <h4>Needs attention</h4>
+                {medicines.some(m => statusOf(m.status) !== MEDICINE_STATUS.available) ? <ul className="nurse-stock-alerts">{medicines.filter(m => statusOf(m.status) !== MEDICINE_STATUS.available).sort((a,b) => Number(statusOf(a.status) === MEDICINE_STATUS.low) - Number(statusOf(b.status) === MEDICINE_STATUS.low)).slice(0,3).map(m => <li key={m.id}><strong>{m.name}</strong><span className={statusOf(m.status).className}>{statusOf(m.status).label}</span></li>)}</ul> : <p>No medicine stock alerts.</p>}
+              </section>
+
+            </div>
+          </div>
+        )}
+
+        {/* AVAILABILITY TAB */}
+        {activeTab === 'medical-programs' && <div>
+          <div className="nurse-dashboard-header nurse-content-heading"><h1>Medical Programs</h1><p>Manage ongoing and recurring health services. Dated activities belong in Health Events.</p></div>
               <div className="programs-card">
                 <div className="programs-card-header">
                   <h3>Active Medical Programs</h3>
@@ -930,46 +988,11 @@ const NurseDashboard = () => {
                 </div>
               </div>
 
-              {/* My Status — now saves to Supabase */}
-              <div className="nurse-my-status-card">
-                <h3>My Status</h3>
-                <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '12px' }}>
-                  Updates live on the Officials and Health Center pages.
-                </p>
-                <div className="nurse-status-options">
-                  {[
-                    { value: 'available', label: '✅ Available Today' },
-                    // For an unscheduled break. The lunch break in the
-                    // weekly schedule already shows itself on the public
-                    // page from the clock, so nobody has to press this
-                    // at noon every day.
-                    { value: 'on-break', label: '🍽️ On Break' },
-                    { value: 'on-leave', label: '🏖️ On Leave' },
-                    { value: 'unavailable', label: '❌ Not Available Today' },
-                  ].map((option) => (
-                    <button
-                      key={option.value}
-                      className={`nurse-status-option-btn ${nurseStatus === option.value ? 'active' : 'inactive'}`}
-                      onClick={() => handleStatusChange(option.value)}
-                      disabled={savingStatus}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-                {savingStatus && (
-                  <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '8px' }}>Saving...</p>
-                )}
-              </div>
+        </div>}
 
-            </div>
-          </div>
-        )}
-
-        {/* AVAILABILITY TAB */}
         {activeTab === 'medicines' && (
           <div>
-            <div className="nurse-dashboard-header">
+            <div className="nurse-dashboard-header nurse-content-heading">
               <h1>Medicines</h1>
               <p>
                 What the health center has today. This list is public — residents
@@ -978,6 +1001,12 @@ const NurseDashboard = () => {
               </p>
             </div>
 
+            <div className="medicine-summary-grid">{[['total','Total Medicines'],['available','Available'],['low','Low Stock'],['unavailable','Out of Stock']].map(([key,label]) => <div className="dashboard-card" key={key}><strong>{countByStatus(medicines)[key]}</strong><span>{label}</span></div>)}</div>
+            <div className="resident-filter-bar nurse-medicine-filters">
+              <label>Search medicines<input type="search" className="resident-search-input" value={medicineQuery} onChange={e => setMedicineQuery(e.target.value)} /></label>
+              <label>Medicine status<select className="filter-select" value={medicineStatus} onChange={e => setMedicineStatus(e.target.value)}><option value="all">All statuses</option>{Object.entries(MEDICINE_STATUS).map(([key,value]) => <option key={key} value={key}>{value.label}</option>)}</select></label>
+              <label>Category<select className="filter-select" value={medicineCategory} onChange={e => setMedicineCategory(e.target.value)}><option value="all">All categories</option>{MEDICINE_CATEGORIES.map(value => <option key={value}>{value}</option>)}</select></label>
+            </div>
             <div className="dashboard-card" style={{ marginBottom: 20 }}>
               <div className="dashboard-card-header">
                 <h3>Today&apos;s Stock</h3>
@@ -992,11 +1021,11 @@ const NurseDashboard = () => {
                 residents can still see it exists and ask when it is expected.
               </p>
 
-              {medicines.length === 0 ? (
-                <p className="dashboard-empty">No medicines listed yet.</p>
+              {filterMedicines(medicines, { query: medicineQuery, status: medicineStatus, category: medicineCategory }).length === 0 ? (
+                <p className="dashboard-empty">No medicines match this view.</p>
               ) : (
                 <div className="medicine-admin-list">
-                  {medicines.map((medicine) => (
+                  {filterMedicines(medicines, { query: medicineQuery, status: medicineStatus, category: medicineCategory }).map((medicine) => (
                     <div key={medicine.id} className="medicine-admin-row">
                       <div className="medicine-admin-info">
                         <strong>{medicine.name}</strong>
@@ -1235,9 +1264,9 @@ const NurseDashboard = () => {
                                 <button
                                   type="button"
                                   className="btn-add btn-sm"
-                                  onClick={() => handleOpenEditHealthEvent(event)}
+                                  onClick={() => setManagedHealthEvent(event)}
                                 >
-                                  <FaEdit aria-hidden="true" /> Edit
+                                  Manage
                                 </button>
                               </div>
                             ))}
@@ -1288,14 +1317,7 @@ const NurseDashboard = () => {
                           <td data-label="Location">{event.location}</td>
                           <td data-label="Target">{event.target_audience}</td>
                           <td data-label="Action" className="action-cell">
-                            <button
-                              className="btn-add btn-sm"
-                              onClick={() => handleOpenEditHealthEvent(event)}>
-                              <FaEdit /> Edit
-                            </button>
-                            <button className="btn-deny btn-sm" onClick={() => handleDeleteEvent(event)}>
-                              <FaTrash /> Delete
-                            </button>
+                            <button type="button" className="btn-add btn-sm" aria-label={`Manage health event ${event.title}`} onClick={() => setManagedHealthEvent(event)}>Manage</button>
                           </td>
                         </tr>
                       ))}
@@ -1307,6 +1329,12 @@ const NurseDashboard = () => {
             </div>
           </div>
         )}
+
+        {managedHealthEvent && <PortalDetailsDialog title="Health Event" reference={managedHealthEvent.title} onClose={() => setManagedHealthEvent(null)}>
+          <dl>{[['Date',managedHealthEvent.event_date],['Location',managedHealthEvent.location],['Target audience',managedHealthEvent.target_audience],['Description',managedHealthEvent.description]].filter(([,value]) => value).map(([label,value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+          <div className="health-event-manage-actions"><button type="button" className="btn-add" onClick={() => { const event = managedHealthEvent; setManagedHealthEvent(null); handleOpenEditHealthEvent(event) }}>Edit</button>
+            <button type="button" className="btn-deny" onClick={() => { const event = managedHealthEvent; setManagedHealthEvent(null); handleDeleteEvent(event) }}>Delete</button></div>
+        </PortalDetailsDialog>}
 
         {/* SETTINGS TAB */}
         {activeTab === 'settings' && (
@@ -1645,11 +1673,11 @@ const NurseDashboard = () => {
               { label: 'Time *', key: 'time_label', placeholder: 'e.g. 8:00 AM - 12:00 PM' },
             ].map((field) => (
               <div key={field.key} style={{ marginBottom: '16px' }}>
-                <label style={{ fontSize: '12px', fontWeight: '600', color: '#374151', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+                <label htmlFor={`program-${field.key}`} style={{ fontSize: '12px', fontWeight: '600', color: '#374151', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
                   {field.label}
                 </label>
                 <input
-                  type="text"
+                  id={`program-${field.key}`} type="text"
                   placeholder={field.placeholder}
                   value={newProgram[field.key]}
                   onChange={(e) => setNewProgram({ ...newProgram, [field.key]: e.target.value })}

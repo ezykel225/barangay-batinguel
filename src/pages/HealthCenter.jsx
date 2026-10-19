@@ -1,10 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   FaUserNurse,
-  FaChevronRight,
-  FaCalendarAlt,
-  FaBullhorn,
-  FaGavel,
   FaLightbulb,
   FaHandsWash,
   FaBug,
@@ -27,6 +23,7 @@ import {
   formatTime, isOnScheduledBreak, manilaWeekday,
 } from '../utils/clinicHours'
 import { eventCardDate, upcomingEvents } from '../utils/eventCalendar'
+import MedicalProgramsPublic from './MedicalProgramsPublic'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import './HealthCenter.css'
@@ -755,10 +752,13 @@ const HealthCenter = () => {
               )}
             </div>
 
-            {/* Bakuna Events */}
+            <section className="health-activities" aria-labelledby="health-activities-heading">
+              <h2 id="health-activities-heading">Programs &amp; Health Activities</h2>
+              <MedicalProgramsPublic />
+            {/* Dated events remain separate from recurring programs. */}
             <div className="health-bakuna-card">
               <div className="health-card-header">
-                <h3>💉 Bakuna & Health Events</h3>
+                <h3>Upcoming Health Events</h3>
                 {canShowAllHealthEvents && (
                   // ⚠️ A real <button>, not a link styled as one: it
                   // reveals the rest of this section in place and there
@@ -810,6 +810,7 @@ const HealthCenter = () => {
                         <div className="bakuna-card-body">
                           <h4>{event.title}</h4>
                           <p>{event.description}</p>
+                          {event.location && <p>{event.location}</p>}
                           <span className="bakuna-target">{event.target_audience}</span>
                         </div>
                       </div>
@@ -818,6 +819,8 @@ const HealthCenter = () => {
                 </div>
               )}
             </div>
+
+            </section>
 
             {/* Health Tips */}
             <div className="health-tips-card">
@@ -837,42 +840,7 @@ const HealthCenter = () => {
               </div>
             </div>
 
-            {/* Quick Links */}
-            <div className="health-quicklinks-card">
-              <h3>Quick Links</h3>
-              <div className="quicklinks-grid">
-                <a href="/announcements" className="quicklink-item">
-                  <div className="quicklink-icon quicklink-blue">
-                    <FaBullhorn />
-                  </div>
-                  <div className="quicklink-info">
-                    <h4>Announcements</h4>
-                    <p>Latest barangay news and advisories</p>
-                  </div>
-                  <FaChevronRight className="quicklink-arrow" />
-                </a>
-                <a href="/reservation" className="quicklink-item">
-                  <div className="quicklink-icon quicklink-green">
-                    <FaCalendarAlt />
-                  </div>
-                  <div className="quicklink-info">
-                    <h4>Court Reservation</h4>
-                    <p>Book the barangay sports court</p>
-                  </div>
-                  <FaChevronRight className="quicklink-arrow" />
-                </a>
-                <a href="/officials" className="quicklink-item">
-                  <div className="quicklink-icon quicklink-navy">
-                    <FaGavel />
-                  </div>
-                  <div className="quicklink-info">
-                    <h4>Officials</h4>
-                    <p>Meet your barangay officials</p>
-                  </div>
-                  <FaChevronRight className="quicklink-arrow" />
-                </a>
-              </div>
-            </div>
+
 
           </div>
         </div>

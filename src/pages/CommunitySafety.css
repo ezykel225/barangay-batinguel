@@ -353,3 +353,19 @@
 .cs-page .cs-stat-label,
 .cs-page .cs-trend-label,
 .cs-page .cs-trend-value { font-size: var(--fs-14, 14px); }
+
+.public-duty-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.public-duty-summary { padding: 12px 16px; border-radius: 8px; background: #eff6ff; color: #1e3a8a; }
+.public-tanod-duty .public-tanod-list { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 14px; }
+.public-tanod-duty .public-tanod-list li { display: flex; flex-direction: column; gap: 10px; padding: 16px; min-width: 0; border: 1px solid #e2e8f0; border-radius: 10px; overflow-wrap: anywhere; }
+@media(max-width: 1024px) { .public-tanod-duty .public-tanod-list { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media(max-width: 600px) { .public-tanod-duty .public-tanod-list { grid-template-columns: minmax(0,1fr); } }
+
+.public-tanod-duty .public-tanod-list { grid-template-columns: repeat(auto-fit,minmax(min(100%,220px),1fr)); }
+.public-tanod-duty .public-tanod-list li { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: start; }
+.public-tanod-duty .public-tanod-list li > span:not(.td-state) { grid-column: 1 / -1; }
+.public-duty-area { font-size: 13px; color: #64748b; }
+@media(max-width: 600px) { .public-tanod-duty .public-tanod-list { grid-template-columns: minmax(0,1fr); } }
+
+.public-tanod-duty { scroll-margin-top: 100px; }
+@media(max-width: 600px) { .public-tanod-duty .public-tanod-list li { grid-template-columns: minmax(0,1fr); } .public-tanod-duty .td-state { justify-self: start; } }

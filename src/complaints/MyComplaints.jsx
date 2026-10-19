@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { FaPlus, FaPaperclip, FaCheckCircle, FaTimes } from 'react-icons/fa'
-import { useModalA11y } from '../components/useModalA11y'
+import PortalDetailsDialog from '../components/PortalDetailsDialog'
 import FileComplaintForm from './FileComplaintForm'
 import {
   COMPLAINT_ERRORS,
@@ -34,11 +34,11 @@ import './Complaints.css'
 // there is no second source, because `complaint_parties` carries no
 // client privilege at all.
 
-const MyComplaints = () => {
+const MyComplaints = ({ startFiling = false }) => {
   const [complaints, setComplaints] = useState([])
   const [loading, setLoading] = useState(true)
   const [problem, setProblem] = useState('')
-  const [showForm, setShowForm] = useState(false)
+  const [showForm, setShowForm] = useState(startFiling)
   const [filed, setFiled] = useState(null)
   const [openId, setOpenId] = useState(null)
   const [detail, setDetail] = useState(null)
@@ -51,7 +51,6 @@ const MyComplaints = () => {
   const referenceRef = useRef(null)
   const newButtonRef = useRef(null)
 
-  useModalA11y(showForm, () => setShowForm(false))
 
   const refresh = useCallback(async () => {
     try {
@@ -247,8 +246,8 @@ const MyComplaints = () => {
         if (!current) return null
         const status = describeComplaintStatus(current.status)
         return (
-          <div className="dashboard-card complaint-detail" id={`complaint-detail-${openId}`}>
-            <h2 className="complaint-detail-reference">{current.reference}</h2>
+          <PortalDetailsDialog title="Complaint Details" reference={current.reference} status={status.label} statusClassName={status.className} onClose={() => { setOpenId(null); setDetail(null) }}>
+          <div className="complaint-detail" id={`complaint-detail-${openId}`}>
             {status.explanation && (
               <p className="complaint-detail-status">{status.explanation}</p>
             )}
@@ -334,26 +333,12 @@ const MyComplaints = () => {
               </>
             )}
           </div>
+          </PortalDetailsDialog>
         )
       })()}
 
-      {showForm && (
-        <div className="modal-overlay" onClick={() => setShowForm(false)}>
-          <div
-            className="modal complaint-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="file-complaint-title"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 id="file-complaint-title">File a Complaint</h2>
-            <FileComplaintForm
-              onFiled={handleFiled}
-              onCancel={() => setShowForm(false)}
-            />
-          </div>
-        </div>
-      )}
+      {showForm && <FileComplaintForm dialog onFiled={handleFiled} onCancel={() => setShowForm(false)} />}
+
     </div>
   )
 }

@@ -333,11 +333,40 @@ test('public duty renders only approved fields and never upgrades scheduled to c
   expect(container).not.toHaveTextContent(/SECRET|9.123456/)
   expect(api.loadPublicTanodDuty).toHaveBeenCalledWith()
 })
-test('public reader distinguishes recorded on-duty status from upcoming scheduled shifts', async () => {
+test('public reader shows checked-in current duty as On Duty', async () => {
   api.loadPublicTanodDuty.mockResolvedValue([{ display_name: 'Checked-in Tanod', general_area: 'Area', shift_start: shift.shift_start, shift_end: shift.shift_end, duty_state: 'currently_on_duty' }])
   render(<PublicTanodDuty />)
-  expect(await screen.findByText('Currently on duty')).toBeInTheDocument()
+  expect(await screen.findByText('On Duty')).toBeInTheDocument()
 })
+
+test('public reader includes overnight Manila shift only until its exclusive end', async () => {
+  jest.setSystemTime(new Date('2026-10-20T01:00:00+08:00'))
+  const overnight = { display_name: 'Overnight member', shift_start: '2026-10-19T22:00:00+08:00', shift_end: '2026-10-20T06:00:00+08:00', duty_state: 'scheduled' }
+  api.loadPublicTanodDuty.mockResolvedValue([overnight, { ...overnight, display_name: 'Future member', shift_start: '2026-10-20T06:00:00+08:00', shift_end: '2026-10-20T14:00:00+08:00' }])
+  render(<PublicTanodDuty />)
+  expect(await screen.findByText('Overnight member')).toBeInTheDocument()
+  expect(screen.queryByText('Future member')).toBeNull()
+  jest.setSystemTime(new Date('2026-10-20T06:00:00+08:00'))
+  api.loadPublicTanodDuty.mockResolvedValue([overnight])
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh duty status' }))
+  expect(await screen.findByText('No Tanods are assigned to the current shift.')).toBeInTheDocument()
+  expect(screen.queryByText('Overnight member')).toBeNull()
+})
+
+test('public reader includes exact start and excludes expired, future and invalid windows', async () => {
+  api.loadPublicTanodDuty.mockResolvedValue([
+    { display_name: 'Starting now', shift_start: '2026-10-19T19:00:00+08:00', shift_end: '2026-10-19T22:00:00+08:00', duty_state: 'scheduled' },
+    { display_name: 'Expired', shift_start: '2026-10-19T06:00:00+08:00', shift_end: '2026-10-19T14:00:00+08:00', duty_state: 'currently_on_duty' },
+    { display_name: 'Tomorrow', shift_start: '2026-10-20T06:00:00+08:00', shift_end: '2026-10-20T14:00:00+08:00', duty_state: 'scheduled' },
+    { display_name: 'Unknown time', shift_start: null, shift_end: null, duty_state: 'scheduled' },
+  ])
+  render(<PublicTanodDuty />)
+  expect(await screen.findByText('Starting now')).toBeInTheDocument()
+  expect(screen.queryByText(/Expired|Tomorrow|Unknown time/)).toBeNull()
+  expect(screen.getByText('Scheduled')).toBeInTheDocument()
+  expect(screen.queryByText('On Duty')).toBeNull()
+})
+
 test('account linking selects existing stable IDs without creating Auth users or changing roles', async () => {
   render(<TanodAccounts roster={[{ id: 'member', full_name: 'Roster person', active: true }]} />)
   await screen.findByText('Not linked')

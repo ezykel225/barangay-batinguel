@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { FaLock, FaUnlockAlt } from 'react-icons/fa'
+import { FaLock, FaUnlockAlt, FaRegFileAlt } from 'react-icons/fa'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { useAuth } from '../context/AuthContext'
@@ -58,51 +58,17 @@ const EServices = () => {
                     {needsAccount
                       ? <FaLock aria-hidden="true" />
                       : <FaUnlockAlt aria-hidden="true" />}
-                    {group.label}
+                    {needsAccount ? 'Resident account required' : group.label}
                   </p>
                 </div>
 
-                <div className="eservices-grid">
-                  {group.services.map((service) => (
+                <div className={`eservices-grid ${needsAccount ? 'eservices-grid-resident' : ''}`}>
+                  {[...group.services].sort((a, b) => ['request-document','my-requests','file-complaint','my-complaints'].indexOf(a.key) - ['request-document','my-requests','file-complaint','my-complaints'].indexOf(b.key)).map((service) => (
                     <article className="eservices-card" key={service.key}>
-                      <h3>{service.label}</h3>
+                      <h3><FaRegFileAlt aria-hidden="true" /> {service.label}</h3>
                       <p className="eservices-card-text">{service.summary}</p>
 
-                      {/* ⚠️ An unauthenticated visitor is sent to sign
-                          in rather than at the service, and is TOLD so
-                          on the button itself. The alternative -- send
-                          them to the service and let ProtectedRoute
-                          bounce them -- is the thing this page exists
-                          to stop. `next` carries them back afterwards;
-                          Login sanitises it. */}
-                      {needsAccount && !isResident ? (
-                        <>
-                          {/* ⚠️ Built by `loginHrefFor`, never by hand.
-                              This line used to assemble
-                              `?next=${encodeURIComponent(service.to)}`
-                              itself, which is a `next` that skips the
-                              allowlist: it would happily put a
-                              destination in the URL that Login then
-                              refuses, producing a link that promises to
-                              bring somebody back and silently does not.
-                              The helper returns a plain `/login` for
-                              anything not on the list, so the link
-                              cannot lie. */}
-                          <Link
-                            className="eservices-card-btn"
-                            to={loginHrefFor(service.to)}
-                          >
-                            Sign in to continue
-                          </Link>
-                          <p className="eservices-card-alt">
-                            No account yet? <Link to="/signup">Create a resident account</Link>
-                          </p>
-                        </>
-                      ) : (
-                        <Link className="eservices-card-btn" to={service.to}>
-                          {service.cta}
-                        </Link>
-                      )}
+                      <Link className="eservices-card-btn" to={needsAccount && !isResident ? loginHrefFor(service.to) : service.to}>{service.cta}</Link>
                     </article>
                   ))}
                 </div>
