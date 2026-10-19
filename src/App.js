@@ -25,6 +25,7 @@ import EventDetails from './pages/EventDetails'
 import OfficialDashboard from './dashboards/OfficialDashboard'
 import NurseDashboard from './dashboards/NurseDashboard'
 import ResidentDashboard from './dashboards/ResidentDashboard'
+import TanodDashboard from './dashboards/TanodDashboard'
 
 function App() {
   return (
@@ -103,6 +104,8 @@ function App() {
               </ProtectedRoute>
             }
           />
+
+          <Route path="/tanod" element={<ProtectedRoute allowedRole="tanod"><TanodDashboard /></ProtectedRoute>} />
 
           {/* 404 Route */}
           <Route path="*" element={<Home />} />

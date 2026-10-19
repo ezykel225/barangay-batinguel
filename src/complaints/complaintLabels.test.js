@@ -137,24 +137,21 @@ describe('status labels', () => {
 })
 
 describe('the evidence contract mirrors the backend', () => {
-  it('lists exactly the four MIME types the bucket accepts', () => {
+  it('lists exactly the seven MIME types the bucket accepts', () => {
     expect(EVIDENCE_MIME_TYPES).toEqual([
-      'image/jpeg', 'image/png', 'image/webp', 'application/pdf',
+      'image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'text/plain', 'video/mp4', 'video/webm',
     ])
   })
 
-  it('uses the same 5 MB ceiling as the bucket and the CHECK', () => {
-    expect(EVIDENCE_MAX_BYTES).toBe(5242880)
+  it('uses the same 25 MB ceiling as the bucket and the CHECK', () => {
+    expect(EVIDENCE_MAX_BYTES).toBe(26214400)
   })
 
-  it('offers NO video, anywhere', () => {
-    // ⚠️ P3-A does not accept it. Offering an option the backend
-    // refuses produces a failure the resident cannot explain.
-    expect(EVIDENCE_MIME_TYPES.join(' ')).not.toContain('video')
-    expect(EVIDENCE_ACCEPT).not.toContain('video')
-    expect(EVIDENCE_ACCEPT).not.toContain('.mp4')
+  it('offers supported video formats but not QuickTime', () => {
+    expect(EVIDENCE_MIME_TYPES).toContain('video/mp4')
+    expect(EVIDENCE_MIME_TYPES).toContain('video/webm')
     expect(EVIDENCE_ACCEPT).not.toContain('.mov')
-    expect(EVIDENCE_TYPES_LABEL.toLowerCase()).not.toContain('video')
+    expect(EVIDENCE_TYPES_LABEL).toContain('MP4')
   })
 
   it('never uses an unrestricted picker', () => {
@@ -164,25 +161,24 @@ describe('the evidence contract mirrors the backend', () => {
     EVIDENCE_ACCEPT.split(',').forEach((token) => {
       expect(
         EVIDENCE_MIME_TYPES.includes(token)
-        || ['.jpg', '.jpeg', '.png', '.webp', '.pdf'].includes(token)
+        || ['.jpg', '.jpeg', '.png', '.webp', '.pdf', '.txt', '.mp4', '.webm'].includes(token)
       ).toBe(true)
     })
   })
 
-  it('refuses a video file with a message naming what IS accepted', () => {
-    const problem = evidenceProblem(fakeFile('clip.mp4', 'video/mp4', 1000))
+  it('refuses an unsupported video file with a message naming what IS accepted', () => {
+    const problem = evidenceProblem(fakeFile('clip.mov', 'video/quicktime', 1000))
     expect(problem).toMatch(/not a supported type/i)
-    expect(problem).toMatch(/JPG, PNG, WebP or PDF/)
-    expect(problem).toMatch(/Video is not supported yet/)
+    expect(problem).toMatch(/JPG, PNG, WebP, PDF/)
   })
 
-  it('refuses a file over 5 MB and says its actual size', () => {
-    const problem = evidenceProblem(fakeFile('big.png', 'image/png', 6000000))
-    expect(problem).toMatch(/over the 5 MB limit/)
-    expect(problem).toMatch(/5\.7 MB/)
+  it('refuses a file over 25 MB and says its actual size', () => {
+    const problem = evidenceProblem(fakeFile('big.png', 'image/png', 30000000))
+    expect(problem).toMatch(/over the 25 MB limit/)
+    expect(problem).toMatch(/28\.6 MB/)
   })
 
-  it('accepts each of the four at the boundary', () => {
+  it('accepts each allowed type at the boundary', () => {
     EVIDENCE_MIME_TYPES.forEach((type) => {
       expect(evidenceProblem(fakeFile('f', type, EVIDENCE_MAX_BYTES))).toBeNull()
     })
@@ -196,7 +192,7 @@ describe('the evidence contract mirrors the backend', () => {
     expect(mediaKindFor('image/jpeg')).toBe('Photo')
     expect(mediaKindFor('image/webp')).toBe('Photo')
     expect(mediaKindFor('application/pdf')).toBe('Document')
-    expect(mediaKindFor('video/mp4')).toBe('')
+    expect(mediaKindFor('video/mp4')).toBe('Video')
     expect(mediaKindFor(undefined)).toBe('')
   })
 

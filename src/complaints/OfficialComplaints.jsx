@@ -1,7 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import PartyLink from '../casesupport/PartyLink'
+import EvidenceActions from '../casesupport/EvidenceActions'
+import SupportHistory from '../casesupport/SupportHistory'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import {
-  FaCommentDots, FaSearch, FaPlus, FaTimes, FaPaperclip, FaArrowLeft,
+  FaCommentDots, FaSearch, FaPlus, FaTimes, FaImage, FaVideo, FaFileAlt,
   FaLock, FaCheckCircle, FaExclamationTriangle,
 } from 'react-icons/fa'
 
@@ -32,6 +35,7 @@ import WalkInComplaintForm from './WalkInComplaintForm'
 import ScreeningPanel from '../screening/ScreeningPanel'
 import KpCasePanel from '../kpcases/KpCasePanel'
 import { useConfirm } from '../components/ConfirmDialog'
+import { DialogShell } from '../components/OfficialArchiveDialog'
 import './Complaints.css'
 
 // The Official Portal's Complaints tab.
@@ -98,6 +102,12 @@ import './Complaints.css'
 // Nothing in this file reads it.
 
 const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
+  const intakeCloseRef = useRef(null)
+  const [encodingBusy, setEncodingBusy] = useState(false)
+  const closeRef = useRef(null)
+  const bodyRef = useRef(null)
+  const activeDetail = useRef(null)
+  const detailRequest = useRef(0)
   // ⚠️ The shared confirmation dialog, because confirming a screening is
   // the one action in this phase that records a barangay decision and
   // cannot afterwards be edited. It brings the focus trap, Escape,
@@ -142,6 +152,9 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
   const [channel, setChannel] = useState('all')
 
   const [selectedId, setSelectedId] = useState(null)
+  useEffect(() => {
+    if (bodyRef.current) bodyRef.current.scrollTop = 0
+  }, [selectedId])
   const [detail, setDetail] = useState(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailRestricted, setDetailRestricted] = useState(false)
@@ -164,12 +177,15 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
 
   useEffect(() => { fetchQueue() }, [fetchQueue])
 
-  const openDetail = async (id) => {
+  const openDetail = async (id, refresh = false) => {
+    if (refresh && activeDetail.current !== id) return
+    activeDetail.current = id
+    const request = ++detailRequest.current
     setSelectedId(id)
-    setDetail(null)
+    if (!refresh) setDetail(null)
     setDetailRestricted(false)
     setDetailError('')
-    setDetailLoading(true)
+    if (!refresh) setDetailLoading(true)
     try {
       // The full row and the three detail RPCs together. Each is gated
       // on the same one predicate, so they agree by construction rather
@@ -178,8 +194,10 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
         loadOfficialComplaintRow(id),
         loadComplaintDetail(id),
       ])
+      if (request !== detailRequest.current) return
 
       if (rowResult.restricted) {
+        setDetail(null)
         // ⚠️ Zero rows, no error. The sentence names no position as the
         // gate and states no policy: an ordinary Kagawad cannot grant
         // themselves records access, and telling them which position
@@ -189,13 +207,15 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
         setDetail({ row: rowResult.row, ...parts })
       }
     } catch {
-      setDetailError(COMPLAINT_ERRORS.detailLoadFailed)
+      if (request === detailRequest.current) setDetailError(COMPLAINT_ERRORS.detailLoadFailed)
     } finally {
-      setDetailLoading(false)
+      if (request === detailRequest.current) setDetailLoading(false)
     }
   }
 
   const closeDetail = () => {
+    activeDetail.current = null
+    detailRequest.current += 1
     setSelectedId(null)
     setDetail(null)
     setDetailRestricted(false)
@@ -235,54 +255,8 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
   const selected = filtered.find((r) => r.id === selectedId)
     || rows.find((r) => r.id === selectedId)
 
-  // ── The Secretary's walk-in intake ────────────────────────────────
-  if (encoding) {
-    return (
-      <div>
-        {/* ⚠️ EVERY OFFICIAL TAB RENDERS ITS OWN PAGE <h1>, and this
-            component is the tab -- the dashboard contributes only the
-            switch line. Without this the Complaints tab would be the
-            only one of thirteen with no page heading at all, which the
-            first Chromium pass caught: my capture harness supplied an
-            <h1> that the real tab did not. The wording matches the nav
-            item that leads here, per X1's convention. */}
-        <div className="official-dashboard-header">
-          <h1>Complaints</h1>
-          <p>Record and review complaints brought to the barangay.</p>
-        </div>
-
-        <div className="complaint-panel">
-        <div className="dashboard-card-header">
-          {/* <h2>, not <h3>: the page heading above is an <h1> and
-              jumping to <h3> skips a level. `.dashboard-card-header h2`
-              is already declared in Complaints.css at the same
-              specificity as the h3 rule, so this is pixel-identical. */}
-          <h2>Record a walk-in complaint</h2>
-          {/* ⚠️ A BACK ARROW, NOT AN ✕, AND THE DISTINCTION IS SEMANTIC.
-              This control does not dismiss the walk-in form over
-              something else -- it LEAVES it and returns to the queue
-              behind it. An ✕ says "close this overlay"; a left arrow
-              says "go back one step", and offering the first for the
-              second teaches a reader that the two are the same control.
-              `type="button"` matters just as much: this sits inside a
-              card that holds a form, and a bare <button> defaults to
-              `submit`. */}
-          <button type="button" className="btn-cancel btn-sm" onClick={() => setEncoding(false)}>
-            <FaArrowLeft aria-hidden="true" /> Back to the queue
-          </button>
-        </div>
-        <WalkInComplaintForm
-          onEncoded={handleEncoded}
-          onCancel={() => setEncoding(false)}
-        />
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div>
-      {confirmDialog}
       <div className="official-dashboard-header">
         <h1>Complaints</h1>
         <p>Record and review complaints brought to the barangay.</p>
@@ -298,7 +272,7 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
               would refuse is worse than no control. The flag decides
               what is painted; the RPC decides what is permitted. */}
           {isSecretary && (
-            <button type="button" className="btn-add" onClick={() => { setEncoded(null); setEncoding(true) }}>
+            <button type="button" className="btn-add" onClick={() => { setEncoded(null); setEncodingBusy(false); setEncoding(true) }}>
               <FaPlus aria-hidden="true" /> Record Walk-in Complaint
             </button>
           )}
@@ -511,19 +485,18 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
 
       {/* ── The detail panel ──────────────────────────────────────── */}
       {selectedId && (
-        <div className="dashboard-card">
-          <div className="dashboard-card-header">
-            <h2>
-              Complaint{' '}
-              <span className="complaint-reference">{selected?.reference || ''}</span>
-            </h2>
-            {/* ⚠️ The ✕ is RIGHT here and wrong above: this dismisses the
-                detail panel, which is the one thing an ✕ means. */}
-            <button type="button" className="btn-cancel btn-sm" onClick={closeDetail}>
-              <FaTimes aria-hidden="true" /> Close
-            </button>
-          </div>
-
+        <div className="official-complaint-modal" aria-hidden={confirmDialog.props.open || undefined} inert={confirmDialog.props.open || undefined}>
+        <DialogShell open titleId="complaint-dialog-title" title="Complaint Details"
+          onCancel={closeDetail} initialFocusRef={closeRef} keyboardSuspended={confirmDialog.props.open}
+          header={<header className="complaint-modal-header">
+            <h3 className="confirm-dialog-title" id="complaint-dialog-title">Complaint Details</h3>
+            <button type="button" ref={closeRef} className="btn-cancel complaint-modal-close" aria-label="Close complaint details" onClick={closeDetail}><FaTimes aria-hidden="true" /></button>
+            <div className="complaint-modal-identity">
+              <p className="complaint-reference">{selected?.reference || ''}</p>
+              {selected && <span className={`status-badge ${describeComplaintStatus(selected.status).className}`}>{describeComplaintStatus(selected.status).label}</span>}
+            </div>
+          </header>}>
+          <div ref={bodyRef} key={selectedId} className="complaint-detail-panel complaint-modal-body">
           {detailLoading && <p className="complaint-empty">Loading complaint...</p>}
           {detailError && <p className="complaint-field-error" role="alert">{detailError}</p>}
 
@@ -542,7 +515,9 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
 
           {!detailLoading && detail?.row && (
             <>
-              <dl className="complaint-detail-list">
+              <section className="complaint-section" aria-label="Complaint information">
+              <h3>Complaint details</h3>
+              <dl className="complaint-detail-list complaint-summary-grid">
                 <div className="complaint-detail-row">
                   <dt>What it is about</dt>
                   <dd>{complaintCategoryLabel(detail.row.category)}</dd>
@@ -582,6 +557,8 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
               <h3>What was reported</h3>
               <p className="complaint-detail-narrative">{detail.row.narrative}</p>
 
+              </section>
+              <section className="complaint-section" aria-label="People involved">
               <h3>People involved</h3>
               {detail.parties.length === 0 ? (
                 <p className="complaint-empty">No parties were recorded.</p>
@@ -591,6 +568,7 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
                     <li key={party.id} className="complaint-party">
                       <span className="complaint-party-role">{party.party_role}</span>
                       <span className="complaint-party-name">{party.full_name_snapshot}</span>
+                      <PartyLink party={party} onChanged={() => openDetail(detail.row.id)} />
                       {/* ⚠️ A NULL CONTACT IS RENDERED AS A STATEMENT,
                           NOT AS A BLANK. `complaint_parties_for()`
                           returns it as NULL for a caller who may not
@@ -610,17 +588,23 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
                 </ul>
               )}
 
-              <h3>Evidence</h3>
+              </section>
+              <section className="complaint-section complaint-evidence-card" aria-label="Evidence">
+              <div className="complaint-section-heading"><h3>Evidence</h3><span className="complaint-private-label"><FaLock aria-hidden="true" /> Private evidence</span></div>
+              <EvidenceActions complaintId={detail.row.id} attachments={detail.attachments} onChanged={() => openDetail(detail.row.id, true)}>
+              <div className="complaint-evidence-block"><h4>Attached evidence</h4>
               {detail.attachments.length === 0 ? (
                 <p className="complaint-empty">No files were attached.</p>
               ) : (
                 <ul className="complaint-file-list">
                   {detail.attachments.map((file) => (
                     <li key={file.id} className="complaint-file">
-                      <FaPaperclip aria-hidden="true" />
+                      {file.media_kind === 'photo' ? <FaImage className="complaint-evidence-icon" aria-hidden="true" />
+                        : file.media_kind === 'video' ? <FaVideo className="complaint-evidence-icon" aria-hidden="true" />
+                          : <FaFileAlt className="complaint-evidence-icon" aria-hidden="true" />}
                       <span className="complaint-file-name">{file.display_filename}</span>
                       <span className="complaint-file-meta">
-                        {mediaKindFor(file.mime_type)} · {formatBytes(file.byte_size)}
+                        {file.mime_type === 'text/plain' ? 'Witness statement' : mediaKindFor(file.mime_type)} · {formatBytes(file.byte_size)}
                       </span>
                       <button
                         type="button"
@@ -635,6 +619,11 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
                 </ul>
               )}
 
+              </div>
+              </EvidenceActions>
+              <SupportHistory complaintId={detail.row.id} version={detail} attachments={detail.attachments} />
+              </section>
+              <section className="complaint-section complaint-history-card" aria-label="Complaint history">
               <h3>History</h3>
               {/* ⚠️ NO ACTOR IS SHOWN, because
                   `complaint_history_for()` does not return one -- it
@@ -684,6 +673,8 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
                   ⚠️ It renders only inside the AUTHORIZED detail branch,
                   so an official who cannot read the complaint at all
                   never reaches it. */}
+              </section>
+              <section className="complaint-section complaint-screening-card" aria-label="KP review screening">
               <h3>KP review screening</h3>
               <ScreeningPanel
                 complaintId={detail.row.id}
@@ -725,18 +716,37 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
                   so an official who cannot read the complaint at all
                   never reaches it, and no resident or public surface
                   renders it at any point. */}
+              </section>
+              <section className="complaint-section" aria-label="KP case">
               <h3>KP case</h3>
               <KpCasePanel
                 complaintId={detail.row.id}
+                complaint={detail.row}
                 isSecretary={isSecretary}
                 isKapitan={isKapitan}
                 confirm={confirm}
                 screeningSignal={screeningSignal}
               />
+              </section>
             </>
           )}
+          </div>
+        </DialogShell>
         </div>
       )}
+      {encoding && <div className="walkin-modal">
+        <DialogShell open titleId="walkin-dialog-title" title="Record Walk-in Complaint"
+          busy={encodingBusy} onCancel={() => setEncoding(false)} initialFocusRef={intakeCloseRef}
+          header={<header className="walkin-modal-header">
+            <h3 className="confirm-dialog-title" id="walkin-dialog-title">Record Walk-in Complaint</h3>
+            <p>Record a complaint received at the Barangay Hall.</p>
+            <button type="button" className="btn-cancel walkin-modal-close" ref={intakeCloseRef}
+              aria-label="Close walk-in complaint" disabled={encodingBusy} onClick={() => setEncoding(false)}><FaTimes aria-hidden="true" /></button>
+          </header>}>
+          <WalkInComplaintForm onEncoded={handleEncoded} onCancel={() => setEncoding(false)} onBusyChange={setEncodingBusy} />
+        </DialogShell>
+      </div>}
+      {confirmDialog}
     </div>
   )
 }

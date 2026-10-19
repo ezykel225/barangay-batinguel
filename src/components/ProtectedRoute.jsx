@@ -1,5 +1,6 @@
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { dashboardForRole } from '../utils/authRoles'
 
 const ProtectedRoute = ({ children, allowedRole }) => {
   const { user, role, loading } = useAuth()
@@ -23,15 +24,7 @@ const ProtectedRoute = ({ children, allowedRole }) => {
 
   // If role does not match redirect to correct dashboard
   if (allowedRole && role !== allowedRole) {
-    if (role === 'official') {
-      return <Navigate to="/official" replace />
-    } else if (role === 'nurse') {
-      return <Navigate to="/nurse" replace />
-    } else if (role === 'resident') {
-      return <Navigate to="/resident" replace />
-    } else {
-      return <Navigate to="/login" replace />
-    }
+    return <Navigate to={dashboardForRole(role)} replace />
   }
 
   return children

@@ -92,3 +92,65 @@
   .inc-grid { grid-template-columns: minmax(0, 1fr); }
   .inc-actions { flex-direction: column; align-items: stretch; }
 }
+
+/* Official incident dialogs: fixed identity header and one body scrollbar. */
+.inc-modal .confirm-dialog { position: relative; display: flex; flex-direction: column; max-width: 900px; max-height: 88vh; padding: 0; overflow: hidden; }
+.inc-record-modal .confirm-dialog { max-width: 840px; }
+.inc-modal-header { position: relative; flex: 0 0 auto; padding: 20px 76px 16px 24px; background: #f4f8ff; border-bottom: 1px solid #dbeafe; overflow-wrap: anywhere; }
+.inc-modal .confirm-dialog-title { margin: 0; font-size: 26px; font-weight: 800; color: #1e3a8a; }
+.inc-modal-header p { margin: 8px 0 0; color: #64748b; font-size: 13px; }
+.inc-modal-close { position: absolute; top: 16px; right: 16px; min-width: 44px; min-height: 44px; }
+.inc-modal-identity { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 10px; }
+.inc-modal-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 20px 24px; overflow-wrap: anywhere; }
+.inc-modal .inc-form { display: flex; flex-direction: column; min-height: 0; margin: 0; padding: 0; overflow: hidden; border: 0; }
+.inc-modal-footer { flex: 0 0 auto; padding: 12px 24px; margin: 0; border-top: 1px solid #e2e8f0; background: #fff; }
+.inc-section { margin: 0 0 20px; padding: 16px; border: 1px solid #e2e8f0; border-radius: 12px; background: #fafbfc; min-width: 0; }
+.inc-modal .inc-section > :is(h3,h4):first-child { margin-top: 0; color: #1e3a8a; font-weight: 700; }
+.inc-modal .kp-summary { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; margin: 0; }
+.inc-modal .kp-summary > div { display: block; padding: 12px 14px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; }
+.inc-modal .kp-summary dt { color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+.inc-modal .kp-summary dd { margin: 8px 0 0; font-weight: 600; }
+.inc-modal .inc-history { margin-left: 6px; padding-left: 18px; border-left: 2px solid #cbd5e1; }
+.inc-modal .inc-history li { position: relative; padding: 0 0 18px; border: 0; }
+.inc-modal .inc-history li::before { content: ''; position: absolute; left: -24px; top: 4px; width: 9px; height: 9px; border: 2px solid #fff; border-radius: 50%; background: #2563eb; }
+.inc-modal .inc-narrative { white-space: pre-wrap; }
+.inc-modal :is(input,textarea,select) { min-width: 0; max-width: 100%; box-sizing: border-box; }
+.inc-modal :is(button,input,textarea,select):focus-visible { outline: 3px solid #2563eb; outline-offset: 3px; }
+.inc-modal button { min-height: 44px; }
+.inc-modal[aria-hidden="true"] .confirm-overlay { z-index: 9999; }
+@media(max-width: 768px) {
+  .inc-modal .confirm-overlay { padding: 12px; }
+  .inc-modal-header { padding-left: 16px; }
+  .inc-modal .confirm-dialog-title { font-size: 24px; }
+  .inc-modal-body { padding: 16px; }
+  .inc-modal .inc-grid, .inc-modal .kp-summary { grid-template-columns: minmax(0,1fr); }
+  .inc-modal .inc-section { padding: 12px; }
+  .inc-modal-footer { padding-inline: 16px; display: flex; flex-wrap: wrap; gap: 10px; }
+  .inc-modal-footer > button { flex: 1 1 120px; }
+  .inc-modal .inc-actions { flex-wrap: wrap; }
+}
+
+.inc-pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 12px; margin-top: 16px; font-size: 13px; color: #475569; }
+.inc-pagination button { min-height: 44px; }
+.inc-pagination button:disabled { opacity: .5; cursor: not-allowed; }
+@media(max-width: 480px) {
+  .inc-pagination { gap: 8px; }
+  .inc-pagination button { padding: 8px 10px; }
+}
+
+/* Column sizing depends on the table container, never the current page's rows. */
+@media(min-width: 769px) {
+  .inc-records-table { table-layout: fixed; min-width: 960px; }
+  .inc-records-table .inc-col-reference, .inc-records-table .inc-col-blotter { width: 160px; }
+  .inc-records-table .inc-col-type { width: 14%; }
+  .inc-records-table .inc-col-when { width: 190px; }
+  .inc-records-table .inc-col-status { width: 150px; }
+  .inc-records-table .inc-col-action { width: 72px; }
+  .inc-records-table :is(th,td) { box-sizing: border-box; }
+  .inc-records-table td:is([data-label="Reference"],[data-label="When"],[data-label="Status"],[data-label="Blotter"],[data-label="Action"]),
+  .inc-records-table .complaint-reference { white-space: nowrap; overflow-wrap: normal; word-break: normal; }
+  .inc-records-table td:is([data-label="Type"],[data-label="Location"]) { white-space: normal; overflow-wrap: anywhere; }
+}
+@media(max-width: 768px) {
+  .inc-records-table colgroup { display: none; }
+}

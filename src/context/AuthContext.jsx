@@ -1,5 +1,6 @@
 import { createContext, useContext, useCallback, useEffect, useState } from 'react'
 import { supabase } from '../supabase/supabaseClient'
+import { isSupportedRole } from '../utils/authRoles'
 
 const AuthContext = createContext()
 
@@ -16,8 +17,9 @@ export const AuthProvider = ({ children }) => {
         .eq('id', userId)
         .single()
 
-      if (data) setRole(data.role)
+      setRole(data && isSupportedRole(data.role) ? data.role : null)
     } catch (error) {
+      setRole(null)
       console.error('Role error:', error)
     }
   }, [])

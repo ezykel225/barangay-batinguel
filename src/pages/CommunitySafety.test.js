@@ -239,6 +239,11 @@ describe('the page itself', () => {
     const h1s = screen.getAllByRole('heading', { level: 1 })
     expect(h1s).toHaveLength(1)
     expect(h1s[0]).toHaveTextContent(LABELS.PAGE_TITLE)
+    expect(h1s[0]).toHaveTextContent('Community Safety & Incident Trends')
+    expect(h1s[0].closest('section')).toHaveClass('cs-hero')
+    expect(screen.getByText('PUBLIC SAFETY INFORMATION')).toBeInTheDocument()
+    expect(screen.getByText('View privacy-protected incident patterns and recorded trends across Barangay Batinguel. Exact incident locations and personal information are not shown.')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Community Safety Map' })).not.toBeInTheDocument()
   })
 
   it('omits the redundant Back to Home link and keeps the page heading', async () => {
@@ -248,7 +253,7 @@ describe('the page itself', () => {
     expect(screen.getByRole('heading', { level: 1, name: LABELS.PAGE_TITLE })).toBeInTheDocument()
   })
 
-  it('reads the four public RPCs and nothing else', async () => {
+  it('reads only the approved public safety and duty RPCs', async () => {
     show()
     await ready()
     const called = supabase.rpc.mock.calls.map((c) => c[0]).sort()
@@ -258,6 +263,7 @@ describe('the page itself', () => {
       'public_safety_type_counts',
       'public_safety_zone_type_counts',
       'public_safety_zones',
+      'public_tanod_on_duty',
     ])
     expect(supabase.from).not.toHaveBeenCalled()
   })
@@ -354,10 +360,11 @@ describe('what the public page can never show', () => {
     })
   })
 
-  it('says nothing about a Tanod or a patrol', async () => {
+  it('shows only the separate public Tanod duty section, never private patrol details', async () => {
     show()
     await ready()
-    expect(document.body.textContent).not.toMatch(/tanod|patrol|roving|static post/i)
+    expect(screen.getByRole('heading', { name: 'Tanod on Duty' })).toBeInTheDocument()
+    expect(document.body.textContent).not.toMatch(/profile UUID|account link IDs|patrol route|roving|static post/i)
   })
 
   it('mentions no complaint, screening or KP case data', async () => {
@@ -643,8 +650,10 @@ describe('the period filter', () => {
       await ready()
     }
     expect(screen.getByLabelText('Period')).toHaveValue(chosen.key)
-    expect(supabase.rpc.mock.calls).toHaveLength(5)
-    supabase.rpc.mock.calls.forEach(([fn, args]) => {
+    const safetyCalls = supabase.rpc.mock.calls.filter(([fn]) => fn !== 'public_tanod_on_duty')
+    expect(safetyCalls).toHaveLength(5)
+    supabase.rpc.mock.calls.filter(([fn]) => fn === 'public_tanod_on_duty').forEach(([, args]) => expect(args).toEqual({}))
+    safetyCalls.forEach(([fn, args]) => {
       expect(args).toEqual(fn === 'public_safety_monthly'
         ? { p_from: null, p_to: null }
         : { p_from: chosen.from, p_to: chosen.to })

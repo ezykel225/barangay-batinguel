@@ -536,7 +536,7 @@ describe('E. scheduling a proceeding', () => {
     mount({ isSecretary: true })
     expect(await screen.findByRole('heading', { name: /Mediation — 20 October 2026, 2:00 PM/ }))
       .toBeInTheDocument()
-    expect(screen.getByText(/Barangay Hall session room/)).toBeInTheDocument()
+    expect(screen.getByText(/Barangay Hall session room/, { selector: '.kp-meta' })).toBeInTheDocument()
   })
 })
 

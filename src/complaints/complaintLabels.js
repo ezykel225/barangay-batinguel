@@ -171,28 +171,22 @@ export const intakeChannelLabel = (stored) => (
 // bucket's own `file_size_limit` plus
 // `complaint_attachments_byte_size_check`. Both refuse a bad file
 // whatever this file says; these constants exist so a resident is told
-// before a 12 MB upload fails.
+// before an unsupported or oversized upload fails.
 //
-// ⚠️ NO VIDEO. P3-A does not accept it, and the reasons are recorded in
-// migration 041: 5 MB is this project's ceiling and a few seconds of
-// phone video exceeds it, `video/quicktime` does not play in a browser
-// `<video>` on every platform (the exact reason HEIC was excluded from
-// the image buckets), and evidence that cannot be viewed during review
-// is not evidence. Offering a video option the backend refuses would be
-// worse than saying so.
+// Migration 050 extends private evidence to MP4/WebM and PDF/text witness statements.
 export const EVIDENCE_MIME_TYPES = [
-  'image/jpeg', 'image/png', 'image/webp', 'application/pdf',
+  'image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'text/plain', 'video/mp4', 'video/webm',
 ]
 
-// ⚠️ NEVER `*/*`. The picker is constrained to the four the bucket
+// ⚠️ NEVER `*/*`. The picker is constrained to the types the bucket
 // accepts. A file picker is not a control -- a determined caller posts
 // whatever they like and the bucket refuses it -- but an unconstrained
 // picker invites a failure the resident cannot explain.
-export const EVIDENCE_ACCEPT = '.jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf'
+export const EVIDENCE_ACCEPT = '.jpg,.jpeg,.png,.webp,.pdf,.txt,.mp4,.webm,image/jpeg,image/png,image/webp,application/pdf,text/plain,video/mp4,video/webm'
 
-export const EVIDENCE_MAX_BYTES = 5242880
-export const EVIDENCE_MAX_LABEL = '5 MB'
-export const EVIDENCE_TYPES_LABEL = 'JPG, PNG, WebP or PDF'
+export const EVIDENCE_MAX_BYTES = 26214400
+export const EVIDENCE_MAX_LABEL = '25 MB'
+export const EVIDENCE_TYPES_LABEL = 'JPG, PNG, WebP, PDF, plain-text witness statements, MP4 or WebM'
 
 // ⚠️ A cap on how many files one submission may carry. Not a backend
 // rule -- the database has no such limit -- so it is stated as this
@@ -214,7 +208,7 @@ export const evidenceProblem = (file) => {
   if (!file) return null
   if (!EVIDENCE_MIME_TYPES.includes(file.type)) {
     return `${file.name || 'That file'} is not a supported type.`
-      + ` Please attach ${EVIDENCE_TYPES_LABEL}. Video is not supported yet.`
+      + ` Please attach ${EVIDENCE_TYPES_LABEL}.`
   }
   if (Number(file.size) > EVIDENCE_MAX_BYTES) {
     return `${file.name || 'That file'} is ${formatBytes(file.size)},`
@@ -229,7 +223,8 @@ export const evidenceProblem = (file) => {
 export const mediaKindFor = (mimeType) => {
   if (typeof mimeType !== 'string') return ''
   if (mimeType.startsWith('image/')) return 'Photo'
-  if (mimeType === 'application/pdf') return 'Document'
+  if (mimeType === 'application/pdf' || mimeType === 'text/plain') return 'Document'
+  if (mimeType === 'video/mp4' || mimeType === 'video/webm') return 'Video'
   return ''
 }
 

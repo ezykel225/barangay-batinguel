@@ -293,25 +293,21 @@ const FileComplaintForm = ({ onFiled, onCancel }) => {
 
       <fieldset className="complaint-fieldset">
         <legend>Supporting files (optional)</legend>
-        {/* ⚠️ THE TRUTH ABOUT WHAT IS ACCEPTED, INCLUDING THE ABSENCE OF
-            VIDEO. The bucket takes four MIME types at 5 MB; offering a
-            video option the backend refuses would produce a failure the
-            resident cannot explain. */}
+        {/* Keep these limits aligned with migration 050 and the private bucket. */}
         <p className="field-note" id="complaint-files-note">
           {EVIDENCE_TYPES_LABEL}, up to {EVIDENCE_MAX_LABEL} each, up to{' '}
-          {EVIDENCE_MAX_FILES} files. <strong>Video is not supported yet</strong> —
-          if you have a video, bring it to the Barangay Hall.
+          {EVIDENCE_MAX_FILES} files. <strong>Videos: MP4 or WebM; witness statements: PDF or plain text.</strong>
         </p>
 
         <label htmlFor="complaint-files" className="modal-form-label">
-          Attach photos or a PDF
+          Attach photos or a PDF, video or witness statement
         </label>
         <input
           id="complaint-files"
           ref={fileInputRef}
           type="file"
           className="modal-form-input"
-          /* ⚠️ Constrained to the four MIME types the bucket accepts,
+          /* ⚠️ Constrained to the allowed MIME types the bucket accepts,
              never an unrestricted wildcard allowlist. */
           accept={EVIDENCE_ACCEPT}
           multiple

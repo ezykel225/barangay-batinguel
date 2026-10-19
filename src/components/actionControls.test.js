@@ -43,21 +43,17 @@ const MODULES = [
 const buttons = (src) => src.match(/<button\b[\s\S]*?<\/button>/g) || []
 
 describe('Back and Close carry the right semantics', () => {
-  // ⚠️ THE DEFECT THIS EXISTS FOR. The walk-in intake's "Back to the
-  // queue" was an ✕. An ✕ means "dismiss this overlay"; a left arrow
-  // means "go back one step", and the walk-in form is a step in a flow
-  // with a queue behind it, not an overlay on top of one.
-  it('uses a back arrow for navigation, never a close cross', () => {
+  it('opens walk-in intake as a dismissible overlay rather than navigating away', () => {
     const src = code('complaints/OfficialComplaints.jsx')
-    const back = buttons(src).find((b) => /Back to the queue/.test(b))
-    expect(back).toBeDefined()
-    expect(back).toMatch(/FaArrowLeft/)
-    expect(back).not.toMatch(/FaTimes/)
+    expect(src).not.toContain('Back to the queue')
+    const close = buttons(src).find((b) => /aria-label="Close walk-in complaint"/.test(b))
+    expect(close).toMatch(/FaTimes/)
+    expect(close).toMatch(/type="button"/)
   })
 
   it('uses a close cross for dismissal, never a back arrow', () => {
     const src = code('complaints/OfficialComplaints.jsx')
-    const close = buttons(src).filter((b) => />\s*Close\s*</.test(b) || /\sClose\s/.test(b))
+    const close = buttons(src).filter((b) => />\s*Close\s*</.test(b) || /\sClose\s/.test(b) || /aria-label="Close complaint details"/.test(b))
     expect(close.length).toBeGreaterThan(0)
     close.forEach((b) => {
       expect(b).toMatch(/FaTimes/)
@@ -95,9 +91,9 @@ describe('Back and Close carry the right semantics', () => {
         expect(b).toMatch(/\?[\s\S]*FaTimes[\s\S]*Close/)
       }
     })
-    const toggle = buttons(src).find((b) => /setShowForm\(\(open\) => !open\)/.test(b))
-    expect(toggle).toMatch(/FaTimes[\s\S]*Close form/)
-    expect(toggle).toMatch(/FaPlus[\s\S]*Record Incident/)
+    const opener = buttons(src).find((b) => /onClick=\{\(\) => setShowForm\(true\)\}/.test(b))
+    expect(opener).toMatch(/FaPlus[\s\S]*Record Incident/)
+    expect(opener).not.toMatch(/FaTimes|Close form/)
   })
 })
 
@@ -120,7 +116,7 @@ describe('no control can submit a form by accident', () => {
 
   it('declares Back and Close as type="button", never submit', () => {
     const all = MODULES.flatMap((rel) => buttons(code(rel)))
-    const navOrClose = all.filter((b) => /Back to |>\s*Close|\sClose\s/.test(b))
+    const navOrClose = all.filter((b) => /Back to |>\s*Close|\sClose\s|aria-label="Close /.test(b))
     expect(navOrClose.length).toBeGreaterThan(2)
     navOrClose.forEach((b) => expect(b).toMatch(/type="button"/))
   })

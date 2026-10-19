@@ -1,3 +1,4 @@
+import DocumentRequirements from '../documents/DocumentRequirements.jsx'
 import { useCallback, useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
@@ -1287,6 +1288,8 @@ const ResidentDashboard = () => {
                 ))}
               </select>
             </div>
+
+            <DocumentRequirements documentType={newRequest.document_type} />
 
             <div className="modal-form-group">
               <label htmlFor="rd-purpose" className="modal-form-label">Purpose</label>

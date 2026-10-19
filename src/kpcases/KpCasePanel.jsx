@@ -1,3 +1,5 @@
+import CaseFollowups from '../casesupport/CaseFollowups'
+import HearingSchedule from '../casesupport/HearingSchedule'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   FaBalanceScale, FaCalendarPlus, FaFileAlt, FaInfoCircle, FaLock, FaUsers,
@@ -119,7 +121,7 @@ const blankHearing = () => ({
 })
 
 const KpCasePanel = ({
-  complaintId, isSecretary = false, isKapitan = false, confirm,
+  complaintId, complaint, isSecretary = false, isKapitan = false, confirm,
   // ⚠️ A BUMPED COUNTER, NOT LIFTED STATE. All screening state still
   // lives in `ScreeningPanel` and all case state still lives here; this
   // is only how a sibling says "the screening changed, look again", so
@@ -499,6 +501,8 @@ const KpCasePanel = ({
             </div>
           </dl>
           <p className="kp-hint">{kpCaseStatusNote(kpCase.status)}</p>
+          <CaseFollowups key={kpCase.id} kpCase={kpCase} parties={parties} complaint={complaint} />
+          <HearingSchedule hearings={hearings} />
           {kpCase.opening_note && (
             <p className="kp-note">{kpCase.opening_note}</p>
           )}

@@ -145,6 +145,60 @@ beforeEach(() => {
 })
 
 const renderQueue = (props = {}) => render(<OfficialComplaints {...props} />)
+
+test('uploaded active evidence refreshes both the file list and withdrawal selector; withdrawal requires a reason', async () => {
+  let active = []
+  const audit = []
+  supabase.rpc.mockImplementation(async (fn, args) => {
+    if (fn === 'complaint_queue') return { data: QUEUE, error: null }
+    if (fn === 'complaint_parties_for') return { data: PARTIES, error: null }
+    if (fn === 'complaint_history_for') return { data: HISTORY, error: null }
+    if (fn === 'complaint_attachments_for') return { data: active, error: null }
+    if (fn === 'case_support_history') return { data: [...audit], error: null }
+    if (fn === 'record_complaint_attachment') {
+      active = [{ id: 'fresh-evidence', object_path: args.p_object_path, display_filename: args.p_display_filename,
+        media_kind: 'photo', mime_type: args.p_mime_type, byte_size: args.p_byte_size }]
+      audit.push({ id: 'uploaded', event_kind: 'evidence_uploaded', created_at: '2026-10-18T10:59:00Z', detail: { attachment_id: 'fresh-evidence' } })
+      return { data: 'fresh-evidence', error: null }
+    }
+    if (fn === 'withdraw_complaint_evidence') {
+      active = []
+      audit.push({ id: 'withdrawn', event_kind: 'evidence_withdrawn', created_at: '2026-10-18T11:00:00Z', detail: { attachment_id: args.p_attachment_id, reason: args.p_reason } })
+      return { data: null, error: null }
+    }
+    return { data: [], error: null }
+  })
+  renderQueue({ isSecretary: true })
+  await screen.findByText('CMP-2026-AB12CD')
+  await userEvent.click(screen.getByRole('button', { name: /View complaint CMP-2026-AB12CD/ }))
+  const withdraw = await screen.findByRole('button', { name: 'Withdraw evidence' })
+  expect(withdraw).toBeDisabled()
+  expect(screen.getByLabelText('Reason')).toBeDisabled()
+  await userEvent.upload(screen.getByLabelText('Additional evidence'), new File(['photo'], 'fresh-photo.jpg', { type: 'image/jpeg' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Upload evidence' }))
+  await screen.findByRole('button', { name: 'Open fresh-photo.jpg' })
+  expect(screen.getByRole('option', { name: 'fresh-photo.jpg' })).toHaveValue('fresh-evidence')
+  await userEvent.selectOptions(screen.getByLabelText('File'), 'fresh-evidence')
+  expect(screen.getByLabelText('Reason')).toBeEnabled()
+  expect(withdraw).toBeDisabled()
+  await userEvent.type(screen.getByLabelText('Reason'), '   ')
+  expect(withdraw).toBeDisabled()
+  expect(supabase.rpc.mock.calls.filter(([fn]) => fn === 'withdraw_complaint_evidence')).toHaveLength(0)
+  await userEvent.clear(screen.getByLabelText('Reason'))
+  await userEvent.type(screen.getByLabelText('Reason'), 'Sample evidence withdrawn.')
+  expect(withdraw).toBeEnabled()
+  await userEvent.click(withdraw)
+  await waitFor(() => expect(screen.queryByRole('option', { name: 'fresh-photo.jpg' })).not.toBeInTheDocument())
+  expect(supabase.rpc).toHaveBeenCalledWith('withdraw_complaint_evidence', { p_attachment_id: 'fresh-evidence', p_reason: 'Sample evidence withdrawn.' })
+  await userEvent.click(screen.getByText('Evidence and case-support audit'))
+  expect(await screen.findByText('Evidence uploaded')).toBeInTheDocument()
+  expect(screen.getByText('Evidence withdrawn')).toBeInTheDocument()
+  expect(screen.getByText('Reason: Sample evidence withdrawn.')).toBeInTheDocument()
+  expect(screen.getByText(/18 Oct 2026.*6:59 PM/)).toBeInTheDocument()
+  expect(document.querySelector('.complaint-audit pre')).toBeNull()
+  expect(document.querySelector('.complaint-audit')).not.toHaveTextContent('attachment_id')
+  expect(document.querySelector('.complaint-audit')).not.toHaveTextContent('fresh-evidence')
+})
 const rowsOnScreen = () => screen.getAllByRole('row').slice(1)
 
 // ── A. The queue reads complaint_queue() and only its safe output ─────
@@ -491,7 +545,7 @@ describe('F. evidence access', () => {
     renderQueue()
     await screen.findByText('CMP-2026-AB12CD')
     await userEvent.click(screen.getByRole('button', { name: /View complaint CMP-2026-AB12CD/ }))
-    await screen.findByText('photo.jpg')
+    await screen.findByRole('button', { name: 'Open photo.jpg' })
     await userEvent.click(screen.getByRole('button', { name: 'Open photo.jpg' }))
 
     await waitFor(() => expect(createSignedUrl).toHaveBeenCalledWith('c1/photo.jpg', 60))
@@ -631,7 +685,7 @@ describe('H. the walk-in form', () => {
   // `auth.uid()`, and `filed_by_profile_id` is NULL for a walk-in.
   it('asks for no reference, status, actor, timestamp or system id', async () => {
     await openForm()
-    const labels = Array.from(document.querySelectorAll('label'))
+    const labels = Array.from(screen.getByRole('dialog', { name: 'Record Walk-in Complaint' }).querySelectorAll('label'))
       .map((l) => l.textContent.toLowerCase()).join(' | ')
     ;['reference', 'status', 'encoded by', 'encoded_by', 'filed by', 'actor',
       'date received', 'timestamp', 'system id', 'complaint id', 'uuid']
@@ -648,7 +702,7 @@ describe('H. the walk-in form', () => {
     ;['residents_registry', 'registryEntries', 'findRegistryMatch',
       'profiles', 'registry_entry_id', 'profile_id']
       .forEach((term) => expect(src).not.toContain(term))
-    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
+    expect(within(screen.getByRole('dialog', { name: 'Record Walk-in Complaint' })).queryByRole('searchbox')).not.toBeInTheDocument()
   })
 
   // ⚠️ FREE TEXT, NOT A PUROK DROPDOWN. P2 established there is nothing
@@ -677,19 +731,19 @@ describe('H. the walk-in form', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/describe what happened/i)
   })
 
-  it('constrains the file picker to the four accepted types, never a wildcard', async () => {
+  it('constrains the file picker to the supported evidence types, never a wildcard', async () => {
     await openForm()
     const picker = screen.getByLabelText(/Attach photos or a PDF/i)
     const accept = picker.getAttribute('accept')
     expect(accept).toContain('image/jpeg')
     expect(accept).toContain('application/pdf')
     expect(accept).not.toContain('*/*')
-    expect(accept).not.toContain('video')
+    expect(accept).toContain('video/mp4')
   })
 
-  it('says video is not supported rather than offering it', async () => {
+  it('describes supported video and witness statements', async () => {
     await openForm()
-    expect(screen.getByText(/Video is not supported yet/i)).toBeInTheDocument()
+    expect(screen.getByText(/Videos: MP4 or WebM/i)).toBeInTheDocument()
   })
 
   // ⚠️ The consequence is permanent and invisible otherwise:
@@ -760,6 +814,7 @@ describe('I. encoding a walk-in complaint', () => {
     encodeOk()
     await userEvent.click(screen.getByRole('button', { name: /Record complaint/i }))
     expect(await screen.findByText('CMP-2026-NEW001')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Record Walk-in Complaint' })).not.toBeInTheDocument()
     expect(screen.getByText(/Give this reference number to the complainant/i))
       .toBeInTheDocument()
     expect(screen.getByText(/need the contact number recorded on this complaint/i))
@@ -819,6 +874,9 @@ describe('I. encoding a walk-in complaint', () => {
     // And the button is disabled as well -- two mechanisms, each
     // asserted, rather than one standing in for the other.
     expect(screen.getByRole('button', { name: /Recording/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Close walk-in complaint' })).toBeDisabled()
+    await userEvent.keyboard('{Escape}')
+    expect(screen.getByRole('dialog', { name: 'Record Walk-in Complaint' })).toBeInTheDocument()
     release()
   })
 
@@ -1061,10 +1119,10 @@ describe('L. the architecture the phase committed to', () => {
   // second one still fails here. P3-B2 added none, P4-A added 042 and
   // Combined Phase 1 added 043, Combined Phase 2 added 044 and Final
   // Integration added 045 -- one apiece, and 045 is the newest.
-  it('lists the expected migrations through 049', () => {
+  it('lists the expected migrations through 053', () => {
     const dir = path.join(__dirname, '..', '..', 'supabase-migrations')
     const files = fs.readdirSync(dir).filter((f) => f.endsWith('.sql')).sort()
-    expect(files).toHaveLength(49)
+    expect(files).toHaveLength(53)
     expect(files[41]).toBe('042_kp_screening_foundation.sql')
     expect(files[42]).toBe('043_kp_case_hearings_summons.sql')
     expect(files[43]).toBe('044_incident_blotter_tanod.sql')
@@ -1073,6 +1131,127 @@ describe('L. the architecture the phase committed to', () => {
     expect(files[46]).toBe('047_edit_tanod_member.sql')
     expect(files[47]).toBe('048_location_type_ties.sql')
     expect(files[48]).toBe('049_public_zone_type_counts.sql')
-    expect(files.some((f) => f.startsWith('050'))).toBe(false)
+    expect(files[49]).toBe('050_case_evidence_support.sql')
+    expect(files[50]).toBe('051_case_review_support.sql')
+    expect(files[51]).toBe('052_tanod_accounts_and_duty.sql')
+    expect(files[52]).toBe('053_tanod_incident_access.sql')
+    expect(files.some((f) => f.startsWith('054'))).toBe(false)
+  })
+})
+
+
+describe('floating complaint details', () => {
+  it('opens details only inside a labelled modal, traps focus, and returns focus on Close', async () => {
+    renderQueue({ isSecretary: true })
+    const view = await screen.findByRole('button', { name: 'View complaint CMP-2026-AB12CD' })
+    view.focus()
+    await userEvent.click(view)
+    const modal = await screen.findByRole('dialog', { name: 'Complaint Details' })
+    expect(modal).toHaveAttribute('aria-modal', 'true')
+    expect(await within(modal).findByText(/shared fence line/)).toBeInTheDocument()
+    expect(modal).toContainElement(document.querySelector('.complaint-detail-panel'))
+    expect(document.querySelector('.dashboard-card.complaint-detail-panel')).toBeNull()
+    expect(document.body.style.overflow).toBe('hidden')
+    const closeIcon = within(modal).getByRole('button', { name: 'Close complaint details' })
+    expect(within(modal).getAllByRole('button', { name: /close/i })).toHaveLength(1)
+    expect(modal.querySelector('.confirm-dialog-actions')).toBeNull()
+    const header = modal.querySelector('.complaint-modal-header')
+    expect(within(header).getByRole('heading', { name: 'Complaint Details' })).toBeInTheDocument()
+    expect(within(header).getByText('CMP-2026-AB12CD')).toBeInTheDocument()
+    expect(within(header).getByText('Received')).toBeInTheDocument()
+    expect(header).toContainElement(closeIcon)
+    const controls = modal.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])')
+    const lastControl = controls[controls.length - 1]
+    expect(closeIcon).toHaveFocus()
+    lastControl.focus()
+    await userEvent.tab()
+    expect(closeIcon).toHaveFocus()
+    await userEvent.tab({ shift: true })
+    expect(lastControl).toHaveFocus()
+    await userEvent.click(closeIcon)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(view).toHaveFocus()
+    expect(document.body.style.overflow).not.toBe('hidden')
+  })
+
+  it('closes with Escape and opens the next selected complaint with its own data', async () => {
+    supabase.from.mockImplementation(() => ({ select: () => ({ eq: (_, id) => ({ maybeSingle: async () => ({ data: { ...FULL_ROW, id, reference: QUEUE.find(row => row.id === id).reference, narrative: id === 'c1' ? 'First complaint narrative' : 'Second complaint narrative' }, error: null }) }) }) }))
+    renderQueue()
+    await userEvent.click(await screen.findByRole('button', { name: 'View complaint CMP-2026-AB12CD' }))
+    expect(await screen.findByText('First complaint narrative')).toBeInTheDocument()
+    const previousBody = document.querySelector('.complaint-modal-body')
+    previousBody.scrollTop = 400
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'View complaint CMP-2026-AB12CD' })).toHaveFocus()
+    const view = screen.getByRole('button', { name: 'View complaint CMP-2026-9XYZ70' })
+    await userEvent.click(view)
+    const modal = screen.getByRole('dialog', { name: 'Complaint Details' })
+    expect(await within(modal).findByText('Second complaint narrative')).toBeInTheDocument()
+    expect(within(modal).getByText('CMP-2026-9XYZ70')).toBeInTheDocument()
+    expect(screen.queryByText('First complaint narrative')).not.toBeInTheDocument()
+    expect(modal.querySelector('.complaint-modal-body').scrollTop).toBe(0)
+    await userEvent.click(within(modal).getByRole('button', { name: 'Close complaint details' }))
+    expect(view).toHaveFocus()
+  })
+
+  it('keeps the header fixed and only the body scrollable on desktop and mobile', () => {
+    const css = read('complaints/Complaints.css')
+    expect(css).toMatch(/max-width: 860px; max-height: 85vh; padding: 0; display: flex; flex-direction: column; overflow: hidden/)
+    expect(css).toMatch(/complaint-modal-header \{ position: relative; flex: 0 0 auto/ )
+    expect(css).toMatch(/complaint-modal-body \{ flex: 1 1 auto; min-height: 0; overflow-y: auto/)
+    expect(css).toMatch(/@media\(max-width: 600px\)[\s\S]*complaint-summary-grid \{ grid-template-columns: minmax\(0,1fr\)/)
+  })
+})
+
+
+describe('walk-in intake modal', () => {
+  it('keeps the queue behind the modal, preserves fields/files/people, and returns focus after Cancel', async () => {
+    renderQueue({ isSecretary: true })
+    const opener = await screen.findByRole('button', { name: 'Record Walk-in Complaint' })
+    await userEvent.click(opener)
+    const modal = screen.getByRole('dialog', { name: 'Record Walk-in Complaint' })
+    expect(modal).toHaveAttribute('aria-modal', 'true')
+    expect(screen.getByRole('table')).toBeInTheDocument()
+    expect(screen.getByRole('searchbox')).toBeInTheDocument()
+    expect(screen.queryByText('Back to the queue')).not.toBeInTheDocument()
+    expect(within(modal).getAllByRole('button', { name: /close/i })).toHaveLength(1)
+    expect(within(modal).getByRole('button', { name: 'Close walk-in complaint' })).toHaveFocus()
+    expect(document.body.style.overflow).toBe('hidden')
+    for (const name of ['Complainant', 'Complaint Details', 'Person or people complained about (optional)', 'Supporting files (optional)']) {
+      expect(within(modal).getByRole('group', { name })).toBeInTheDocument()
+    }
+    await userEvent.click(within(modal).getByRole('button', { name: 'Add another person' }))
+    expect(within(modal).getAllByLabelText('Name')).toHaveLength(2)
+    await userEvent.upload(within(modal).getByLabelText('Attach photos or a PDF, video or witness statement'), new File(['photo'], 'intake.jpg', { type: 'image/jpeg' }))
+    expect(within(modal).getByText('intake.jpg')).toBeInTheDocument()
+    const footer = modal.querySelector('.modal-actions')
+    expect(footer).not.toContainElement(modal.querySelector('.walkin-form-body'))
+    await userEvent.click(within(modal).getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(opener).toHaveFocus()
+    expect(document.body.style.overflow).not.toBe('hidden')
+  })
+
+  it('closes with Escape, restores focus, and starts a fresh form when reopened', async () => {
+    renderQueue({ isSecretary: true })
+    const opener = await screen.findByRole('button', { name: 'Record Walk-in Complaint' })
+    await userEvent.click(opener)
+    await userEvent.type(screen.getByLabelText(/Full name/), 'Unsaved name')
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(opener).toHaveFocus()
+    await userEvent.click(opener)
+    expect(screen.getByLabelText(/Full name/)).toHaveValue('')
+    await userEvent.click(screen.getByRole('button', { name: 'Close walk-in complaint' }))
+    expect(opener).toHaveFocus()
+  })
+
+  it('keeps the header/footer outside the sole scrolling form body on mobile', () => {
+    const css = read('complaints/Complaints.css')
+    expect(css).toMatch(/walkin-modal \.confirm-dialog \{[^}]*overflow: hidden/)
+    expect(css).toMatch(/walkin-form-body \{ min-height: 0; overflow-y: auto/)
+    expect(css).toMatch(/walkin-modal \.modal-actions \{ flex: 0 0 auto/)
+    expect(css).toMatch(/@media\(max-width: 600px\)[\s\S]*walkin-modal \.confirm-dialog \{ max-height: 90vh/)
   })
 })
