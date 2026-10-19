@@ -638,3 +638,56 @@
      squeezed below the 24px minimum target. */
   .modal-actions > button { flex: 1 1 100%; }
 }
+
+/* Floating official complaint details. */
+.official-complaint-modal .confirm-dialog { position: relative; max-width: 860px; max-height: 85vh; padding: 0; display: flex; flex-direction: column; overflow: hidden; }
+.official-complaint-modal .confirm-dialog-title { margin: 0; padding: 0 52px 0 0; background: #f4f8ff; color: #1e3a8a; font-size: 26px; font-weight: 800; }
+.complaint-modal-close { position: absolute; top: 16px; right: 16px; min-width: 44px; min-height: 44px; }
+.complaint-modal-header { position: relative; flex: 0 0 auto; z-index: 1; padding: 20px 24px 16px; background: #f4f8ff; border-bottom: 1px solid #dbeafe; }
+.complaint-modal-identity { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 10px; }
+.complaint-modal-header .complaint-reference { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.complaint-modal-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 24px 4px; overflow-wrap: anywhere; min-width: 0; }
+.official-complaint-modal .complaint-section { margin: 22px 0; }
+.official-complaint-modal .complaint-section h3 { color: #1e3a8a; }
+.official-complaint-modal .complaint-summary-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.official-complaint-modal .complaint-summary-grid .complaint-detail-row { display: block; padding: 12px 14px; border: 1px solid #e2e8f0; background: #f8fafc; border-radius: 10px; }
+.official-complaint-modal .complaint-summary-grid dt { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #64748b; }
+.official-complaint-modal .complaint-summary-grid dd { margin: 8px 0 0; font-weight: 600; }
+.official-complaint-modal :is(button,input,select,textarea):focus-visible { outline: 3px solid #2563eb; outline-offset: 3px; }
+@media(max-width: 600px) {
+  .official-complaint-modal .confirm-overlay { padding: 12px; }
+  .official-complaint-modal .confirm-dialog-title { font-size: 24px; }
+  .complaint-modal-header, .complaint-modal-body { padding-inline: 16px; }
+  .official-complaint-modal .complaint-summary-grid { grid-template-columns: minmax(0,1fr); }
+  .official-complaint-modal .complaint-section { min-width: 0; }
+  .official-complaint-modal :is(input,select,textarea) { max-width: 100%; box-sizing: border-box; }
+}
+
+/* Walk-in intake uses the existing form inside a fixed header/body/footer shell. */
+.walkin-modal .confirm-dialog { position: relative; display: flex; flex-direction: column; max-width: 860px; max-height: 85vh; padding: 0; overflow: hidden; }
+.walkin-modal-header { position: relative; flex: 0 0 auto; padding: 20px 76px 16px 24px; border-bottom: 1px solid #dbeafe; background: #f4f8ff; }
+.walkin-modal .confirm-dialog-title { margin: 0; color: #1e3a8a; font-size: 26px; font-weight: 800; }
+.walkin-modal-header p { margin: 8px 0 0; color: #64748b; font-size: 13px; }
+.walkin-modal-close { position: absolute; top: 16px; right: 16px; min-height: 44px; min-width: 44px; }
+.walkin-modal .complaint-form { display: flex; flex-direction: column; min-height: 0; margin: 0; overflow: hidden; }
+.walkin-form-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 18px 24px; }
+.walkin-modal .complaint-fieldset { margin: 0 0 18px; padding: 14px 16px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fafbfc; min-width: 0; }
+.walkin-modal legend { color: #1e3a8a; font-weight: 700; }
+.walkin-modal .modal-form-group { margin-bottom: 14px; }
+.walkin-modal .field-note { color: #64748b; line-height: 1.5; }
+.walkin-modal .complaint-notice { margin-bottom: 16px; padding: 12px; font-size: 13px; line-height: 1.5; }
+.walkin-modal .complaint-notice p { margin: 0; }
+.walkin-modal .modal-actions { flex: 0 0 auto; margin: 0; padding: 12px 24px; border-top: 1px solid #e2e8f0; background: #fff; }
+.walkin-modal :is(input,select,textarea) { max-width: 100%; box-sizing: border-box; }
+.walkin-modal :is(button,input,select,textarea):focus-visible { outline: 3px solid #2563eb; outline-offset: 3px; }
+.walkin-modal button { min-height: 44px; }
+@media(max-width: 600px) {
+  .walkin-modal .confirm-overlay { padding: 12px; }
+  .walkin-modal .confirm-dialog { max-height: 90vh; }
+  .walkin-modal-header { padding-left: 16px; }
+  .walkin-modal .confirm-dialog-title { font-size: 24px; }
+  .walkin-form-body { padding: 16px; }
+  .walkin-modal .complaint-fieldset { padding: 12px; }
+  .walkin-modal .modal-actions { padding-inline: 16px; display: flex; flex-wrap: wrap; gap: 10px; }
+  .walkin-modal .modal-actions > button { flex: 1 1 120px; }
+}

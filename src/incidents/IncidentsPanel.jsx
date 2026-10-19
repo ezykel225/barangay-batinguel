@@ -1,5 +1,6 @@
 import OfficialTanodNotes from '../tanod/OfficialTanodNotes'
 import DeviceLocation from './DeviceLocation'
+import { DialogShell } from '../components/OfficialArchiveDialog'
 import IncidentKpLink from '../casesupport/IncidentKpLink'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
@@ -39,6 +40,8 @@ import './Incidents.css'
 // "Peace and Order and Blotter Records" was still refused all four. So the
 // database decides, and this only avoids painting a control it would refuse.
 
+const INCIDENTS_PER_PAGE = 10
+
 const blankForm = () => ({
   incidentType: 'traffic_accident',
   occurredAt: '',
@@ -53,12 +56,16 @@ const blankForm = () => ({
 })
 
 const IncidentsPanel = ({ canAdminister = false, confirm }) => {
+  const recordCloseRef = useRef(null)
+  const detailCloseRef = useRef(null)
+  const [confirming, setConfirming] = useState(false)
   const [rows, setRows] = useState([])
   const [roster, setRoster] = useState([])
   const [loading, setLoading] = useState(true)
   const [problem, setProblem] = useState('')
   const [busy, setBusy] = useState('')
 
+  const [page, setPage] = useState(1)
   const [filterType, setFilterType] = useState('')
   const [filterFrom, setFilterFrom] = useState('')
   const [filterTo, setFilterTo] = useState('')
@@ -95,6 +102,10 @@ const IncidentsPanel = ({ canAdminister = false, confirm }) => {
   }, [filterFrom, filterTo, filterType])
 
   useEffect(() => { fetchAll() }, [fetchAll])
+  useEffect(() => { setPage(1) }, [filterType, filterFrom, filterTo])
+  useEffect(() => {
+    setPage(current => Math.min(current, Math.max(1, Math.ceil(rows.length / INCIDENTS_PER_PAGE))))
+  }, [rows.length])
 
   const run = async (key, work, fallbackKey) => {
     if (inFlight.current) return false
@@ -157,7 +168,9 @@ const IncidentsPanel = ({ canAdminister = false, confirm }) => {
   }
 
   const handleStatus = async (incidentId, status) => {
-    const ok = await confirm({
+    setConfirming(true)
+    let ok
+    try { ok = await confirm({
       title: 'Change this incident record?',
       message: `The incident will be recorded as "${incidentStatusLabel(status)}".`
         + ' The change is added to the blotter history, which cannot be rewritten.',
@@ -165,6 +178,7 @@ const IncidentsPanel = ({ canAdminister = false, confirm }) => {
       cancelLabel: 'Go back',
       destructive: false,
     })
+    } finally { setConfirming(false) }
     if (!ok) return
     await run('status', async () => {
       await setIncidentStatus({ incidentId, status })
@@ -189,6 +203,10 @@ const IncidentsPanel = ({ canAdminister = false, confirm }) => {
     }, 'tanodFailed')
   }
 
+  const totalPages = Math.max(1, Math.ceil(rows.length / INCIDENTS_PER_PAGE))
+  const currentPage = Math.min(page, totalPages)
+  const pageStart = (currentPage - 1) * INCIDENTS_PER_PAGE
+  const visibleRows = rows.slice(pageStart, pageStart + INCIDENTS_PER_PAGE)
   const withoutCoordinates = rows.filter((row) => !row.has_coordinates).length
 
   return (
@@ -198,7 +216,7 @@ const IncidentsPanel = ({ canAdminister = false, confirm }) => {
         <p>Record what happened, and keep the barangay&rsquo;s internal blotter.</p>
       </div>
 
-      {problem && (
+      {problem && !showForm && !detail && (
         <p className="inc-problem" role="alert">
           <FaInfoCircle aria-hidden="true" /> {problem}
         </p>
@@ -210,23 +228,125 @@ const IncidentsPanel = ({ canAdminister = false, confirm }) => {
           <button
             type="button"
             className="btn-add"
-            onClick={() => setShowForm((open) => !open)}
+            onClick={() => setShowForm(true)}
             aria-expanded={showForm}
             aria-controls="inc-record-form"
           >
-            {/* ⚠️ THE ICON FOLLOWS THE LABEL. This was `<FaPlus>` in both
-                states, so the open form offered a PLUS sign beside the word
-                "Close" -- an icon asserting the opposite of its own label,
-                which is the same fault as an ✕ used for navigation. */}
-            {showForm
-              ? <><FaTimes aria-hidden="true" /> Close form</>
-              : <><FaPlus aria-hidden="true" /> Record Incident</>}
+            <FaPlus aria-hidden="true" /> Record Incident
           </button>
         </div>
 
-        {showForm && (
+        <div className="resident-filter-bar inc-filters">
+          <div className="filter-select-wrap">
+            <label className="visually-hidden" htmlFor="inc-filter-type">Filter by incident type</label>
+            <select
+              id="inc-filter-type" className="filter-select" value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+            >
+              <option value="">All types</option>
+              {INCIDENT_TYPE_KEYS.map((key) => (
+                <option key={key} value={key}>{incidentTypeLabel(key)}</option>
+              ))}
+            </select>
+          </div>
+          <div className="filter-select-wrap">
+            <label className="visually-hidden" htmlFor="inc-filter-from">Incidents from</label>
+            <input id="inc-filter-from" className="filter-select" type="date" value={filterFrom}
+              onChange={(e) => setFilterFrom(e.target.value)} />
+          </div>
+          <div className="filter-select-wrap">
+            <label className="visually-hidden" htmlFor="inc-filter-to">Incidents up to</label>
+            <input id="inc-filter-to" className="filter-select" type="date" value={filterTo}
+              onChange={(e) => setFilterTo(e.target.value)} />
+          </div>
+        </div>
+
+        {loading ? (
+          <p className="complaint-empty">Loading incidents...</p>
+        ) : rows.length === 0 ? (
+          <p className="complaint-empty">
+            {filterType || filterFrom || filterTo
+              ? 'No incidents match this filter.'
+              : 'No incidents recorded yet.'}
+          </p>
+        ) : (
+          <>
+            <p className="inc-summary" aria-live="polite">
+              {rows.length} {rows.length === 1 ? 'incident' : 'incidents'} &middot; Showing {pageStart + 1}&ndash;{Math.min(pageStart + INCIDENTS_PER_PAGE, rows.length)}
+            </p>
+            {withoutCoordinates > 0 && <p className="inc-summary">
+              {withoutCoordinates} {withoutCoordinates === 1 ? 'incident has' : 'incidents have'} no coordinates and {withoutCoordinates === 1 ? 'does' : 'do'} not appear on the map.
+            </p>}
+            <div className="table-wrapper">
+              <table className="dashboard-table inc-records-table">
+                <colgroup>
+                  <col className="inc-col-reference" />
+                  <col className="inc-col-type" />
+                  <col className="inc-col-when" />
+                  <col className="inc-col-location" />
+                  <col className="inc-col-status" />
+                  <col className="inc-col-blotter" />
+                  <col className="inc-col-action" />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th>Reference</th><th>Type</th><th>When</th>
+                    <th>Location</th><th>Status</th><th>Blotter</th><th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleRows.map((row) => (
+                    <tr key={row.id}>
+                      <td data-label="Reference"><span className="complaint-reference">{row.reference}</span></td>
+                      <td data-label="Type">{incidentTypeLabel(row.incident_type)}</td>
+                      <td data-label="When">{incidentDateTime(row.occurred_at)}</td>
+                      <td data-label="Location">
+                        {row.location_text}
+                        {row.has_coordinates && (
+                          <> <FaMapMarkerAlt aria-label="Has coordinates" className="inc-pin" /></>
+                        )}
+                      </td>
+                      <td data-label="Status">
+                        <span className={`kp-badge kp-badge-${row.status}`}>
+                          {incidentStatusLabel(row.status)}
+                        </span>
+                      </td>
+                      <td data-label="Blotter">
+                        <span className="complaint-reference">{row.blotter_reference || 'Not recorded'}</span>
+                      </td>
+                      <td data-label="Action">
+                        <button
+                          type="button" className="btn-add btn-sm"
+                          onClick={() => openDetail(row.id)}
+                          aria-label={`View incident ${row.reference}`}
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {totalPages > 1 && <nav className="inc-pagination" aria-label="Incident records pagination">
+              <button type="button" className="btn-cancel btn-sm" aria-label="Previous page" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>&lsaquo; Previous</button>
+              <span>Page {currentPage} of {totalPages}</span>
+              <button type="button" className="btn-cancel btn-sm" aria-label="Next page" disabled={currentPage === totalPages} onClick={() => setPage(currentPage + 1)}>Next &rsaquo;</button>
+            </nav>}
+          </>
+        )}
+      </div>
+
+      {showForm && <div className="inc-modal inc-record-modal">
+        <DialogShell open titleId="inc-record-title" title="Record Incident" busy={Boolean(busy)} onCancel={() => setShowForm(false)} initialFocusRef={recordCloseRef}
+          header={<header className="inc-modal-header">
+            <h3 className="confirm-dialog-title" id="inc-record-title">Record Incident</h3>
+            <p>Record an incident for the barangay's internal incident and blotter records.</p>
+            <button type="button" className="btn-cancel inc-modal-close" ref={recordCloseRef} aria-label="Close record incident" disabled={Boolean(busy)} onClick={() => setShowForm(false)}><FaTimes aria-hidden="true" /></button>
+          </header>}>
           <form id="inc-record-form" className="kp-form inc-form" onSubmit={handleRecord}>
-            <h3>Record an incident</h3>
+            <div className="inc-modal-body">
+            {problem && <p className="inc-problem" role="alert">{problem}</p>}
             <p className="inc-hint"><FaInfoCircle aria-hidden="true" /> {INCIDENT_TYPE_DISCLAIMER}</p>
 
             <div className="inc-grid">
@@ -340,115 +460,31 @@ const IncidentsPanel = ({ canAdminister = false, confirm }) => {
               />
             </div>
 
-            <div className="modal-actions">
+            </div>
+            <div className="modal-actions inc-modal-footer">
+              <button type="button" className="btn-cancel" disabled={Boolean(busy)} onClick={() => setShowForm(false)}>Cancel</button>
               <button type="submit" className="btn-add" disabled={Boolean(busy)}>
                 {busy === 'record' ? 'Recording...' : 'Record incident'}
               </button>
             </div>
           </form>
-        )}
-
-        <div className="resident-filter-bar inc-filters">
-          <div className="filter-select-wrap">
-            <label className="visually-hidden" htmlFor="inc-filter-type">Filter by incident type</label>
-            <select
-              id="inc-filter-type" className="filter-select" value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-            >
-              <option value="">All types</option>
-              {INCIDENT_TYPE_KEYS.map((key) => (
-                <option key={key} value={key}>{incidentTypeLabel(key)}</option>
-              ))}
-            </select>
-          </div>
-          <div className="filter-select-wrap">
-            <label className="visually-hidden" htmlFor="inc-filter-from">Incidents from</label>
-            <input id="inc-filter-from" className="filter-select" type="date" value={filterFrom}
-              onChange={(e) => setFilterFrom(e.target.value)} />
-          </div>
-          <div className="filter-select-wrap">
-            <label className="visually-hidden" htmlFor="inc-filter-to">Incidents up to</label>
-            <input id="inc-filter-to" className="filter-select" type="date" value={filterTo}
-              onChange={(e) => setFilterTo(e.target.value)} />
-          </div>
-        </div>
-
-        {loading ? (
-          <p className="complaint-empty">Loading incidents...</p>
-        ) : rows.length === 0 ? (
-          <p className="complaint-empty">
-            {filterType || filterFrom || filterTo
-              ? 'No incidents match this filter.'
-              : 'No incidents recorded yet.'}
-          </p>
-        ) : (
-          <>
-            <p className="inc-summary">
-              {rows.length} recorded
-              {withoutCoordinates > 0 && (
-                <> &middot; <strong>{withoutCoordinates}</strong> without coordinates, so not on the map</>
-              )}
-            </p>
-            <div className="table-wrapper">
-              <table className="dashboard-table">
-                <thead>
-                  <tr>
-                    <th>Reference</th><th>Type</th><th>When</th>
-                    <th>Location</th><th>Status</th><th>Blotter</th><th>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => (
-                    <tr key={row.id}>
-                      <td data-label="Reference"><span className="complaint-reference">{row.reference}</span></td>
-                      <td data-label="Type">{incidentTypeLabel(row.incident_type)}</td>
-                      <td data-label="When">{incidentDateTime(row.occurred_at)}</td>
-                      <td data-label="Location">
-                        {row.location_text}
-                        {row.has_coordinates && (
-                          <> <FaMapMarkerAlt aria-label="Has coordinates" className="inc-pin" /></>
-                        )}
-                      </td>
-                      <td data-label="Status">
-                        <span className={`kp-badge kp-badge-${row.status}`}>
-                          {incidentStatusLabel(row.status)}
-                        </span>
-                      </td>
-                      <td data-label="Blotter">
-                        <span className="complaint-reference">{row.blotter_reference || 'Not recorded'}</span>
-                      </td>
-                      <td data-label="Action">
-                        <button
-                          type="button" className="btn-add btn-sm"
-                          onClick={() => openDetail(row.id)}
-                          aria-label={`View incident ${row.reference}`}
-                        >
-                          View
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-      </div>
+        </DialogShell>
+      </div>}
 
       {detail && (
-        <div className="dashboard-card inc-detail">
-          <div className="dashboard-card-header">
-            <h2>{detail.reference}</h2>
-            {/* ⚠️ `btn-cancel`, NOT `btn-deny`. Dismissing a read-only
-                detail panel destroys nothing, and the red class is what
-                Stand down and Remove use -- so this read as a dangerous
-                action and looked unlike the Complaint queue's own Close,
-                which is the same control one tab away. */}
-            <button type="button" className="btn-cancel btn-sm" onClick={() => setDetail(null)}>
-              <FaTimes aria-hidden="true" /> Close
-            </button>
-          </div>
-
+        <div className="inc-modal inc-view-modal" aria-hidden={confirming || undefined} inert={confirming || undefined}>
+        <DialogShell open titleId="inc-detail-title" title="Incident Details" initialFocusRef={detailCloseRef}
+          busy={Boolean(busy)} keyboardSuspended={confirming} onCancel={() => setDetail(null)}
+          header={<header className="inc-modal-header">
+            <h3 className="confirm-dialog-title" id="inc-detail-title">Incident Details</h3>
+            <button type="button" className="btn-cancel btn-sm inc-modal-close" ref={detailCloseRef} aria-label="Close incident details" disabled={Boolean(busy)} onClick={() => setDetail(null)}><FaTimes aria-hidden="true" /></button>
+            <div className="inc-modal-identity"><strong>{detail.reference}</strong><span className={`kp-badge kp-badge-${detail.status}`}>{incidentStatusLabel(detail.status)}</span>
+              {detail.blotter_reference && <span>Blotter {detail.blotter_reference}</span>}
+            </div>
+          </header>}>
+          <div className="inc-modal-body inc-detail" key={detail.id}>
+          {problem && <p className="inc-problem" role="alert">{problem}</p>}
+          <section className="inc-section" aria-label="Incident summary">
           <dl className="kp-summary">
             <div><dt>Type</dt><dd>{incidentTypeLabel(detail.incident_type)}</dd></div>
             <div><dt>When</dt><dd>{incidentDateTime(detail.occurred_at)}</dd></div>
@@ -475,11 +511,12 @@ const IncidentsPanel = ({ canAdminister = false, confirm }) => {
             </div>
           </dl>
 
-          <h3>What happened</h3>
-          {canAdminister && <><IncidentKpLink key={detail.id} incidentId={detail.id} /><OfficialTanodNotes key={`notes-${detail.id}`} incidentId={detail.id} /></>}
-          <p className="inc-narrative">{detail.narrative}</p>
+          </section>
+          <section className="inc-section" aria-label="What happened"><h3>What happened</h3>
+          <p className="inc-narrative">{detail.narrative}</p></section>
+          {canAdminister && <><section className="inc-section" aria-label="Linked KP Case"><IncidentKpLink key={detail.id} incidentId={detail.id} /></section><section className="inc-section" aria-label="Tanod operational follow-up"><OfficialTanodNotes key={`notes-${detail.id}`} incidentId={detail.id} /></section></>}
 
-          <h3>Blotter entry {detail.blotter_reference}</h3>
+          <section className="inc-section" aria-label="Blotter Entry"><h3>Blotter entry {detail.blotter_reference}</h3>
           <p className="inc-hint"><FaLock aria-hidden="true" /> {BLOTTER_INTERNAL_NOTE}</p>
           <p className="inc-narrative inc-snapshot">{detail.blotter_summary}</p>
           <p className="field-note">{BLOTTER_APPEND_ONLY_NOTE}</p>
@@ -496,7 +533,8 @@ const IncidentsPanel = ({ canAdminister = false, confirm }) => {
             ))}
           </ul>
 
-          <h4>Tanod involved</h4>
+          </section>
+          <section className="inc-section" aria-label="Tanod involvement"><h4>Tanod involved</h4>
           {attending.length === 0 ? (
             <p className="complaint-empty">No Tanod recorded for this incident.</p>
           ) : (
@@ -513,9 +551,10 @@ const IncidentsPanel = ({ canAdminister = false, confirm }) => {
               records gets one neutral sentence that names no position, no
               policy and no SQLSTATE -- `ActionMenu`'s own rule, and the same
               shape the restricted complaint panel takes. */}
+          </section>
           {canAdminister ? (
             <>
-              <h4>Records actions</h4>
+              <section className="inc-section" aria-label="Record Actions"><h4>Record Actions</h4>
               <div className="inc-actions">
                 {INCIDENT_STATUS_KEYS.filter((key) => key !== detail.status).map((key) => (
                   <button
@@ -528,7 +567,8 @@ const IncidentsPanel = ({ canAdminister = false, confirm }) => {
                 ))}
               </div>
 
-              <form className="kp-form" onSubmit={handleAmend}>
+              </section>
+              <section className="inc-section" aria-label="Blotter amendment"><form className="kp-form" onSubmit={handleAmend}>
                 <label className="modal-form-label" htmlFor="inc-amend">Add a blotter amendment</label>
                 <textarea
                   id="inc-amend" className="modal-form-input" rows={2}
@@ -539,10 +579,10 @@ const IncidentsPanel = ({ canAdminister = false, confirm }) => {
                     {busy === 'amend' ? 'Saving...' : 'Add amendment'}
                   </button>
                 </div>
-              </form>
+              </form></section>
 
               {roster.length > 0 && (
-                <div className="inc-attribute">
+                <div className="inc-attribute inc-section">
                   <label className="modal-form-label" htmlFor="inc-add-tanod">Record another Tanod</label>
                   <select
                     id="inc-add-tanod" className="modal-form-input" defaultValue=""
@@ -566,6 +606,8 @@ const IncidentsPanel = ({ canAdminister = false, confirm }) => {
               <FaExclamationTriangle aria-hidden="true" /> {RECORDS_RESTRICTED_NOTE}
             </p>
           )}
+          </div>
+        </DialogShell>
         </div>
       )}
     </div>

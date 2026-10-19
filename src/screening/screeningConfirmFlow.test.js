@@ -169,7 +169,7 @@ describe('A. confirming a screening from the Official Portal', () => {
       screen.getByLabelText('Decision note'), 'Agreed at the barangay hall.'
     )
 
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: /^(?!Complaint Details$)/ })).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /Confirm screening/ }))
 
     // The real `ConfirmDialog`, mounted by the real `useConfirm`.
@@ -264,7 +264,7 @@ describe('B. the refusals', () => {
       screen.getAllByRole('button', { name: 'Go back' }).find((b) => dialog.contains(b))
     )
 
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /^(?!Complaint Details$)/ })).not.toBeInTheDocument())
     expect(confirmCount()).toBe(0)
     // The form is still there, with the choice kept.
     expect(screen.getByLabelText(/Confirmed outcome/)).toHaveValue('close_without_kp_process')
@@ -300,7 +300,7 @@ describe('B. the refusals', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       /choose what the barangay will do|outcome/i
     )
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: /^(?!Complaint Details$)/ })).not.toBeInTheDocument()
     expect(confirmCount()).toBe(0)
   })
 
@@ -352,7 +352,7 @@ describe('C. the shared dialog is wired, not merely imported', () => {
 
     await userEvent.keyboard('{Escape}')
 
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /^(?!Complaint Details$)/ })).not.toBeInTheDocument())
     expect(confirmCount()).toBe(0)
   })
 })

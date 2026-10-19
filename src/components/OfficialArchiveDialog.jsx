@@ -28,15 +28,17 @@ import './OfficialArchiveDialog.css'
 // still cannot trigger the destructive action from a text field, because
 // neither dialog is a <form> and neither action button is a submit.
 
-const DialogShell = ({
+export const DialogShell = ({
   open,
   titleId,
   title,
+  header,
   children,
   actions,
   busy,
   onCancel,
   initialFocusRef,
+  keyboardSuspended = false,
 }) => {
   const dialogRef = useRef(null)
   const previouslyFocused = useRef(null)
@@ -60,6 +62,7 @@ const DialogShell = ({
     if (!open) return undefined
 
     const onKeyDown = (event) => {
+      if (keyboardSuspended) return
       if (event.key === 'Escape') {
         event.preventDefault()
         if (!busy) onCancel()
@@ -87,7 +90,7 @@ const DialogShell = ({
 
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [open, busy, onCancel])
+  }, [open, busy, onCancel, keyboardSuspended])
 
   useEffect(() => {
     if (!open) return undefined
@@ -112,9 +115,9 @@ const DialogShell = ({
         ref={dialogRef}
         onClick={(event) => event.stopPropagation()}
       >
-        <h3 className="confirm-dialog-title" id={titleId}>{title}</h3>
+        {header || <h3 className="confirm-dialog-title" id={titleId}>{title}</h3>}
         {children}
-        <div className="confirm-dialog-actions">{actions}</div>
+        {actions && <div className="confirm-dialog-actions">{actions}</div>}
       </div>
     </div>
   )

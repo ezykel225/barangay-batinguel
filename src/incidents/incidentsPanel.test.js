@@ -95,7 +95,7 @@ const mount = (props = {}) => render(
 const fnNames = () => rpcCalls.map(([fn]) => fn)
 const openDetail = async () => {
   await userEvent.click(await screen.findByRole('button', { name: /View incident INC-2026-AB12CD/ }))
-  await screen.findByRole('heading', { name: 'INC-2026-AB12CD' })
+  await screen.findByRole('dialog', { name: 'Incident Details' })
 }
 
 // ── A. The queue ─────────────────────────────────────────────────────────────
@@ -119,7 +119,7 @@ describe('A. the incident queue', () => {
 
   it('says how many incidents have no coordinates and so are not on the map', async () => {
     mount()
-    expect(await screen.findByText(/without coordinates, so not on the map/)).toBeInTheDocument()
+    expect(await screen.findByText(/1 incident has no coordinates and does not appear on the map/)).toBeInTheDocument()
   })
 
   it('offers two different empty states', async () => {
@@ -155,6 +155,7 @@ describe('B. recording an incident', () => {
     ;['p_reference', 'p_status', 'p_recorded_by', 'p_created_at', 'p_blotter_reference']
       .forEach((key) => expect(args).not.toHaveProperty(key))
     expect(args.p_location_text).toBe('Perdices Street')
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Record Incident' })).not.toBeInTheDocument())
   })
 
   // ⚠️ Half a coordinate would plot at (0, 0) — a point in the Gulf of
@@ -200,7 +201,7 @@ describe('C. who may administer records', () => {
     mount({ canAdminister: false })
     await openDetail()
 
-    expect(screen.queryByRole('heading', { name: 'Records actions' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Record Actions' })).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Add a blotter amendment')).not.toBeInTheDocument()
     expect(screen.getByText(/handled by the barangay records staff/i)).toBeInTheDocument()
   })
@@ -225,7 +226,7 @@ describe('C. who may administer records', () => {
   it('offers the records controls with the flag', async () => {
     mount({ canAdminister: true })
     await openDetail()
-    expect(screen.getByRole('heading', { name: 'Records actions' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Record Actions' })).toBeInTheDocument()
     expect(screen.getByLabelText('Add a blotter amendment')).toBeInTheDocument()
   })
 
@@ -415,4 +416,177 @@ describe('G. the filter bar controls', () => {
       expect(control.className.split(/\s+/)).toContain('filter-select')
     })
   })
+})
+
+
+describe('incident floating dialogs', () => {
+  it('opens the record form above the unchanged table, retains fields, and closes with Cancel', async () => {
+    mount()
+    await screen.findByText('INC-2026-AB12CD')
+    const opener = screen.getByRole('button', { name: 'Record Incident' })
+    await userEvent.click(opener)
+    const modal = screen.getByRole('dialog', { name: 'Record Incident' })
+    expect(modal).toHaveAttribute('aria-modal', 'true')
+    expect(screen.getByRole('table')).toBeInTheDocument()
+    expect(modal).toContainElement(document.querySelector('#inc-record-form'))
+    expect(within(modal).getByRole('button', { name: 'Close record incident' })).toHaveFocus()
+    expect(document.body.style.overflow).toBe('hidden')
+    for (const label of ['What kind of incident', 'When it happened', 'How it reached the barangay', 'Location', 'Tanod involved (optional)', 'Latitude (optional)', 'Longitude (optional)', 'What happened']) {
+      expect(within(modal).getByLabelText(label)).toBeInTheDocument()
+    }
+    expect(within(modal).getByRole('button', { name: /Use Current Location/i })).toBeInTheDocument()
+    await userEvent.click(within(modal).getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(opener).toHaveFocus()
+    expect(document.body.style.overflow).not.toBe('hidden')
+  })
+
+  it('shows the correct fixed incident identity and only one Close control, with no inline details', async () => {
+    mount({ canAdminister: true })
+    await openDetail()
+    const modal = screen.getByRole('dialog', { name: 'Incident Details' })
+    const header = modal.querySelector('.inc-modal-header')
+    expect(within(header).getByRole('heading', { name: 'Incident Details' })).toBeInTheDocument()
+    expect(within(header).getByText('INC-2026-AB12CD')).toBeInTheDocument()
+    expect(within(header).getByText('Recorded')).toBeInTheDocument()
+    expect(within(header).getByText('Blotter BLT-2026-ZZ99YY')).toBeInTheDocument()
+    expect(within(modal).getAllByRole('button', { name: /close incident details/i })).toHaveLength(1)
+    expect(modal.querySelector('.confirm-dialog-actions')).toBeNull()
+    expect(document.querySelector('.dashboard-card.inc-detail')).toBeNull()
+    expect(modal).toContainElement(document.querySelector('.inc-detail'))
+    expect(within(modal).getByRole('region', { name: 'What happened' })).toHaveTextContent(DETAIL.narrative)
+    expect(within(modal).getByRole('region', { name: 'Blotter Entry' })).toHaveTextContent('Plate number corrected.')
+    const close = within(modal).getByRole('button', { name: 'Close incident details' })
+    const buttons = modal.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])')
+    buttons[buttons.length - 1].focus()
+    await userEvent.tab()
+    expect(close).toHaveFocus()
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'View incident INC-2026-AB12CD' })).toHaveFocus()
+  })
+
+  it('closes recording with Escape and opens another incident with its own identity', async () => {
+    mount()
+    await userEvent.click(screen.getByRole('button', { name: 'Record Incident' }))
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Record Incident' })).toHaveFocus()
+    const original = supabase.rpc.getMockImplementation()
+    supabase.rpc.mockImplementation((fn, args) => fn === 'incident_detail' ? Promise.resolve({ data: [{ ...DETAIL, ...QUEUE.find(row => row.id === args.p_incident_id) }], error: null }) : original(fn, args))
+    await userEvent.click(await screen.findByRole('button', { name: 'View incident INC-2026-QQ77RR' }))
+    const modal = await screen.findByRole('dialog', { name: 'Incident Details' })
+    expect(within(modal.querySelector('.inc-modal-header')).getByText('INC-2026-QQ77RR')).toBeInTheDocument()
+    expect(within(modal.querySelector('.inc-modal-header')).getByText('Resolved')).toBeInTheDocument()
+    await userEvent.click(within(modal).getByRole('button', { name: 'Close incident details' }))
+    expect(screen.getByRole('button', { name: 'View incident INC-2026-QQ77RR' })).toHaveFocus()
+  })
+
+  it('uses one body scrollbar with fixed headers, form-only footer, and stacked fields up to tablet width', () => {
+    const css = fs.readFileSync(path.join(__dirname, 'Incidents.css'), 'utf8')
+    expect(css).toMatch(/inc-modal \.confirm-dialog \{[^}]*max-height: 88vh;[^}]*overflow: hidden/)
+    expect(css).toMatch(/inc-modal-body \{ flex: 1 1 auto; min-height: 0; overflow-y: auto/)
+    expect(css).toMatch(/inc-modal-header \{ position: relative; flex: 0 0 auto/)
+    expect(css).toMatch(/@media\(max-width: 768px\)[\s\S]*inc-modal \.inc-grid, \.inc-modal \.kp-summary \{ grid-template-columns: minmax\(0,1fr\)/)
+  })
+})
+
+
+describe('incident records pagination', () => {
+  const records = Array.from({ length: 41 }, (_, index) => ({
+    ...QUEUE[0], id: `page-${index}`, reference: `INC-PAGE-${index + 1}`,
+    incident_type: index >= 28 ? 'threat' : 'traffic_accident',
+    occurred_at: new Date(Date.UTC(2026, 8, index + 1)).toISOString(),
+    has_coordinates: index !== 40,
+  }))
+  const installPages = (data = records) => {
+    const original = supabase.rpc.getMockImplementation()
+    supabase.rpc.mockImplementation((fn, args) => {
+      if (fn !== 'incident_queue') return original(fn, args)
+      const filtered = data.filter(row => (!args.p_type || row.incident_type === args.p_type)
+        && (!args.p_from || row.occurred_at.slice(0, 10) >= args.p_from)
+        && (!args.p_to || row.occurred_at.slice(0, 10) <= args.p_to))
+      return Promise.resolve({ data: filtered, error: null })
+    })
+  }
+  const rowCount = () => within(screen.getByRole('table')).getAllByRole('row').length - 1
+
+  it('shows ten rows, preserves order, navigates both ways, and shows one row on the final page', async () => {
+    installPages()
+    mount()
+    expect(await screen.findByText('41 incidents \u00b7 Showing 1\u201310')).toBeInTheDocument()
+    expect(rowCount()).toBe(10)
+    const columns = screen.getByRole('table').querySelector('colgroup').outerHTML
+    expect(screen.getByRole('table').querySelectorAll('col')).toHaveLength(7)
+    expect(screen.getByText('Page 1 of 5')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Previous page' })).toBeDisabled()
+    expect(screen.getByText('INC-PAGE-1')).toBeInTheDocument()
+    expect(screen.queryByText('INC-PAGE-11')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Next page' }))
+    expect(screen.getByText('41 incidents \u00b7 Showing 11\u201320')).toBeInTheDocument()
+    expect(screen.getByText('INC-PAGE-11')).toBeInTheDocument()
+    expect(screen.getByRole('table').querySelector('colgroup').outerHTML).toBe(columns)
+    await userEvent.click(screen.getByRole('button', { name: 'Previous page' }))
+    expect(screen.getByText('Page 1 of 5')).toBeInTheDocument()
+    for (let i = 0; i < 4; i++) await userEvent.click(screen.getByRole('button', { name: 'Next page' }))
+    expect(screen.getByText('41 incidents \u00b7 Showing 41\u201341')).toBeInTheDocument()
+    expect(rowCount()).toBe(1)
+    expect(screen.getByText('INC-PAGE-41')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Next page' })).toBeDisabled()
+    expect(screen.getByText('1 incident has no coordinates and does not appear on the map.')).toBeInTheDocument()
+  })
+
+  it('paginates the filtered results and resets to page one for each type/date filter change', async () => {
+    installPages()
+    mount()
+    await screen.findByText('Page 1 of 5')
+    await userEvent.click(screen.getByRole('button', { name: 'Next page' }))
+    await userEvent.selectOptions(screen.getByLabelText('Filter by incident type'), 'threat')
+    expect(await screen.findByText('13 incidents \u00b7 Showing 1\u201310')).toBeInTheDocument()
+    expect(screen.getByText('Page 1 of 2')).toBeInTheDocument()
+    expect(screen.getByText('INC-PAGE-29')).toBeInTheDocument()
+    expect(rowCount()).toBe(10)
+    await userEvent.click(screen.getByRole('button', { name: 'Next page' }))
+    expect(rowCount()).toBe(3)
+    expect(screen.getByText('13 incidents \u00b7 Showing 11\u201313')).toBeInTheDocument()
+    await userEvent.type(screen.getByLabelText('Incidents from'), '2026-10-01')
+    expect(await screen.findByText('11 incidents \u00b7 Showing 1\u201310')).toBeInTheDocument()
+    expect(screen.getByText('Page 1 of 2')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Next page' }))
+    await userEvent.type(screen.getByLabelText('Incidents up to'), '2026-10-05')
+    expect(await screen.findByText('5 incidents \u00b7 Showing 1\u20135')).toBeInTheDocument()
+    expect(rowCount()).toBe(5)
+    expect(screen.queryByRole('navigation', { name: 'Incident records pagination' })).not.toBeInTheDocument()
+    await userEvent.clear(screen.getByLabelText('Incidents up to'))
+    await userEvent.type(screen.getByLabelText('Incidents up to'), '2026-09-01')
+    expect(await screen.findByText('No incidents match this filter.')).toBeInTheDocument()
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Incident records pagination' })).not.toBeInTheDocument()
+  })
+
+  it('uses singular incident wording and plural coordinate wording without counting only the visible page', async () => {
+    installPages([{ ...records[0], has_coordinates: false }])
+    const { unmount } = mount()
+    expect(await screen.findByText('1 incident \u00b7 Showing 1\u20131')).toBeInTheDocument()
+    expect(screen.getByText('1 incident has no coordinates and does not appear on the map.')).toBeInTheDocument()
+    unmount()
+    installPages(records.map(row => ({ ...row, has_coordinates: false })))
+    mount()
+    expect(await screen.findByText('41 incidents have no coordinates and do not appear on the map.')).toBeInTheDocument()
+    expect(rowCount()).toBe(10)
+  })
+})
+
+
+test('incident table fixes desktop column widths and wrapping while preserving mobile cards', () => {
+  const css = fs.readFileSync(path.join(__dirname, 'Incidents.css'), 'utf8')
+  const desktop = css.slice(css.indexOf('/* Column sizing depends'))
+  expect(desktop).toMatch(/@media\(min-width: 769px\)[\s\S]*table-layout: fixed/)
+  for (const column of ['reference', 'type', 'when', 'status', 'blotter', 'action']) {
+    expect(desktop).toContain(`.inc-col-${column}`)
+  }
+  expect(desktop).toMatch(/white-space: nowrap; overflow-wrap: normal; word-break: normal/)
+  expect(desktop).toMatch(/data-label="Type"[\s\S]*data-label="Location"[\s\S]*white-space: normal/)
+  expect(desktop).toMatch(/@media\(max-width: 768px\)[\s\S]*colgroup \{ display: none/)
+  expect(desktop).not.toMatch(/text-overflow:\s*ellipsis/)
 })

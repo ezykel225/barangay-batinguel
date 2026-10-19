@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { FaPlus, FaTrash, FaPaperclip, FaInfoCircle } from 'react-icons/fa'
 
 import {
@@ -53,7 +53,7 @@ const blankRespondent = () => ({
   addressNote: '',
 })
 
-const WalkInComplaintForm = ({ onEncoded, onCancel }) => {
+const WalkInComplaintForm = ({ onEncoded, onCancel, onBusyChange }) => {
   const [complainantName, setComplainantName] = useState('')
   const [complainantContact, setComplainantContact] = useState('')
   const [category, setCategory] = useState('')
@@ -65,6 +65,8 @@ const WalkInComplaintForm = ({ onEncoded, onCancel }) => {
   const [problem, setProblem] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const fileInputRef = useRef(null)
+
+  useEffect(() => { onBusyChange?.(submitting) }, [submitting, onBusyChange])
 
   const addRespondent = () => setRespondents((list) => [...list, blankRespondent()])
 
@@ -147,6 +149,7 @@ const WalkInComplaintForm = ({ onEncoded, onCancel }) => {
 
   return (
     <form className="complaint-form" onSubmit={handleSubmit} noValidate>
+      <div className="walkin-form-body">
       {/* ⚠️ WHAT THE CONTACT NUMBER ACTUALLY UNLOCKS, stated because the
           consequence is invisible otherwise and permanent.
           `encode_walk_in_complaint()` accepts a blank contact
@@ -222,6 +225,8 @@ const WalkInComplaintForm = ({ onEncoded, onCancel }) => {
         </div>
       </fieldset>
 
+      <fieldset className="complaint-fieldset">
+        <legend>Complaint Details</legend>
       <div className="modal-form-group">
         <label htmlFor="walkin-category" className="modal-form-label">
           What is this complaint about? <span aria-hidden="true">*</span>
@@ -290,6 +295,7 @@ const WalkInComplaintForm = ({ onEncoded, onCancel }) => {
         </p>
       </div>
 
+      </fieldset>
       <fieldset className="complaint-fieldset">
         <legend>Person or people complained about (optional)</legend>
         <p className="field-note">
@@ -413,6 +419,7 @@ const WalkInComplaintForm = ({ onEncoded, onCancel }) => {
 
       {problem && <p className="complaint-field-error" role="alert">{problem}</p>}
 
+      </div>
       <div className="modal-actions">
         <button type="button" className="btn-cancel" onClick={onCancel} disabled={submitting}>
           Cancel
