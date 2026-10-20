@@ -1,3 +1,4 @@
+import IncidentLocationPicker from './IncidentLocationPicker'
 import OfficialTanodNotes from '../tanod/OfficialTanodNotes'
 import DeviceLocation from './DeviceLocation'
 import { DialogShell } from '../components/OfficialArchiveDialog'
@@ -17,7 +18,7 @@ import {
 } from './incidentLabels'
 import {
   amendBlotterEntry, attributeIncidentTanod, incidentMessage, loadBlotterHistory,
-  loadIncidentDetail, loadIncidentQueue, loadIncidentTanod, recordIncident, setIncidentStatus,
+  loadIncidentDetail, loadIncidentQueue, loadIncidentTanod, recordIncident, setIncidentStatus, setIncidentMapLocation,
 } from './incidentApi'
 import { loadTanodRoster } from '../tanod/tanodApi'
 import './Incidents.css'
@@ -77,6 +78,16 @@ const IncidentsPanel = ({ canAdminister = false, confirm }) => {
   const [history, setHistory] = useState([])
   const [attending, setAttending] = useState([])
   const [amendNote, setAmendNote] = useState('')
+  const [editingLocation, setEditingLocation] = useState(false)
+  const [locationFeedback, setLocationFeedback] = useState('')
+  const locationActionRef = useRef(null)
+  const returnLocationFocus = useRef(false)
+  useEffect(() => {
+    if (!editingLocation && !busy && returnLocationFocus.current) {
+      returnLocationFocus.current = false
+      locationActionRef.current?.focus()
+    }
+  }, [editingLocation, busy])
 
   // ⚠️ A REF, NOT THE `busy` STATE. React batches `setBusy`, so a guard read
   // from the render closure lets two submits in one tick both run -- which is
@@ -139,6 +150,19 @@ const IncidentsPanel = ({ canAdminister = false, confirm }) => {
     } catch (err) {
       setProblem(incidentMessage(err, 'loadFailed'))
     }
+  }
+
+  const closeLocationEditor = () => {
+    setEditingLocation(false)
+    returnLocationFocus.current = true
+  }
+  const saveLocation = async (coordinates) => {
+    await run('location', async () => {
+      await setIncidentMapLocation({ incidentId: detail.id, ...coordinates })
+      closeLocationEditor()
+      setLocationFeedback('Map location saved. Safety Map will use it on its next refresh.')
+      await Promise.all([fetchAll(), openDetail(detail.id)])
+    }, 'mapLocationFailed')
   }
 
   const handleRecord = async (event) => {
@@ -209,11 +233,14 @@ const IncidentsPanel = ({ canAdminister = false, confirm }) => {
   const visibleRows = rows.slice(pageStart, pageStart + INCIDENTS_PER_PAGE)
   const withoutCoordinates = rows.filter((row) => !row.has_coordinates).length
 
+  const hasFilters = Boolean(filterType || filterFrom || filterTo)
+  const clearFilters = () => { setFilterType(''); setFilterFrom(''); setFilterTo(''); setPage(1) }
+
   return (
-    <div>
+    <div className="inc-page">
       <div className="official-dashboard-header">
         <h1>Incidents &amp; Blotter</h1>
-        <p>Record what happened, and keep the barangay&rsquo;s internal blotter.</p>
+        <p>Review recorded incidents and their linked barangay blotter records.</p>
       </div>
 
       {problem && !showForm && !detail && (
@@ -222,7 +249,10 @@ const IncidentsPanel = ({ canAdminister = false, confirm }) => {
         </p>
       )}
 
-      <div className="dashboard-card">
+      {!loading && !problem && <section className="inc-overview" aria-label="Current incident results">
+        {[[hasFilters ? 'Matching incidents' : 'Total incidents', rows.length], ['Mapped incidents', rows.length - withoutCoordinates], ['Without coordinates', withoutCoordinates], ['Linked blotter records', rows.filter(row => row.blotter_reference).length]].map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}
+      </section>}
+      <div className="dashboard-card inc-records-card">
         <div className="dashboard-card-header">
           <h2 className="section-heading"><FaClipboardList aria-hidden="true" /> Incident records</h2>
           <button
@@ -234,13 +264,14 @@ const IncidentsPanel = ({ canAdminister = false, confirm }) => {
           >
             <FaPlus aria-hidden="true" /> Record Incident
           </button>
+
         </div>
 
         <div className="resident-filter-bar inc-filters">
           <div className="filter-select-wrap">
-            <label className="visually-hidden" htmlFor="inc-filter-type">Filter by incident type</label>
+            <label htmlFor="inc-filter-type">Incident type</label>
             <select
-              id="inc-filter-type" className="filter-select" value={filterType}
+              aria-label="Filter by incident type" id="inc-filter-type" className="filter-select" value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
             >
               <option value="">All types</option>
@@ -250,15 +281,17 @@ const IncidentsPanel = ({ canAdminister = false, confirm }) => {
             </select>
           </div>
           <div className="filter-select-wrap">
-            <label className="visually-hidden" htmlFor="inc-filter-from">Incidents from</label>
-            <input id="inc-filter-from" className="filter-select" type="date" value={filterFrom}
+            <label htmlFor="inc-filter-from">From</label>
+            <input aria-label="Incidents from" id="inc-filter-from" className="filter-select" type="date" value={filterFrom}
               onChange={(e) => setFilterFrom(e.target.value)} />
           </div>
           <div className="filter-select-wrap">
-            <label className="visually-hidden" htmlFor="inc-filter-to">Incidents up to</label>
-            <input id="inc-filter-to" className="filter-select" type="date" value={filterTo}
+            <label htmlFor="inc-filter-to">To</label>
+            <input aria-label="Incidents up to" id="inc-filter-to" className="filter-select" type="date" value={filterTo}
               onChange={(e) => setFilterTo(e.target.value)} />
           </div>
+          {hasFilters && <button type="button" className="btn-cancel inc-clear" onClick={clearFilters}>Clear filters</button>}
+
         </div>
 
         {loading ? (
@@ -266,16 +299,16 @@ const IncidentsPanel = ({ canAdminister = false, confirm }) => {
         ) : rows.length === 0 ? (
           <p className="complaint-empty">
             {filterType || filterFrom || filterTo
-              ? 'No incidents match this filter.'
-              : 'No incidents recorded yet.'}
+              ? 'No incidents match the current filters.'
+              : 'No incident records have been created yet.'}
           </p>
         ) : (
           <>
             <p className="inc-summary" aria-live="polite">
-              {rows.length} {rows.length === 1 ? 'incident' : 'incidents'} &middot; Showing {pageStart + 1}&ndash;{Math.min(pageStart + INCIDENTS_PER_PAGE, rows.length)}
+              Showing {pageStart + 1}&ndash;{Math.min(pageStart + INCIDENTS_PER_PAGE, rows.length)} of {rows.length} {hasFilters ? 'matching ' : ''}{rows.length === 1 ? 'incident' : 'incidents'}
             </p>
-            {withoutCoordinates > 0 && <p className="inc-summary">
-              {withoutCoordinates} {withoutCoordinates === 1 ? 'incident has' : 'incidents have'} no coordinates and {withoutCoordinates === 1 ? 'does' : 'do'} not appear on the map.
+            {withoutCoordinates > 0 && <p className="inc-coordinate-note"><FaInfoCircle aria-hidden="true" /><span>
+              {withoutCoordinates} {withoutCoordinates === 1 ? 'incident has' : 'incidents have'} no coordinates and {withoutCoordinates === 1 ? 'does' : 'do'} not appear on the map.</span>
             </p>}
             <div className="table-wrapper">
               <table className="dashboard-table inc-records-table">
@@ -286,25 +319,22 @@ const IncidentsPanel = ({ canAdminister = false, confirm }) => {
                   <col className="inc-col-location" />
                   <col className="inc-col-status" />
                   <col className="inc-col-blotter" />
-                  <col className="inc-col-action" />
                 </colgroup>
                 <thead>
                   <tr>
                     <th>Reference</th><th>Type</th><th>When</th>
-                    <th>Location</th><th>Status</th><th>Blotter</th><th>Action</th>
+                    <th>Location</th><th>Status</th><th>Blotter</th>
                   </tr>
                 </thead>
                 <tbody>
                   {visibleRows.map((row) => (
                     <tr key={row.id}>
-                      <td data-label="Reference"><span className="complaint-reference">{row.reference}</span></td>
+                      <td data-label="Reference"><button type="button" className="inc-reference" onClick={() => { setEditingLocation(false); setLocationFeedback(''); openDetail(row.id) }} aria-label={`View incident ${row.reference}`}>{row.reference}</button></td>
                       <td data-label="Type">{incidentTypeLabel(row.incident_type)}</td>
                       <td data-label="When">{incidentDateTime(row.occurred_at)}</td>
                       <td data-label="Location">
                         {row.location_text}
-                        {row.has_coordinates && (
-                          <> <FaMapMarkerAlt aria-label="Has coordinates" className="inc-pin" /></>
-                        )}
+                        <span className="inc-location-state">{row.has_coordinates ? <><FaMapMarkerAlt aria-hidden="true" /> Mapped location</> : 'No map coordinates'}</span>
                       </td>
                       <td data-label="Status">
                         <span className={`kp-badge kp-badge-${row.status}`}>
@@ -312,17 +342,9 @@ const IncidentsPanel = ({ canAdminister = false, confirm }) => {
                         </span>
                       </td>
                       <td data-label="Blotter">
-                        <span className="complaint-reference">{row.blotter_reference || 'Not recorded'}</span>
+                        <span className="inc-blotter">{row.blotter_reference ? <><span>Linked</span><strong>{row.blotter_reference}</strong></> : 'Not recorded'}</span>
                       </td>
-                      <td data-label="Action">
-                        <button
-                          type="button" className="btn-add btn-sm"
-                          onClick={() => openDetail(row.id)}
-                          aria-label={`View incident ${row.reference}`}
-                        >
-                          View
-                        </button>
-                      </td>
+
                     </tr>
                   ))}
                 </tbody>
@@ -488,18 +510,8 @@ const IncidentsPanel = ({ canAdminister = false, confirm }) => {
           <dl className="kp-summary">
             <div><dt>Type</dt><dd>{incidentTypeLabel(detail.incident_type)}</dd></div>
             <div><dt>When</dt><dd>{incidentDateTime(detail.occurred_at)}</dd></div>
-            <div><dt>Location</dt><dd>{detail.location_text}</dd></div>
-            <div><dt>Area note</dt><dd>{detail.area_note || 'None recorded'}</dd></div>
             <div><dt>How it reached us</dt><dd>{incidentSourceLabel(detail.source)}</dd></div>
             <div><dt>Recorded by</dt><dd>{detail.recorded_by_name || 'Not recorded'}</dd></div>
-            <div>
-              <dt>Coordinates</dt>
-              <dd>
-                {detail.latitude !== null && detail.latitude !== undefined
-                  ? `${detail.latitude}, ${detail.longitude}`
-                  : 'None recorded — not shown on the map'}
-              </dd>
-            </div>
             <div>
               <dt>Status</dt>
               <dd>
@@ -511,6 +523,19 @@ const IncidentsPanel = ({ canAdminister = false, confirm }) => {
             </div>
           </dl>
 
+          </section>
+          <section className="inc-section" aria-label="Location"><h3>Location</h3>
+            <p className="inc-location-description">{detail.location_text}</p>
+            <p className="field-note">{detail.latitude !== null && detail.latitude !== undefined ? 'Map location recorded' : 'No map location has been set for this incident.'}</p>
+            <dl className="kp-summary">
+              <div><dt>Area note</dt><dd>{detail.area_note || 'None recorded'}</dd></div>
+              <div><dt>Coordinates</dt><dd>{detail.latitude !== null && detail.latitude !== undefined ? `${detail.latitude}, ${detail.longitude}` : 'None recorded - not shown on the map'}</dd></div>
+            </dl>
+            {locationFeedback && <p role="status" className="inc-location-feedback">{locationFeedback}</p>}
+            {canAdminister && <>
+              {!editingLocation && <button type="button" className="btn-add inc-location-action" ref={locationActionRef} disabled={Boolean(busy)} onClick={() => { setEditingLocation(true); setLocationFeedback('') }}>{detail.latitude !== null && detail.latitude !== undefined ? 'Edit map location' : 'Add map location'}</button>}
+              {editingLocation && <IncidentLocationPicker key={detail.id} latitude={detail.latitude} longitude={detail.longitude} busy={Boolean(busy)} onSave={saveLocation} onCancel={closeLocationEditor} />}
+            </>}
           </section>
           <section className="inc-section" aria-label="What happened"><h3>What happened</h3>
           <p className="inc-narrative">{detail.narrative}</p></section>

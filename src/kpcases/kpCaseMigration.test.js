@@ -82,7 +82,7 @@ describe('A. the migration', () => {
   // this file. After Tanod editing (047), type ties (048), and public type buckets (049), case support continues in 050-051.
   it('is still 043, still in place, with only the expected later migrations', () => {
     const files = fs.readdirSync(DIR).filter((f) => f.endsWith('.sql')).sort()
-    expect(files).toHaveLength(56)
+    expect(files).toHaveLength(57)
     expect(files[42]).toBe('043_kp_case_hearings_summons.sql')
     expect(files[43]).toBe('044_incident_blotter_tanod.sql')
     expect(files[44]).toBe('045_public_safety_aggregates.sql')
@@ -97,7 +97,8 @@ describe('A. the migration', () => {
     expect(files[53]).toBe('054_barangay_resident_directory.sql')
     expect(files[54]).toBe('055_verified_resident_directory_sync.sql')
     expect(files[55]).toBe('056_resident_eligibility.sql')
-    expect(files.some((f) => f.startsWith('057'))).toBe(false)
+    expect(files[56]).toBe('057_incident_map_location.sql')
+    expect(files.some((f) => f.startsWith('058'))).toBe(false)
   })
 
   it('leaves 001-042 alone', () => {

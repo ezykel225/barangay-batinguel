@@ -109,3 +109,16 @@ export const attributeIncidentTanod = async ({ incidentId, tanodId, role, note }
   })
   if (error) { logFailure('Attribute incident Tanod', error); throw incidentError(error, 'tanodFailed') }
 }
+
+export const setIncidentMapLocation = async ({ incidentId, latitude, longitude }) => {
+  const lat = latitude === null || String(latitude ?? '').trim() === '' ? NaN : Number(latitude)
+  const lng = longitude === null || String(longitude ?? '').trim() === '' ? NaN : Number(longitude)
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+    throw incidentError(null, 'mapLocationInvalid')
+  }
+  const { data, error } = await supabase.rpc('set_incident_map_location', {
+    p_incident_id: incidentId, p_latitude: lat, p_longitude: lng,
+  })
+  if (error) { logFailure('Save incident map location', error); throw incidentError(error, 'mapLocationFailed') }
+  return (data || [])[0] || null
+}
