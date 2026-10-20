@@ -7,7 +7,6 @@ import {
   FaClipboardList,
   FaUsers,
   FaUserFriends,
-  FaAddressBook,
   FaChartBar,
   FaHistory,
   FaFileAlt,
@@ -274,12 +273,6 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderActio
     // and PUNONG_BARANGAY_LABEL still supplies the wording there.
     { id: 'officials', label: 'Officials Directory', icon: <FaUsers /> },
     { id: 'residents', label: 'Residents', icon: <FaUserFriends /> },
-    // Voter Reference List, not "Residents Registry": the table holds the
-    // voter records the barangay has available, not a complete list of who
-    // lives here, and the city may supply a broader dataset later. The tab
-    // id stays 'registry' -- it is the switch value the dashboard matches
-    // on, not something anybody reads.
-    { id: 'registry', label: 'Voter Reference List', icon: <FaAddressBook /> },
     { id: 'reports', label: 'Reports', icon: <FaChartBar /> },
     { id: 'activity', label: 'Activity Log', icon: <FaHistory /> },
     { id: 'settings', label: 'Settings', icon: <FaCog /> },

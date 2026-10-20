@@ -156,6 +156,7 @@ export const ACTIVITY_ENTITY_LABELS = {
   event: 'Event',
   waste_schedule: 'Waste schedule',
   registry_entry: 'Voter reference entry',
+  barangay_resident: 'Barangay resident',
   medicine: 'Medicine',
   health_event: 'Health event',
   medical_program: 'Medical program',

@@ -104,7 +104,7 @@ beforeEach(() => {
 // component's own arrays has to be made here too deliberately.
 const OFFICIAL_ONLY = [
   'Announcements', 'Waste Management', 'Officials Directory',
-  'Residents', 'Voter Reference List', 'Reports', 'Activity Log',
+  'Residents', 'Reports', 'Activity Log',
 ]
 const NURSE_ONLY = ['Medicines', 'Availability', 'Health Events']
 // ⚠️ 'Complaints' LEFT THIS LIST IN P3-B2, and it was removed rather
@@ -147,14 +147,14 @@ describe('A. role="official"', () => {
   // ⚠️ A DEFINITION CHANGE, NOT A LOOSENED ASSERTION: the guard still
   // compares the WHOLE list by equality, so a fourteenth surface added
   // without a decision still fails here.
-  it('renders the sixteen Official destinations', () => {
+  it('renders the fifteen Official destinations', () => {
     const { container } = renderSidebar('official')
     expect(navItems(container)).toEqual([
       'Dashboard', 'Announcements', 'Events', 'Reservations',
       'Document Requests', 'Complaints',
       'Incidents & Blotter', 'Tanod Operations', 'Safety Map & Analytics',
       'Waste Management',
-      'Officials Directory', 'Residents', 'Voter Reference List',
+      'Officials Directory', 'Residents',
       'Reports', 'Activity Log', 'Settings',
     ])
   })
@@ -342,8 +342,9 @@ describe('the mobile drawer', () => {
   it('offers the Official destinations to an official', async () => {
     const { container } = renderSidebar('official')
     await openDrawer()
-    expect(drawerItems(container)).toHaveLength(16)
+    expect(drawerItems(container)).toHaveLength(15)
     expect(drawerItems(container)).toContain('Officials Directory')
+    expect(drawerItems(container)).not.toContain('Voter Reference List')
     // The drawer is the WHOLE of navigation on a phone, so a tab that
     // reaches the rail and not the drawer is unreachable there.
     expect(drawerItems(container)).toContain('Complaints')

@@ -118,9 +118,9 @@ const body = (name) => {
   return sql(match[0])
 }
 describe('Tanod static authorization contracts (not live role impersonation)', () => {
-  test('052/053 are next, ordered and explicitly depend on the existing model', () => {
+  test('052/053 retain their order and dependencies before the directory foundation', () => {
     const files = fs.readdirSync(path.join(__dirname,'../../supabase-migrations')).filter((f) => /^\d{3}_/.test(f)).sort()
-    expect(files.slice(-2)).toEqual(['052_tanod_accounts_and_duty.sql','053_tanod_incident_access.sql'])
+    expect(files.slice(51,54)).toEqual(['052_tanod_accounts_and_duty.sql','053_tanod_incident_access.sql','054_barangay_resident_directory.sql'])
     expect(accounts).toMatch(/begin;[\s\S]*?do \$prerequisites\$/)
     expect(access).toContain("to_regprocedure('public.require_tanod_member_id()')")
     expect(access).toContain('raise exception \'053 requires 052')

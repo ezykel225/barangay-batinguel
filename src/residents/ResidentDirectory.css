@@ -1,0 +1,55 @@
+.resident-directory { padding: 20px; min-width: 0; }
+.directory-heading,.directory-list li { display:flex; justify-content:space-between; align-items:center; gap:16px; }
+.directory-heading h2 { margin:0; font-size:22px; font-weight:700; }
+.directory-heading p,.directory-list p,.directory-note { color:#64748b; font-size:14px; margin:8px 0; }
+.directory-filters,.directory-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin:20px 0; }
+.directory-filters { grid-template-columns:2fr 1fr 1fr; }
+.resident-directory label { display:flex; flex-direction:column; gap:8px; font-weight:600; min-width:0; }
+.resident-directory :is(input,select) { width:100%; min-width:0; box-sizing:border-box; border:1px solid #cbd5e1; border-radius:8px; padding:10px; font:inherit; }
+.directory-list { padding:0; list-style:none; }
+.directory-list li { border-bottom:1px solid #e2e8f0; padding:16px 0; overflow-wrap:anywhere; }
+.directory-actions { display:flex; gap:12px; flex-wrap:wrap; justify-content:flex-end; }
+.directory-dialog .confirm-dialog { max-width:680px; padding:0; max-height:88vh; display:flex; flex-direction:column; overflow:hidden; }
+.directory-modal-header { display:flex; justify-content:space-between; align-items:center; padding:20px; background:#f4f8ff; border-bottom:1px solid #dbeafe; gap:12px; }
+.directory-modal-header h2 { margin:0; font-size:24px; font-weight:700; }
+.directory-modal-header button { min-width:44px; min-height:44px; }
+.directory-form { padding:20px; overflow-y:auto; min-height:0; }
+.directory-form .directory-fields { margin-top:0; }
+.resident-directory :is(button,input,select):focus-visible { outline:3px solid #2563eb; outline-offset:3px; }
+@media(max-width:768px) { .directory-filters,.directory-fields { grid-template-columns:minmax(0,1fr); } .directory-heading { align-items:flex-start; flex-direction:column; } .directory-list li { flex-wrap:wrap; } .directory-dialog .confirm-overlay { padding:12px; } }
+
+.residents-view-switch { display:flex; flex-wrap:wrap; gap:6px; padding:6px; background:#edf3fc; border-radius:10px; margin-bottom:18px; }
+.residents-view-switch button { flex:1; min-height:44px; padding:10px 14px; border:0; border-radius:7px; color:#334155; font:inherit; font-weight:600; background:transparent; cursor:pointer; }
+.residents-view-switch button[aria-pressed="true"] { background:#fff; color:#1e3a8a; box-shadow:0 1px 4px #0f172a1a; }
+.residents-workspace [hidden] { display:none !important; }
+.residents-workspace h2 { font-size:22px; font-weight:700; color:#1e3a8a; }
+.directory-summary { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin:18px 0; }
+.directory-summary > div { min-width:0; padding:14px; border:1px solid #e2e8f0; background:#f8fafc; border-radius:8px; }
+.directory-summary dt { font-size:12px; color:#64748b; }
+.directory-summary dd { margin:6px 0 0; color:#1e3a8a; font-size:24px; font-weight:700; }
+.directory-reset { border:0; background:none; color:#1d4ed8; justify-self:start; cursor:pointer; padding:4px; font:inherit; }
+.directory-table { table-layout:fixed; width:100%; border-collapse:collapse; font-size:14px; }
+.directory-table th { text-align:left; background:#f8fafc; font-size:12px; color:#64748b; }
+.directory-table :is(th,td) { padding:14px 10px; border-bottom:1px solid #e2e8f0; overflow-wrap:anywhere; vertical-align:middle; }
+.directory-table th:first-child { width:25%; }.directory-table th:last-child { width:180px; }
+.directory-table .directory-actions { gap:8px; flex-wrap:nowrap; }
+.directory-table .directory-actions button { padding:8px 12px; }
+.directory-table tbody tr:hover { background:#f8fbff; }
+.resident-reference-note { padding:12px 16px; background:#eff6ff; border-left:3px solid #3b82f6; color:#334155; font-size:14px; margin:14px 0; }
+@media(max-width:900px) { .directory-table thead { display:none; }.directory-table,.directory-table tbody { display:block; }.directory-table tr { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); padding:12px 0; border-bottom:1px solid #e2e8f0; gap:10px; }.directory-table td { border:0; display:block; padding:0; }.directory-table td::before { content:attr(data-label); display:block; color:#64748b; font-size:12px; margin-bottom:5px; }.directory-table td:first-child,.directory-table td:last-child { grid-column:1/-1; }.directory-table .directory-actions { justify-content:flex-start; }.directory-summary { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:480px) { .residents-view-switch { flex-direction:column; }.resident-directory { padding:16px; }.directory-summary { gap:8px; }.directory-summary > div { padding:10px; } }
+
+.residents-workspace .resident-filter-bar :is(input,select) { min-height:44px; }
+.residents-view-switch button:focus-visible { outline:3px solid #2563eb; outline-offset:2px; }
+.resident-name-button { border:0; background:transparent; padding:4px 0; text-align:left; color:#1e3a8a; font:inherit; font-weight:700; cursor:pointer; overflow-wrap:anywhere; }
+.resident-name-button:hover { color:#2563eb; text-decoration:underline; }
+.directory-table th:last-child { width:70px; }
+.directory-filters.has-filters { grid-template-columns: minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) auto; align-items:end; }
+.directory-filters .directory-reset { justify-self:end; min-height:44px; padding:8px; white-space:nowrap; font-size:13px; }
+.resident-profile-heading { display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+.resident-directory .resident-profile-heading h3 { margin:0 0 8px; font-size:22px; color:#1e3a8a; font-weight:700; }
+.resident-profile-heading > button { margin-left:auto; }
+.resident-profile-avatar { flex:0 0 72px; width:72px; height:72px; border-radius:50%; background:#dbeafe; color:#1e3a8a; display:flex; align-items:center; justify-content:center; font-size:26px; font-weight:800; overflow:hidden; }
+.resident-profile-avatar img { width:100%; height:100%; object-fit:cover; }
+@media(max-width:768px) { .directory-filters.has-filters { grid-template-columns:minmax(0,1fr); }.directory-filters .directory-reset { justify-self:start; }.resident-profile-heading > button { margin-left:0; } }
+@media(max-width:480px) { .residents-view-switch { flex-wrap:nowrap; flex-direction:row; }.residents-view-switch button { min-width:0; padding:8px 4px; font-size:12px; } }
