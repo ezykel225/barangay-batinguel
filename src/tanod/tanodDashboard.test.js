@@ -30,11 +30,11 @@ beforeEach(() => {
 })
 afterEach(() => { jest.useRealTimers() })
 const show = () => render(<MemoryRouter><TanodDashboard /></MemoryRouter>)
-const ready = async () => { await screen.findByRole('heading', { name: 'Good evening, Sample Tanod' }) }
-test('shows four focused navigation choices and never infers attendance from a schedule', async () => {
+const ready = async () => { await screen.findByRole('heading', { name: 'Good evening, Sample T.' }) }
+test('shows five focused navigation choices and never infers attendance from a schedule', async () => {
   show(); await ready()
   const nav = screen.getByRole('navigation', { name: 'Tanod dashboard' })
-  expect(within(nav).getAllByRole('button')).toHaveLength(4)
+  expect(within(nav).getAllByRole('button')).toHaveLength(5)
   expect(screen.getAllByText('Scheduled').length).toBeGreaterThan(0)
   expect(screen.queryByText('Currently on duty')).toBeNull()
   expect(screen.getByText('2 reports submitted today')).toBeInTheDocument()
@@ -333,11 +333,40 @@ test('public duty renders only approved fields and never upgrades scheduled to c
   expect(container).not.toHaveTextContent(/SECRET|9.123456/)
   expect(api.loadPublicTanodDuty).toHaveBeenCalledWith()
 })
-test('public reader distinguishes recorded on-duty status from upcoming scheduled shifts', async () => {
+test('public reader shows checked-in current duty as On Duty', async () => {
   api.loadPublicTanodDuty.mockResolvedValue([{ display_name: 'Checked-in Tanod', general_area: 'Area', shift_start: shift.shift_start, shift_end: shift.shift_end, duty_state: 'currently_on_duty' }])
   render(<PublicTanodDuty />)
-  expect(await screen.findByText('Currently on duty')).toBeInTheDocument()
+  expect(await screen.findByText('On Duty')).toBeInTheDocument()
 })
+
+test('public reader includes overnight Manila shift only until its exclusive end', async () => {
+  jest.setSystemTime(new Date('2026-10-20T01:00:00+08:00'))
+  const overnight = { display_name: 'Overnight member', shift_start: '2026-10-19T22:00:00+08:00', shift_end: '2026-10-20T06:00:00+08:00', duty_state: 'scheduled' }
+  api.loadPublicTanodDuty.mockResolvedValue([overnight, { ...overnight, display_name: 'Future member', shift_start: '2026-10-20T06:00:00+08:00', shift_end: '2026-10-20T14:00:00+08:00' }])
+  render(<PublicTanodDuty />)
+  expect(await screen.findByText('Overnight member')).toBeInTheDocument()
+  expect(screen.queryByText('Future member')).toBeNull()
+  jest.setSystemTime(new Date('2026-10-20T06:00:00+08:00'))
+  api.loadPublicTanodDuty.mockResolvedValue([overnight])
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh duty status' }))
+  expect(await screen.findByText('No Tanods are assigned to the current shift.')).toBeInTheDocument()
+  expect(screen.queryByText('Overnight member')).toBeNull()
+})
+
+test('public reader includes exact start and excludes expired, future and invalid windows', async () => {
+  api.loadPublicTanodDuty.mockResolvedValue([
+    { display_name: 'Starting now', shift_start: '2026-10-19T19:00:00+08:00', shift_end: '2026-10-19T22:00:00+08:00', duty_state: 'scheduled' },
+    { display_name: 'Expired', shift_start: '2026-10-19T06:00:00+08:00', shift_end: '2026-10-19T14:00:00+08:00', duty_state: 'currently_on_duty' },
+    { display_name: 'Tomorrow', shift_start: '2026-10-20T06:00:00+08:00', shift_end: '2026-10-20T14:00:00+08:00', duty_state: 'scheduled' },
+    { display_name: 'Unknown time', shift_start: null, shift_end: null, duty_state: 'scheduled' },
+  ])
+  render(<PublicTanodDuty />)
+  expect(await screen.findByText('Starting now')).toBeInTheDocument()
+  expect(screen.queryByText(/Expired|Tomorrow|Unknown time/)).toBeNull()
+  expect(screen.getByText('Scheduled')).toBeInTheDocument()
+  expect(screen.queryByText('On Duty')).toBeNull()
+})
+
 test('account linking selects existing stable IDs without creating Auth users or changing roles', async () => {
   render(<TanodAccounts roster={[{ id: 'member', full_name: 'Roster person', active: true }]} />)
   await screen.findByText('Not linked')
@@ -388,4 +417,43 @@ test.each([
   api.loadMyDuty.mockResolvedValue([{ ...shift, shift_start: '2026-10-19T' + start + ':00+08:00', shift_end: endDate + 'T' + end + ':00+08:00' }])
   show(); await ready()
   expect(within(screen.getByRole('region', { name: "Today's Duty" })).getByText(label)).toBeInTheDocument()
+})
+
+
+test('Settings opens for the linked Tanod with structured compact identity and shared avatar', async () => {
+  const person = {id:'account-id',role:'tanod',first_name:'Carlo',middle_name:'M.',last_name:'Abellanosa',full_name:'Carlo M. Abellanosa',photo_url:'https://example.test/avatar.png'}
+  require('../context/AuthContext').useAuth.mockReturnValue({user:{id:'account-id'},role:'tanod',logout:jest.fn()})
+  const query = {select:jest.fn(),eq:jest.fn(),single:jest.fn().mockResolvedValue({data:person,error:null})}
+  query.select.mockReturnValue(query); query.eq.mockReturnValue(query)
+  require('../supabase/supabaseClient').supabase.from.mockReturnValue(query)
+  show()
+  expect(await screen.findByRole('heading',{name:'Good evening, Carlo A.'})).toBeInTheDocument()
+  expect(screen.queryByRole('heading',{name:/Carlo M\./})).toBeNull()
+  await userEventClickSettings()
+  expect(screen.getByRole('heading',{name:'Settings',level:1})).toBeInTheDocument()
+  expect(screen.getByLabelText('First Name')).toHaveValue('Carlo')
+  expect(screen.getByRole('region',{name:'Account / Tanod Status'})).toHaveTextContent('Sample Tanod')
+  expect(query.eq).toHaveBeenCalledWith('id','account-id')
+  expect(api.setAccountLink).not.toHaveBeenCalled()
+})
+async function userEventClickSettings() { fireEvent.click(screen.getByRole('button',{name:'Settings',exact:true})) }
+
+test('duty areas share icon/text wrapper and report metadata shares one aligned container', async () => {
+  const {container} = show(); await ready()
+  const summaries = container.querySelectorAll('.td-summary-grid > article')
+  expect(summaries).toHaveLength(4)
+  summaries.forEach(card => {
+    expect(card.children[0]).toHaveClass('td-icon')
+    expect(card.children[0].querySelector('svg')).toBeTruthy()
+    expect(card.children[1]).toHaveClass('td-summary-body')
+  })
+  expect(container.querySelectorAll('.td-area-row').length).toBeGreaterThan(0)
+  container.querySelectorAll('.td-area-row').forEach(row => { expect(row.querySelector('svg')).toHaveAttribute('aria-hidden','true'); expect(row.querySelector('span')).toBeTruthy() })
+  fireEvent.click(screen.getByRole('button',{name:'My Reports',exact:true}))
+  await screen.findByText('INC-OWN')
+  const card = screen.getByText('INC-OWN').closest('article')
+  const chips = card.querySelector('.td-report-chips')
+  expect(chips).toHaveTextContent('Submitted by me')
+  expect(chips).toHaveTextContent('No KP case linked')
+  expect([...chips.children].every(child => child.tagName === 'SPAN')).toBe(true)
 })

@@ -1119,10 +1119,10 @@ describe('L. the architecture the phase committed to', () => {
   // second one still fails here. P3-B2 added none, P4-A added 042 and
   // Combined Phase 1 added 043, Combined Phase 2 added 044 and Final
   // Integration added 045 -- one apiece, and 045 is the newest.
-  it('lists the expected migrations through 053', () => {
+  it('lists the expected migrations through 058', () => {
     const dir = path.join(__dirname, '..', '..', 'supabase-migrations')
     const files = fs.readdirSync(dir).filter((f) => f.endsWith('.sql')).sort()
-    expect(files).toHaveLength(53)
+    expect(files).toHaveLength(58)
     expect(files[41]).toBe('042_kp_screening_foundation.sql')
     expect(files[42]).toBe('043_kp_case_hearings_summons.sql')
     expect(files[43]).toBe('044_incident_blotter_tanod.sql')
@@ -1135,7 +1135,12 @@ describe('L. the architecture the phase committed to', () => {
     expect(files[50]).toBe('051_case_review_support.sql')
     expect(files[51]).toBe('052_tanod_accounts_and_duty.sql')
     expect(files[52]).toBe('053_tanod_incident_access.sql')
-    expect(files.some((f) => f.startsWith('054'))).toBe(false)
+    expect(files[53]).toBe('054_barangay_resident_directory.sql')
+    expect(files[54]).toBe('055_verified_resident_directory_sync.sql')
+    expect(files[55]).toBe('056_resident_eligibility.sql')
+    expect(files[56]).toBe('057_incident_map_location.sql')
+    expect(files[57]).toBe('058_targeted_sms.sql')
+    expect(files.some((f) => f.startsWith('059'))).toBe(false)
   })
 })
 

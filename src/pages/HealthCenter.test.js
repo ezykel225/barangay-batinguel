@@ -1,4 +1,4 @@
-// The public Health Center's "Bakuna & Health Events" card.
+// The public Health Center's "Upcoming Health Events" card.
 //
 // This suite exists for one regression, found during the MASTER-B B3
 // browser smoke test and PRE-EXISTING -- the query read
@@ -89,7 +89,7 @@ const renderPage = async (healthEventRows) => {
   const view = render(<HealthCenter />)
   // The card's own heading is present from the first paint; waiting for
   // the loading line to GO is what proves the fetch resolved.
-  await screen.findByRole('heading', { name: /bakuna & health events/i })
+  await screen.findByRole('heading', { name: /upcoming health events/i })
   await screen.findByText(
     (_, node) => node?.className === 'health-bakuna-card',
     { selector: '.health-bakuna-card' },
@@ -101,7 +101,7 @@ const renderPage = async (healthEventRows) => {
 // than to the whole page -- "Community Health Checkup" could appear in
 // a programme list elsewhere.
 const bakunaCard = () =>
-  screen.getByRole('heading', { name: /bakuna & health events/i }).closest('.health-bakuna-card')
+  screen.getByRole('heading', { name: /upcoming health events/i }).closest('.health-bakuna-card')
 
 const cardTitles = () =>
   Array.from(bakunaCard().querySelectorAll('.bakuna-card-body h4')).map((h) => h.textContent)
@@ -126,7 +126,7 @@ afterEach(() => {
   jest.clearAllMocks()
 })
 
-describe('Health Center -> Bakuna & Health Events', () => {
+describe('Health Center -> Upcoming Health Events', () => {
   // ─── A. past + upcoming mixed ──────────────────────────────────────
   test('excludes past events and shows the upcoming ones', async () => {
     await renderPage([

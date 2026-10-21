@@ -898,3 +898,28 @@ describe('I. the wiring', () => {
       })
   })
 })
+
+
+describe('current scheduled proceeding presentation', () => {
+  it('keeps the scheduled controls and empty optional panel, with an explicit additional scheduler', async () => {
+    withCase({ panel: [] })
+    mount({ isSecretary: true, isKapitan: true })
+    await screen.findByText('Scheduled proceeding')
+    expect(screen.queryByRole('heading', { name: 'Schedule a proceeding' })).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Attendance for Ezequel Bautista')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Hearing notice/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Summons' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Record the proceeding' })).toBeInTheDocument()
+    expect(screen.getByText('No panel member recorded yet.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Member name')).toHaveValue('')
+    expect(supabase.rpc.mock.calls.some(([name]) => name === 'assign_kp_panel_member' || name === 'schedule_kp_hearing')).toBe(false)
+    const toggle = screen.getByRole('button', { name: 'Schedule another proceeding' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await userEvent.click(toggle)
+    expect(screen.getByRole('heading', { name: 'Schedule a proceeding' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Date')).toHaveValue('')
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    await userEvent.click(toggle)
+    expect(screen.queryByRole('heading', { name: 'Schedule a proceeding' })).not.toBeInTheDocument()
+  })
+})

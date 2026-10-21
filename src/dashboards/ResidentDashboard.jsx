@@ -1,3 +1,5 @@
+import PortalDetailsDialog from '../components/PortalDetailsDialog'
+import { filterRows } from '../utils/residentGroups'
 import DocumentRequirements from '../documents/DocumentRequirements.jsx'
 import { useCallback, useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
@@ -119,6 +121,12 @@ const ResidentDashboard = () => {
     return resolveResidentTab(requested)
   })
   const [userProfile, setUserProfile] = useState(null)
+  const [requestQuery, setRequestQuery] = useState('')
+  const [requestStatus, setRequestStatus] = useState('all')
+  const [requestType, setRequestType] = useState('all')
+  const [startComplaint, setStartComplaint] = useState(false)
+  useEffect(() => { if (activeTab !== 'complaints') setStartComplaint(false) }, [activeTab])
+  const [selectedReservation, setSelectedReservation] = useState(null)
   const [requests, setRequests] = useState([])
   const [myReservations, setMyReservations] = useState([])
   const [loading, setLoading] = useState(true)
@@ -709,6 +717,11 @@ const ResidentDashboard = () => {
     />
   )
 
+  const filteredRequests = filterRows(requests, { query: requestQuery, fields: ['document_type', 'purpose'] })
+    .filter(row => requestStatus === 'all' || row.status === requestStatus)
+    .filter(row => requestType === 'all' || row.document_type === requestType)
+
+
   return (
     <div className="dashboard-layout">
       <Sidebar
@@ -858,6 +871,12 @@ const ResidentDashboard = () => {
                   <FaPlus /> New Request
                 </button>
               </div>
+              <div className="resident-filter-bar resident-request-filters">
+                <label>Search requests<input type="search" className="resident-search-input" value={requestQuery} onChange={e => setRequestQuery(e.target.value)} placeholder="Document or purpose" /></label>
+                <label>Status<select className="filter-select" value={requestStatus} onChange={e => setRequestStatus(e.target.value)}><option value="all">All statuses</option>{Object.entries(STATUS_LABELS).map(([key, value]) => <option key={key} value={key}>{value.label}</option>)}</select></label>
+                <label>Document type<select className="filter-select" value={requestType} onChange={e => setRequestType(e.target.value)}><option value="all">All document types</option>{DOCUMENT_TYPES.map(type => <option key={type}>{type}</option>)}</select></label>
+              </div>
+              {!loading && requests.length > 0 && filteredRequests.length === 0 && <p>No requests match these filters.</p>}
               {loading ? (
                 <p>Loading...</p>
               ) : requests.length === 0 ? (
@@ -877,7 +896,7 @@ const ResidentDashboard = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {requests.map((r) => (
+                      {filteredRequests.map((r) => (
                         <tr key={r.id}>
                           <td data-label="Document">{r.document_type}</td>
                           <td data-label="Purpose">{r.purpose}</td>
@@ -963,6 +982,7 @@ const ResidentDashboard = () => {
                             )}
                           </td>
                           <td data-label="Action">
+                            <button type="button" className="btn-add btn-sm" onClick={() => setSelectedReservation(r)} aria-label={`View reservation ${r.reference || r.preferred_date}`}>View</button>
                             {canCancel(r) ? (
                               <button
                                 className="btn-deny"
@@ -971,9 +991,7 @@ const ResidentDashboard = () => {
                               >
                                 {cancellingId === r.id ? 'Cancelling...' : 'Cancel'}
                               </button>
-                            ) : (
-                              <span style={{ fontSize: 12, color: '#6b7280' }}>—</span>
-                            )}
+                            ) : null}
                           </td>
                         </tr>
                       ))}
@@ -991,7 +1009,15 @@ const ResidentDashboard = () => {
             /resident, so an official, the nurse and any unsupported
             role are bounced before this renders, and P1's fail-safe is
             untouched. No new role, and no new protected route. */}
-        {activeTab === 'complaints' && <MyComplaints />}
+        {activeTab === 'complaints' && <MyComplaints startFiling={startComplaint} />}
+
+        {selectedReservation && <PortalDetailsDialog title="Reservation Details" reference={selectedReservation.reference} status={RESERVATION_STATUS_LABELS[selectedReservation.status]?.label || selectedReservation.status} statusClassName={RESERVATION_STATUS_LABELS[selectedReservation.status]?.className || ''} onClose={() => setSelectedReservation(null)}>
+          <dl>{[
+            ['Date', bookingDate(selectedReservation.preferred_date)], ['Time', [selectedReservation.preferred_time, selectedReservation.end_time].filter(Boolean).join(' - ')],
+            ['Purpose', selectedReservation.purpose], ['Submitted', selectedReservation.created_at ? new Date(selectedReservation.created_at).toLocaleDateString() : null],
+            ['Contact number', selectedReservation.contact_number], ['Additional notes', selectedReservation.additional_notes], ['Activity', selectedReservation.activity_type], ['Duration (hours)', selectedReservation.duration_hours], ['Office-hours reason', selectedReservation.exception_reason],
+          ].filter(([, value]) => value).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+        </PortalDetailsDialog>}
 
         {activeTab === 'settings' && (
           <div>
@@ -1000,7 +1026,9 @@ const ResidentDashboard = () => {
               <p>Manage your account preferences.</p>
             </div>
 
-            <div className="dashboard-card" style={{ maxWidth: 480, marginBottom: 20 }}>
+            <div className="resident-settings-grid">
+              <div className="resident-settings-column">
+            <div className="dashboard-card">
               <div className="dashboard-card-header">
                 <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <FaUser style={{ color: '#15803d' }} /> My Details
@@ -1111,7 +1139,7 @@ const ResidentDashboard = () => {
               )}
             </div>
 
-            <div className="dashboard-card" style={{ maxWidth: 480, marginBottom: 20 }}>
+            <div className="dashboard-card">
               <div className="dashboard-card-header">
                 <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <FaUser style={{ color: '#15803d' }} /> Profile Photo
@@ -1155,7 +1183,9 @@ const ResidentDashboard = () => {
               </div>
             </div>
 
-            <div className="dashboard-card" style={{ maxWidth: 480, marginBottom: 20 }}>
+              </div>
+              <div className="resident-settings-column">
+            <div className="dashboard-card">
               <div className="dashboard-card-header">
                 <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <FaFileAlt style={{ color: '#15803d' }} /> ID Verification
@@ -1196,7 +1226,7 @@ const ResidentDashboard = () => {
               )}
             </div>
 
-            <div className="dashboard-card" style={{ maxWidth: 480 }}>
+            <div className="dashboard-card">
               <div className="dashboard-card-header">
                 <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <FaLock style={{ color: '#15803d' }} /> Change Password
@@ -1265,6 +1295,8 @@ const ResidentDashboard = () => {
                 style={{ marginTop: 8 }}>
                 {passwordLoading ? 'Saving...' : 'Save Password'}
               </button>
+            </div>
+              </div>
             </div>
           </div>
         )}

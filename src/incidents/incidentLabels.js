@@ -96,6 +96,8 @@ export const BLOTTER_APPEND_ONLY_NOTE = 'Amendments are added to the history bel
 // Punong Barangay can..."), and printing that would put an authorization model
 // on a screen somebody may be standing beside.
 export const INCIDENT_ERRORS = Object.freeze({
+  mapLocationFailed: 'The map location could not be saved. Try again in a moment.',
+  mapLocationInvalid: 'Select a valid map location before saving.',
   loadFailed: 'The incident records could not be loaded. Try again in a moment.',
   recordFailed: 'That incident could not be recorded. Check the details and try again.',
   notPermittedRecord: 'Recording an incident is handled by the barangay officials.',

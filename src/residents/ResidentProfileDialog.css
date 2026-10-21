@@ -1,0 +1,34 @@
+.resident-profile-dialog .confirm-dialog { width:100%; max-width:760px; height:auto; min-height:0; max-height:88vh; max-height:88dvh; }
+.resident-profile-dialog .portal-details-identity:empty { display:none; }
+.resident-profile-dialog .portal-details-body { padding:24px; }
+.resident-profile-dialog .resident-profile-heading { display:grid; grid-template-columns:80px minmax(0,1fr) auto; align-items:center; gap:18px; padding-bottom:22px; border-bottom:1px solid #e2e8f0; }
+.resident-profile-dialog .resident-profile-avatar { width:80px; height:80px; flex-basis:80px; font-size:28px; box-shadow:0 0 0 4px #f1f5ff; }
+.resident-profile-dialog .resident-profile-heading .resident-profile-name { margin:0 0 10px; color:#1e3a8a; font-size:24px; font-weight:800; line-height:1.25; overflow-wrap:anywhere; }
+.resident-profile-summary { min-width:0; }
+.resident-profile-status { display:flex; align-items:center; flex-wrap:wrap; gap:10px; }
+.resident-profile-dialog .resident-profile-purok { display:flex; align-items:center; gap:7px; margin:10px 0 0; color:#475569; font-size:14px; }
+.resident-profile-purok svg { color:#64748b; flex-shrink:0; }
+.resident-profile-dialog .resident-profile-heading > button { margin:0; white-space:nowrap; }
+.resident-profile-sections { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin-top:20px; }
+.resident-profile-section { min-width:0; padding:16px 18px; border:1px solid #e2e8f0; background:#fbfcfe; border-radius:10px; }
+.resident-profile-dialog .resident-profile-section h3 { display:flex; align-items:center; gap:9px; margin:0 0 4px; font-size:15px; font-weight:700; color:#1e3a8a; }
+.resident-profile-section h3 svg { color:#64748b; font-size:14px; flex-shrink:0; }
+.resident-profile-dialog .resident-profile-section dl { display:block; margin:0; }
+.resident-profile-dialog .resident-profile-section dl > div { padding:14px 0; border:0; border-bottom:1px solid #e8edf3; border-radius:0; background:transparent; }
+.resident-profile-dialog .resident-profile-section dl > div:last-child { border:0; padding-bottom:0; }
+.resident-profile-dialog .resident-profile-section dt { font-size:12px; line-height:1.4; color:#64748b; }
+.resident-profile-dialog .resident-profile-section dd { margin:5px 0 0; font-size:16px; font-weight:600; line-height:1.5; color:#1e293b; }
+.resident-profile-verification { display:inline-block; padding:2px 9px; background:#edf3fc; border:1px solid #dce6f5; border-radius:6px; color:#1e3a8a; font-size:13px; }
+@media(max-width:768px) {
+  .resident-profile-dialog .resident-profile-heading { grid-template-columns:80px minmax(0,1fr); gap:16px; }
+  .resident-profile-dialog .resident-profile-heading > button { grid-column:2; justify-self:start; }
+}
+@media(max-width:600px) {
+  .resident-profile-dialog .portal-details-body { padding:18px 16px; }
+  .resident-profile-dialog .resident-profile-heading { grid-template-columns:72px minmax(0,1fr); padding-bottom:18px; gap:14px; }
+  .resident-profile-dialog .resident-profile-avatar { width:72px; height:72px; flex-basis:72px; font-size:25px; }
+  .resident-profile-dialog .resident-profile-heading .resident-profile-name { font-size:21px; }
+  .resident-profile-dialog .resident-profile-heading > button { grid-column:1/-1; justify-self:stretch; }
+  .resident-profile-sections { grid-template-columns:minmax(0,1fr); gap:12px; margin-top:16px; }
+  .resident-profile-section { padding:14px 16px; }
+}

@@ -1,5 +1,9 @@
+import SmsComposer from '../sms/SmsComposer'
+import SmsHistory from '../sms/SmsHistory'
+import ResidentsWorkspace from '../residents/ResidentsWorkspace'
+import { residentPurokOptions, matchesResidentPurok } from '../residents/residentPresentation'
 import DocumentRequestDetails from '../documents/DocumentRequestDetails'
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useRef, useState, useEffect, useMemo, useCallback } from 'react'
 import {
   FaClipboardList,
   FaBullhorn,
@@ -78,14 +82,10 @@ import {
   PUROK_FILTER_UNLISTED,
   describeVerification,
   filterRows,
-  findReconciliationIssues,
   groupResidents,
-  isActionableSeverity,
   isKnownPurok,
   normalizeName,
   purokShortLabel,
-  RECONCILE_SEVERITIES,
-  VOTER_LIST_CAVEAT,
 } from '../utils/residentGroups'
 import {
   EXCEPTION_BADGE_LABEL,
@@ -419,7 +419,11 @@ const OfficialDashboard = () => {
   // click. confirm() resolves true/false, so each handler needs one
   // early return and nothing else changes -- which matters, because
   // several of these sit on top of the per-row processing locks.
+  const [smsEnabled,setSmsEnabled] = useState({})
   const [confirm, confirmDialog] = useConfirm()
+  const announcementSms = useRef(null)
+  const eventSms = useRef(null)
+
   const [activeTab, setActiveTab] = useState('dashboard')
 
   // ── Notifications ──────────────────────────────────────────────────
@@ -1003,7 +1007,7 @@ const OfficialDashboard = () => {
   const fetchResidentsList = async () => {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, full_name, contact_number, purok, verification_status, verification_notes, id_document_url')
+      .select('id, full_name, contact_number, purok, verification_status, verification_notes, id_document_url, photo_url')
       .eq('role', 'resident')
       .order('full_name', { ascending: true })
 
@@ -1283,6 +1287,18 @@ const OfficialDashboard = () => {
     })
     if (!ok) return
     return withVerificationGuard(resident.id, async () => {
+      if (resident.verification_status === 'ineligible') {
+        const { data: directory, error: lookupError } = await supabase.rpc('barangay_resident_directory')
+        if (lookupError) { toast.error('Resident record permission is required to reinstate this account.'); return }
+        const linked = (directory || []).find(row => row.profile_id === resident.id)
+        if (linked) {
+          const { error: eligibilityError } = await supabase.rpc('set_barangay_resident_eligibility', { p_resident_id: linked.id, p_active: true })
+          if (eligibilityError) { toast.error('Could not reactivate the linked resident.'); return }
+          toast.success('Resident and linked account reactivated.')
+          fetchResidentsList()
+          return
+        }
+      }
       const { error } = await supabase
         .from('profiles')
         .update({
@@ -2378,6 +2394,7 @@ const OfficialDashboard = () => {
       return
     }
 
+    if (announcementSms.current && !announcementSms.current.beforeSave()) return
     setSubmitting(true)
     try {
       // .select() matters: RLS filters rows rather than raising, so a
@@ -2398,6 +2415,7 @@ const OfficialDashboard = () => {
       } else if (!data || data.length === 0) {
         toast.error('No announcement was updated. You may not have permission to edit it.')
       } else {
+        await announcementSms.current?.afterSave(editingAnnouncement.id)
         toast.success('Announcement updated.')
         logActivity({
           action: 'edited',
@@ -2422,6 +2440,7 @@ const OfficialDashboard = () => {
       return
     }
 
+    if (announcementSms.current && !announcementSms.current.beforeSave()) return
     setSubmitting(true)
     try {
       // Readback returns the new id so the audit entry can point at the
@@ -2442,6 +2461,7 @@ const OfficialDashboard = () => {
       } else if (!inserted?.id) {
         toast.error('Saved, but the announcement could not be read back. Refresh to confirm it is there.')
       } else {
+        await announcementSms.current?.afterSave(inserted.id)
         toast.success('Announcement added!')
         logActivity({
           action: 'added',
@@ -2542,6 +2562,7 @@ const OfficialDashboard = () => {
       return
     }
 
+    if (eventSms.current && !eventSms.current.beforeSave()) return
     setSubmitting(true)
     try {
       // .select() matters: RLS filters rows rather than raising, so a
@@ -2563,6 +2584,7 @@ const OfficialDashboard = () => {
       } else if (!data || data.length === 0) {
         toast.error('Nothing was updated — you may not have permission to change events.')
       } else {
+        await eventSms.current?.afterSave(editingEvent.id)
         toast.success('Event updated.')
         logActivity({
           action: 'edited',
@@ -2587,6 +2609,7 @@ const OfficialDashboard = () => {
       return
     }
 
+    if (eventSms.current && !eventSms.current.beforeSave()) return
     setSubmitting(true)
     try {
       // Readback returns the new id so the audit entry can point at the
@@ -2608,6 +2631,7 @@ const OfficialDashboard = () => {
       } else if (!inserted?.id) {
         toast.error('Saved, but the event could not be read back. Refresh to confirm it is there.')
       } else {
+        await eventSms.current?.afterSave(inserted.id)
         toast.success('Event added!')
         logActivity({
           action: 'added',
@@ -2698,21 +2722,21 @@ const OfficialDashboard = () => {
   const residentGroups = useMemo(() => groupResidents(residentsList), [residentsList])
 
   const residentFilter = useMemo(
-    () => ({ query: residentQuery, purok: residentPurok, fields: RESIDENT_SEARCH_FIELDS }),
-    [residentQuery, residentPurok]
+    () => ({ query: residentQuery, purok: 'all', fields: RESIDENT_SEARCH_FIELDS }),
+    [residentQuery]
   )
 
   const residentGroupCounts = useMemo(() => {
     const counts = {}
     RESIDENT_GROUPS.forEach((group) => {
-      counts[group.id] = filterRows(residentGroups[group.id], residentFilter).length
+      counts[group.id] = filterRows(residentGroups[group.id], residentFilter).filter(r => matchesResidentPurok(r.purok, residentPurok === 'all' ? '' : residentPurok)).length
     })
     return counts
-  }, [residentGroups, residentFilter])
+  }, [residentGroups, residentFilter, residentPurok])
 
   const visibleResidents = useMemo(
-    () => filterRows(residentGroups[residentGroup], residentFilter),
-    [residentGroups, residentGroup, residentFilter]
+    () => filterRows(residentGroups[residentGroup], residentFilter).filter(r => matchesResidentPurok(r.purok, residentPurok === 'all' ? '' : residentPurok)),
+    [residentGroups, residentGroup, residentFilter, residentPurok]
   )
 
   const activeResidentGroup = RESIDENT_GROUPS.find((group) => group.id === residentGroup)
@@ -2851,22 +2875,6 @@ const OfficialDashboard = () => {
   // group's own total rather than quietly falling short.
   const unclassifiedRequestCount =
     residentGroups.requests.length - awaitingVerificationCount - returnedToResidentCount
-
-  // D6. Detection only -- see findReconciliationIssues for why this
-  // cannot conclude anything about identity, and why it never writes.
-  const reconciliationIssues = useMemo(
-    () => findReconciliationIssues({ residents: residentsList, registryEntries }),
-    [residentsList, registryEntries]
-  )
-  // Counted by severity, from the same arrays the panel renders. Rolling
-  // them into one number made the expected case -- verified residents who
-  // are simply not registered voters -- read as part of a backlog.
-  const reconciliationAttention = reconciliationIssues
-    .filter((issue) => isActionableSeverity(issue.severity))
-    .reduce((total, issue) => total + issue.items.length, 0)
-  const reconciliationInformational = reconciliationIssues
-    .filter((issue) => !isActionableSeverity(issue.severity))
-    .reduce((total, issue) => total + issue.items.length, 0)
 
   // ── Reports: derived entirely from data already fetched, so no
   // extra queries are needed for the charts. ──────────────────────
@@ -3253,7 +3261,7 @@ const OfficialDashboard = () => {
                     <tbody>
                       {filteredAnnouncements.map((ann) => (
                         <tr key={ann.id}>
-                          <td data-label="Title">{ann.title}</td>
+                          <td data-label="Title">{ann.title}<SmsHistory sourceType="announcement" sourceId={ann.id}/></td>
                           <td data-label="Badge">{ann.badge}</td>
                           <td data-label="Date Posted">
                             {new Date(ann.date_posted).toLocaleDateString()}
@@ -3422,7 +3430,7 @@ const OfficialDashboard = () => {
                     <tbody>
                       {filteredEvents.map((event) => (
                         <tr key={event.id}>
-                          <td data-label="Title">{event.title}</td>
+                          <td data-label="Title">{event.title}<SmsHistory sourceType="event" sourceId={event.id}/></td>
                           <td data-label="Date">{event.event_date}</td>
                           <td data-label="Location">{event.location}</td>
                           <td data-label="Action" className="action-cell">
@@ -4028,12 +4036,10 @@ const OfficialDashboard = () => {
           <div>
             <div className="official-dashboard-header">
               <h1>Residents</h1>
-              <p>
-                Resident accounts, grouped by where they stand in verification.
-                The group is read from each account&rsquo;s stored verification
-                status — nothing here is a second record that could drift from it.
-              </p>
+              <p>Manage the barangay resident directory and review online resident accounts.</p>
             </div>
+            <ResidentsWorkspace canManageDirectory={isSecretary || isKapitan} profiles={residentsList} onEligibilityChange={fetchResidentsList}
+              accounts={<>
 
             <div className="dashboard-card">
               {residentsList.length === 0 ? (
@@ -4046,7 +4052,7 @@ const OfficialDashboard = () => {
                       wrong. `aria-pressed` carries the selected state to a
                       screen reader, which the green underline does not. */}
                   <div className="resident-group-tabs" role="group" aria-label="Resident account groups">
-                    {RESIDENT_GROUPS.map((group) => (
+                    {RESIDENT_GROUPS.filter(group => group.id !== 'residents').map((group) => (
                       <button
                         key={group.id}
                         type="button"
@@ -4076,7 +4082,7 @@ const OfficialDashboard = () => {
                         `${returnedToResidentCount} returned to the resident to correct`,
                         unclassifiedRequestCount > 0
                           ? `${unclassifiedRequestCount} with an unrecognised status — see the`
-                            + ' cross-check below'
+                            + ' unrecognised verification status'
                           : null,
                       ].filter(Boolean).join(' · ')}
                     </p>
@@ -4092,7 +4098,7 @@ const OfficialDashboard = () => {
                       label: 'Filter resident accounts by purok',
                       value: residentPurok,
                       onChange: setResidentPurok,
-                      options: PUROK_FILTER_OPTIONS,
+                      options: [{ value: 'all', label: 'All Puroks' }, ...residentPurokOptions(residentsList)],
                     }}
                     resultText={
                       residentFiltersActive
@@ -4262,109 +4268,8 @@ const OfficialDashboard = () => {
               )}
             </div>
 
-            {/* ── D6: account ↔ voter reference list cross-check ─────
-                Always rendered, including when there is nothing to report.
-                The Archived Officials panel was hidden while empty in
-                migration 018's first cut and the result was a reviewer
-                looking for a feature that was working correctly. A panel
-                that says "nothing to reconcile" is the useful answer; a
-                panel that is absent is indistinguishable from one that is
-                broken.
-
-                Read-only by construction: this block renders findings and
-                offers no action. Nothing here merges records, rewrites a
-                name, creates or deletes an account, or edits the voter
-                reference data. */}
-            <div className="dashboard-card" style={{ marginTop: 20 }}>
-              <div className="dashboard-card-header">
-                <h3>Account &amp; voter list cross-check</h3>
-                <span className="official-archive-count">
-                  {reconciliationIssues.length === 0
-                    ? 'nothing to cross-check'
-                    : [
-                      reconciliationAttention > 0
-                        ? `${reconciliationAttention} to look at` : null,
-                      reconciliationInformational > 0
-                        ? `${reconciliationInformational} for information` : null,
-                    ].filter(Boolean).join(' · ')}
-                </span>
-              </div>
-              <p className="dashboard-card-note">
-                <strong>{VOTER_LIST_CAVEAT}</strong>
-              </p>
-              <p className="dashboard-card-note">
-                So a verified resident who is <em>not</em> on the voter reference
-                list is <strong>normal, not an error</strong>, and stays verified.
-                Being absent from that list must never lead to a rejection, a loss
-                of verification or a &ldquo;Not a resident&rdquo; outcome — and a
-                verified account must never be added to the voter reference data
-                just to clear a line from this panel.
-              </p>
-              <p className="dashboard-card-note">
-                Nothing here changes any record; the panel has no actions at all.
-                Names are compared as exact text because the two tables share no
-                identifier — a string comparison, never a statement that two
-                records describe the same person.
-              </p>
-
-              {reconciliationIssues.length === 0 ? (
-                <p className="dashboard-empty">
-                  Nothing to cross-check between resident accounts and the voter
-                  reference list.
-                </p>
-              ) : (
-                <ul className="reconcile-list">
-                  {reconciliationIssues.map((issue) => (
-                    <li key={issue.id} className={`reconcile-item reconcile-${issue.severity}`}>
-                      <div className="reconcile-item-head">
-                        {/* Three levels, not two: 'expected' says in words that
-                            the rows beneath it are the normal case, so ordinary
-                            verified residents are not filed under "problems". */}
-                        <span className={`badge badge-${RECONCILE_SEVERITIES[issue.severity].badge}`}>
-                          {RECONCILE_SEVERITIES[issue.severity].label}
-                        </span>
-                        <h4>{issue.title}</h4>
-                        <span className="reconcile-count">
-                          {issue.items.length}
-                        </span>
-                      </div>
-                      <p className="reconcile-explanation">{issue.explanation}</p>
-                      <ul className="reconcile-rows">
-                        {issue.items.map((item) => (
-                          <li key={item.key}>
-                            <span className="reconcile-row-name">{item.label}</span>
-                            <span className="reconcile-row-detail">{item.detail}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              <p className="reconcile-footnote">
-                An account and a voter reference entry cannot be linked reliably
-                until there is a stored relationship between them — the{' '}
-                <code>profile_id</code> foreign key still outstanding in the
-                project notes. Until that exists this panel is detection only, and
-                a name match here proves that two records carry the same text, not
-                that they describe the same person.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'registry' && (
-          <div>
-            <div className="official-dashboard-header">
-              <h1>Voter Reference List</h1>
-              <p>
-                {VOTER_LIST_CAVEAT} It is used as a cross-reference signal when
-                verifying a new account — never as an automatic approval, and
-                never as a reason to refuse somebody who is not on it.
-              </p>
-            </div>
-
+              </>}
+              voterReference={<><h2>Voter Reference List</h2><div className="resident-reference-note"><strong>Reference only.</strong> This list contains available voter records and is not the complete Barangay Resident Directory. A verified barangay resident may not appear here.</div>
             <div className="dashboard-card">
               <div className="dashboard-card-header">
                 <h3>Voter Reference Entries</h3>
@@ -4461,6 +4366,9 @@ const OfficialDashboard = () => {
                 </>
               )}
             </div>
+              </>}
+
+            />
           </div>
         )}
 
@@ -5080,6 +4988,7 @@ const OfficialDashboard = () => {
               />
             </div>
 
+            <SmsComposer ref={announcementSms} sourceType="announcement" onEnabledChange={value => setSmsEnabled(current => ({...current,announcement:value}))} sourceId={editingAnnouncement?.id} draft={newAnnouncement} editing={Boolean(editingAnnouncement)} onResult={(message,failed) => failed ? toast.error(message) : toast.success(message)}/>
             <div className="modal-buttons">
               <button
                 className="btn-cancel"
@@ -5094,7 +5003,7 @@ const OfficialDashboard = () => {
               >
                 {submitting
                   ? 'Saving...'
-                  : editingAnnouncement ? 'Save Changes' : 'Save Announcement'}
+                  : smsEnabled.announcement ? 'Save & Send SMS' : editingAnnouncement ? 'Save Changes' : 'Save Announcement'}
               </button>
             </div>
           </div>
@@ -5141,6 +5050,7 @@ const OfficialDashboard = () => {
               />
             </div>
 
+            <SmsComposer ref={eventSms} sourceType="event" onEnabledChange={value => setSmsEnabled(current => ({...current,event:value}))} sourceId={editingEvent?.id} draft={newEvent} editing={Boolean(editingEvent)} onResult={(message,failed) => failed ? toast.error(message) : toast.success(message)}/>
             <div className="modal-buttons">
               <button
                 className="btn-cancel"
@@ -5156,7 +5066,7 @@ const OfficialDashboard = () => {
                 onClick={editingEvent ? handleUpdateEvent : handleAddEvent}
                 disabled={submitting}
               >
-                {submitting ? 'Saving...' : 'Save Event'}
+                {submitting ? 'Saving...' : smsEnabled.event ? 'Publish & Send SMS' : 'Save Event'}
               </button>
             </div>
           </div>

@@ -10,7 +10,7 @@
 // ⚠️ CRA 5's preset sets `resetMocks: true`, so every implementation is
 // installed in `beforeEach` rather than in the factory.
 
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import fs from 'fs'
 import path from 'path'
@@ -24,9 +24,10 @@ let popups = []
 jest.mock('leaflet', () => {
   const layer = () => {
     const self = {
-      addTo: () => self,
-      remove: () => self,
-      bindPopup: (html) => { globalThis.__popups.push(html); return self },
+      markers: [], removed: false,
+      addTo: (parent) => { if (parent?.markers) parent.markers.push(self); return self },
+      remove: () => { self.removed = true; return self },
+      bindPopup: (html) => { globalThis.__popups.push(html); self.popup = html; return self },
     }
     return self
   }
@@ -39,8 +40,8 @@ jest.mock('leaflet', () => {
         fitBounds: () => {},
       }),
       tileLayer: () => layer(),
-      layerGroup: () => layer(),
-      circleMarker: () => layer(),
+      layerGroup: () => { const group = layer(); globalThis.__groups.push(group); return group },
+      circleMarker: (coordinates, options) => { const marker = layer(); marker.options = options; marker.coordinates = coordinates; return marker },
       latLngBounds: (v) => v,
     },
   }
@@ -78,54 +79,16 @@ const POINTS = [
   },
 ]
 
-const BY_TYPE = [
-  { incident_type: 'traffic_accident', total: 5 },
-  { incident_type: 'threat', total: 2 },
-]
-const BY_STATUS = [
-  { status: 'recorded', total: 4 },
-  { status: 'resolved', total: 3 },
-]
-const MONTHLY = [
-  { month_key: '2026-09', total: 2 },
-  { month_key: '2026-10', total: 5 },
-]
-const LOCATIONS = [
-  {
-    key: 'rizal street', location_key: 'rizal street', location_label: 'Rizal Street',
-    total: 5, with_coordinates: 4, top_type: 'traffic_accident',
-    centroid_latitude: 9.3068, centroid_longitude: 123.3054,
-  },
-  {
-    key: 'colon street', location_key: 'colon street', location_label: 'Colon Street',
-    total: 2, with_coordinates: 2, top_type: 'threat',
-    centroid_latitude: 9.3072, centroid_longitude: 123.306,
-  },
-  // Single occurrence — below the repeat threshold, so not a hotspot.
-  {
-    key: 'perdices street', location_key: 'perdices street', location_label: 'Perdices Street',
-    total: 1, with_coordinates: 1, top_type: 'other',
-    centroid_latitude: 9.307, centroid_longitude: 123.305,
-  },
-]
-// Only Rizal Street is patrolled, so Colon Street is the one gap.
-const COVERAGE = [
-  { area_key: 'rizal street', area_label: 'Rizal Street', assignment_count: 3, tanod_count: 2 },
-]
+const COVERAGE = [{ area_key: 'rizal street', area_label: 'Rizal Street', assignment_count: 3, tanod_count: 2 }]
+POINTS.push(...Array.from({length:4},(_,i)=>({...POINTS[0],id:`traffic-${i}`,reference:`INC-TRAFFIC-${i}`})), {...POINTS[1],id:'threat-2',reference:'INC-THREAT-2'})
+const repeatRows = (area, counts) => Object.entries(counts).flatMap(([type,count]) => Array.from({length:count},(_,i)=>({...POINTS[0],id:`${area}-${type}-${i}`,reference:`INC-${area}-${type}-${i}`,location_text:area,incident_type:type})))
 
 let rpcCalls = []
 
 const install = (overrides = {}) => {
   rpcCalls = []
-  const table = {
-    incident_map_points: POINTS,
-    incident_counts_by_type: BY_TYPE,
-    incident_counts_by_status: BY_STATUS,
-    incident_monthly_trend: MONTHLY,
-    incident_location_frequency: LOCATIONS,
-    tanod_coverage_summary: COVERAGE,
-    ...overrides,
-  }
+  const mapRows = overrides.incident_map_points ?? POINTS
+  const table = { incident_map_points: mapRows, incident_queue: mapRows, tanod_coverage_summary: COVERAGE, ...overrides }
   supabase.rpc.mockImplementation((fn, args) => {
     rpcCalls.push([fn, args])
     return Promise.resolve({ data: table[fn] ?? [], error: null })
@@ -135,6 +98,7 @@ const install = (overrides = {}) => {
 beforeEach(() => {
   popups = []
   globalThis.__popups = popups
+  globalThis.__groups = []
   supabase.from.mockReturnValue({})
   install()
 })
@@ -149,10 +113,10 @@ const caption = () => screen.getByText(/incidents? plotted/).textContent
 
 describe('most common type ties', () => {
   it('displays both demo ties and avoids attributing all incidents to a winner', async () => {
-    install({ incident_location_frequency: [
-      { ...LOCATIONS[0], location_label: 'Demo eight', total: 8, top_type: 'disturbance / traffic_accident' },
-      { ...LOCATIONS[1], location_label: 'Demo five', total: 5, top_type: 'disturbance / traffic_accident' },
-      { ...LOCATIONS[2], location_label: 'Clear winner', total: 4, top_type: 'traffic_accident' },
+    install({ incident_map_points: [
+      ...repeatRows('Demo eight',{disturbance:3,traffic_accident:3,other:2}),
+      ...repeatRows('Demo five',{disturbance:2,traffic_accident:2,other:1}),
+      ...repeatRows('Clear winner',{disturbance:1,traffic_accident:3}),
     ] })
     mount()
     await ready()
@@ -167,7 +131,7 @@ describe('most common type ties', () => {
   })
 
   it('displays three tied types without choosing a single winner', async () => {
-    install({ incident_location_frequency: [{ ...LOCATIONS[0], top_type: 'disturbance / public_safety_hazard / traffic_accident' }] })
+    install({ incident_map_points: repeatRows('Three-way tie',{disturbance:2,public_safety_hazard:2,traffic_accident:2}) })
     mount()
     await ready()
     expect(screen.getByText('Multiple types (tie)')).toBeInTheDocument()
@@ -177,11 +141,10 @@ describe('most common type ties', () => {
 // ── A. What reaches the screen ───────────────────────────────────────────────
 
 describe('A. the map and analytics reads', () => {
-  it('builds everything from the six RPCs and never reads a table', async () => {
+  it('builds the filtered record collection and coverage from authorized RPCs and never reads a table', async () => {
     mount()
     await ready()
-    ;['incident_map_points', 'incident_counts_by_type', 'incident_counts_by_status',
-      'incident_monthly_trend', 'incident_location_frequency', 'tanod_coverage_summary']
+    ;['incident_map_points', 'incident_queue', 'tanod_coverage_summary']
       .forEach((fn) => expect(fnNames()).toContain(fn))
     expect(supabase.from).not.toHaveBeenCalled()
   })
@@ -263,14 +226,14 @@ describe('C. incidents with no coordinates', () => {
   it('leaves an incident with no coordinates off the map and off the list', async () => {
     const { container } = mount()
     await ready()
-    expect(caption()).toMatch(/^2 incidents plotted\./)
+    expect(caption()).toMatch(/^7 incidents plotted\./)
     expect(container.textContent).not.toContain('INC-2026-NOCOORD')
     popups.forEach((html) => expect(html).not.toContain('INC-2026-NOCOORD'))
   })
 
   it('says so in words rather than letting the count read as the whole record', async () => {
     mount()
-    expect(await screen.findByText(/still recorded and counted; it is not on the map/))
+    expect(await screen.findByText(/still recorded and counted/))
       .toBeInTheDocument()
   })
 
@@ -300,7 +263,7 @@ describe('D. the numbers are counts', () => {
     mount()
     await ready()
     const tile = screen.getByText('Incidents recorded').closest('.smap-stat')
-    expect(within(tile).getByText('7')).toBeInTheDocument()
+    expect(within(tile).getByText('8')).toBeInTheDocument()
   })
 
   it('counts only the locations with more than one incident as repeated', async () => {
@@ -387,14 +350,13 @@ describe('F. the coverage gaps', () => {
 // ── G. Filters ───────────────────────────────────────────────────────────────
 
 describe('G. filtering', () => {
-  it('sends the type to the map reader rather than filtering in the browser', async () => {
-    mount()
-    await ready()
-    rpcCalls = []
+  it('filters the one loaded incident collection without refetching a different map subset', async () => {
+    mount(); await ready(); rpcCalls = []
     await userEvent.selectOptions(screen.getByLabelText('Filter the map by incident type'), 'threat')
-    await waitFor(() => expect(fnNames()).toContain('incident_map_points'))
-    const [, args] = rpcCalls.find(([fn]) => fn === 'incident_map_points')
-    expect(args.p_type).toBe('threat')
+    expect(caption()).toMatch(/^2 incidents plotted/)
+    expect(fnNames()).not.toContain('incident_map_points')
+    const list = screen.getByText('Incident locations as a list').closest('details')
+    expect(within(list).queryByText('INC-2026-AB12CD')).toBeNull()
   })
 
   it('sends a null rather than an empty string when no filter is applied', async () => {
@@ -515,5 +477,102 @@ describe('J. the filter bar controls', () => {
       expect(control).not.toBeNull()
       expect(control.className.split(/\s+/)).toContain('filter-select')
     })
+  })
+})
+
+
+// Regression: the live Leaflet group, not popup strings retained from older renders.
+const activeFeatures = () => globalThis.__groups.filter(g => !g.removed).flatMap(g => g.markers)
+const dots = () => activeFeatures().filter(m => m.options.radius === 6)
+const areas = () => activeFeatures().filter(m => m.options.radius !== 6)
+const FILTER_ROWS = [
+  ...Array.from({length:6},(_,i)=>({...POINTS[0],id:`ta${i}`,reference:`TA-${i}`,location_text:'Area A',occurred_at:i===0?'2026-10-19T16:00:00Z':i===1?'2026-10-20T15:59:59.999Z':'2026-10-20T16:00:00Z'})),
+  ...Array.from({length:2},(_,i)=>({...POINTS[0],id:`d${i}`,reference:`D-${i}`,incident_type:'disturbance',location_text:'Area A',occurred_at:'2026-10-19T03:00:00Z'})),
+  ...Array.from({length:2},(_,i)=>({...POINTS[0],id:`t${i}`,reference:`T-${i}`,incident_type:'theft_property',location_text:'Area B',occurred_at:'2026-10-20T03:00:00Z'})),
+  ...Array.from({length:2},(_,i)=>({...POINTS[0],id:`h${i}`,reference:`H-${i}`,incident_type:'public_safety_hazard',location_text:'Area B',occurred_at:'2026-10-21T03:00:00Z'})),
+  {...POINTS[0],id:'no-coordinates',reference:'NO-COORDS',location_text:'Area A',latitude:null,longitude:null,occurred_at:'2026-10-20T03:00:00Z'},
+]
+const filteredFixture = () => install({ incident_map_points:FILTER_ROWS.filter(r=>r.latitude!==null),incident_queue:FILTER_ROWS,tanod_coverage_summary:[{area_key:'area a',area_label:'Area A',assignment_count:1,tanod_count:1}] })
+
+describe('authoritative filter pipeline regression', () => {
+  beforeEach(filteredFixture)
+  it('all records drive summaries, while only mapped records drive circles and their bands', async () => {
+    mount(); await ready()
+    expect(dots()).toHaveLength(12); expect(areas()).toHaveLength(2)
+    expect(areas().find(a=>a.popup.includes('Area A')).popup).toMatch('8 incidents recorded')
+    expect(areas().find(a=>a.popup.includes('Area B')).popup).toMatch('4 incidents recorded &middot; More recorded')
+    expect(areas().find(a=>a.popup.includes('Area A')).options.weight).toBe(3)
+    expect(screen.getByText('Incidents recorded').closest('.smap-stat')).toHaveTextContent('13')
+    expect(caption()).toContain('1 matching incident has no usable coordinates')
+  })
+  it.each([['traffic_accident',6],['disturbance',2],['theft_property',2],['public_safety_hazard',2]])('%s changes markers, circles, tooltips and accessible list together', async (type,count) => {
+    mount(); await ready()
+    await userEvent.selectOptions(screen.getByLabelText('Filter the map by incident type'),type)
+    await waitFor(()=>expect(dots()).toHaveLength(count))
+    expect(areas()).toHaveLength(1)
+    expect(areas()[0].popup).toContain(`${count} incidents recorded &middot; Most recorded`)
+    const list = screen.getByText('Incident locations as a list').closest('details')
+    expect(within(list).getAllByRole('listitem')).toHaveLength(count)
+    if(type!=='traffic_accident') expect(caption()).not.toContain('no usable coordinates')
+  })
+  it('All -> Traffic -> Threat -> reset removes stale Leaflet layers and restores full analytics', async () => {
+    mount(); await ready()
+    await userEvent.selectOptions(screen.getByLabelText('Filter the map by incident type'),'traffic_accident')
+    await waitFor(()=>expect(dots()).toHaveLength(6))
+    await userEvent.selectOptions(screen.getByLabelText('Filter the map by incident type'),'threat')
+    await waitFor(()=>expect(activeFeatures()).toHaveLength(0))
+    expect(caption()).toContain('No recorded incidents match these filters.')
+    expect(caption()).not.toContain('no usable coordinates')
+    expect(areas()).toHaveLength(0)
+    expect(screen.getByText('Incident locations as a list').closest('details').querySelectorAll('li')).toHaveLength(0)
+    await userEvent.click(screen.getByRole('button',{name:'Reset filters'}))
+    await waitFor(()=>expect(dots()).toHaveLength(12))
+    expect(areas()).toHaveLength(2)
+  })
+  it.each([['2026-10-21','',6],['','2026-10-20',6],['2026-10-20','2026-10-20',4]])('date range %s to %s uses inclusive Manila calendar days', async (from,to,count) => {
+    mount(); await ready()
+    fireEvent.change(screen.getByLabelText('Map from date'),{target:{value:from}})
+    fireEvent.change(screen.getByLabelText('Map up to date'),{target:{value:to}})
+    await waitFor(()=>expect(dots()).toHaveLength(count))
+    expect(caption()).toMatch(new RegExp(`^${count} incidents plotted`))
+    await userEvent.click(screen.getByRole('button',{name:'Reset filters'}))
+    await waitFor(()=>expect(dots()).toHaveLength(12))
+    expect(screen.getByLabelText('Map from date')).toHaveValue('')
+    expect(screen.getByLabelText('Map up to date')).toHaveValue('')
+  })
+  it('combines type and dates and counts unmapped rows without adding them to map circles', async () => {
+    mount(); await ready()
+    await userEvent.selectOptions(screen.getByLabelText('Filter the map by incident type'),'traffic_accident')
+    fireEvent.change(screen.getByLabelText('Map from date'),{target:{value:'2026-10-20'}})
+    fireEvent.change(screen.getByLabelText('Map up to date'),{target:{value:'2026-10-20'}})
+    await waitFor(()=>expect(dots()).toHaveLength(2))
+    expect(areas()).toHaveLength(1)
+    expect(areas()[0].popup).toContain('2 incidents recorded')
+    expect(screen.getByText('Incidents recorded').closest('.smap-stat')).toHaveTextContent('3')
+    expect(caption()).toContain('1 matching incident has no usable coordinates')
+  })
+  it('all-unmapped matches have accurate counts but no concentration circles, including patrol matches', async () => {
+    install({incident_map_points:[],incident_queue:FILTER_ROWS.filter(r=>r.latitude===null),tanod_coverage_summary:COVERAGE})
+    mount(); await ready()
+    expect(activeFeatures()).toHaveLength(0)
+    expect(caption()).toMatch(/^0 incidents plotted/)
+    expect(caption()).toContain('1 matching incident has no usable coordinates')
+    expect(caption()).not.toContain('No recorded incidents match')
+  })
+  it('late coverage responses cannot replace the latest date selection', async () => {
+    const initial = supabase.rpc.getMockImplementation()
+    let resolveOld,resolveNew
+    supabase.rpc.mockImplementation((fn,args)=>{
+      if(fn==='tanod_coverage_summary' && args.p_from==='2026-10-20') return new Promise(resolve=>{resolveOld=resolve})
+      if(fn==='tanod_coverage_summary' && args.p_from==='2026-10-21') return new Promise(resolve=>{resolveNew=resolve})
+      return initial(fn,args)
+    })
+    mount(); await ready()
+    fireEvent.change(screen.getByLabelText('Map from date'),{target:{value:'2026-10-20'}})
+    fireEvent.change(screen.getByLabelText('Map from date'),{target:{value:'2026-10-21'}})
+    await act(async()=>{resolveNew({data:[{area_key:'area b'}],error:null})})
+    await act(async()=>{resolveOld({data:[{area_key:'area a'}],error:null})})
+    expect(areas().find(a=>a.popup.includes('Area B')).options.weight).toBe(3)
+    expect(areas().find(a=>a.popup.includes('Area A')).options.weight).toBe(1)
   })
 })

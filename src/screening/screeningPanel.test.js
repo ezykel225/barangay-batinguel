@@ -750,3 +750,26 @@ describe('G. the wiring', () => {
       .forEach((t) => expect(src).not.toContain(t))
   })
 })
+
+
+describe('confirmed Secretary review presentation', () => {
+  it('keeps confirmation read-only until a new screening is deliberately started', async () => {
+    renderPanel({ isSecretary: true }, [CONFIRMED_ROW])
+    await screen.findByRole('button', { name: 'Start new screening' })
+    expect(screen.queryByRole('group', { name: /Review questions/i })).not.toBeInTheDocument()
+    expect(screen.queryByText(/0 of 6 answered/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save screening' })).not.toBeInTheDocument()
+    expect(supabase.rpc.mock.calls.some(([name]) => name === 'prepare_complaint_screening')).toBe(false)
+    await userEvent.click(screen.getByRole('button', { name: 'Start new screening' }))
+    expect(screen.getByRole('group', { name: /Review questions/i })).toBeInTheDocument()
+    expect(screen.getByText(/0 of 6 answered/)).toBeInTheDocument()
+    expect(within(document.querySelector('.screening-history')).getByText('Proceed with the barangay KP process')).toBeInTheDocument()
+    for (const question of document.querySelectorAll('.screening-question')) {
+      fireEvent.click(question.querySelector('input[value="no"]'))
+    }
+    await userEvent.click(screen.getByRole('button', { name: 'Save screening' }))
+    await waitFor(() => expect(supabase.rpc).toHaveBeenCalledWith('prepare_complaint_screening', expect.objectContaining({ p_complaint_id: 'c1' })))
+    const args = supabase.rpc.mock.calls.find(([name]) => name === 'prepare_complaint_screening')[1]
+    expect(args).not.toHaveProperty('p_screening_id')
+  })
+})

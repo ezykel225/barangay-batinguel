@@ -66,6 +66,7 @@ export const ENTITY_TYPES = Object.freeze([
   'event',
   'waste_schedule',
   'registry_entry',
+  'barangay_resident', // migration 054; written atomically by the directory RPC
   'medicine',
   'health_event',
   'medical_program',

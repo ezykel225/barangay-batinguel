@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { FaPlus, FaTrash, FaPaperclip, FaExclamationTriangle } from 'react-icons/fa'
+import { FaPlus, FaTrash, FaPaperclip, FaExclamationTriangle, FaTimes } from 'react-icons/fa'
 import {
   COMPLAINT_CATEGORIES,
   EVIDENCE_ACCEPT,
@@ -12,6 +12,7 @@ import {
   COMPLAINT_ERRORS,
 } from './complaintLabels'
 import { fileComplaintWithEvidence } from './complaintApi'
+import { DialogShell } from '../components/OfficialArchiveDialog'
 import './Complaints.css'
 
 // Filing a complaint online, as an authenticated resident.
@@ -41,7 +42,7 @@ const blankRespondent = () => ({
   addressNote: '',
 })
 
-const FileComplaintForm = ({ onFiled, onCancel }) => {
+const FileComplaintForm = ({ onFiled, onCancel, dialog = false }) => {
   const [category, setCategory] = useState('')
   const [narrative, setNarrative] = useState('')
   const [locationNote, setLocationNote] = useState('')
@@ -57,6 +58,7 @@ const FileComplaintForm = ({ onFiled, onCancel }) => {
   // a re-render.
   const [submitting, setSubmitting] = useState(false)
   const fileInputRef = useRef(null)
+  const closeRef = useRef(null)
 
   const addRespondent = () => setRespondents((list) => [...list, blankRespondent()])
 
@@ -127,8 +129,9 @@ const FileComplaintForm = ({ onFiled, onCancel }) => {
     }
   }
 
-  return (
+  const form = (
     <form className="complaint-form" onSubmit={handleSubmit} noValidate>
+      <div className="complaint-form-body">
       {/* ⚠️ NOT AN EMERGENCY SERVICE, said before the form rather than
           after it. There is deliberately NO phone number here: the only
           numbers this repository holds are the Barangay Hall's own
@@ -344,6 +347,7 @@ const FileComplaintForm = ({ onFiled, onCancel }) => {
 
       {problem && <p className="complaint-field-error" role="alert">{problem}</p>}
 
+      </div>
       <div className="modal-actions">
         <button type="button" className="btn-cancel" onClick={onCancel} disabled={submitting}>
           Cancel
@@ -354,6 +358,10 @@ const FileComplaintForm = ({ onFiled, onCancel }) => {
       </div>
     </form>
   )
+  return dialog ? <div className="resident-filing-dialog"><DialogShell open titleId="file-complaint-title" title="File a Complaint" busy={submitting} onCancel={onCancel} initialFocusRef={closeRef}
+    header={<header className="resident-filing-header"><h2 id="file-complaint-title">File a Complaint</h2><button type="button" className="btn-cancel" ref={closeRef} aria-label="Close file a complaint" onClick={onCancel} disabled={submitting}><FaTimes aria-hidden="true" /></button></header>}>
+    {form}
+  </DialogShell></div> : form
 }
 
 export default FileComplaintForm

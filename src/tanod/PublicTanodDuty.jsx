@@ -13,14 +13,21 @@ export default function PublicTanodDuty() {
     finally { setLoading(false) }
   }, [])
   useEffect(() => { refresh(); const timer = setInterval(refresh, 60000); return () => clearInterval(timer) }, [refresh])
+  // Compare timezone-bearing instants, including Manila overnight shifts.
+  const now = Date.now()
+  const current = rows.filter(row => Date.parse(row.shift_start) <= now && now < Date.parse(row.shift_end))
+  const renderRows = list => {
+    const sharedArea = list[0]?.general_area && list.every(row => row.general_area === list[0].general_area) ? list[0].general_area : null
+    return <>{sharedArea && <p className="public-duty-area">Patrol area: {sharedArea}</p>}<ul className="public-tanod-list">{list.map((row, index) => <li key={`${row.display_name}-${row.shift_start}-${index}`}>
+    <strong>{row.display_name}</strong><span className={`td-state ${row.duty_state === 'currently_on_duty' ? 'td-state-on' : ''}`}>{row.duty_state === 'currently_on_duty' ? 'On Duty' : 'Scheduled'}</span>
+    <span>{shiftWindow(row)}</span>{!sharedArea && <span>{row.general_area}</span>}
+  </li>)}</ul></>
+  }
   return <section className="public-tanod-duty" aria-labelledby="public-tanod-heading">
-    <h2 id="public-tanod-heading">Tanod on Duty</h2>
-    <p>Current and upcoming shifts, independent of the incident period selected below. “Currently on duty” requires a recorded check-in; a schedule alone does not confirm attendance. This is not live location tracking.</p>
-    {loading ? <p role="status">Loading duty information…</p> : failed ? <p role="status">Duty information is temporarily unavailable.</p> : !rows.length ? <p>No current or upcoming duty information is published.</p>
-      : <ul className="public-tanod-list">{rows.map((row, index) => <li key={`${row.display_name}-${row.shift_start}-${index}`}>
-        <strong>{row.display_name}</strong><span className={`td-state ${row.duty_state === 'currently_on_duty' ? 'td-state-on' : ''}`}>{row.duty_state === 'currently_on_duty' ? 'Currently on duty' : 'Scheduled'}</span>
-        <span>{shiftWindow(row)}</span><span>{row.general_area}</span>
-      </li>)}</ul>}
-    <button type="button" className="btn-add" onClick={refresh}>Refresh duty information</button>
+    <div className="public-duty-heading"><h2 id="public-tanod-heading">Tanod on Duty</h2><button type="button" className="btn-add" onClick={refresh}>Refresh duty status</button></div>
+    <p>Showing Tanods assigned to the current shift. On-duty status requires a recorded check-in. This is not live location tracking.</p>
+    {loading ? <p role="status">Loading duty information...</p> : failed ? <p role="status">Duty information is temporarily unavailable.</p> : <>
+      {current.length ? renderRows(current) : <p>No Tanods are assigned to the current shift.</p>}
+    </>}
   </section>
 }

@@ -1,4 +1,6 @@
-import { useState, useEffect, useMemo } from 'react'
+import SmsComposer from '../sms/SmsComposer'
+import SmsHistory from '../sms/SmsHistory'
+import { useRef, useState, useEffect, useMemo } from 'react'
 import {
   FaUserNurse,
   FaPlus,
@@ -14,6 +16,8 @@ import {
 import { supabase } from '../supabase/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
+import PortalDetailsDialog from '../components/PortalDetailsDialog'
+import { countByStatus, filterMedicines } from '../utils/medicineFilter'
 import Sidebar from '../components/Sidebar'
 import { useModalA11y } from '../components/useModalA11y'
 import { HEALTH_NURSE_NAME, HEALTH_NURSE_ROLE } from '../constants/barangay'
@@ -63,7 +67,12 @@ const NurseDashboard = () => {
   // Destructive actions go through this rather than acting on the first
   // click. confirm() resolves true/false, so each handler needs one
   // early return and nothing else changes.
+  const [smsEnabled,setSmsEnabled] = useState({})
   const [confirm, confirmDialog] = useConfirm()
+  const [selectedSmsSource,setSelectedSmsSource] = useState(null)
+  const healthSms = useRef(null)
+  const programSms = useRef(null)
+
   // Table stays the default and the management interface; the calendar
   // is an additional visual schedule over the same health_events rows.
   const [healthEventView, setHealthEventView] = useState('table')
@@ -71,6 +80,10 @@ const NurseDashboard = () => {
   const [healthMonth, setHealthMonth] = useState(() => monthOf(manilaToday()))
   // Null when adding, the row when editing. One modal serves both.
   const [editingHealthEvent, setEditingHealthEvent] = useState(null)
+  const [managedHealthEvent, setManagedHealthEvent] = useState(null)
+  const [medicineQuery, setMedicineQuery] = useState('')
+  const [medicineStatus, setMedicineStatus] = useState('all')
+  const [medicineCategory, setMedicineCategory] = useState('all')
   const [activeTab, setActiveTab] = useState('dashboard')
   const [healthEvents, setHealthEvents] = useState([])
   const [nurseAvailability, setNurseAvailability] = useState([])
@@ -235,6 +248,7 @@ const NurseDashboard = () => {
       toast.error('Please fill in all required fields!')
       return
     }
+    if (healthSms.current && !healthSms.current.beforeSave()) return
     setSubmitting(true)
     try {
       // .select() matters: RLS filters rows rather than raising, so a
@@ -258,6 +272,7 @@ const NurseDashboard = () => {
       } else if (!data || data.length === 0) {
         toast.error('Nothing was updated — you may not have permission to change health events.')
       } else {
+        await healthSms.current?.afterSave(editingHealthEvent.id)
         toast.success('Health event updated.')
         logActivity({
           action: 'edited',
@@ -299,6 +314,7 @@ const NurseDashboard = () => {
       toast.error('Please fill in all required fields!')
       return
     }
+    if (healthSms.current && !healthSms.current.beforeSave()) return
     setSubmitting(true)
     try {
       // Readback returns the new id so the audit entry can point at the
@@ -323,6 +339,7 @@ const NurseDashboard = () => {
       } else if (!inserted?.id) {
         toast.error('Saved, but the event could not be read back. Refresh to confirm it is there.')
       } else {
+        await healthSms.current?.afterSave(inserted.id)
         toast.success('Health event added!')
         logActivity({
           action: 'added',
@@ -693,6 +710,7 @@ const NurseDashboard = () => {
       return
     }
 
+    if (programSms.current && !programSms.current.beforeSave()) return
     setSubmitting(true)
     try {
       if (editingProgram) {
@@ -711,6 +729,7 @@ const NurseDashboard = () => {
         if (error) {
           toast.error('Failed to update program!')
         } else {
+          await programSms.current?.afterSave(editingProgram.id)
           toast.success('Program updated!')
           logActivity({
             action: 'edited',
@@ -742,6 +761,7 @@ const NurseDashboard = () => {
         } else if (!inserted?.id) {
           toast.error('Saved, but the program could not be read back. Refresh to confirm it is there.')
         } else {
+          await programSms.current?.afterSave(inserted.id)
           toast.success('Program added!')
           logActivity({
             action: 'added',
@@ -866,7 +886,7 @@ const NurseDashboard = () => {
               <div className="bakuna-calendar-card">
                 <div className="bakuna-calendar-header">
                   <h3>💉 Upcoming Health Events</h3>
-                  <button className="btn-add" onClick={() => setShowEventModal(true)}>Manage</button>
+                  <button className="btn-add" onClick={() => setActiveTab('health-events')}>View all events</button>
                 </div>
                 {loading ? (
                   <p className="loading-text">Loading...</p>
@@ -896,38 +916,9 @@ const NurseDashboard = () => {
 
               {/* Active Medical Programs — now backed by the medical_programs table */}
               <div className="programs-card">
-                <div className="programs-card-header">
-                  <h3>Active Medical Programs</h3>
-                  <button className="btn-add" onClick={handleOpenAddProgram}>
-                    <FaPlus /> Add Program
-                  </button>
-                </div>
-                <p className="programs-subtitle">Update schedules and program availability</p>
-                <div className="programs-grid">
-                  {medicalPrograms.length === 0 ? (
-                    <p className="empty-text">No programs set up yet.</p>
-                  ) : (
-                    medicalPrograms.map((program) => (
-                      <div key={program.id} className="program-item">
-                        <div className="program-item-title">{program.title}</div>
-                        <div className="program-item-schedule">{program.schedule_label}</div>
-                        <div className="program-item-time">{program.time_label}</div>
-                        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                          <button className="program-edit-btn" onClick={() => handleEditProgram(program)}>
-                            Edit Schedule →
-                          </button>
-                          <button
-                            className="program-edit-btn"
-                            style={{ color: '#dc2626' }}
-                            onClick={() => handleDeleteProgram(program)}
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
+                <div className="programs-card-header"><h3>Active Medical Programs</h3><button type="button" className="btn-add" onClick={() => setActiveTab('medical-programs')}>View all programs</button></div>
+                <p className="programs-subtitle">Recurring services and published schedules</p>
+                {medicalPrograms.length ? medicalPrograms.slice(0, 3).map(program => <div className="program-item" key={program.id}><strong>{program.title}</strong><p>{program.schedule_label} {program.time_label}</p></div>) : <p>No programs set up yet.</p>}
               </div>
 
               {/* My Status — now saves to Supabase */}
@@ -962,14 +953,60 @@ const NurseDashboard = () => {
                 )}
               </div>
 
+              <section className="nurse-stock-card" aria-labelledby="nurse-stock-heading">
+                <div className="programs-card-header"><h3 id="nurse-stock-heading">Medicine Stock</h3><button type="button" className="btn-add" onClick={() => setActiveTab('medicines')}>View medicines</button></div>
+                <div className="nurse-stock-counts">{Object.entries(MEDICINE_STATUS).map(([key,meta]) => <div className={meta.className} key={key}><strong>{countByStatus(medicines)[key]}</strong><span>{meta.label}</span></div>)}</div>
+                <h4>Needs attention</h4>
+                {medicines.some(m => statusOf(m.status) !== MEDICINE_STATUS.available) ? <ul className="nurse-stock-alerts">{medicines.filter(m => statusOf(m.status) !== MEDICINE_STATUS.available).sort((a,b) => Number(statusOf(a.status) === MEDICINE_STATUS.low) - Number(statusOf(b.status) === MEDICINE_STATUS.low)).slice(0,3).map(m => <li key={m.id}><strong>{m.name}</strong><span className={statusOf(m.status).className}>{statusOf(m.status).label}</span></li>)}</ul> : <p>No medicine stock alerts.</p>}
+              </section>
+
             </div>
           </div>
         )}
 
         {/* AVAILABILITY TAB */}
+        {activeTab === 'medical-programs' && <div>
+          <div className="nurse-dashboard-header nurse-content-heading"><h1>Medical Programs</h1><p>Manage ongoing and recurring health services. Dated activities belong in Health Events.</p></div>
+              <div className="programs-card">
+                <div className="programs-card-header">
+                  <h3>Active Medical Programs</h3>
+                  <button className="btn-add" onClick={handleOpenAddProgram}>
+                    <FaPlus /> Add Program
+                  </button>
+                </div>
+                <p className="programs-subtitle">Update schedules and program availability</p>
+                <div className="programs-grid">
+                  {medicalPrograms.length === 0 ? (
+                    <p className="empty-text">No programs set up yet.</p>
+                  ) : (
+                    medicalPrograms.map((program) => (
+                      <div key={program.id} className="program-item">
+                        <div className="program-item-title">{program.title}<SmsHistory sourceType="medical_program" sourceId={program.id}/></div>
+                        <div className="program-item-schedule">{program.schedule_label}</div>
+                        <div className="program-item-time">{program.time_label}</div>
+                        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                          <button className="program-edit-btn" onClick={() => handleEditProgram(program)}>
+                            Edit Schedule →
+                          </button>
+                          <button
+                            className="program-edit-btn"
+                            style={{ color: '#dc2626' }}
+                            onClick={() => handleDeleteProgram(program)}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+        </div>}
+
         {activeTab === 'medicines' && (
           <div>
-            <div className="nurse-dashboard-header">
+            <div className="nurse-dashboard-header nurse-content-heading">
               <h1>Medicines</h1>
               <p>
                 What the health center has today. This list is public — residents
@@ -978,6 +1015,12 @@ const NurseDashboard = () => {
               </p>
             </div>
 
+            <div className="medicine-summary-grid">{[['total','Total Medicines'],['available','Available'],['low','Low Stock'],['unavailable','Out of Stock']].map(([key,label]) => <div className="dashboard-card" key={key}><strong>{countByStatus(medicines)[key]}</strong><span>{label}</span></div>)}</div>
+            <div className="resident-filter-bar nurse-medicine-filters">
+              <label>Search medicines<input type="search" className="resident-search-input" value={medicineQuery} onChange={e => setMedicineQuery(e.target.value)} /></label>
+              <label>Medicine status<select className="filter-select" value={medicineStatus} onChange={e => setMedicineStatus(e.target.value)}><option value="all">All statuses</option>{Object.entries(MEDICINE_STATUS).map(([key,value]) => <option key={key} value={key}>{value.label}</option>)}</select></label>
+              <label>Category<select className="filter-select" value={medicineCategory} onChange={e => setMedicineCategory(e.target.value)}><option value="all">All categories</option>{MEDICINE_CATEGORIES.map(value => <option key={value}>{value}</option>)}</select></label>
+            </div>
             <div className="dashboard-card" style={{ marginBottom: 20 }}>
               <div className="dashboard-card-header">
                 <h3>Today&apos;s Stock</h3>
@@ -992,11 +1035,11 @@ const NurseDashboard = () => {
                 residents can still see it exists and ask when it is expected.
               </p>
 
-              {medicines.length === 0 ? (
-                <p className="dashboard-empty">No medicines listed yet.</p>
+              {filterMedicines(medicines, { query: medicineQuery, status: medicineStatus, category: medicineCategory }).length === 0 ? (
+                <p className="dashboard-empty">No medicines match this view.</p>
               ) : (
                 <div className="medicine-admin-list">
-                  {medicines.map((medicine) => (
+                  {filterMedicines(medicines, { query: medicineQuery, status: medicineStatus, category: medicineCategory }).map((medicine) => (
                     <div key={medicine.id} className="medicine-admin-row">
                       <div className="medicine-admin-info">
                         <strong>{medicine.name}</strong>
@@ -1235,9 +1278,9 @@ const NurseDashboard = () => {
                                 <button
                                   type="button"
                                   className="btn-add btn-sm"
-                                  onClick={() => handleOpenEditHealthEvent(event)}
+                                  onClick={() => setManagedHealthEvent(event)}
                                 >
-                                  <FaEdit aria-hidden="true" /> Edit
+                                  Manage
                                 </button>
                               </div>
                             ))}
@@ -1286,16 +1329,9 @@ const NurseDashboard = () => {
                           <td data-label="Title">{event.title}</td>
                           <td data-label="Date">{event.event_date}</td>
                           <td data-label="Location">{event.location}</td>
-                          <td data-label="Target">{event.target_audience}</td>
+                          <td data-label="Target">{event.target_audience}<SmsHistory sourceType="health_event" sourceId={event.id}/></td>
                           <td data-label="Action" className="action-cell">
-                            <button
-                              className="btn-add btn-sm"
-                              onClick={() => handleOpenEditHealthEvent(event)}>
-                              <FaEdit /> Edit
-                            </button>
-                            <button className="btn-deny btn-sm" onClick={() => handleDeleteEvent(event)}>
-                              <FaTrash /> Delete
-                            </button>
+                            <button type="button" className="btn-add btn-sm" aria-label={`Manage health event ${event.title}`} onClick={() => setManagedHealthEvent(event)}>Manage</button>
                           </td>
                         </tr>
                       ))}
@@ -1307,6 +1343,12 @@ const NurseDashboard = () => {
             </div>
           </div>
         )}
+
+        {managedHealthEvent && <PortalDetailsDialog title="Health Event" reference={managedHealthEvent.title} onClose={() => setManagedHealthEvent(null)}>
+          <dl>{[['Date',managedHealthEvent.event_date],['Location',managedHealthEvent.location],['Target audience',managedHealthEvent.target_audience],['Description',managedHealthEvent.description]].filter(([,value]) => value).map(([label,value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+          <button type="button" className="btn-cancel" onClick={()=>{setSelectedSmsSource(managedHealthEvent.id);setManagedHealthEvent(null)}}>SMS notifications</button><div className="health-event-manage-actions"><button type="button" className="btn-add" onClick={() => { const event = managedHealthEvent; setManagedHealthEvent(null); handleOpenEditHealthEvent(event) }}>Edit</button>
+            <button type="button" className="btn-deny" onClick={() => { const event = managedHealthEvent; setManagedHealthEvent(null); handleDeleteEvent(event) }}>Delete</button></div>
+        </PortalDetailsDialog>}
 
         {/* SETTINGS TAB */}
         {activeTab === 'settings' && (
@@ -1437,7 +1479,7 @@ const NurseDashboard = () => {
               { label: 'Description', key: 'description', type: 'text', placeholder: 'Event description' },
               { label: 'Event Date *', key: 'event_date', type: 'date', placeholder: '' },
               { label: 'Location', key: 'location', type: 'text', placeholder: 'Event location' },
-              { label: 'Target Audience', key: 'target_audience', type: 'text', placeholder: 'e.g. Senior Citizens' },
+              { label: 'Public audience note (not used for SMS selection)', key: 'target_audience', type: 'text', placeholder: 'e.g. Senior Citizens' },
             ].map((field) => (
               <div key={field.key} style={{ marginBottom: '16px' }}>
                 <label style={{ fontSize: '12px', fontWeight: '600', color: '#374151', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
@@ -1452,6 +1494,7 @@ const NurseDashboard = () => {
                 />
               </div>
             ))}
+            <SmsComposer ref={healthSms} sourceType="health_event" onEnabledChange={value => setSmsEnabled(current => ({...current,health_event:value}))} sourceId={editingHealthEvent?.id} draft={newEvent} editing={Boolean(editingHealthEvent)} onResult={(message,failed) => failed ? toast.error(message) : toast.success(message)}/>
             <div className="modal-buttons">
               <button
                 className="btn-cancel"
@@ -1467,7 +1510,7 @@ const NurseDashboard = () => {
                 onClick={editingHealthEvent ? handleUpdateHealthEvent : handleAddEvent}
                 disabled={submitting}
               >
-                {submitting ? 'Saving...' : 'Save Event'}
+                {submitting ? 'Saving...' : smsEnabled.health_event ? 'Publish & Send SMS' : 'Save Event'}
               </button>
             </div>
           </div>
@@ -1645,11 +1688,11 @@ const NurseDashboard = () => {
               { label: 'Time *', key: 'time_label', placeholder: 'e.g. 8:00 AM - 12:00 PM' },
             ].map((field) => (
               <div key={field.key} style={{ marginBottom: '16px' }}>
-                <label style={{ fontSize: '12px', fontWeight: '600', color: '#374151', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+                <label htmlFor={`program-${field.key}`} style={{ fontSize: '12px', fontWeight: '600', color: '#374151', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
                   {field.label}
                 </label>
                 <input
-                  type="text"
+                  id={`program-${field.key}`} type="text"
                   placeholder={field.placeholder}
                   value={newProgram[field.key]}
                   onChange={(e) => setNewProgram({ ...newProgram, [field.key]: e.target.value })}
@@ -1657,16 +1700,18 @@ const NurseDashboard = () => {
                 />
               </div>
             ))}
+            <SmsComposer ref={programSms} sourceType="medical_program" onEnabledChange={value => setSmsEnabled(current => ({...current,medical_program:value}))} sourceId={editingProgram?.id} draft={newProgram} editing={Boolean(editingProgram)} onResult={(message,failed) => failed ? toast.error(message) : toast.success(message)}/>
             <div className="modal-buttons">
               <button className="btn-cancel" onClick={() => { setShowProgramModal(false); setEditingProgram(null) }}>Cancel</button>
               <button className="btn-save" onClick={handleSaveProgram} disabled={submitting}>
-                {submitting ? 'Saving...' : editingProgram ? 'Update Program' : 'Save Program'}
+                {submitting ? 'Saving...' : smsEnabled.medical_program ? 'Save & Send SMS' : editingProgram ? 'Update Program' : 'Save Program'}
               </button>
             </div>
           </div>
         </div>
       )}
 
+      {selectedSmsSource && <SmsHistory sourceType="health_event" sourceId={selectedSmsSource} openOnMount onClose={()=>setSelectedSmsSource(null)}/>}
       {confirmDialog}
     </div>
   )

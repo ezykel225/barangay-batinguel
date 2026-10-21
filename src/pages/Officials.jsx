@@ -393,8 +393,7 @@ const Officials = () => {
                 </h3>
                 <p>Punong Barangay</p>
                 <p className="kapitan-quote">
-                  "Committed to serving every resident of Batinguel
-                  with transparency and integrity."
+                  Barangay administration and coordination of community services.
                 </p>
               </div>
             </div>
@@ -462,10 +461,9 @@ const Officials = () => {
                       <div className="council-card-role">Punong Barangay</div>
                       <div className="council-card-name">{punong.full_name}</div>
                       <p className="council-card-desc">
-                        Ready to help for all programs for our official.
-                        Our official commitment to every resident with heart.
+                        Leads barangay administration and coordinates community services.
                       </p>
-                      <ConsultationBlock official={punong} hideWhenEmpty />
+                      <ConsultationBlock official={punong} />
                     </div>
                   </div>
                 </div>

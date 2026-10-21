@@ -813,3 +813,17 @@ body {
   min-width: 0;
   overflow-wrap: anywhere;
 }
+
+/* Centered directory cards; uploads never determine portrait dimensions. */
+.council-row-center { display: flex; justify-content: center; }
+.council-card-punong { display: flex; flex-direction: column; width: 100%; max-width: 360px; text-align: center; }
+.council-featured { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; max-width: 660px; margin: 0 auto 24px; }
+.council-featured .council-card { display: flex; flex-direction: column; min-width: 0; text-align: center; }
+.council-card .council-card-image { width: 100%; height: auto; aspect-ratio: 5 / 4; margin: 0; border-radius: 0; overflow: hidden; }
+
+.council-card-photo, .council-small-photo { width: 100%; height: 100%; object-fit: cover; object-position: center 25%; }
+.council-grid { grid-template-columns: repeat(3,minmax(0,1fr)); max-width: 1000px; margin: 0 auto; }
+.council-small-image { width: 100%; height: auto; aspect-ratio: 5 / 4; margin: 0; border-radius: 0; overflow: hidden; }
+.council-card-body, .council-small-body { min-width: 0; overflow-wrap: anywhere; }
+@media(max-width: 1024px) { .council-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media(max-width: 600px) { .council-grid, .council-featured { grid-template-columns: minmax(0,1fr); } }

@@ -7,7 +7,6 @@ import {
   FaClipboardList,
   FaUsers,
   FaUserFriends,
-  FaAddressBook,
   FaChartBar,
   FaHistory,
   FaFileAlt,
@@ -72,7 +71,7 @@ const DESKTOP_QUERY = '(min-width: 769px)'
 // notification bell; the nurse passes nothing, because there is
 // deliberately no nurse bell (see Notifications in CLAUDE.md), and the
 // header simply has brand + menu.
-const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderAction = null, tanodName = '', onTanodLogout = null }) => {
+const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderAction = null, tanodName = '', tanodPhoto = '', onTanodLogout = null }) => {
   const navigate = useNavigate()
   const { user } = useAuth()
   const [profileName, setProfileName] = useState('')
@@ -274,12 +273,6 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderActio
     // and PUNONG_BARANGAY_LABEL still supplies the wording there.
     { id: 'officials', label: 'Officials Directory', icon: <FaUsers /> },
     { id: 'residents', label: 'Residents', icon: <FaUserFriends /> },
-    // Voter Reference List, not "Residents Registry": the table holds the
-    // voter records the barangay has available, not a complete list of who
-    // lives here, and the city may supply a broader dataset later. The tab
-    // id stays 'registry' -- it is the switch value the dashboard matches
-    // on, not something anybody reads.
-    { id: 'registry', label: 'Voter Reference List', icon: <FaAddressBook /> },
     { id: 'reports', label: 'Reports', icon: <FaChartBar /> },
     { id: 'activity', label: 'Activity Log', icon: <FaHistory /> },
     { id: 'settings', label: 'Settings', icon: <FaCog /> },
@@ -287,6 +280,7 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderActio
 
   const nurseNavItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <FaTachometerAlt /> },
+    { id: 'medical-programs', label: 'Medical Programs', icon: <FaNotesMedical /> },
     { id: 'medicines', label: 'Medicines', icon: <FaPills /> },
     { id: 'availability', label: 'Availability', icon: <FaHeartbeat /> },
     { id: 'health-events', label: 'Health Events', icon: <FaNotesMedical /> },
@@ -340,6 +334,7 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderActio
       { id: 'duty', label: 'My Duty', icon: <FaCalendarAlt /> },
       { id: 'report', label: 'Report Incident', icon: <FaExclamationTriangle /> },
       { id: 'reports', label: 'My Reports', icon: <FaClipboardList /> },
+      { id: 'settings', label: 'Settings', icon: <FaCog /> },
     ], portalName: 'Tanod Portal' }],
     ['official', { navItems: officialNavItems, portalName: 'Official Portal' }],
     ['nurse', { navItems: nurseNavItems, portalName: 'Health Center Portal' }],
@@ -373,7 +368,7 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderActio
       <div className="sidebar-user-avatar">
         <PersonAvatar
           name={role === 'tanod' ? tanodName : profileName}
-          photoUrl={profilePhoto}
+          photoUrl={role === 'tanod' ? tanodPhoto : profilePhoto}
           fallbackIcon={role === 'nurse' ? <FaHeartbeat /> : <FaUser />}
           className="sidebar-user-photo"
         />
