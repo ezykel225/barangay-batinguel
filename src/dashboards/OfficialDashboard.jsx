@@ -1,7 +1,9 @@
+import SmsComposer from '../sms/SmsComposer'
+import SmsHistory from '../sms/SmsHistory'
 import ResidentsWorkspace from '../residents/ResidentsWorkspace'
 import { residentPurokOptions, matchesResidentPurok } from '../residents/residentPresentation'
 import DocumentRequestDetails from '../documents/DocumentRequestDetails'
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useRef, useState, useEffect, useMemo, useCallback } from 'react'
 import {
   FaClipboardList,
   FaBullhorn,
@@ -417,7 +419,11 @@ const OfficialDashboard = () => {
   // click. confirm() resolves true/false, so each handler needs one
   // early return and nothing else changes -- which matters, because
   // several of these sit on top of the per-row processing locks.
+  const [smsEnabled,setSmsEnabled] = useState({})
   const [confirm, confirmDialog] = useConfirm()
+  const announcementSms = useRef(null)
+  const eventSms = useRef(null)
+
   const [activeTab, setActiveTab] = useState('dashboard')
 
   // ── Notifications ──────────────────────────────────────────────────
@@ -2388,6 +2394,7 @@ const OfficialDashboard = () => {
       return
     }
 
+    if (announcementSms.current && !announcementSms.current.beforeSave()) return
     setSubmitting(true)
     try {
       // .select() matters: RLS filters rows rather than raising, so a
@@ -2408,6 +2415,7 @@ const OfficialDashboard = () => {
       } else if (!data || data.length === 0) {
         toast.error('No announcement was updated. You may not have permission to edit it.')
       } else {
+        await announcementSms.current?.afterSave(editingAnnouncement.id)
         toast.success('Announcement updated.')
         logActivity({
           action: 'edited',
@@ -2432,6 +2440,7 @@ const OfficialDashboard = () => {
       return
     }
 
+    if (announcementSms.current && !announcementSms.current.beforeSave()) return
     setSubmitting(true)
     try {
       // Readback returns the new id so the audit entry can point at the
@@ -2452,6 +2461,7 @@ const OfficialDashboard = () => {
       } else if (!inserted?.id) {
         toast.error('Saved, but the announcement could not be read back. Refresh to confirm it is there.')
       } else {
+        await announcementSms.current?.afterSave(inserted.id)
         toast.success('Announcement added!')
         logActivity({
           action: 'added',
@@ -2552,6 +2562,7 @@ const OfficialDashboard = () => {
       return
     }
 
+    if (eventSms.current && !eventSms.current.beforeSave()) return
     setSubmitting(true)
     try {
       // .select() matters: RLS filters rows rather than raising, so a
@@ -2573,6 +2584,7 @@ const OfficialDashboard = () => {
       } else if (!data || data.length === 0) {
         toast.error('Nothing was updated — you may not have permission to change events.')
       } else {
+        await eventSms.current?.afterSave(editingEvent.id)
         toast.success('Event updated.')
         logActivity({
           action: 'edited',
@@ -2597,6 +2609,7 @@ const OfficialDashboard = () => {
       return
     }
 
+    if (eventSms.current && !eventSms.current.beforeSave()) return
     setSubmitting(true)
     try {
       // Readback returns the new id so the audit entry can point at the
@@ -2618,6 +2631,7 @@ const OfficialDashboard = () => {
       } else if (!inserted?.id) {
         toast.error('Saved, but the event could not be read back. Refresh to confirm it is there.')
       } else {
+        await eventSms.current?.afterSave(inserted.id)
         toast.success('Event added!')
         logActivity({
           action: 'added',
@@ -3247,7 +3261,7 @@ const OfficialDashboard = () => {
                     <tbody>
                       {filteredAnnouncements.map((ann) => (
                         <tr key={ann.id}>
-                          <td data-label="Title">{ann.title}</td>
+                          <td data-label="Title">{ann.title}<SmsHistory sourceType="announcement" sourceId={ann.id}/></td>
                           <td data-label="Badge">{ann.badge}</td>
                           <td data-label="Date Posted">
                             {new Date(ann.date_posted).toLocaleDateString()}
@@ -3416,7 +3430,7 @@ const OfficialDashboard = () => {
                     <tbody>
                       {filteredEvents.map((event) => (
                         <tr key={event.id}>
-                          <td data-label="Title">{event.title}</td>
+                          <td data-label="Title">{event.title}<SmsHistory sourceType="event" sourceId={event.id}/></td>
                           <td data-label="Date">{event.event_date}</td>
                           <td data-label="Location">{event.location}</td>
                           <td data-label="Action" className="action-cell">
@@ -4974,6 +4988,7 @@ const OfficialDashboard = () => {
               />
             </div>
 
+            <SmsComposer ref={announcementSms} sourceType="announcement" onEnabledChange={value => setSmsEnabled(current => ({...current,announcement:value}))} sourceId={editingAnnouncement?.id} draft={newAnnouncement} editing={Boolean(editingAnnouncement)} onResult={(message,failed) => failed ? toast.error(message) : toast.success(message)}/>
             <div className="modal-buttons">
               <button
                 className="btn-cancel"
@@ -4988,7 +5003,7 @@ const OfficialDashboard = () => {
               >
                 {submitting
                   ? 'Saving...'
-                  : editingAnnouncement ? 'Save Changes' : 'Save Announcement'}
+                  : smsEnabled.announcement ? 'Save & Send SMS' : editingAnnouncement ? 'Save Changes' : 'Save Announcement'}
               </button>
             </div>
           </div>
@@ -5035,6 +5050,7 @@ const OfficialDashboard = () => {
               />
             </div>
 
+            <SmsComposer ref={eventSms} sourceType="event" onEnabledChange={value => setSmsEnabled(current => ({...current,event:value}))} sourceId={editingEvent?.id} draft={newEvent} editing={Boolean(editingEvent)} onResult={(message,failed) => failed ? toast.error(message) : toast.success(message)}/>
             <div className="modal-buttons">
               <button
                 className="btn-cancel"
@@ -5050,7 +5066,7 @@ const OfficialDashboard = () => {
                 onClick={editingEvent ? handleUpdateEvent : handleAddEvent}
                 disabled={submitting}
               >
-                {submitting ? 'Saving...' : 'Save Event'}
+                {submitting ? 'Saving...' : smsEnabled.event ? 'Publish & Send SMS' : 'Save Event'}
               </button>
             </div>
           </div>

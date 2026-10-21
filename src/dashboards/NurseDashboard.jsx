@@ -1,4 +1,6 @@
-import { useState, useEffect, useMemo } from 'react'
+import SmsComposer from '../sms/SmsComposer'
+import SmsHistory from '../sms/SmsHistory'
+import { useRef, useState, useEffect, useMemo } from 'react'
 import {
   FaUserNurse,
   FaPlus,
@@ -65,7 +67,12 @@ const NurseDashboard = () => {
   // Destructive actions go through this rather than acting on the first
   // click. confirm() resolves true/false, so each handler needs one
   // early return and nothing else changes.
+  const [smsEnabled,setSmsEnabled] = useState({})
   const [confirm, confirmDialog] = useConfirm()
+  const [selectedSmsSource,setSelectedSmsSource] = useState(null)
+  const healthSms = useRef(null)
+  const programSms = useRef(null)
+
   // Table stays the default and the management interface; the calendar
   // is an additional visual schedule over the same health_events rows.
   const [healthEventView, setHealthEventView] = useState('table')
@@ -241,6 +248,7 @@ const NurseDashboard = () => {
       toast.error('Please fill in all required fields!')
       return
     }
+    if (healthSms.current && !healthSms.current.beforeSave()) return
     setSubmitting(true)
     try {
       // .select() matters: RLS filters rows rather than raising, so a
@@ -264,6 +272,7 @@ const NurseDashboard = () => {
       } else if (!data || data.length === 0) {
         toast.error('Nothing was updated — you may not have permission to change health events.')
       } else {
+        await healthSms.current?.afterSave(editingHealthEvent.id)
         toast.success('Health event updated.')
         logActivity({
           action: 'edited',
@@ -305,6 +314,7 @@ const NurseDashboard = () => {
       toast.error('Please fill in all required fields!')
       return
     }
+    if (healthSms.current && !healthSms.current.beforeSave()) return
     setSubmitting(true)
     try {
       // Readback returns the new id so the audit entry can point at the
@@ -329,6 +339,7 @@ const NurseDashboard = () => {
       } else if (!inserted?.id) {
         toast.error('Saved, but the event could not be read back. Refresh to confirm it is there.')
       } else {
+        await healthSms.current?.afterSave(inserted.id)
         toast.success('Health event added!')
         logActivity({
           action: 'added',
@@ -699,6 +710,7 @@ const NurseDashboard = () => {
       return
     }
 
+    if (programSms.current && !programSms.current.beforeSave()) return
     setSubmitting(true)
     try {
       if (editingProgram) {
@@ -717,6 +729,7 @@ const NurseDashboard = () => {
         if (error) {
           toast.error('Failed to update program!')
         } else {
+          await programSms.current?.afterSave(editingProgram.id)
           toast.success('Program updated!')
           logActivity({
             action: 'edited',
@@ -748,6 +761,7 @@ const NurseDashboard = () => {
         } else if (!inserted?.id) {
           toast.error('Saved, but the program could not be read back. Refresh to confirm it is there.')
         } else {
+          await programSms.current?.afterSave(inserted.id)
           toast.success('Program added!')
           logActivity({
             action: 'added',
@@ -967,7 +981,7 @@ const NurseDashboard = () => {
                   ) : (
                     medicalPrograms.map((program) => (
                       <div key={program.id} className="program-item">
-                        <div className="program-item-title">{program.title}</div>
+                        <div className="program-item-title">{program.title}<SmsHistory sourceType="medical_program" sourceId={program.id}/></div>
                         <div className="program-item-schedule">{program.schedule_label}</div>
                         <div className="program-item-time">{program.time_label}</div>
                         <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
@@ -1315,7 +1329,7 @@ const NurseDashboard = () => {
                           <td data-label="Title">{event.title}</td>
                           <td data-label="Date">{event.event_date}</td>
                           <td data-label="Location">{event.location}</td>
-                          <td data-label="Target">{event.target_audience}</td>
+                          <td data-label="Target">{event.target_audience}<SmsHistory sourceType="health_event" sourceId={event.id}/></td>
                           <td data-label="Action" className="action-cell">
                             <button type="button" className="btn-add btn-sm" aria-label={`Manage health event ${event.title}`} onClick={() => setManagedHealthEvent(event)}>Manage</button>
                           </td>
@@ -1332,7 +1346,7 @@ const NurseDashboard = () => {
 
         {managedHealthEvent && <PortalDetailsDialog title="Health Event" reference={managedHealthEvent.title} onClose={() => setManagedHealthEvent(null)}>
           <dl>{[['Date',managedHealthEvent.event_date],['Location',managedHealthEvent.location],['Target audience',managedHealthEvent.target_audience],['Description',managedHealthEvent.description]].filter(([,value]) => value).map(([label,value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
-          <div className="health-event-manage-actions"><button type="button" className="btn-add" onClick={() => { const event = managedHealthEvent; setManagedHealthEvent(null); handleOpenEditHealthEvent(event) }}>Edit</button>
+          <button type="button" className="btn-cancel" onClick={()=>{setSelectedSmsSource(managedHealthEvent.id);setManagedHealthEvent(null)}}>SMS notifications</button><div className="health-event-manage-actions"><button type="button" className="btn-add" onClick={() => { const event = managedHealthEvent; setManagedHealthEvent(null); handleOpenEditHealthEvent(event) }}>Edit</button>
             <button type="button" className="btn-deny" onClick={() => { const event = managedHealthEvent; setManagedHealthEvent(null); handleDeleteEvent(event) }}>Delete</button></div>
         </PortalDetailsDialog>}
 
@@ -1465,7 +1479,7 @@ const NurseDashboard = () => {
               { label: 'Description', key: 'description', type: 'text', placeholder: 'Event description' },
               { label: 'Event Date *', key: 'event_date', type: 'date', placeholder: '' },
               { label: 'Location', key: 'location', type: 'text', placeholder: 'Event location' },
-              { label: 'Target Audience', key: 'target_audience', type: 'text', placeholder: 'e.g. Senior Citizens' },
+              { label: 'Public audience note (not used for SMS selection)', key: 'target_audience', type: 'text', placeholder: 'e.g. Senior Citizens' },
             ].map((field) => (
               <div key={field.key} style={{ marginBottom: '16px' }}>
                 <label style={{ fontSize: '12px', fontWeight: '600', color: '#374151', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
@@ -1480,6 +1494,7 @@ const NurseDashboard = () => {
                 />
               </div>
             ))}
+            <SmsComposer ref={healthSms} sourceType="health_event" onEnabledChange={value => setSmsEnabled(current => ({...current,health_event:value}))} sourceId={editingHealthEvent?.id} draft={newEvent} editing={Boolean(editingHealthEvent)} onResult={(message,failed) => failed ? toast.error(message) : toast.success(message)}/>
             <div className="modal-buttons">
               <button
                 className="btn-cancel"
@@ -1495,7 +1510,7 @@ const NurseDashboard = () => {
                 onClick={editingHealthEvent ? handleUpdateHealthEvent : handleAddEvent}
                 disabled={submitting}
               >
-                {submitting ? 'Saving...' : 'Save Event'}
+                {submitting ? 'Saving...' : smsEnabled.health_event ? 'Publish & Send SMS' : 'Save Event'}
               </button>
             </div>
           </div>
@@ -1685,16 +1700,18 @@ const NurseDashboard = () => {
                 />
               </div>
             ))}
+            <SmsComposer ref={programSms} sourceType="medical_program" onEnabledChange={value => setSmsEnabled(current => ({...current,medical_program:value}))} sourceId={editingProgram?.id} draft={newProgram} editing={Boolean(editingProgram)} onResult={(message,failed) => failed ? toast.error(message) : toast.success(message)}/>
             <div className="modal-buttons">
               <button className="btn-cancel" onClick={() => { setShowProgramModal(false); setEditingProgram(null) }}>Cancel</button>
               <button className="btn-save" onClick={handleSaveProgram} disabled={submitting}>
-                {submitting ? 'Saving...' : editingProgram ? 'Update Program' : 'Save Program'}
+                {submitting ? 'Saving...' : smsEnabled.medical_program ? 'Save & Send SMS' : editingProgram ? 'Update Program' : 'Save Program'}
               </button>
             </div>
           </div>
         </div>
       )}
 
+      {selectedSmsSource && <SmsHistory sourceType="health_event" sourceId={selectedSmsSource} openOnMount onClose={()=>setSelectedSmsSource(null)}/>}
       {confirmDialog}
     </div>
   )
