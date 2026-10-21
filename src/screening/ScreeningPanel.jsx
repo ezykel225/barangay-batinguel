@@ -93,6 +93,7 @@ const ScreeningPanel = ({
   const [recommendation, setRecommendation] = useState('')
   const [recommendationNote, setRecommendationNote] = useState('')
   const [saving, setSaving] = useState(false)
+  const [startingNew, setStartingNew] = useState(false)
 
   const [outcome, setOutcome] = useState('')
   const [decisionNote, setDecisionNote] = useState('')
@@ -106,10 +107,16 @@ const ScreeningPanel = ({
     try {
       const rows = await loadScreenings(complaintId)
       setScreenings(rows)
+      setStartingNew(false)
       // Re-open the existing draft rather than a blank form, so a
       // Secretary returning to a part-finished review sees what they
       // already recorded instead of silently starting again.
       const open = rows.find((r) => r.is_open)
+      if (!open) {
+        setAnswers(blankAnswers())
+        setRecommendation('')
+        setRecommendationNote('')
+      }
       if (open) {
         setAnswers({ ...blankAnswers(), ...(open.answers || {}) })
         setRecommendation(open.recommendation || '')
@@ -273,7 +280,10 @@ const ScreeningPanel = ({
       )}
 
       {/* ── Preparing: the Barangay Secretary's ───────────────────── */}
-      {isSecretary && (
+      {isSecretary && !openScreening && history.length > 0 && !startingNew && (
+        <button type="button" className="btn-cancel" onClick={() => setStartingNew(true)}>Start new screening</button>
+      )}
+      {isSecretary && (openScreening || history.length === 0 || startingNew) && (
         <form className="complaint-form" onSubmit={handlePrepare} noValidate>
           <fieldset className="complaint-fieldset">
             <legend>Review questions</legend>

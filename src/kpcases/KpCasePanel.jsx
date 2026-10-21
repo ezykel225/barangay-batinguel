@@ -126,7 +126,7 @@ const KpCasePanel = ({
   // lives in `ScreeningPanel` and all case state still lives here; this
   // is only how a sibling says "the screening changed, look again", so
   // confirming a review repaints this panel without a page reload.
-  screeningSignal = 0,
+  screeningSignal = 0, onDispositionLoaded,
 }) => {
   const [kpCase, setKpCase] = useState(null)
   const [screenings, setScreenings] = useState([])
@@ -141,6 +141,7 @@ const KpCasePanel = ({
   const [memberName, setMemberName] = useState('')
   const [memberRole, setMemberRole] = useState(KP_PANEL_ROLE_KEYS[0])
   const [form, setForm] = useState(blankHearing)
+  const [showScheduler, setShowScheduler] = useState(false)
   const [conclusionNote, setConclusionNote] = useState('')
   const [notice, setNotice] = useState(null)
 
@@ -167,6 +168,7 @@ const KpCasePanel = ({
       ])
       setKpCase(row)
       setScreenings(screeningRows)
+      if (onDispositionLoaded) onDispositionLoaded({ complaintId, screening: screeningRows[0] || null, kpCase: row })
       if (!row) {
         setHearings([])
         setParties([])
@@ -194,7 +196,7 @@ const KpCasePanel = ({
       setLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [complaintId, screeningSignal])
+  }, [complaintId, screeningSignal, onDispositionLoaded])
 
   useEffect(() => { fetchCase() }, [fetchCase])
 
@@ -210,6 +212,7 @@ const KpCasePanel = ({
   // ⚠️ THIS DOES NOT REPLACE THE DATABASE CHECK AND MUST NOT. It decides
   // which control is painted; the RPC still decides whether the row is
   // written, and a crafted call is still refused with its own P0001.
+  const hasScheduledProceeding = hearings.some((hearing) => hearing.status === 'scheduled')
   const latestScreening = screenings[0] || null
   const screeningConfirmed = Boolean(latestScreening) && !latestScreening.is_open
   const mayOpenCase = screeningConfirmed
@@ -288,7 +291,7 @@ const KpCasePanel = ({
       location: form.location,
       presidingNote: form.presidingNote,
       adminNotes: form.adminNotes,
-    }), 'scheduleFailed').then((ok) => { if (ok) setForm(blankHearing()) })
+    }), 'scheduleFailed').then((ok) => { if (ok) { setForm(blankHearing()); setShowScheduler(false) } })
   }
 
   const handleRecord = (hearing) => (event) => {
@@ -576,6 +579,7 @@ const KpCasePanel = ({
                 const settled = Boolean(hearing.outcome)
                 return (
                   <li key={hearing.id} className="kp-hearing">
+                    {hearing.status === 'scheduled' && <p className="kp-meta"><strong>Scheduled proceeding</strong></p>}
                     <h5>
                       {kpProceedingTypeLabel(hearing.proceeding_type)}
                       {' — '}
@@ -788,7 +792,12 @@ const KpCasePanel = ({
             </ul>
           )}
 
-          {canAdminister && kpCase.status !== 'concluded' && (
+          {canAdminister && kpCase.status !== 'concluded' && hasScheduledProceeding && (
+            <button type="button" className="btn-cancel" aria-expanded={showScheduler} onClick={() => setShowScheduler((value) => !value)}>
+              {showScheduler ? 'Hide additional scheduler' : 'Schedule another proceeding'}
+            </button>
+          )}
+          {canAdminister && kpCase.status !== 'concluded' && (!hasScheduledProceeding || showScheduler) && (
             /* ⚠️ NO STATUTORY DEADLINE IS COMPUTED, SUGGESTED OR
                DEFAULTED. The date field opens empty and the system
                proposes nothing: a suggested date would assert a period

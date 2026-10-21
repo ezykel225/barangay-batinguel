@@ -483,3 +483,26 @@ describe('D. when Open KP case is offered', () => {
     await waitFor(() => expect(openCaseForm()).toBeInTheDocument())
   })
 })
+
+
+describe('authorized complaint disposition header', () => {
+  it('shows confirmed referral without a KP opening or a replacement Secretary form', async () => {
+    screeningRows = [confirmedAs('refer_for_further_action')]
+    render(<OfficialComplaints isSecretary />)
+    await userEvent.click(await screen.findByRole('button', { name: /View complaint CMP-2026-AB12CD/ }))
+    await waitFor(() => expect(document.querySelector('.complaint-modal-header')).toHaveTextContent('Referred for further action'))
+    expect(screen.queryByRole('button', { name: /Open a KP case/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: /Review questions/i })).not.toBeInTheDocument()
+  })
+  it('shows ongoing KP only for a confirmed proceed outcome and active linked case', async () => {
+    screeningRows = [confirmedAs('proceed_to_kp_process')]
+    const original = supabase.rpc.getMockImplementation()
+    supabase.rpc.mockImplementation((name, args) => name === 'kp_case_for_complaint'
+      ? Promise.resolve({ data: [{ id: 'k1', reference: 'KP-2026-DEMO', status: 'open' }], error: null })
+      : original(name, args))
+    render(<OfficialComplaints isKapitan />)
+    await userEvent.click(await screen.findByRole('button', { name: /View complaint CMP-2026-AB12CD/ }))
+    await waitFor(() => expect(document.querySelector('.complaint-modal-header')).toHaveTextContent('KP process ongoing'))
+    expect(screen.getByText('KP-2026-DEMO')).toBeInTheDocument()
+  })
+})

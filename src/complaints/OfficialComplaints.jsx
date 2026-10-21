@@ -34,6 +34,7 @@ import {
 import WalkInComplaintForm from './WalkInComplaintForm'
 import ScreeningPanel from '../screening/ScreeningPanel'
 import KpCasePanel from '../kpcases/KpCasePanel'
+import { officialComplaintDisposition } from './officialComplaintDisposition'
 import { useConfirm } from '../components/ConfirmDialog'
 import { DialogShell } from '../components/OfficialArchiveDialog'
 import './Complaints.css'
@@ -142,6 +143,7 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
   // out of `ScreeningPanel` and no case state is lifted out of
   // `KpCasePanel`.
   const [screeningSignal, setScreeningSignal] = useState(0)
+  const [disposition, setDisposition] = useState(null)
 
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
@@ -254,6 +256,8 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
   const emptyMessage = queueEmptyMessage({ total: rows.length, filtered: filtered.length })
   const selected = filtered.find((r) => r.id === selectedId)
     || rows.find((r) => r.id === selectedId)
+  const detailBadge = officialComplaintDisposition(detail?.row?.status || selected?.status,
+    disposition?.complaintId === selectedId && !detailRestricted ? disposition : null)
 
   return (
     <div>
@@ -493,7 +497,7 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
             <button type="button" ref={closeRef} className="btn-cancel complaint-modal-close" aria-label="Close complaint details" onClick={closeDetail}><FaTimes aria-hidden="true" /></button>
             <div className="complaint-modal-identity">
               <p className="complaint-reference">{selected?.reference || ''}</p>
-              {selected && <span className={`status-badge ${describeComplaintStatus(selected.status).className}`}>{describeComplaintStatus(selected.status).label}</span>}
+              {selected && <span className={`status-badge ${detailBadge.className}`}>{detailBadge.label}</span>}
             </div>
           </header>}>
           <div ref={bodyRef} key={selectedId} className="complaint-detail-panel complaint-modal-body">
@@ -530,10 +534,10 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
                   <dt>Status</dt>
                   <dd>
                     <span
-                      className={`status-badge ${describeComplaintStatus(detail.row.status).className}`}
+                      className={`status-badge ${detailBadge.className}`}
                       title={detail.row.status}
                     >
-                      {describeComplaintStatus(detail.row.status).label}
+                      {detailBadge.label}
                     </span>
                   </dd>
                 </div>
@@ -676,7 +680,7 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
               </section>
               <section className="complaint-section complaint-screening-card" aria-label="KP review screening">
               <h3>KP review screening</h3>
-              <ScreeningPanel
+              <ScreeningPanel key={detail.row.id}
                 complaintId={detail.row.id}
                 isSecretary={isSecretary}
                 isKapitan={isKapitan}
@@ -719,7 +723,8 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
               </section>
               <section className="complaint-section" aria-label="KP case">
               <h3>KP case</h3>
-              <KpCasePanel
+              <KpCasePanel key={detail.row.id}
+                onDispositionLoaded={setDisposition}
                 complaintId={detail.row.id}
                 complaint={detail.row}
                 isSecretary={isSecretary}
