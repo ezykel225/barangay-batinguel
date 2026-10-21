@@ -48,7 +48,10 @@ revoke all on public.sms_source_rules,public.sms_broadcasts,public.sms_broadcast
 create function public.sms_may_manage(p_type text,p_actor uuid)
 returns boolean language sql stable security definer set search_path='' as $$
  select exists(select 1 from public.profiles p where p.id=p_actor and
-  ((p_type in ('announcement','event') and p.role='official') or
+  ((p_type in ('announcement','event') and p.role='official' and exists(
+    select 1 from public.official_account_links l
+    join public.barangay_officials bo on bo.id=l.official_id
+    where l.profile_id=p.id and bo.archived_at is null)) or
    (p_type in ('health_event','medical_program') and p.role='nurse')));
 $$;
 create function public.sms_require_manager(p_type text)

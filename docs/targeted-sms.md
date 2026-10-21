@@ -1,4 +1,4 @@
-﻿# Targeted resident SMS (iProgSMS)
+# Targeted resident SMS (iProgSMS)
 
 ## Rollout status
 
@@ -20,7 +20,7 @@ Dry runs work through guarded database RPCs without the sender function or provi
 
 The authoritative population is `barangay_residents`, not the Voter Reference List or online-account population. Active directory residents can participate without `profile_id`. No name matching, voter joins, profile creation, inferred medical eligibility, complaints, or incidents are used.
 
-Migration 036 allows the `official` profile role to manage announcements/events and the `nurse` role to manage health events; existing program management and the 017 Nurse audit rules use that same Nurse role. The new guard mirrors those permissions. It deliberately does not use Secretary/Punong-only resident-record administration permissions to grant Nurses general directory access.
+Migration 036 allows the `official` profile role to manage announcements/events and the `nurse` role to manage health events; existing program management and the 017 Nurse audit rules use that same Nurse role. Announcement/Event SMS additionally requires the stable UUID `official_account_links` relationship to a non-archived `barangay_officials` record, matching the active-identity predicate in 044 for the explicit worker actor. No position restriction is added. This is deliberately narrower than the role-only source policies in 036. Health Event/Program SMS remains Nurse-role-only; the baseline Medical Program policy DDL is not present in this migration history, so its deployed definition has not been independently verified. It deliberately does not use Secretary/Punong-only resident-record administration permissions to grant Nurses general directory access.
 
 New tables have RLS enabled, no policies and no direct PUBLIC/anon/authenticated/service-role privileges. Guarded RPCs return counts/configuration/history, never recipient lists or bulk phones. The worker RPCs grant EXECUTE only to service_role and recheck the verified initiating actor/source role. Edge authentication uses `auth.getUser()`, not a browser flag or publishable key alone.
 

@@ -11,12 +11,17 @@ let db;(async()=>{
  create function auth.role() returns text language sql stable as $$select current_setting('test.role',true)$$;
  create table public.profiles(id uuid primary key,role text,full_name text);
  create function public.is_official(p_id uuid) returns boolean language sql stable security definer as $$select exists(select 1 from public.profiles where id=p_id and role='official')$$;
+ create table public.barangay_officials(id uuid primary key,position text,archived_at timestamptz);
+ create table public.official_account_links(official_id uuid primary key references public.barangay_officials(id),profile_id uuid unique references public.profiles(id));
  create table public.activity_log(id uuid default gen_random_uuid(),action text,entity_type text,entity_id uuid,subject text,actor_id uuid,actor_name text);
  create table public.announcements(id uuid primary key,title text,description text);
  create table public.events(id bigint primary key,title text,event_date date,location text);
  create table public.health_events(id uuid primary key,title text,event_date date,location text);
  create table public.medical_programs(id uuid primary key,title text,schedule_label text,time_label text);
  insert into public.profiles values('${id(1)}','official','Official'),('${id(2)}','nurse','Nurse'),('${id(3)}','resident','Resident'),('${id(4)}','tanod','Tanod');
+ insert into public.profiles values('${id(5)}','official','Unlinked'),('${id(6)}','official','Archived');
+ insert into public.barangay_officials values('${id(20)}','Kagawad',null),('${id(21)}','Barangay Secretary',now());
+ insert into public.official_account_links values('${id(20)}','${id(1)}'),('${id(21)}','${id(6)}');
  insert into public.announcements values('${id(10)}','Water advisory','Public notice');
  insert into public.events values(11,'Public event','2026-11-01','Hall');
  insert into public.health_events values('${id(12)}','Health event','2026-11-02','Health Center');
@@ -36,6 +41,13 @@ let db;(async()=>{
  const preview=(type='announcement',source=id(10),audience={type:'all_residents'})=>db.query('select public.sms_preview($1,$2,null,$3) value',[type,source,audience]).then(r=>r.rows[0].value)
  const prepare=(snap,key=500,dry=true,type='announcement',source=id(10),kind='initial')=>db.query('select public.sms_prepare_broadcast($1,$2,$3,$4,$5,$6,$7) id',[type,source,kind,snap.audience,snap.preview_token,id(key),dry]).then(r=>r.rows[0].id)
  await test('anon/resident/Tanod cannot preview; directory and deliveries remain private',async()=>{for(const [n,role]of[[null,'anon'],[3,'authenticated'],[4,'authenticated']]){await actor(n,role);await assert.rejects(preview());await assert.rejects(db.query('select * from public.sms_broadcast_recipients'),e=>e.code==='42501')}})
+ await test('Official SMS requires a stable linked active identity, not role or position alone',async()=>{
+  for(const n of [5,6]){await actor(n);await assert.rejects(preview(),e=>e.code==='42501');await assert.rejects(preview('event','11'),e=>e.code==='42501')}
+  await actor(1);assert.equal((await preview()).eligible,4);assert.equal((await preview('event','11')).eligible,4);
+  await owner(`delete from public.official_account_links where profile_id='${id(1)}'`);await actor(1);await assert.rejects(preview(),e=>e.code==='42501');
+  await owner(`insert into public.official_account_links values('${id(20)}','${id(1)}')`);
+  await actor(2);assert.equal((await preview('health_event',id(12))).eligible,4);assert.equal((await preview('medical_program',id(13))).eligible,4);
+ })
  await test('Official content and Nurse health authorization stay separate',async()=>{await actor(1);await assert.rejects(preview('health_event',id(12)));await actor(2);await assert.rejects(preview());assert.equal((await preview('medical_program',id(13))).eligible,4)})
  await test('all active directory residents counted; missing phones and normalized duplicates skipped',async()=>{await actor(1);const s=await preview();assert.equal(s.eligible,4);assert.equal(s.recipients,2);assert.equal(s.skipped,2);assert.ok(!JSON.stringify(s).includes('639171234567'));assert.ok(!('_recipients'in s))})
  await test('Senior 60+ includes birthday today, excludes tomorrow and missing DOB',async()=>{await actor(1);const s=await preview('announcement',id(10),{type:'senior_citizens'});assert.equal(s.eligible,2);assert.equal(s.missing_dob,1)})
@@ -46,6 +58,11 @@ let db;(async()=>{
  await test('changed audience after preview requires fresh confirmation',async()=>{await actor(1);const s=await preview();await owner(`update public.barangay_residents set mobile_number='09179999999' where id='${id(104)}'`);await actor(1);await assert.rejects(prepare(s,502),/changed/);})
  let live
  await test('one live initial per source prevents repeated publishing with another request key',async()=>{await actor(1);const s=await preview();live=await prepare(s,503,false);await assert.rejects(prepare(s,504,false),e=>e.code==='23505')})
+ await test('worker rejects an initiating official archived or unlinked after preparation',async()=>{
+  await owner(`update public.barangay_officials set archived_at=now() where id='${id(20)}'`);await actor(null,'service_role');await assert.rejects(db.query('select * from public.sms_claim_batch($1,$2)',[live,id(1)]),e=>e.code==='42501');
+  await owner(`update public.barangay_officials set archived_at=null where id='${id(20)}'`);await owner(`delete from public.official_account_links where profile_id='${id(1)}'`);await actor(null,'service_role');await assert.rejects(db.query('select * from public.sms_claim_batch($1,$2)',[live,id(1)]),e=>e.code==='42501');
+  await owner(`insert into public.official_account_links values('${id(20)}','${id(1)}')`);
+ })
  await test('worker claim is service-only and rechecks initiating actor',async()=>{await actor(1);await assert.rejects(db.query('select * from public.sms_claim_batch($1,$2)',[live,id(1)]),e=>e.code==='42501');await actor(null,'service_role');await assert.rejects(db.query('select * from public.sms_claim_batch($1,$2)',[live,id(2)]),e=>e.code==='42501')})
  let batch
  await test('durable claims never reclaim attempting recipients',async()=>{await actor(null,'service_role');batch=(await db.query('select * from public.sms_claim_batch($1,$2)',[live,id(1)])).rows;assert.equal(batch.length,2);assert.equal((await db.query('select * from public.sms_claim_batch($1,$2)',[live,id(1)])).rows.length,0)})
