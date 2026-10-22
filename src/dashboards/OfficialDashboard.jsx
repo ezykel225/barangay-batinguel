@@ -49,6 +49,7 @@ import OfficialComplaints from '../complaints/OfficialComplaints'
 import IncidentsPanel from '../incidents/IncidentsPanel'
 import TanodPanel from '../tanod/TanodPanel'
 import SafetyMapPanel from '../safetymap/SafetyMapPanel'
+import CreditManagement from '../communityCredit/CreditManagement'
 import { canGenerate } from '../documents/documentRegistry'
 import {
   actionCellIsEmpty,
@@ -4371,6 +4372,8 @@ const OfficialDashboard = () => {
             />
           </div>
         )}
+
+        {activeTab === 'community-credit' && <CreditManagement canManage={isSecretary || isKapitan} />}
 
         {activeTab === 'officials' && (
           <div>

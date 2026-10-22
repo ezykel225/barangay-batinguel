@@ -30,6 +30,7 @@ import toast from 'react-hot-toast'
 import Sidebar from '../components/Sidebar'
 import { useModalA11y } from '../components/useModalA11y'
 import NotificationBell from '../components/NotificationBell'
+import CreditProfile from '../communityCredit/CreditProfile'
 import { useNotifications } from '../components/useNotifications'
 import '../components/Sidebar.css'
 import './ResidentDashboard.css'
@@ -1010,6 +1011,8 @@ const ResidentDashboard = () => {
             role are bounced before this renders, and P1's fail-safe is
             untouched. No new role, and no new protected route. */}
         {activeTab === 'complaints' && <MyComplaints startFiling={startComplaint} />}
+
+        {activeTab === 'community-credit' && <div><div className="resident-dashboard-header"><h1>Community Credit</h1><p>View your current policy-based score and immutable credit history.</p></div><CreditProfile /></div>}
 
         {selectedReservation && <PortalDetailsDialog title="Reservation Details" reference={selectedReservation.reference} status={RESERVATION_STATUS_LABELS[selectedReservation.status]?.label || selectedReservation.status} statusClassName={RESERVATION_STATUS_LABELS[selectedReservation.status]?.className || ''} onClose={() => setSelectedReservation(null)}>
           <dl>{[

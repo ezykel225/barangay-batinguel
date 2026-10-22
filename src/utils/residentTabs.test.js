@@ -31,7 +31,7 @@ describe('the ?tab= deep link into the resident portal', () => {
       // ⚠️ 'complaints' was added by P3-B1 together with the fifth
       // entry in Sidebar's residentNavItems. This assertion failing is
       // the guard working: the two arrays must not drift.
-      'dashboard', 'documents', 'reservations', 'complaints', 'settings',
+      'dashboard', 'documents', 'reservations', 'complaints', 'community-credit', 'settings',
     ])
   })
 })

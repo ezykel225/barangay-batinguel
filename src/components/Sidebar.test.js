@@ -147,14 +147,14 @@ describe('A. role="official"', () => {
   // ⚠️ A DEFINITION CHANGE, NOT A LOOSENED ASSERTION: the guard still
   // compares the WHOLE list by equality, so a fourteenth surface added
   // without a decision still fails here.
-  it('renders the fifteen Official destinations', () => {
+  it('renders the sixteen Official destinations', () => {
     const { container } = renderSidebar('official')
     expect(navItems(container)).toEqual([
       'Dashboard', 'Announcements', 'Events', 'Reservations',
       'Document Requests', 'Complaints',
       'Incidents & Blotter', 'Tanod Operations', 'Safety Map & Analytics',
       'Waste Management',
-      'Officials Directory', 'Residents',
+      'Officials Directory', 'Residents', 'Community Credit',
       'Reports', 'Activity Log', 'Settings',
     ])
   })
@@ -195,13 +195,13 @@ describe('B. role="nurse"', () => {
 })
 
 describe('C. role="resident"', () => {
-  it('renders the five Resident destinations', () => {
+  it('renders the six Resident destinations', () => {
     const { container } = renderSidebar('resident')
     expect(navItems(container)).toEqual([
       // ⚠️ `Complaints` was added by P3-B1, which also added
       // 'complaints' to RESIDENT_TABS -- residentTabs.test.js is what
       // holds those two arrays together.
-      'Dashboard', 'Document Requests', 'My Reservations', 'Complaints', 'Settings',
+      'Dashboard', 'Document Requests', 'My Reservations', 'Complaints', 'Community Credit', 'Settings',
     ])
   })
 
@@ -342,7 +342,7 @@ describe('the mobile drawer', () => {
   it('offers the Official destinations to an official', async () => {
     const { container } = renderSidebar('official')
     await openDrawer()
-    expect(drawerItems(container)).toHaveLength(15)
+    expect(drawerItems(container)).toHaveLength(16)
     expect(drawerItems(container)).toContain('Officials Directory')
     expect(drawerItems(container)).not.toContain('Voter Reference List')
     // The drawer is the WHOLE of navigation on a phone, so a tab that

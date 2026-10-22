@@ -6,6 +6,7 @@ import { describeVerification } from '../utils/residentGroups'
 import { purokLabel } from './residentPresentation'
 import { residentBirthDateLabel, residentMobileLabel } from './residentProfileDisplay'
 import './ResidentProfileDialog.css'
+import CreditProfile from '../communityCredit/CreditProfile'
 
 export function ResidentAvatar({ resident, profile }) {
   const [failed, setFailed] = useState(false)
@@ -16,7 +17,7 @@ export function ResidentAvatar({ resident, profile }) {
 }
 
 export default function ResidentProfileDialog({resident,profile,onClose,onEdit}) {
-  const linked = resident.profile_id ? 'Linked' : 'Not linked'
+  const linked = resident.account_linked || resident.profile_id ? 'Linked' : 'Not linked'
   const active = resident.resident_status === 'active'
   return <div className="resident-profile-dialog"><PortalDetailsDialog title="Resident Profile" onClose={onClose}>
     <div className="resident-profile-heading">
@@ -26,7 +27,7 @@ export default function ResidentProfileDialog({resident,profile,onClose,onEdit})
         <div className="resident-profile-status"><span className={`badge ${active?'badge-approved':'badge-pending'}`}>{active?'Active':'Inactive'}</span></div>
         <p className="resident-profile-purok"><FaMapMarkerAlt aria-hidden="true"/><span>{purokLabel(resident.purok) || 'Purok not recorded'}</span></p>
       </div>
-      <button type="button" className="confirm-dialog-confirm" onClick={onEdit}>Edit Resident</button>
+      {onEdit&&<button type="button" className="confirm-dialog-confirm" onClick={onEdit}>Edit Resident</button>}
     </div>
     <div className="resident-profile-sections">
       <section className="resident-profile-section" aria-label="Personal Information">
@@ -38,5 +39,6 @@ export default function ResidentProfileDialog({resident,profile,onClose,onEdit})
         <dl><div><dt>Online account</dt><dd>{linked}</dd></div><div><dt>Account verification</dt><dd><span className="resident-profile-verification">{profile ? describeVerification(profile.verification_status).label : 'Not available'}</span></dd></div></dl>
       </section>
     </div>
+    <CreditProfile residentId={resident.id} showResident />
   </PortalDetailsDialog></div>
 }

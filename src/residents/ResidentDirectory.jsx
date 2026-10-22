@@ -9,7 +9,7 @@ import { manilaToday } from '../utils/displayLabels'
 import { directorySummary, purokLabel, residentPurokOptions } from './residentPresentation'
 import './ResidentDirectory.css'
 
-export default function ResidentDirectory({ profiles = [], onEligibilityChange }) {
+export default function ResidentDirectory({ canManage = true, profiles = [], onEligibilityChange }) {
   const [confirm, confirmation] = useConfirm()
   const eligibilityLock = useRef(false)
   const refreshKey = profiles.map(p => `${p.id}:${p.verification_status}`).join('|')
@@ -28,14 +28,14 @@ export default function ResidentDirectory({ profiles = [], onEligibilityChange }
   const firstRef = useRef(null)
   useEffect(() => {
     let alive = true
-    supabase.rpc('barangay_resident_directory').then(({ data, error: err }) => {
+    supabase.rpc(canManage ? 'barangay_resident_directory' : 'community_credit_resident_directory').then(({ data, error: err }) => {
       if (!alive) return
       if (err) setError('Resident directory unavailable. Check authorization and whether migration 054 has been applied.')
       else setRows(data || [])
       setLoading(false)
     })
     return () => { alive = false }
-  }, [refreshKey])
+  }, [refreshKey,canManage])
   const openForm = row => { setForm(row ? { ...emptyResident(), ...row, birth_date: row.birth_date || '' } : emptyResident()); setFormError('') }
   const save = async event => {
     event.preventDefault()
@@ -78,8 +78,8 @@ export default function ResidentDirectory({ profiles = [], onEligibilityChange }
   const change = event => setForm({ ...form, [event.target.name]: event.target.value })
   const filtered = filterResidents(rows, search, status, purok)
   return <section className="resident-directory dashboard-card" aria-label="Barangay Residents">
-    <div className="directory-heading"><div><h2>Barangay Residents</h2><p>Manage resident details and explicit online-account links.</p></div>
-      <button className="confirm-dialog-confirm" onClick={() => openForm(null)} disabled={loading || !!error}>Add Resident</button></div>
+    <div className="directory-heading"><div><h2>Barangay Residents</h2><p>{canManage?'Manage resident details and explicit online-account links.':'Open a resident profile for legitimate barangay use.'}</p></div>
+      {canManage&&<button className="confirm-dialog-confirm" onClick={() => openForm(null)} disabled={loading || !!error}>Add Resident</button>}</div>
     {notice && <p role="status">{notice}</p>}{error && <p role="alert">{error}</p>}
     {!loading && !error && <dl className="directory-summary">{directorySummary(rows).map(([label,value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>}
     <div className={`directory-filters${search.trim() || status || purok ? ' has-filters' : ''}`}><label>Search residents<input placeholder="Search residents..." value={search} onChange={e => setSearch(e.target.value)} type="search" /></label>
@@ -87,14 +87,14 @@ export default function ResidentDirectory({ profiles = [], onEligibilityChange }
       <label>Purok filter<select value={purok} onChange={e => setPurok(e.target.value)}><option value="">All Puroks</option>{residentPurokOptions(rows).map(p => <option key={p.value} value={p.value}>{p.label}</option>)}</select></label>{(search.trim() || status || purok) && <button type="button" className="directory-reset" onClick={() => { setSearch(''); setStatus(''); setPurok('') }}>Clear filters</button>}</div>
     {loading ? <p role="status">Loading resident directory...</p> : !error && <><p>{search.trim() || status || purok ? `Showing ${filtered.length} of ${rows.length} residents` : `${rows.length} ${rows.length === 1 ? 'resident' : 'residents'}`}</p>
       {filtered.length > 0 && <table className="directory-table"><thead><tr><th scope="col">Resident name</th><th scope="col">Purok</th><th scope="col">Status</th><th scope="col">Online account</th><th scope="col">Actions</th></tr></thead>
-        <tbody>{filtered.map(r => <tr key={r.id}><td data-label="Resident name"><button className="resident-name-button" onClick={() => setView(r)}>{residentName(r)}</button></td><td data-label="Purok">{purokLabel(r.purok) || 'Not recorded'}</td><td data-label="Status"><span className={`badge ${r.resident_status === 'active' ? 'badge-approved' : 'badge-pending'}`}>{r.resident_status === 'active' ? 'Active' : 'Inactive'}</span></td><td data-label="Online account">{r.profile_id ? 'Explicitly linked' : 'Not linked'}</td><td data-label="Actions"><ActionMenu portal label={`Actions for ${residentName(r)}`} subject={residentName(r)} items={[
-          {key:'edit',label:'Edit resident',onSelect:()=>openForm(r)},
-          {key:'eligibility',label:r.resident_status==='active'?'Mark as Not Resident':'Reactivate resident',danger:r.resident_status==='active',onSelect:()=>changeEligibility(r)},
+        <tbody>{filtered.map(r => <tr key={r.id}><td data-label="Resident name"><button className="resident-name-button" onClick={()=>setView(r)}>{residentName(r)}</button></td><td data-label="Purok">{purokLabel(r.purok) || 'Not recorded'}</td><td data-label="Status"><span className={`badge ${r.resident_status === 'active' ? 'badge-approved' : 'badge-pending'}`}>{r.resident_status === 'active' ? 'Active' : 'Inactive'}</span></td><td data-label="Online account">{r.account_linked || r.profile_id ? 'Explicitly linked' : 'Not linked'}</td><td data-label="Actions"><ActionMenu portal label={`Actions for ${residentName(r)}`} subject={residentName(r)} items={[
+          {key:'profile',label:'View resident profile',onSelect:()=>setView(r)},
+          ...(canManage?[{key:'edit',label:'Edit resident',onSelect:()=>openForm(r)},{key:'eligibility',label:r.resident_status==='active'?'Mark as Not Resident':'Reactivate resident',danger:r.resident_status==='active',onSelect:()=>changeEligibility(r)}]:[]),
         ]}/></td></tr>)}</tbody>
       </table>}
       {!filtered.length && <p>{rows.length ? 'No residents match the current filters.' : 'No barangay resident records have been added yet.'}</p>}</>}
     {confirmation}
-    {view && <ResidentProfileDialog key={view.id} resident={view} profile={profiles.find(p=>p.id===view.profile_id)} onClose={()=>setView(null)} onEdit={()=>{const row=view;setView(null);setTimeout(()=>openForm(row),0)}}/>}
+    {view && <ResidentProfileDialog key={view.id} resident={view} profile={profiles.find(p=>p.id===view.profile_id)} onClose={()=>setView(null)} onEdit={canManage?()=>{const row=view;setView(null);setTimeout(()=>openForm(row),0)}:null}/>}
     {form && <div className="directory-dialog"><DialogShell open titleId={titleId} title={form.id ? 'Edit Resident' : 'Add Resident'} initialFocusRef={firstRef} busy={busy} onCancel={() => setForm(null)}
       header={<header className="directory-modal-header"><h2 id={titleId}>{form.id ? 'Edit Resident' : 'Add Resident'}</h2><button type="button" aria-label="Close resident form" disabled={busy} onClick={() => setForm(null)}>×</button></header>}>
       <form onSubmit={save} className="directory-form"><div className="directory-fields">

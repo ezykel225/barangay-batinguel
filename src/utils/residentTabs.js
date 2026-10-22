@@ -20,7 +20,7 @@
 // The resident portal's own tab ids. These must match
 // `residentNavItems` in Sidebar.jsx; `residentTabs.test.js` is the only
 // thing holding the two together, so do not edit one without the other.
-export const RESIDENT_TABS = ['dashboard', 'documents', 'reservations', 'complaints', 'settings']
+export const RESIDENT_TABS = ['dashboard', 'documents', 'reservations', 'complaints', 'community-credit', 'settings']
 
 export const DEFAULT_RESIDENT_TAB = 'dashboard'
 
