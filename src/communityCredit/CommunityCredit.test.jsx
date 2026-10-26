@@ -17,6 +17,23 @@ test('renders a configured server-calculated score and empty ledger',async()=>{
  expect(screen.getByText(/verified person-linking and outcome review/)).toBeInTheDocument()
 })
 
+test('renders enrollment start and the approved 100-point model',async()=>{
+ api.getResidentCreditProfile.mockResolvedValue({...profile,enrolled:true,starting_score:100,base_score:100,event_total:0,current_score:100,credit_started_at:'2026-10-22T00:00:00Z'})
+ render(<CreditProfile residentId="resident"/>)
+ expect(await screen.findByLabelText('Current community credit score 100 out of 100')).toBeInTheDocument()
+ expect(screen.getByText('Starting score').nextSibling).toHaveTextContent('100')
+ expect(screen.getByText('Credit started').nextSibling).not.toHaveTextContent('None')
+})
+
+test('does not invent a score before controlled enrollment',async()=>{
+ api.getResidentCreditProfile.mockResolvedValue({configured:true,enrolled:false,policy_name:'Fixture',minimum_score:0,maximum_score:100,resident:profile.resident,ledger:[]})
+ render(<CreditProfile residentId="resident"/>)
+ expect(await screen.findByText('Community credit enrollment has not started for this resident.')).toBeInTheDocument()
+ expect(screen.queryByLabelText(/Current community credit score/)).not.toBeInTheDocument()
+ expect(screen.queryByRole('heading',{name:'Credit Ledger'})).not.toBeInTheDocument()
+ expect(screen.queryByText('No credit events recorded.')).not.toBeInTheDocument()
+})
+
 test('renders the safe no-policy state',async()=>{
  api.getResidentCreditProfile.mockResolvedValue({configured:false,resident:profile.resident,ledger:[]})
  render(<CreditProfile residentId="resident"/>)
@@ -69,10 +86,15 @@ test('policy dialog Save still submits the guarded policy RPC',async()=>{
  api.getCreditAdminState.mockResolvedValue(adminState);api.saveCreditPolicy.mockResolvedValue('new-policy')
  render(<CreditManagement canManage/>);fireEvent.click(await screen.findByRole('button',{name:'Create policy'}))
  fireEvent.change(screen.getByLabelText('Name'),{target:{value:'Fixture'}})
- fireEvent.change(screen.getByLabelText('Minimum score'),{target:{value:'0'}})
- fireEvent.change(screen.getByLabelText('Base score'),{target:{value:'50'}})
- fireEvent.change(screen.getByLabelText('Maximum score'),{target:{value:'100'}})
+ expect(screen.queryByRole('spinbutton',{name:/score/i})).not.toBeInTheDocument()
+ expect(screen.getByLabelText('Fixed Community Credit v1 score configuration')).toHaveTextContent('Starting score100Minimum score0Maximum score100')
  fireEvent.click(screen.getByRole('button',{name:'Save draft policy'}))
- await waitFor(()=>expect(api.saveCreditPolicy).toHaveBeenCalledWith(expect.objectContaining({name:'Fixture',minimum_score:'0',base_score:'50',maximum_score:'100'})))
+ await waitFor(()=>expect(api.saveCreditPolicy).toHaveBeenCalledWith(expect.objectContaining({name:'Fixture',minimum_score:0,base_score:100,maximum_score:100})))
+})
+
+test('activation reports the actual server enrollment count',async()=>{
+ api.getCreditAdminState.mockResolvedValue(adminState);api.activateCreditPolicy.mockResolvedValue({policy_id:'policy-1',added:43,enrolled:43})
+ render(<CreditManagement canManage/>);fireEvent.click(await screen.findByRole('button',{name:'Activate'}))
+ expect(await screen.findByText('Policy activated. 43 active residents enrolled.')).toBeInTheDocument()
 })
 

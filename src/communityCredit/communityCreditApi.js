@@ -15,6 +15,7 @@ export const saveCreditPolicy = policy => rpc('save_community_credit_policy', {
 })
 export const activateCreditPolicy = id => rpc('activate_community_credit_policy', { p_id: id })
 export const retireCreditPolicy = id => rpc('retire_community_credit_policy', { p_id: id })
+export const enrollActiveResidents = id => rpc('community_credit_enroll_active_residents', { p_policy_id: id })
 export const saveCreditRule = rule => rpc('save_community_credit_rule', {
   p_id: rule.id || null, p_policy_id: rule.policy_id, p_rule_code: rule.rule_code, p_title: rule.title,
   p_description: rule.description || '', p_category: rule.category, p_source_domain: rule.source_domain,

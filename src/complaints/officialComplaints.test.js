@@ -1122,7 +1122,7 @@ describe('L. the architecture the phase committed to', () => {
   it('lists the expected migrations through 058', () => {
     const dir = path.join(__dirname, '..', '..', 'supabase-migrations')
     const files = fs.readdirSync(dir).filter((f) => f.endsWith('.sql')).sort()
-    expect(files).toHaveLength(59)
+    expect(files).toHaveLength(60)
     expect(files[41]).toBe('042_kp_screening_foundation.sql')
     expect(files[42]).toBe('043_kp_case_hearings_summons.sql')
     expect(files[43]).toBe('044_incident_blotter_tanod.sql')
@@ -1141,6 +1141,7 @@ describe('L. the architecture the phase committed to', () => {
     expect(files[56]).toBe('057_incident_map_location.sql')
     expect(files[57]).toBe('058_targeted_sms.sql')
     expect(files[58]).toBe('059_community_credit_foundation.sql')
+    expect(files[59]).toBe('060_community_credit_enrollment.sql')
   })
 })
 
