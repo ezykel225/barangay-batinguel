@@ -302,9 +302,8 @@ describe('migration 028 and the dashboard agree on which positions carry power',
     expect(idx).toContain('WHERE archived_at IS NULL')
   })
 
-  it('the dashboard gates on those same three strings', () => {
+  it('the retained dashboard gates still use the powered positions they need', () => {
     expect(OFFICIAL).toContain("officialInfo?.position === 'Punong Barangay'")
-    expect(OFFICIAL).toContain("officialInfo?.position === 'Barangay Treasurer'")
     expect(OFFICIAL).toContain("officialInfo?.position === 'Barangay Secretary'")
   })
 })

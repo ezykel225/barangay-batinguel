@@ -30,8 +30,7 @@ const EServices = () => {
       <Navbar />
 
       <main id="main-content" tabIndex={-1}>
-        {/* Compact hero. The informational pages (Home, Officials,
-            Health Center) carry a tall photographic hero; this page
+        {/* Compact hero. The informational pages carry a tall photographic hero; this page
             exists to get somebody into a service, so the content
             starts sooner. */}
         <section className="eservices-hero">
@@ -81,8 +80,8 @@ const EServices = () => {
             <p>
               Visit the Barangay Hall during office hours, or see the contact
               details at the bottom of this page. Document requests are
-              processed by the Barangay Secretary and court reservations by
-              the Barangay Treasurer.
+              processed by the Barangay Secretary, while complaints are
+              reviewed by authorized barangay personnel.
             </p>
           </aside>
         </section>

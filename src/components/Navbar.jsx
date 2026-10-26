@@ -23,7 +23,7 @@ const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
-  const { user, role, logout } = useAuth()
+  const { user, role, loading: authLoading, logout } = useAuth()
   const [residentProfile, setResidentProfile] = useState(null)
 
   useEffect(() => {
@@ -51,6 +51,7 @@ const Navbar = () => {
   }
 
   const isLoggedInResident = role === 'resident' && !!user
+  const isUnsupportedAccount = !!user && !authLoading && !role
 
   return (
     <nav className="navbar">
@@ -88,14 +89,6 @@ const Navbar = () => {
               className={location.pathname === '/officials'
                 ? 'active' : ''}>
               Officials
-            </Link>
-          </li>
-          <li>
-            <Link
-              to="/health-center"
-              className={location.pathname === '/health-center'
-                ? 'active' : ''}>
-              Health Center
             </Link>
           </li>
           {/* ⚠️ A PUBLIC entry, deliberately NOT an E-Services item.
@@ -142,6 +135,15 @@ const Navbar = () => {
                 )}
                 <span>{residentProfile?.full_name?.split(' ')[0] || 'My Account'}</span>
               </Link>
+            </li>
+          ) : isUnsupportedAccount ? (
+            <li className="navbar-profile-item">
+              <span className="navbar-unsupported-role">
+                Your account role is no longer supported by this version of the system.
+              </span>
+              <button type="button" className="navbar-login-btn" onClick={handleLogout}>
+                Logout
+              </button>
             </li>
           ) : (
             <li>
@@ -190,11 +192,6 @@ const Navbar = () => {
           </Link>
         </li>
         <li>
-          <Link to="/health-center" onClick={toggleMenu}>
-            Health Center
-          </Link>
-        </li>
-        <li>
           <Link to="/community-safety" onClick={toggleMenu}>
             Community Safety
           </Link>
@@ -229,6 +226,21 @@ const Navbar = () => {
               <Link to="/resident" onClick={toggleMenu}>
                 My Account
               </Link>
+            </li>
+            <li>
+              <button
+                type="button"
+                className="navbar-mobile-login"
+                onClick={() => { toggleMenu(); handleLogout() }}
+              >
+                Logout
+              </button>
+            </li>
+          </>
+        ) : isUnsupportedAccount ? (
+          <>
+            <li className="navbar-unsupported-role">
+              Your account role is no longer supported by this version of the system.
             </li>
             <li>
               <button
