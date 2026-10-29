@@ -11,6 +11,8 @@ import {
   SAFETY_ERRORS, loadCoverageSummary, loadSafetyIncidents,
 } from './safetyApi'
 import { filterSafetyIncidents, safetyAnalyticsFor } from './officialIncidentAnalytics'
+import { loadBarangayAnalytics } from '../analytics/analyticsApi'
+import { displayLabel } from '../people/PeopleHistory'
 import './SafetyMap.css'
 
 // Combined Phase 2 — the internal safety map and the descriptive analytics.
@@ -44,6 +46,7 @@ const SafetyMapPanel = () => {
   const [coverageProblem, setCoverageProblem] = useState('')
   const [loading, setLoading] = useState(true)
   const [problem, setProblem] = useState('')
+  const [linkedAnalytics, setLinkedAnalytics] = useState(null)
   useEffect(() => {
     let live = true
     loadSafetyIncidents().then(rows => { if (live) setIncidents(rows) })
@@ -61,6 +64,12 @@ const SafetyMapPanel = () => {
       .catch(() => { if (live) setCoverageProblem(SAFETY_ERRORS.analyticsFailed) })
     return () => { live = false }
   }, [from, to])
+  useEffect(() => {
+    let live = true
+    loadBarangayAnalytics({ from, to, category: type }).then(result => { if (live) setLinkedAnalytics(result) })
+      .catch(() => { if (live) setLinkedAnalytics(null) })
+    return () => { live = false }
+  }, [from, to, type])
   const filteredIncidents = useMemo(() => filterSafetyIncidents(incidents, { type, from, to }), [incidents, type, from, to])
   const { points, byType, byStatus, monthly, locations, mapHotspots } = useMemo(() => safetyAnalyticsFor(filteredIncidents), [filteredIncidents])
   const coverage = coverageResult?.from === from && coverageResult?.to === to ? coverageResult.rows : []
@@ -134,6 +143,14 @@ const SafetyMapPanel = () => {
             </ul>
           </>
         )}
+      </div>
+
+      <div className="dashboard-card" aria-label="Linked record insights">
+        <div className="dashboard-card-header"><h2 className="section-heading"><FaChartBar aria-hidden="true" /> Linked role, outcome and time insights</h2></div>
+        <p className="smap-note" role="note"><FaInfoCircle aria-hidden="true" /> These descriptive counts use the same date and incident-type filters as the map. Person-related counts include only verified UUID links.</p>
+        {!linkedAnalytics?<p className="complaint-empty">Linked-record insights are unavailable.</p>:<div className="analytics-insights-grid">
+          {[['Roles',linkedAnalytics.roles,'role'],['Outcomes',linkedAnalytics.outcomes,'outcome'],['Weekdays',linkedAnalytics.weekdays,'weekday'],['Recorded time periods',linkedAnalytics.time_buckets,'bucket']].map(([title,rows,field])=><section className="analytics-block" key={title}><h3>{title}</h3>{rows?.length?<ul className="analytics-bars">{rows.map((row,index)=><li key={`${row[field]}-${index}`}><button type="button" disabled><span>{field==='bucket'?`${Number(row.bucket)*4}:00–${Number(row.bucket)*4+3}:59`:displayLabel(row[field])}</span><strong>{row.total}</strong></button></li>)}</ul>:<p>No matching verified records.</p>}</section>)}
+        </div>}
       </div>
 
       <div className="dashboard-card">

@@ -50,6 +50,7 @@ import TanodPanel from '../tanod/TanodPanel'
 import SafetyMapPanel from '../safetymap/SafetyMapPanel'
 import CreditManagement from '../communityCredit/CreditManagement'
 import PeopleHistory from '../people/PeopleHistory'
+import AnalyticsInsights from '../analytics/AnalyticsInsights'
 import { canGenerate } from '../documents/documentRegistry'
 import {
   actionCellIsEmpty,
@@ -3593,7 +3594,8 @@ const OfficialDashboard = () => {
         {/* ========================
             REPORTS TAB
         ======================== */}
-        {activeTab === 'reports' && (
+        {activeTab === 'reports' && <AnalyticsInsights />}
+        {false && activeTab === 'reports' && (
           <div>
             <div className="official-dashboard-header">
               <h1>Reports</h1>

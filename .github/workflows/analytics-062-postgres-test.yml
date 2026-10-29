@@ -1,0 +1,112 @@
+name: Analytics 062 isolated PostgreSQL validation
+on:
+  push:
+    branches: [analytics-062-ci-test]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CI_WORKDIR: ${{ runner.temp }}/analytics-062-ci
+      CI_DB_CONTAINER: supabase_db_analytics-062-ci
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Initialize unlinked disposable local database
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$CI_WORKDIR"
+          supabase init --workdir "$CI_WORKDIR"
+          test ! -e "$CI_WORKDIR/supabase/.temp/project-ref"
+          # Docker PostgreSQL only: no login/link, remote URL, or seed.
+          supabase db start --workdir "$CI_WORKDIR"
+          docker exec "$CI_DB_CONTAINER" pg_isready -U postgres -d postgres
+      - name: Copy exact migrations into disposable workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$CI_WORKDIR/supabase/migrations"
+          python3 - <<'PY'
+          import hashlib, os, pathlib
+          source = pathlib.Path('supabase-migrations')
+          target = pathlib.Path(os.environ['CI_WORKDIR']) / 'supabase/migrations'
+          files = sorted(source.glob('[0-9][0-9][0-9]_*.sql'))
+          assert len(files) == 62
+          assert [int(f.name[:3]) for f in files] == list(range(1, 63))
+          for f in files:
+              output = target / f.name
+              output.write_bytes(f.read_bytes())
+              assert hashlib.sha256(output.read_bytes()).digest() == hashlib.sha256(f.read_bytes()).digest()
+          PY
+      - name: Apply migrations 001 through 061 locally
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in "$CI_WORKDIR"/supabase/migrations/*.sql; do
+            number=$(basename "$file" | cut -c1-3)
+            if [ "$number" = 062 ]; then continue; fi
+            echo "Applying $(basename "$file") to isolated Docker PostgreSQL"
+            docker exec -i "$CI_DB_CONTAINER" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -v VERBOSITY=verbose < "$file"
+          done
+          echo 'Migration 001-061 local setup: PASS'
+      - name: Compile migration 062 locally
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker exec -i "$CI_DB_CONTAINER" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -v VERBOSITY=verbose < "$CI_WORKDIR/supabase/migrations/062_analytics_insights.sql"
+          echo 'Migration 062 PostgreSQL compilation: PASS'
+      - name: Snapshot Community Credit state
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker exec -i "$CI_DB_CONTAINER" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 <<'SQL'
+          create schema ci_validation;
+          create table ci_validation.credit_state(table_name text primary key, fingerprint text);
+          do $snapshot$
+          declare t record; fingerprint text;
+          begin
+            for t in select tablename from pg_catalog.pg_tables where schemaname='public' and tablename like 'community_credit_%' loop
+              execute format('select md5(coalesce(string_agg(row_to_json(x)::text,'''' order by row_to_json(x)::text),'''')) from public.%I x',t.tablename) into fingerprint;
+              insert into ci_validation.credit_state values(t.tablename,fingerprint);
+            end loop;
+          end; $snapshot$;
+          SQL
+      - name: Execute all 59 behavioral contracts
+        id: behavior
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker exec -i "$CI_DB_CONTAINER" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -v VERBOSITY=verbose < supabase-tests/062_analytics_behavioral.sql | tee "$RUNNER_TEMP/analytics-062-results.log"
+          grep -F 'PASS: all 59 migration-062 behavioral contracts passed' "$RUNNER_TEMP/analytics-062-results.log"
+          grep -Fx ROLLBACK "$RUNNER_TEMP/analytics-062-results.log"
+      - name: Verify rollback and Community Credit safety
+        if: ${{ !cancelled() && steps.behavior.outcome != 'skipped' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker exec -i "$CI_DB_CONTAINER" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 <<'SQL'
+          do $verify$
+          declare t record; c record; n bigint; fingerprint text;
+          begin
+            for t in select * from ci_validation.credit_state loop
+              execute format('select md5(coalesce(string_agg(row_to_json(x)::text,'''' order by row_to_json(x)::text),'''')) from public.%I x',t.table_name) into fingerprint;
+              if fingerprint is distinct from t.fingerprint then raise exception 'Community Credit changed: %',t.table_name; end if;
+            end loop;
+            for c in select c.table_schema,c.table_name,c.column_name from information_schema.columns c join information_schema.tables t using(table_schema,table_name) where t.table_type='BASE TABLE' and c.table_schema in ('public','auth') and c.udt_name='uuid' loop
+              execute format('select count(*) from %I.%I where %I::text like ''f062%%''',c.table_schema,c.table_name,c.column_name) into n;
+              if n<>0 then raise exception 'Fixture persisted: %.%.%',c.table_schema,c.table_name,c.column_name; end if;
+            end loop;
+            raise notice 'Rollback fixture verification: PASS; Community Credit unchanged';
+          end; $verify$;
+          SQL
+      - name: Stop disposable infrastructure
+        if: always()
+        run: supabase stop --workdir "$CI_WORKDIR" --no-backup

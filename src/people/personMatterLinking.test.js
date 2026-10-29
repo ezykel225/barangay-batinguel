@@ -16,7 +16,7 @@ beforeEach(() => { jest.clearAllMocks(); api.searchPeople.mockResolvedValue([]);
 describe('migration 061 identity and security contracts', () => {
   test('is ordered after 060 and leaves earlier migrations present', () => {
     const files = fs.readdirSync(path.join(process.cwd(), 'supabase-migrations')).filter(f => /^\d{3}_.*\.sql$/.test(f)).sort()
-    expect(files.slice(-2)).toEqual(['060_community_credit_enrollment.sql', '061_person_matter_linking.sql'])
+    expect(files.slice(-3)).toEqual(['060_community_credit_enrollment.sql', '061_person_matter_linking.sql', '062_analytics_insights.sql'])
   })
   test('creates external identities, reviewed resident transitions, and exact-one incident links', () => {
     expect(clean).toContain('create table public.external_persons')

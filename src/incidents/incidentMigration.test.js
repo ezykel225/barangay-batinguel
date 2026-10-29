@@ -41,7 +41,7 @@ describe('A. the migration file', () => {
   // not a loosened assertion.
   it('is still 044, still in place, with only the expected later migrations', () => {
     const files = fs.readdirSync(DIR).filter((f) => f.endsWith('.sql')).sort()
-    expect(files).toHaveLength(61)
+    expect(files).toHaveLength(62)
     expect(files[43]).toBe(FILE)
     expect(files[44]).toBe('045_public_safety_aggregates.sql')
     expect(files[45]).toBe('046_kp_conclude_case.sql')
