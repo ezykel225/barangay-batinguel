@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
-      CI_WORKDIR: ${{ runner.temp }}/analytics-062-ci
+      CI_WORKDIR: /tmp/analytics-062-ci
       CI_DB_CONTAINER: supabase_db_analytics-062-ci
     steps:
       - uses: actions/checkout@v4
