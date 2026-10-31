@@ -29,11 +29,14 @@ $$;
 
 create function public.person_analytics(p_person_kind text,p_person_id uuid,p_from date default null,p_to date default null,p_window text default 'all')
 returns jsonb language plpgsql stable security definer set search_path='' as $$
-declare v_identity jsonb; v_enrolled timestamptz; v_now timestamptz:=now(); v_today date:=(now() at time zone 'Asia/Manila')::date;
+declare v_admin boolean; v_identity jsonb; v_enrolled timestamptz; v_now timestamptz:=now(); v_today date:=(now() at time zone 'Asia/Manila')::date;
   v_filter_start timestamptz; v_filter_end timestamptz; v_current_start timestamptz; v_previous_start timestamptz; v_result jsonb;
 begin
   perform public.person_history_require_view();
-  if p_person_kind not in ('resident','external') or p_person_id is null or p_window not in ('all','last_30_days','last_90_days','last_12_months','previous_12_months','custom')
+  -- Complaint location notes are restricted to records administrators, as on the
+  -- complaints table policy; every other official reads them as 'Restricted'.
+  v_admin:=coalesce(public.current_official_may_administer_records(),false);
+  if p_person_kind is null or p_window is null or p_person_kind not in ('resident','external') or p_person_id is null or p_window not in ('all','last_30_days','last_90_days','last_12_months','previous_12_months','custom')
     or (p_window='custom' and (p_from is null and p_to is null)) or (p_from is not null and p_to is not null and p_from>p_to) then raise exception 'Invalid analytics request'; end if;
   v_current_start:=((v_today-interval '12 months')::date::timestamp at time zone 'Asia/Manila');
   v_previous_start:=((v_today-interval '24 months')::date::timestamp at time zone 'Asia/Manila');
@@ -54,7 +57,10 @@ begin
   end if;
   if v_identity is null then raise exception 'Person unavailable'; end if;
 
-  with raw as (select * from public.analytics_person_matters(p_person_kind,p_person_id)),
+  with raw as (select m.matter_key,m.matter_kind,m.matter_id,m.reference,m.occurred_at,m.category,
+      case when m.matter_kind='complaint' and not v_admin then 'Restricted' else m.area_label end area_label,
+      m.role,m.outcome,m.related_records
+    from public.analytics_person_matters(p_person_kind,p_person_id) m),
   filtered as (select * from raw where (v_filter_start is null or occurred_at>=v_filter_start) and (v_filter_end is null or occurred_at<v_filter_end)),
   matters as (select distinct on(matter_key) * from filtered order by matter_key,occurred_at),
   qualifying as (select distinct on(matter_key) * from raw where role in ('respondent','subject') order by matter_key,occurred_at),
@@ -91,7 +97,7 @@ begin
         when extract(hour from occurred_at at time zone 'Asia/Manila')<16 then '12 PM–3:59 PM' when extract(hour from occurred_at at time zone 'Asia/Manila')<20 then '4 PM–7:59 PM' else '8 PM–11:59 PM' end bucket,
        count(distinct matter_key) total from filtered group by 1,2) x),'[]'::jsonb),
     'monthly',coalesce((select jsonb_agg(x order by x.month) from
-      (select to_char(date_trunc('month',occurred_at at time zone 'Asia/Manila'),'YYYY-MM') month,count(distinct matter_key) total from filtered group by 1) x),'[]'::jsonb),
+      (select to_char(date_trunc('month',occurred_at at time zone 'Asia/Manila'),'YYYY-MM') as month,count(distinct matter_key) total from filtered group by 1) x),'[]'::jsonb),
     'comparison',jsonb_build_object('current_period','last_12_months','current_period_qualifying_matters',(select count(*) from current12),
       'previous_period_qualifying_matters',(select count(*) from previous12),'absolute_change',(select count(*) from current12)-(select count(*) from previous12)),
     'community_credit_periods',jsonb_build_object('enrolled',v_enrolled is not null,'started_at',v_enrolled,
@@ -119,11 +125,14 @@ end; $$;
 
 create function public.barangay_safety_analytics(p_from date default null,p_to date default null,p_category text default null,p_area text default null,p_window text default 'all')
 returns jsonb language plpgsql stable security definer set search_path='' as $$
-declare v_result jsonb; v_now timestamptz:=now(); v_today date:=(now() at time zone 'Asia/Manila')::date;
+declare v_admin boolean; v_result jsonb; v_now timestamptz:=now(); v_today date:=(now() at time zone 'Asia/Manila')::date;
   v_start timestamptz; v_end timestamptz; v_current_start timestamptz; v_previous_start timestamptz;
 begin
   perform public.person_history_require_view();
-  if p_window not in ('all','last_30_days','last_90_days','last_12_months','previous_12_months','custom')
+  -- The named, barangay-wide repeat_people list is for records administrators only.
+  -- Others receive NULL plus repeat_people_restricted=true, never an empty list.
+  v_admin:=coalesce(public.current_official_may_administer_records(),false);
+  if p_window is null or p_window not in ('all','last_30_days','last_90_days','last_12_months','previous_12_months','custom')
     or (p_window='custom' and (p_from is null and p_to is null)) or (p_from is not null and p_to is not null and p_from>p_to) then raise exception 'Invalid analytics range'; end if;
   v_current_start:=((v_today-interval '12 months')::date::timestamp at time zone 'Asia/Manila');
   v_previous_start:=((v_today-interval '24 months')::date::timestamp at time zone 'Asia/Manila');
@@ -146,24 +155,24 @@ begin
       'victim_matters',(select count(distinct incident_id) from parties where role='victim'),
       'substantiated_outcomes',(select count(distinct incident_id) from parties where outcome_status='substantiated'),
       'not_substantiated_outcomes',(select count(distinct incident_id) from parties where outcome_status='not_substantiated')),
-    'monthly',coalesce((select jsonb_agg(x order by x.month) from (select to_char(date_trunc('month',occurred_at at time zone 'Asia/Manila'),'YYYY-MM') month,count(*) total from incidents group by 1) x),'[]'::jsonb),
+    'monthly',coalesce((select jsonb_agg(x order by x.month) from (select to_char(date_trunc('month',occurred_at at time zone 'Asia/Manila'),'YYYY-MM') as month,count(*) total from incidents group by 1) x),'[]'::jsonb),
     'categories',coalesce((select jsonb_agg(x order by x.total desc,x.category) from (select incident_type category,count(*) total from incidents group by 1) x),'[]'::jsonb),
     'locations',coalesce((select jsonb_agg(x order by x.total desc,x.area) from (select area,count(*) total from incidents group by 1) x),'[]'::jsonb),
     'roles',coalesce((select jsonb_agg(x order by x.total desc,x.role) from (select role,count(distinct incident_id) total from parties group by 1) x),'[]'::jsonb),
     'outcomes',coalesce((select jsonb_agg(x order by x.total desc,x.outcome) from (select outcome_status outcome,count(distinct incident_id) total from parties group by 1) x),'[]'::jsonb),
     'weekdays',coalesce((select jsonb_agg(x order by x.weekday_number) from (select extract(isodow from occurred_at at time zone 'Asia/Manila')::int weekday_number,to_char(occurred_at at time zone 'Asia/Manila','FMDay') weekday,count(*) total from incidents group by 1,2) x),'[]'::jsonb),
     'time_buckets',coalesce((select jsonb_agg(x order by x.bucket) from (select (extract(hour from occurred_at at time zone 'Asia/Manila')::int/4) bucket,count(*) total from incidents group by 1) x),'[]'::jsonb),
-    'repeat_people',coalesce((select jsonb_agg(x order by x.qualifying_matters desc,x.display_name) from (
+    'repeat_people',case when v_admin then coalesce((select jsonb_agg(x order by x.qualifying_matters desc,x.display_name) from (
       with qualified as (
         select case when p.resident_id is not null then 'resident' else 'external' end person_kind,
           coalesce(p.resident_id,p.external_person_id) person_id,
-          coalesce(concat_ws(' ',r.first_name,r.middle_name,r.last_name,r.suffix),concat_ws(' ',e.first_name,e.middle_name,e.last_name,e.suffix)) display_name,
+          case when p.resident_id is not null then concat_ws(' ',r.first_name,r.middle_name,r.last_name,r.suffix) else concat_ws(' ',e.first_name,e.middle_name,e.last_name,e.suffix) end display_name,
           'incident:'||p.incident_id::text matter_key,'incident'::text matter_kind,i.reference,p.outcome_status outcome,i.incident_type category,i.occurred_at recorded_at
         from parties p join incidents i on i.id=p.incident_id left join public.barangay_residents r on r.id=p.resident_id
         left join public.external_persons e on e.id=p.external_person_id where p.role in ('respondent','subject')
         union all
         select case when p.resident_id is not null then 'resident' else 'external' end,coalesce(p.resident_id,p.external_person_id),
-          coalesce(concat_ws(' ',r.first_name,r.middle_name,r.last_name,r.suffix),concat_ws(' ',e.first_name,e.middle_name,e.last_name,e.suffix)),
+          case when p.resident_id is not null then concat_ws(' ',r.first_name,r.middle_name,r.last_name,r.suffix) else concat_ws(' ',e.first_name,e.middle_name,e.last_name,e.suffix) end,
           'complaint:'||p.complaint_id::text,'complaint',c.reference,'unknown',c.category,c.created_at
         from public.complaint_parties p join public.complaints c on c.id=p.complaint_id
         left join public.barangay_residents r on r.id=p.resident_id left join public.external_persons e on e.id=p.external_person_id
@@ -181,7 +190,8 @@ begin
           group by q2.category order by count(distinct q2.matter_key) desc,q2.category limit 1) top_category,max(q.recorded_at) last_recorded_matter
         ,coalesce(jsonb_agg(distinct jsonb_build_object('matter_key',q.matter_key,'reference',q.reference,'kind',q.matter_kind)),'[]'::jsonb) contributing_matters
       from qualified q group by q.person_kind,q.person_id having count(distinct q.matter_key)>1
-    ) x),'[]'::jsonb),
+    ) x),'[]'::jsonb) end,
+    'repeat_people_restricted',not v_admin,
     'community_credit',case when not exists(select 1 from public.community_credit_policies where status='active') then
       jsonb_build_object('configured',false,'message','Community Credit policy is not configured.') else jsonb_build_object(
       'configured',true,'policy_id',(select id from public.community_credit_policies where status='active'),
@@ -205,8 +215,9 @@ create function public.repeated_dispute_analytics(p_from date default null,p_to 
 returns jsonb language plpgsql stable security definer set search_path='' as $$
 declare v_now timestamptz:=now(); v_today date:=(now() at time zone 'Asia/Manila')::date; v_start timestamptz; v_end timestamptz;
 begin
-  perform public.person_history_require_view();
-  if p_window not in ('all','last_30_days','last_90_days','last_12_months','previous_12_months','custom')
+  -- Named complainant/respondent pairs: records administrators only (42501 otherwise).
+  perform public.person_history_require_admin();
+  if p_window is null or p_window not in ('all','last_30_days','last_90_days','last_12_months','previous_12_months','custom')
     or (p_window='custom' and (p_from is null and p_to is null)) or (p_from is not null and p_to is not null and p_from>p_to) then raise exception 'Invalid analytics range'; end if;
   if p_window='last_30_days' then v_start:=v_now-interval '30 days'; v_end:=v_now;
   elsif p_window='last_90_days' then v_start:=v_now-interval '90 days'; v_end:=v_now;
@@ -215,7 +226,7 @@ begin
   elsif p_window='custom' then if p_from is not null then v_start:=(p_from::timestamp at time zone 'Asia/Manila'); end if; if p_to is not null then v_end:=((p_to+1)::timestamp at time zone 'Asia/Manila'); end if; end if;
   return coalesce((with stable as (
     select p.complaint_id,p.party_role,case when p.resident_id is not null then 'resident:'||p.resident_id::text else 'external:'||p.external_person_id::text end person_key,
-      coalesce(concat_ws(' ',r.first_name,r.middle_name,r.last_name,r.suffix),concat_ws(' ',e.first_name,e.middle_name,e.last_name,e.suffix)) display_name,c.reference,c.created_at
+      case when p.resident_id is not null then concat_ws(' ',r.first_name,r.middle_name,r.last_name,r.suffix) else concat_ws(' ',e.first_name,e.middle_name,e.last_name,e.suffix) end display_name,c.reference,c.created_at
     from public.complaint_parties p join public.complaints c on c.id=p.complaint_id
     left join public.barangay_residents r on r.id=p.resident_id left join public.external_persons e on e.id=p.external_person_id
     where (p.resident_id is not null or p.external_person_id is not null) and p.party_role in ('complainant','respondent')
