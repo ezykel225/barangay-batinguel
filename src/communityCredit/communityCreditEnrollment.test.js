@@ -6,7 +6,9 @@ const sql=fs.readFileSync(path.join(root,'supabase-migrations','060_community_cr
 
 describe('Community Credit enrollment migration',()=>{
  test('is additive migration 060 and does not alter applied 059',()=>{
-  expect(sql).toMatch(/^-- NOT APPLIED/);expect(sql).toContain('begin;');expect(sql).toMatch(/commit;\s*$/)
+  // Verified present in production on 2026-10-30 by read-only catalog inspection.
+  expect(sql).toMatch(/^-- APPLIED\. Verified present in production on 2026-10-30 by read-only catalog inspection;/);expect(sql).not.toContain('NOT APPLIED')
+  expect(sql).toContain('begin;');expect(sql).toMatch(/commit;\s*$/)
   expect(fs.existsSync(path.join(root,'supabase-migrations','059_community_credit_foundation.sql'))).toBe(true)
  })
  test('enrollment belongs to resident UUID and policy UUID exactly once',()=>{

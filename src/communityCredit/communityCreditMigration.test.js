@@ -7,8 +7,10 @@ const sql=fs.readFileSync(path.join(root,'supabase-migrations','059_community_cr
 describe('community credit foundation migration',()=>{
   test('is the additive migration after targeted SMS',()=>{
     expect(fs.existsSync(path.join(root,'supabase-migrations','058_targeted_sms.sql'))).toBe(true)
-    expect(sql).toContain('-- NOT APPLIED')
-    expect(sql).toMatch(/^-- NOT APPLIED[\s\S]*begin;/)
+    // Verified present in production on 2026-10-30 by read-only catalog inspection.
+    expect(sql).toContain('-- APPLIED. Verified present in production on 2026-10-30')
+    expect(sql).toMatch(/^-- APPLIED\. Verified present in production on 2026-10-30 by read-only catalog inspection;[\s\S]*begin;/)
+    expect(sql).not.toContain('NOT APPLIED')
   })
   test.each(['community_credit_policies','community_credit_rules','community_credit_events'])('%s has RLS and no client table grant',table=>{
     expect(sql).toContain(`alter table public.${table} enable row level security`)
