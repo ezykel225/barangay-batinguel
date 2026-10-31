@@ -267,7 +267,7 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderActio
     { id: 'people-history', label: 'People & History', icon: <FaUsers /> },
     { id: 'community-credit', label: 'Community Credit', icon: <FaStar /> },
     { id: 'officials', label: 'Officials Directory', icon: <FaUsers /> },
-    { id: 'reports', label: 'Reports', icon: <FaChartBar /> },
+    { id: 'reports', label: 'Analytics & Insights', icon: <FaChartBar /> },
     { id: 'activity', label: 'Activity Log', icon: <FaHistory /> },
     { id: 'settings', label: 'Settings', icon: <FaCog /> },
   ]

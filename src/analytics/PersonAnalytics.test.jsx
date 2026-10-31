@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import PersonAnalytics from './PersonAnalytics'
 
 const data=(qualifying,requiresReview)=>({
@@ -26,12 +26,29 @@ test('shows review, starting-100 wording, and exact contributing references at s
   expect(screen.queryByText(/hidden-uuid/)).not.toBeInTheDocument()
 })
 
-test('offers server time-window presets and category/outcome drill-down',()=>{
+test('offers server time-window presets and category/outcome drill-down',async()=>{
   const onWindowChange=jest.fn();render(<PersonAnalytics data={data(0,false)} onWindowChange={onWindowChange}/>)
   expect(screen.getByRole('option',{name:'Last 30 days'})).toBeInTheDocument()
   expect(screen.getByRole('option',{name:'Last 90 days'})).toBeInTheDocument()
   expect(screen.getByRole('option',{name:'Last 12 months'})).toBeInTheDocument()
   fireEvent.change(screen.getByLabelText('Time window'),{target:{value:'last_90_days'}})
   expect(onWindowChange).toHaveBeenCalledWith('last_90_days')
+  // The window change settles asynchronously; wait for the control to be usable again.
+  await waitFor(()=>expect(screen.getByLabelText('Time window')).not.toBeDisabled())
   fireEvent.click(screen.getByRole('button',{name:/Public Disturbance/}));expect(screen.getByText('INC-001')).toBeInTheDocument()
+})
+
+test('rows that open no records are not buttons; rows that do are (Remediation C)',()=>{
+  const withWeekdays={...data(0,false),weekdays:[{weekday:'Monday',weekday_number:1,total:2}]}
+  render(<PersonAnalytics data={withWeekdays}/>)
+  expect(screen.getByText('Monday')).toBeInTheDocument()
+  expect(screen.queryByRole('button',{name:/Monday/})).not.toBeInTheDocument()
+  expect(screen.getByRole('button',{name:/Public Disturbance/})).toBeEnabled()
+  expect(document.querySelector('.analytics-bars button:disabled')).toBeNull()
+})
+
+test('unavailable analytics say so instead of loading forever',()=>{
+  render(<PersonAnalytics data={null} unavailable/>)
+  expect(screen.getByRole('alert')).toHaveTextContent(/Analytics are unavailable for this person right now/)
+  expect(screen.queryByText(/Loading factual analytics/)).not.toBeInTheDocument()
 })

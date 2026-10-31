@@ -2,7 +2,12 @@ import { supabase } from '../supabase/supabaseClient'
 
 const rpc = async (name, args) => {
   const { data, error } = await supabase.rpc(name, args)
-  if (error) throw new Error('Analytics are unavailable.')
+  if (error) {
+    // Keep the SQLSTATE so a 42501 refusal can be shown as a restriction, not an outage.
+    const failure = new Error('Analytics are unavailable.')
+    failure.code = error.code
+    throw failure
+  }
   return data
 }
 

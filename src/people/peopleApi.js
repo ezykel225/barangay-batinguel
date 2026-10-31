@@ -2,7 +2,12 @@ import { supabase } from '../supabase/supabaseClient'
 
 const rpc = async (name, args) => {
   const { data, error } = await supabase.rpc(name, args)
-  if (error) throw new Error('The people-history operation could not be completed.')
+  if (error) {
+    // Keep the SQLSTATE so callers can tell a 42501 refusal from an outage.
+    const failure = new Error('The people-history operation could not be completed.')
+    failure.code = error.code
+    throw failure
+  }
   return data
 }
 
