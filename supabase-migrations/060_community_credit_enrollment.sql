@@ -1,4 +1,6 @@
--- NOT APPLIED. Requires applied migration 059. Community Credit enrollment only.
+-- APPLIED. Verified present in production on 2026-10-30 by read-only catalog inspection;
+-- the original application date was not recorded. Requires applied migration 059.
+-- Community Credit enrollment only.
 -- No complaint, KP, incident, blotter, Tanod or historical record creates a credit event here.
 begin;
 

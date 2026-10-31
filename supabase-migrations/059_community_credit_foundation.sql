@@ -1,4 +1,5 @@
--- NOT APPLIED. Community Credit Phase 1 foundation only.
+-- APPLIED. Verified present in production on 2026-10-30 by read-only catalog inspection;
+-- the original application date was not recorded. Community Credit Phase 1 foundation only.
 -- Reports, complaints, incidents and blotter entries never create credit events here.
 begin;
 
