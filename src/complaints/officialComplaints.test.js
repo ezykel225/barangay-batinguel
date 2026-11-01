@@ -1086,10 +1086,9 @@ describe('L. the architecture the phase committed to', () => {
     expect(app).toContain('/track-complaint')
   })
 
-  it('leaves the nurse and resident navigation untouched', () => {
+  it('keeps one resident complaints destination and no retired nurse navigation', () => {
     const sidebar = read('components/Sidebar.jsx')
-    const nurse = /const nurseNavItems = \[([\s\S]*?)\n  \]/.exec(sidebar)[1]
-    expect(nurse).not.toContain('complaints')
+    expect(sidebar).not.toMatch(/const nurseNavItems\s*=/)
     const resident = /const residentNavItems = \[([\s\S]*?)\n  \]/.exec(sidebar)[1]
     // The resident has had one since P3-B1; it is the same single entry.
     expect((resident.match(/complaints/g) || [])).toHaveLength(1)

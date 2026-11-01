@@ -155,18 +155,6 @@
   border: 1px solid #fca5a5;
 }
 
-/* A pending office-hours request, under its status pill. Neutral
-   colours on purpose: it is not a warning and not a refusal, it is a
-   request the barangay has not answered yet. */
-.reservation-exception-note {
-  display: block;
-  margin-top: 4px;
-  font-size: var(--fs-12);
-  line-height: 1.4;
-  color: #b45309;
-  overflow-wrap: anywhere;
-}
-
 .resident-request-filters label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: #64748b; min-width: 0; }
 .resident-request-filters input, .resident-request-filters select { max-width: 100%; }
 

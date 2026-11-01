@@ -273,7 +273,7 @@ const ResidentSignup = () => {
             <div className="login-left-content">
               <h1>Create a Resident Account</h1>
               <p>
-                Sign up to request barangay documents, check waste
+                Sign up to request barangay documents, file complaints,
                 collection schedules, and stay updated on
                 announcements and events. An official verifies your
                 account before you can request documents — uploading

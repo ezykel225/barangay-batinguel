@@ -468,9 +468,9 @@ describe('the route and every link to it land together', () => {
 
   it('keeps complaints inside the resident portal alongside the dedicated role routes', () => {
     const protectedRoles = [...app.matchAll(/allowedRole="(\w+)"/g)].map((m) => m[1])
-    expect(protectedRoles.sort()).toEqual(['nurse', 'official', 'resident', 'tanod'])
+    expect(protectedRoles.sort()).toEqual(['official', 'resident', 'tanod'])
     // ⚠️ The resident complaint experience is a TAB of /resident, which
-    // ProtectedRoute already gates -- so an official, the nurse and any
+    // ProtectedRoute already gates -- so an official and any
     // unsupported role are bounced before it renders, and P1's
     // fail-safe is untouched.
     expect(read('components/ProtectedRoute.jsx')).toMatch(/Navigate to="\/login" replace/)

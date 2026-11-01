@@ -61,25 +61,6 @@
 }
 
 /* ================================
-    RESERVATIONS PAGE
-  ================================ */
-.reservations-header {
-  margin-bottom: 32px;
-}
-
-.reservations-header h1 {
-  font-size: var(--fs-28);
-  font-weight: 700;
-  color: #1f2937;
-  margin-bottom: 4px;
-}
-
-.reservations-header p {
-  font-size: var(--fs-14);
-  color: #5f6775;
-}
-
-/* ================================
     OFFICIALS DIRECTORY PAGE
   ================================ */
 .officials-dir-header {

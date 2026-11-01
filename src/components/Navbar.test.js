@@ -14,9 +14,8 @@ import { MemoryRouter } from 'react-router-dom'
 import Navbar from './Navbar'
 import { E_SERVICES, SERVICE_GROUPS } from '../constants/eServices'
 
-jest.mock('../context/AuthContext', () => ({
-  useAuth: () => ({ user: null, role: null, logout: async () => {} }),
-}))
+const mockUseAuth = jest.fn(() => ({ user: null, role: null, loading: false, logout: async () => {} }))
+jest.mock('../context/AuthContext', () => ({ useAuth: () => mockUseAuth() }))
 jest.mock('../supabase/supabaseClient', () => ({
   supabase: { auth: { signOut: async () => ({}) } },
 }))
@@ -25,6 +24,23 @@ const renderNavbar = () =>
   render(<MemoryRouter><Navbar /></MemoryRouter>)
 
 const toggle = () => screen.getByRole('button', { name: /navigation menu/i })
+
+beforeEach(() => {
+  mockUseAuth.mockReturnValue({ user: null, role: null, loading: false, logout: async () => {} })
+})
+
+describe('unsupported authenticated accounts', () => {
+  it('explains the unsupported role, offers logout, and grants no dashboard identity', () => {
+    const logout = jest.fn()
+    mockUseAuth.mockReturnValue({ user: { id: 'nurse-account' }, role: null, loading: false, logout })
+    renderNavbar()
+
+    expect(screen.getAllByText(/account role is no longer supported/i).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('button', { name: 'Logout' }).length).toBeGreaterThan(0)
+    expect(screen.queryByRole('link', { name: 'Login' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Resident Dashboard|Official Dashboard|Nurse/i })).not.toBeInTheDocument()
+  })
+})
 
 describe('the mobile menu button', () => {
   it('has an accessible name', () => {
@@ -111,15 +127,10 @@ describe('the mobile drawer and the E-Services catalogue', () => {
     })
   })
 
-  it('no longer gives Court Reservation its own top-level entry', () => {
+  it('removes Court Reservation from every navigation level', () => {
     openDrawer()
-    // It is still reachable -- as a service inside E-Services, which is
-    // the point of the change.
-    const courtLinks = screen.getAllByRole('link', { name: /Court Reservation/ })
-    expect(courtLinks.length).toBeGreaterThan(0)
-    courtLinks.forEach((link) => {
-      expect(link.closest('.navbar-mobile-sublist')).not.toBeNull()
-    })
+    expect(screen.queryByRole('link', { name: /Court Reservation/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Track a Court Reservation/ })).not.toBeInTheDocument()
   })
 })
 

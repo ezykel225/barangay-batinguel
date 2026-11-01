@@ -1,39 +1,17 @@
 import { useEffect, useState } from 'react'
 import {
   FaUserTie,
-  FaUserNurse,
   FaUser,
 } from 'react-icons/fa'
 import { MdVerified } from 'react-icons/md'
 import { supabase } from '../supabase/supabaseClient'
-import {
-  HEALTH_NURSE_ROLE, PUNONG_BARANGAY_LABEL,
-} from '../constants/barangay'
+import { PUNONG_BARANGAY_LABEL } from '../constants/barangay'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { PersonAvatar } from '../utils/officialPhotos'
 import './Officials.css'
 import { buildOfficialWeek, groupByOfficial, todayLine } from '../utils/officialAvailability'
 import { manilaWeekday } from '../utils/clinicHours'
-
-// Health Department — the barangay has one nurse, identified by role
-// rather than by person until the barangay confirms a name and a photo
-// together. See HEALTH_NURSE_ROLE in constants/barangay.js.
-const healthDept = [
-  {
-    id: 1,
-    // One role string, not two. This card used to render
-    // HEALTH_NURSE_NAME ("Barangay Health Nurse") directly above
-    // HEALTH_NURSE_ROLE ("Public Health Nurse") -- the same defect
-    // HEALTH_NURSE_ROLE's own comment describes, moved from her
-    // Settings card to the public pages. The role is the honest label
-    // until the barangay confirms a name and photo together.
-    name: HEALTH_NURSE_ROLE,
-    role: 'Barangay Health Center',
-    desc: 'Oversees local community immunization drives, maternal care programs, and clinical health tracking.',
-    liveAvailability: true,
-  },
-]
 
 const DAY_ORDER = {
   Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5,
@@ -48,7 +26,6 @@ const getIcon = (position) => {
 const Officials = () => {
   const [officials, setOfficials] = useState([])
   const [schedule, setSchedule] = useState([])
-  const [nurseStatus, setNurseStatus] = useState(null)
   const [kapitanStatus, setKapitanStatus] = useState('available')
   const [availability, setAvailability] = useState([])
   // Which cards have their week opened. Keyed by official id, so one
@@ -58,12 +35,10 @@ const Officials = () => {
   const [openSchedules, setOpenSchedules] = useState({})
   const [loadingOfficials, setLoadingOfficials] = useState(true)
   const [loadingSchedule, setLoadingSchedule] = useState(true)
-  const [loadingNurse, setLoadingNurse] = useState(true)
 
   useEffect(() => {
     fetchOfficials()
     fetchSchedule()
-    fetchNurseAvailability()
     fetchKapitanStatus()
     fetchAvailability()
   }, [])
@@ -148,31 +123,6 @@ const Officials = () => {
     }
   }
 
-  const fetchNurseAvailability = async () => {
-    try {
-      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-      const today = days[new Date().getDay()]
-
-      const { data, error } = await supabase
-        .from('nurse_availability')
-        .select('status')
-        .eq('day_of_week', today)
-        .limit(1)
-
-      if (error) {
-        console.error('Nurse fetch error:', error)
-        setNurseStatus('unavailable')
-      } else {
-        setNurseStatus(data?.[0]?.status || 'unavailable')
-      }
-    } catch (err) {
-      console.error('Nurse fetch error:', err)
-      setNurseStatus('unavailable')
-    } finally {
-      setLoadingNurse(false)
-    }
-  }
-
   const formatTime = (time) => {
     if (!time || time === '00:00') return null
     const [hour, minute] = time.split(':')
@@ -200,31 +150,6 @@ const Officials = () => {
     'on-leave': { label: 'On Leave', className: 'unavailable' },
   }
   const statusInfo = kapitanStatusConfig[kapitanStatus] || kapitanStatusConfig['available']
-
-  const renderAvailabilityBadge = (person) => {
-    if (person.liveAvailability) {
-      if (loadingNurse) {
-        return (
-          <div className="health-badge health-badge-loading">
-            Checking availability...
-          </div>
-        )
-      }
-      const isAvailable = nurseStatus === 'available'
-      return (
-        <div className={`health-badge ${isAvailable ? 'health-badge-available' : 'health-badge-unavailable'}`}>
-          <span className={`health-badge-dot ${isAvailable ? 'dot-available' : 'dot-unavailable'}`}></span>
-          {isAvailable ? 'Available Today' : 'Not Available Today'}
-        </div>
-      )
-    }
-    return (
-      <div className="health-badge health-badge-available">
-        <span className="health-badge-dot dot-available"></span>
-        Available Today
-      </div>
-    )
-  }
 
   const availabilityByOfficial = groupByOfficial(availability)
   const today = manilaWeekday()
@@ -527,33 +452,6 @@ const Officials = () => {
               )}
             </>
           )}
-        </div>
-      </section>
-
-      {/* Health Department */}
-      <section className="health-dept-section">
-        <div className="health-dept-container">
-          <h2 className="section-title">Health Department</h2>
-          <p className="section-subtitle">
-            Our dedicated health professionals serving the community
-          </p>
-          <div className="health-dept-grid">
-            {healthDept.map((person) => (
-              <div key={person.id} className="health-dept-card">
-                <div className="health-dept-avatar">
-                  <PersonAvatar
-                    name={person.name}
-                    fallbackIcon={<FaUserNurse />}
-                    className="health-dept-photo"
-                  />
-                </div>
-                <div className="health-dept-name">{person.name}</div>
-                <div className="health-dept-role">{person.role}</div>
-                <p className="health-dept-desc">{person.desc}</p>
-                {renderAvailabilityBadge(person)}
-              </div>
-            ))}
-          </div>
         </div>
       </section>
 

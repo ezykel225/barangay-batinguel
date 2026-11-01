@@ -5,13 +5,10 @@ import ProtectedRoute from './components/ProtectedRoute'
 
 // Pages
 import Home from './pages/Home'
-import Reservation from './pages/Reservation'
 import EServices from './pages/EServices'
-import TrackReservation from './pages/TrackReservation'
 import TrackComplaint from './pages/TrackComplaint'
 import CommunitySafety from './pages/CommunitySafety'
 import About from './pages/About'
-import HealthCenter from './pages/HealthCenter'
 import Officials from './pages/Officials'
 import Login from './pages/Login'
 import ResidentSignup from './pages/ResidentSignup'
@@ -23,7 +20,6 @@ import EventDetails from './pages/EventDetails'
 
 // Dashboards
 import OfficialDashboard from './dashboards/OfficialDashboard'
-import NurseDashboard from './dashboards/NurseDashboard'
 import ResidentDashboard from './dashboards/ResidentDashboard'
 import TanodDashboard from './dashboards/TanodDashboard'
 
@@ -46,8 +42,6 @@ function App() {
           {/* Public Routes */}
           <Route path="/" element={<Home />} />
           <Route path="/e-services" element={<EServices />} />
-          <Route path="/reservation" element={<Reservation />} />
-          <Route path="/track-reservation" element={<TrackReservation />} />
           {/* ⚠️ Public on purpose: a walk-in complainant has no account.
               The lookup itself is two-factor inside track_complaint(). */}
           <Route path="/track-complaint" element={<TrackComplaint />} />
@@ -62,7 +56,6 @@ function App() {
               the homepage and reads as broken. */}
           <Route path="/community-safety" element={<CommunitySafety />} />
           <Route path="/about" element={<About />} />
-          <Route path="/health-center" element={<HealthCenter />} />
           <Route path="/officials" element={<Officials />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<ResidentSignup />} />
@@ -85,14 +78,6 @@ function App() {
             element={
               <ProtectedRoute allowedRole="official">
                 <OfficialDashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/nurse"
-            element={
-              <ProtectedRoute allowedRole="nurse">
-                <NurseDashboard />
               </ProtectedRoute>
             }
           />

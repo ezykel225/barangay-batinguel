@@ -10,13 +10,9 @@ import {
   FaChartBar,
   FaHistory,
   FaFileAlt,
-  FaTrashAlt,
   FaCog,
   FaSignOutAlt,
   FaUser,
-  FaHeartbeat,
-  FaPills,
-  FaNotesMedical,
   FaHome,
   FaBars,
   FaTimes,
@@ -32,7 +28,6 @@ import { supabase } from '../supabase/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
-import { HEALTH_NURSE_ROLE } from '../constants/barangay'
 import { PersonAvatar } from '../utils/officialPhotos'
 import './Sidebar.css'
 
@@ -143,8 +138,6 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderActio
         } else {
           setProfilePosition('Barangay Official')
         }
-      } else if (role === 'nurse') {
-        setProfilePosition(HEALTH_NURSE_ROLE)
       } else if (role === 'resident') {
         setProfilePosition('Resident')
       }
@@ -244,7 +237,6 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderActio
     { id: 'dashboard', label: 'Dashboard', icon: <FaTachometerAlt /> },
     { id: 'announcements', label: 'Announcements', icon: <FaBullhorn /> },
     { id: 'events', label: 'Events', icon: <FaCalendarAlt /> },
-    { id: 'reservations', label: 'Reservations', icon: <FaClipboardList /> },
     { id: 'documents', label: 'Document Requests', icon: <FaFileAlt /> },
     // P3-B2. Placed after the two decision queues it sits beside in the
     // official's day, and before the management tabs. ⚠️ It is a TAB,
@@ -265,7 +257,6 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderActio
     { id: 'incidents', label: 'Incidents & Blotter', icon: <FaExclamationTriangle /> },
     { id: 'tanod', label: 'Tanod Operations', icon: <FaUserShield /> },
     { id: 'safety-map', label: 'Safety Map & Analytics', icon: <FaMapMarkedAlt /> },
-    { id: 'waste', label: 'Waste Management', icon: <FaTrashAlt /> },
     // ⚠️ There is no `kapitan` tab here any more. The Punong Barangay's
     // status was a whole destination for one value that changes a few
     // times a day; it now lives as a compact row on the Dashboard
@@ -280,19 +271,9 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderActio
     { id: 'settings', label: 'Settings', icon: <FaCog /> },
   ]
 
-  const nurseNavItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: <FaTachometerAlt /> },
-    { id: 'medical-programs', label: 'Medical Programs', icon: <FaNotesMedical /> },
-    { id: 'medicines', label: 'Medicines', icon: <FaPills /> },
-    { id: 'availability', label: 'Availability', icon: <FaHeartbeat /> },
-    { id: 'health-events', label: 'Health Events', icon: <FaNotesMedical /> },
-    { id: 'settings', label: 'Settings', icon: <FaCog /> },
-  ]
-
   const residentNavItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <FaTachometerAlt /> },
     { id: 'documents', label: 'Document Requests', icon: <FaFileAlt /> },
-    { id: 'reservations', label: 'My Reservations', icon: <FaClipboardList /> },
     { id: 'complaints', label: 'Complaints', icon: <FaCommentDots /> },
     { id: 'community-credit', label: 'Community Credit', icon: <FaStar /> },
     { id: 'settings', label: 'Settings', icon: <FaCog /> },
@@ -340,7 +321,6 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderActio
       { id: 'settings', label: 'Settings', icon: <FaCog /> },
     ], portalName: 'Tanod Portal' }],
     ['official', { navItems: officialNavItems, portalName: 'Official Portal' }],
-    ['nurse', { navItems: nurseNavItems, portalName: 'Health Center Portal' }],
     ['resident', { navItems: residentNavItems, portalName: 'Resident Portal' }],
   ])
 
@@ -372,7 +352,7 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderActio
         <PersonAvatar
           name={role === 'tanod' ? tanodName : profileName}
           photoUrl={role === 'tanod' ? tanodPhoto : profilePhoto}
-          fallbackIcon={role === 'nurse' ? <FaHeartbeat /> : <FaUser />}
+          fallbackIcon={<FaUser />}
           className="sidebar-user-photo"
         />
       </div>

@@ -1,36 +1,29 @@
 # Barangay Batinguel E-System
 
 A web-based e-processing system for Barangay Batinguel, Dumaguete City,
-built with React and Supabase. Residents can view announcements and
-events, check the health center schedule and which medicines are in
-stock, reserve the covered court, and request barangay documents.
-Officials and the health center nurse have protected dashboards to
-manage those services.
+built with React and Supabase. Residents can view barangay information,
+request documents, file complaints, and review their Community Credit
+profile. Officials manage the retained barangay, safety, resident, and
+Community Credit workflows through a protected dashboard.
 
 ## Features
 
 ### Public pages
-- Home, Announcements, Events, Officials directory
-- **Health Center** — clinic hours including the lunch break, the
-  nurse's live availability, and which medicines are currently in stock
-- **Covered Court Reservation** — free to book, with a month-at-a-glance
-  availability calendar. No payment of any kind; donations are voluntary
-  and handled in person at the Barangay Hall.
+- Home, Announcements, Events, Officials directory, and Community Safety
+- E-Services entry points for document requests and complaints
 
 ### Resident Dashboard
 - Request barangay documents and track their status
-- View and cancel their own court reservations
+- File complaints and review complaint details
+- Review their Community Credit profile
 - Correct their own name, contact number and purok
 - Upload a valid ID (optional — see *Design decisions*)
 
 ### Official Dashboard
-Reservations, announcements, events, document requests, waste collection
-schedule, officials directory, residents registry, resident account
-verification, reports, and an append-only activity log.
-
-### Nurse Dashboard
-Medicine availability, health center events, medical programs, and the
-weekly availability schedule.
+Dashboard, announcements, events, document requests, complaints, incidents
+and blotter, Tanod operations, safety map and reporting, officials directory,
+residents and account verification, Community Credit administration, reports,
+settings, and an append-only activity log.
 
 ### Authentication
 Supabase Auth with role-based access (official / nurse / resident),
@@ -122,17 +115,12 @@ sees your local `.env`.
 src/
   assets/images/  Official portraits and page backgrounds
   components/     Navbar, Footer, Sidebar, ProtectedRoute
-  constants/      Barangay facts, medicine categories, page content
+  constants/      Barangay facts and retained page content
   context/        AuthContext (Supabase auth + role state)
-  dashboards/     OfficialDashboard, NurseDashboard, ResidentDashboard
-  pages/          Public-facing pages (Home, Reservation, Officials, …)
+  dashboards/     OfficialDashboard and ResidentDashboard
+  pages/          Public-facing pages (Home, Community Safety, Officials, …)
   supabase/       Supabase client configuration
   utils/          Photo lookup, storage paths, clinic-hour parsing
-
-supabase/functions/
-  notify-reservation-sms — texts a resident when their court booking is
-  approved or declined (IPROG SMS). Officials only; the request carries
-  a reservation id, and every value in the message is read from that row.
 
 supabase-migrations/
   14 numbered SQL files recording every schema, RLS and trigger change
@@ -162,14 +150,9 @@ reasoning in the relevant migration header.
 - **ID upload is optional at signup.** Requiring one would exclude the
   residents most likely to need a Certificate of Indigency. They verify
   in person at the Barangay Hall instead.
-- **Medicine stock is a status, not a quantity.** "Available / Low /
-  Out of stock" is something a nurse can keep honest daily; a published
-  count would require logging every tablet dispensed and would be wrong
-  within hours.
-- **The court is free, and the database has no money columns at all.**
-  Ten fee-model columns were dropped in migration 006. "The system
-  cannot charge you" is a stronger claim than "the system is configured
-  not to charge you."
+- **Retired modules remain in migration history.** Their database history is
+  preserved for auditability, but they are not advertised or routed by the
+  revised application.
 - **A registry match never auto-verifies an account.** It proves someone
   typed a name that exists, and in a barangay everyone knows their
   neighbours' names. The ID and the official settle identity.

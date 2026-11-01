@@ -32,7 +32,7 @@ test('actual Official Residents defaults to directory; account groups, verificat
  fireEvent.click(screen.getByRole('button',{name:'Cancel',exact:true}))
  expect(within(requests).queryByRole('button',{name:/^Residents/})).not.toBeInTheDocument()
  fireEvent.click(within(requests).getByRole('button',{name:/Not Residents/}));expect(accountView.getByText('Ineligible Example')).toBeVisible()
- fireEvent.click(screen.getByRole('button',{name:'Voter Reference List'}));expect(screen.getByText(/This list contains available voter records/)).toBeVisible();expect(screen.queryByRole('button',{name:'Cross-check'})).not.toBeInTheDocument()
+ expect(screen.queryByRole('button',{name:'Voter Reference List'})).not.toBeInTheDocument()
  expect(screen.queryByRole('button',{name:'Verify',exact:true})).not.toBeInTheDocument()
  fireEvent.click(screen.getByRole('button',{name:'Account Verification'}));expect(within(requests).getByRole('button',{name:/Not Residents/})).toHaveAttribute('aria-pressed','true')
 })

@@ -2,12 +2,11 @@ import {fireEvent,render,screen,waitFor,within} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import {MemoryRouter} from 'react-router-dom'
 import OfficialDashboard from '../dashboards/OfficialDashboard'
-import NurseDashboard from '../dashboards/NurseDashboard'
 import {supabase} from '../supabase/supabaseClient'
 import {useAuth} from '../context/AuthContext'
 jest.mock('../supabase/supabaseClient',()=>({supabase:{from:jest.fn(),rpc:jest.fn(),functions:{invoke:jest.fn()},storage:{from:jest.fn()}}}))
 jest.mock('../context/AuthContext',()=>({useAuth:jest.fn()}))
-jest.mock('../components/Sidebar',()=>({setActiveTab})=><nav>{['announcements','events','health-events','medical-programs'].map(t=><button key={t} onClick={()=>setActiveTab(t)}>{t} navigation</button>)}</nav>)
+jest.mock('../components/Sidebar',()=>({setActiveTab})=><nav>{['announcements','events'].map(t=><button key={t} onClick={()=>setActiveTab(t)}>{t} navigation</button>)}</nav>)
 jest.mock('../components/NotificationBell',()=>()=>null)
 jest.mock('../components/useNotifications',()=>({useNotifications:()=>({notifications:[],readIds:new Set(),badges:{},refresh:()=>{},markRead:()=>{},markAllRead:()=>{}})}))
 jest.mock('react-hot-toast',()=>({__esModule:true,default:Object.assign(jest.fn(),{success:jest.fn(),error:jest.fn()})}))
@@ -21,18 +20,14 @@ beforeEach(()=>{
  supabase.functions.invoke.mockImplementation(async()=>{order.push('provider-mock');return{data:{counts:{pending:0,accepted:2}},error:null}})
 })
 test.each([
- ['announcement','announcements',false,'Add Announcement','announcements'],
- ['event','events',false,'Add Event','events'],
- ['health_event','health-events',true,'Add Health Event','health_events'],
- ['medical_program','medical-programs',true,'Add Program','medical_programs'],
-])('%s actual form publishes once then requests confirmed SMS',async(type,tab,nurse,button,table)=>{
- render(<MemoryRouter>{nurse?<NurseDashboard/>:<OfficialDashboard/>}</MemoryRouter>);await userEvent.click(screen.getByRole('button',{name:tab+' navigation'}));await userEvent.click(await screen.findByRole('button',{name:button}))
+ ['announcement','announcements','Add Announcement','announcements'],
+ ['event','events','Add Event','events'],
+])('%s actual form publishes once then requests confirmed SMS',async(type,tab,button,table)=>{
+ render(<MemoryRouter><OfficialDashboard/></MemoryRouter>);await userEvent.click(screen.getByRole('button',{name:tab+' navigation'}));await userEvent.click(await screen.findByRole('button',{name:button}))
  const dialog=screen.getByRole('dialog')
  const set=(selector,value)=>fireEvent.change(dialog.querySelector(selector),{target:{value}})
  if(type==='announcement'){set('#off-title','Public notice');set('#off-description','Public description')}
  if(type==='event'){set('#off-event-title','Public event');set('#off-event-date','2026-11-01')}
- if(type==='health_event'){set('input[placeholder="e.g. Vaccination Drive"]','Public health event');set('input[type=date]','2026-11-01')}
- if(type==='medical_program'){set('#program-title','Public program');set('#program-schedule_label','Tuesday');set('#program-time_label','8 AM')}
  fireEvent.click(within(dialog).getByLabelText('Send SMS when this content is published'))
  // Cannot publish/send with an unconfirmed draft.
  const save=()=>within(dialog).getByRole('button',{name:/Save & Send SMS|Publish & Send SMS/})
