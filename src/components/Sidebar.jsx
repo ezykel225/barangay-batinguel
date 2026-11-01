@@ -26,6 +26,7 @@ import {
   FaExclamationTriangle,
   FaUserShield,
   FaMapMarkedAlt,
+  FaStar,
 } from 'react-icons/fa'
 import { supabase } from '../supabase/supabaseClient'
 import { useAuth } from '../context/AuthContext'
@@ -273,6 +274,7 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderActio
     // and PUNONG_BARANGAY_LABEL still supplies the wording there.
     { id: 'officials', label: 'Officials Directory', icon: <FaUsers /> },
     { id: 'residents', label: 'Residents', icon: <FaUserFriends /> },
+    { id: 'community-credit', label: 'Community Credit', icon: <FaStar /> },
     { id: 'reports', label: 'Reports', icon: <FaChartBar /> },
     { id: 'activity', label: 'Activity Log', icon: <FaHistory /> },
     { id: 'settings', label: 'Settings', icon: <FaCog /> },
@@ -292,6 +294,7 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderActio
     { id: 'documents', label: 'Document Requests', icon: <FaFileAlt /> },
     { id: 'reservations', label: 'My Reservations', icon: <FaClipboardList /> },
     { id: 'complaints', label: 'Complaints', icon: <FaCommentDots /> },
+    { id: 'community-credit', label: 'Community Credit', icon: <FaStar /> },
     { id: 'settings', label: 'Settings', icon: <FaCog /> },
   ]
 

@@ -23,6 +23,14 @@ test('profile summary and two detail groups show actual data with no technical i
  expect(dialog).not.toHaveTextContent(/private-.*uuid|profile_id|Senior Citizen|civil status/i)
  expect(resident.mobile_number).toBe('09982971260');expect(resident.birth_date).toBe('1965-03-22')
 })
+test('restricted Resident 360 uses account_linked without a profile UUID',()=>{
+ const restricted={id:'resident-only-id',first_name:'Lina',last_name:'Santos',resident_status:'active',purok:'2',account_linked:true}
+ render(<ResidentProfileDialog resident={restricted} profile={null} onClose={()=>{}} onEdit={null}/>)
+ const account=within(screen.getByRole('region',{name:'Account Information'}))
+ expect(account.getByText('Linked')).toBeVisible()
+ expect(screen.queryByRole('button',{name:'Edit Resident'})).not.toBeInTheDocument()
+ expect(document.body).not.toHaveTextContent(/profile_id|profile uuid/i)
+})
 test('inactive status and initials fallback remain clear, including failed photo fallback',()=>{
  const {rerender}=render(<ResidentProfileDialog resident={{...resident,resident_status:'inactive'}} profile={null} onClose={()=>{}} onEdit={()=>{}}/> )
  expect(screen.getByLabelText('Ana Cruz initials')).toHaveTextContent('AC');expect(screen.getByText('Inactive')).toBeVisible()
@@ -34,7 +42,8 @@ test('Edit opens existing form with original unformatted saved values',async()=>
  render(<ResidentDirectory profiles={[profile]}/>);fireEvent.click(await screen.findByRole('button',{name:'Ana Cruz'}));fireEvent.click(screen.getByRole('button',{name:'Edit Resident'}))
  await screen.findByRole('dialog',{name:'Edit Resident'})
  expect(screen.getByLabelText('Birth date (optional)')).toHaveValue('1965-03-22');expect(screen.getByLabelText('Mobile number (optional)')).toHaveValue('09982971260')
- expect(supabase.rpc).toHaveBeenCalledTimes(1)
+ expect(supabase.rpc).toHaveBeenCalledTimes(2)
+ expect(supabase.rpc).toHaveBeenCalledWith('community_credit_profile',{p_resident_id:resident.id})
 })
 test('Escape, close label, scroll lock and focus return survive presentation wrapper',async()=>{
  function Harness(){const [open,setOpen]=useState(false);return <><button onClick={()=>setOpen(true)}>Open profile</button>{open&&<ResidentProfileDialog resident={resident} onClose={()=>setOpen(false)} onEdit={()=>{}}/>}</>}
