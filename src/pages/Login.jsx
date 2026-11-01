@@ -69,7 +69,7 @@ const AUDIENCES = [
     label: 'Barangay Personnel',
     heading: 'Personnel sign in',
     help: 'Sign in using your authorized barangay personnel account. '
-      + 'Official, nurse and Tanod accounts are provisioned by authorized administration.',
+      + 'Official and Tanod accounts are provisioned by authorized administration.',
   },
 ]
 

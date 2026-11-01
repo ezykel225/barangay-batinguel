@@ -85,4 +85,21 @@ describe('retired module scope cleanup', () => {
     ].join('\n')
     expect(publicCopy).not.toMatch(/court reservation|track reservation|health center schedule|medicine stock|waste schedule/i)
   })
+
+  // Sign-in and sign-up are read by every new resident and every staff member,
+  // so a retired service promised there is promised to everyone. Comments are
+  // stripped first: they legitimately record the retired features' history.
+  test('sign-in and sign-up copy promises no retired service or role', () => {
+    const code = (relativePath) => source(relativePath)
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/(^|[^:])\/\/.*$/gm, '$1')
+    const login = code('pages/Login.jsx')
+    const signup = code('pages/ResidentSignup.jsx')
+    const retired = /court|reservation|booking|nurse|health cent(?:er|re)|clinic|medicine|waste|voter reference/i
+    expect(login).not.toMatch(retired)
+    expect(signup).not.toMatch(retired)
+    // The retained services are still described.
+    expect(login).toContain('Official and Tanod accounts are provisioned by authorized administration.')
+    expect(signup).toMatch(/requesting a barangay document needs a\s+verified account/)
+  })
 })

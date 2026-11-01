@@ -311,8 +311,8 @@ const ResidentSignup = () => {
                   <li>
                     <strong>Wait for an official to verify you.</strong> A new
                     account starts as <em>Awaiting review</em>. Signing in works
-                    straight away, and so does booking the covered court — but
-                    requesting a barangay document needs a verified account.
+                    straight away, but requesting a barangay document needs a
+                    verified account.
                   </li>
                 </ol>
 
