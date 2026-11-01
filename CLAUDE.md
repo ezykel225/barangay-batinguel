@@ -8,6 +8,90 @@ for Barangay Services, Official Information, and Health Center Management.*
 
 ---
 
+## ⚠️ Final system scope — read this before anything below
+
+Decided by the repo owner, 2026-11-01. **This section overrides any later
+section that describes a retired module as live.** The rest of this file is
+kept as the project's historical and architectural record; much of it was
+written when the retired modules were still running, and it is not edited
+to pretend otherwise. Where they disagree, this section is current.
+
+### Retained
+
+- The public website and E-Services: Home, About, Officials, Announcements,
+  Events, E-Services, Track a Complaint, sign-in, sign-up and password reset.
+- Document Requests (resident request; Secretary decision and printable
+  prototypes).
+- Complaints, the KP review screening and KP cases, Incidents and the
+  digital Blotter.
+- Tanod Operations, and the Tanod portal (`/tanod`).
+- The Community Safety Map (public, aggregated) and the internal Safety Map
+  & Analytics tab.
+- Community Credit (059/060).
+- People & History and complaint-party linking (061).
+- Analytics & Insights (062).
+- Announcements and Events, with active SMS broadcasting (058).
+- The Officials Directory and the Residents directory, including account
+  verification and the **Voter List Match** badge.
+- The Punong Barangay status row and the public consultation schedule.
+
+### ⛔ Retired — do NOT restore, rebuild or propose bringing back
+
+| Retired | What is gone | What deliberately remains |
+|---|---|---|
+| **Court Reservations** and reservation tracking | `/reservation`, `/track-reservation`, the Reservations tab, the resident booking UI | The `reservations` table and its triggers, until migration 064 empties it. The helpers `normalize_reservation_reference` (complaint tracking reuses it) and `reservation_slot_hour` (the generated column depends on it) |
+| **Health Center** and the **Nurse Dashboard** | `/health-center`, `/nurse`, every nurse UI | The health tables (public read only after 063, emptied by 064). `'nurse'` stays in `profiles_role_check` because one nurse account still exists |
+| **Waste Management** | The official tab and the public schedule | `waste_schedule` (public read only after 063, emptied by 064) |
+| **Voter Reference List UI** | The tab that listed and edited voter entries | The `residents_registry` table (official read only after 063). It is still used by the Voter List Match badge and by complaint-party linking, and is **never** deleted |
+
+A task, review or audit that finds a retired module missing should treat
+that as correct. Do not add a route, tab, catalogue entry, notification,
+SMS source or migration that brings one back. Old notifications that still
+point at a retired tab open the Dashboard instead (`utils/officialTabs.js`).
+
+### Role model
+
+Four values are storable in `profiles.role` (`profiles_role_check`, since
+migration 052), and three of them have a portal:
+
+| Role | Portal | Notes |
+|---|---|---|
+| `official` | `/official`, 15 tabs | Position powers (Punong Barangay, Secretary, Treasurer) resolve through `official_account_links` (MASTER-A), never by name or `committee` |
+| `resident` | `/resident`, 5 tabs (Dashboard, Document Requests, Complaints, Community Credit, Settings) | Self-signup; lands on Home after login |
+| `tanod` | `/tanod` (Overview, My Duty, Report Incident, My Reports, Settings) | Account provisioned by trusted administration (052) and linked one-to-one to a Tanod **roster** record (migration 044) through the private `tanod_account_links` table, the same pattern as `official_account_links` |
+| `nurse` | **none** | Retired. `utils/authRoles.js` treats it as unsupported: sign-in succeeds at Supabase and is then signed out with "no supported portal role". ⚠️ **The SMS permission check still grants a nurse health-source broadcasts** (`sms_may_manage` in 058) and is reachable over the API with valid credentials. Ban the nurse account in Supabase Auth when 063 is applied; removing that branch needs a separately approved migration |
+
+There is still no `admin` role (see *User roles*).
+
+The Official Portal's tabs are `utils/officialTabs.js`, kept equal to
+`officialNavItems` in `Sidebar.jsx` by `officialTabs.test.js`. Any tab id
+that is not on that list, including a stored notification `link_tab`, opens
+the Dashboard. The resident equivalent is `utils/residentTabs.js`.
+
+### Migrations 047–064 and their real status
+
+`supabase-migrations/` is a record, not a runner. ⚠️ **Several headers
+still read "NOT APPLIED" for migrations that are in production**, and the
+APPLIED header corrections for 059–061 live on `main` (#51) and #55, so
+they reach the stacked branches only when the stack merges. The status
+below is the evidence-based one.
+
+| # | What | Status |
+|---|---|---|
+| 047–058 | Tanod edit, location-type ties, public zone type counts, case evidence and review support, Tanod accounts and duty, Tanod incident access, resident directory, verification sync, eligibility, incident map location, targeted SMS | **In production.** Every function and table each one creates is present in the 2026-10-30 production schema snapshot, and `profiles_role_check` there includes `tanod`. Their headers still read NOT APPLIED; correcting them is a separate documentation task |
+| 059 | Community Credit foundation | **APPLIED**, verified 2026-10-30 by read-only catalog inspection. Header corrected on `main` |
+| 060 | Community Credit enrollment | **APPLIED**, same evidence |
+| 061 | Person & Matter Linking | **APPLIED**, all 32 objects present on 2026-10-30. Header corrected on #55. **Do not re-run it** |
+| 062 | Analytics & Insights (4 functions, 1 index) | **NOT APPLIED.** PR #56. Additive; 89/89 local behavioral assertions. Must be applied before #56's frontend deploys. There is no rollback script, so recovery is a frontend rollback |
+| 063 | Retire legacy module access (revokes, 13 policies dropped) | **NOT APPLIED.** PR #53. 24/24 local assertions. Apply in a maintenance window, after both future bookings are resolved, **immediately before** #52 is merged. Emergency-only rollback: `supabase-tests/063_rollback_contingency.sql`, validated round-trip, needs separate approval |
+| 064 | Legacy data cleanup (deletes the retired modules' rows) | **NOT APPLIED, and it refuses to run as shipped** (placeholder approval values). PR #54 only; it is not on the 063 branch. 29/29 local assertions. It needs the Secretary's approval, retention authority, a private export with a rehearsed restore, and **separate explicit authorization**. It is outside the 062/063 deployment |
+
+Merge order, with **"Create a merge commit"** every time:
+`main ← #52 ← #55 ← #56 ← #53 ← #54`. Each upper PR is retargeted to
+`main` just before it is merged.
+
+---
+
 ## Git workflow
 
 **You do not merge. The repo owner does.** The whole point of the PR is
@@ -575,6 +659,13 @@ copies if you edit the file.
 
 ## User roles
 
+> ⚠️ **Superseded in part. See *Final system scope* at the top.** Since
+> migration 052, `profiles_role_check` permits **four** values, including
+> `tanod` with its own `/tanod` portal. The `nurse` role is retired: the
+> value is still storable, but it has no portal and its sign-in is refused.
+> The table and the "three roles" paragraph below are the record as written
+> before 052.
+
 Three roles, stored in `profiles.role`:
 
 | Role | How created | Lands on |
@@ -975,6 +1066,10 @@ such row.
 
 ## Database notes
 
+> ⚠️ **The counts below are as of migration 046.** The PR stack now carries
+> `001`–`064`. For which of `047`–`064` are applied, see the migration table
+> in *Final system scope*. Tables were not re-counted for this note.
+
 **46 migrations**, `001` through `046`, all applied. ⚠️ 027 is a
 DATA CORRECTION, not a schema change — see *The portrait is lost by the
 RENAME* under *Public E-Services (X5)*.
@@ -1288,6 +1383,11 @@ own domain with SPF, DKIM and DMARC.
 
 ### Officials
 
+> ⚠️ **Superseded. See *Final system scope*.** The Official Portal now has
+> **15** tabs, listed in `utils/officialTabs.js`: Reservations and Waste
+> Management are retired, and People & History, Community Credit and
+> Analytics & Insights (the `reports` id) were added.
+
 **Sixteen** sidebar tabs, defined in `Sidebar.jsx` as
 `officialNavItems`: Dashboard, Announcements, Events, Reservations,
 Document Requests, **Complaints**, **Incidents & Blotter**, **Tanod
@@ -1356,6 +1456,9 @@ Several of them carry more than their name suggests:
 - Reports, Activity Log
 
 ### Nurses
+
+> ⛔ **Retired.** The Nurse Dashboard and the public Health Center no
+> longer exist. Do not restore them. Kept as history.
 - **Medicine availability**, clinic availability with lunch break,
   medical programs, health events
 - Health Events — `Table | Calendar`, with **Edit Health Event**
@@ -1843,6 +1946,10 @@ stores it — it means "this arrived and nobody has dealt with it yet".
 ---
 
 ## Court reservations
+
+> ⛔ **Retired.** Court Reservations and reservation tracking are removed
+> from the application, and migration 063 closes client access to them. Do
+> not restore them. This section is the record of how the module worked.
 
 - **Reservable 5:00 PM – 10:00 PM, up to 4 hours** (migrations 020 and
   021). The court is made available for booking after office hours, so
@@ -10858,6 +10965,8 @@ seen with real data in them.
 ### Deferred, by decision
 
 - **No Tanod login**, no account, no portal, no `tanod` role.
+  ✅ **Superseded by migration 052:** a `tanod` role and the `/tanod`
+  portal now exist. See *Final system scope*.
 - **No continuous GPS**, no live tracking, no device telemetry.
 - **No official purok polygons** and no purok normalisation.
 - ~~**No public incident map and no public analytics page.** Nothing in
@@ -11581,6 +11690,9 @@ The project's own rule, for the eleventh phase running:
 ---
 
 ## Health centre
+
+> ⛔ **Retired.** The Health Center and the Nurse Dashboard are removed.
+> Do not restore them. Kept as history.
 
 **Medicine stock is a status, not a quantity** — Available / Low stock /
 Out of stock. A published count is a promise; keeping one truthful means
