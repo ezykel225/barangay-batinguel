@@ -42,10 +42,15 @@
 --   * kapitan_availability, kapitan_status and every retained service's objects.
 --   * service_role and the table owner (maintenance) are not revoked from anything.
 --
--- Order of application: the live site uses the reservation endpoints until PR #52
--- deploys, so apply this AFTER that deployment completes, immediately, in one
--- transaction. Rolling the frontend back does NOT restore any privilege revoked
--- here; restoring retired API access requires its own reviewed migration.
+-- Order of application (APPROVED, FAIL-CLOSED): resolve every future pending or
+-- approved reservation first, then, inside an authorized maintenance window, apply
+-- this migration IMMEDIATELY BEFORE merging and deploying PR #52. Between the apply
+-- and that deploy the old frontend still shows the retired screens, and every write
+-- they attempt is refused (no data is lost); the window is kept short. The opposite
+-- order was rejected because it leaves the retired endpoints callable over the API
+-- after the UI is gone. Rolling the frontend back does NOT restore any privilege
+-- revoked here. The only restore path is the emergency-only, separately authorized
+-- supabase-tests/063_rollback_contingency.sql.
 --
 -- Fail-closed: a guard block below stops the whole migration if any object it names
 -- is missing or different, and a verification block refuses to commit unless the
