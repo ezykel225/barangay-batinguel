@@ -263,10 +263,11 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderActio
     // overview. NOTHING about the feature was removed -- the data, the
     // `kapitan_status` policy and the `isKapitan` gate are untouched,
     // and PUNONG_BARANGAY_LABEL still supplies the wording there.
-    { id: 'officials', label: 'Officials Directory', icon: <FaUsers /> },
     { id: 'residents', label: 'Residents', icon: <FaUserFriends /> },
+    { id: 'people-history', label: 'People & History', icon: <FaUsers /> },
     { id: 'community-credit', label: 'Community Credit', icon: <FaStar /> },
-    { id: 'reports', label: 'Reports', icon: <FaChartBar /> },
+    { id: 'officials', label: 'Officials Directory', icon: <FaUsers /> },
+    { id: 'reports', label: 'Analytics & Insights', icon: <FaChartBar /> },
     { id: 'activity', label: 'Activity Log', icon: <FaHistory /> },
     { id: 'settings', label: 'Settings', icon: <FaCog /> },
   ]

@@ -25,6 +25,7 @@ import {
   FaBoxOpen,
   FaCheckDouble,
   FaPrint,
+  FaFileAlt,
 } from 'react-icons/fa'
 import { supabase } from '../supabase/supabaseClient'
 import { pathFromPublicUrl } from '../utils/storagePath'
@@ -48,6 +49,8 @@ import IncidentsPanel from '../incidents/IncidentsPanel'
 import TanodPanel from '../tanod/TanodPanel'
 import SafetyMapPanel from '../safetymap/SafetyMapPanel'
 import CreditManagement from '../communityCredit/CreditManagement'
+import PeopleHistory from '../people/PeopleHistory'
+import AnalyticsInsights from '../analytics/AnalyticsInsights'
 import { canGenerate } from '../documents/documentRegistry'
 import {
   actionCellIsEmpty,
@@ -2397,40 +2400,6 @@ const OfficialDashboard = () => {
   const unclassifiedRequestCount =
     residentGroups.requests.length - awaitingVerificationCount - returnedToResidentCount
 
-  // ── Reports: derived entirely from data already fetched, so no
-  // extra queries are needed for the charts. ──────────────────────
-
-  const monthlyCounts = useMemo(() => {
-    // Last 6 months, oldest first.
-    const buckets = []
-    const now = new Date()
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      buckets.push({
-        key: `${d.getFullYear()}-${d.getMonth()}`,
-        label: `${MONTH_SHORT[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`,
-        documents: 0,
-      })
-    }
-    const indexOf = (dateStr) => {
-      if (!dateStr) return -1
-      const d = new Date(dateStr)
-      return buckets.findIndex((b) => b.key === `${d.getFullYear()}-${d.getMonth()}`)
-    }
-    documentRequests.forEach((r) => {
-      const i = indexOf(r.created_at)
-      if (i !== -1) buckets[i].documents += 1
-    })
-    return buckets
-  }, [documentRequests])
-
-  const documentTypeCounts = useMemo(() => {
-    const map = {}
-    documentRequests.forEach((r) => {
-      map[r.document_type] = (map[r.document_type] || 0) + 1
-    })
-    return Object.entries(map).sort((a, b) => b[1] - a[1])
-  }, [documentRequests])
   // One definition, rendered twice -- once in the desktop topbar and
   // once in the mobile header -- so the two placements cannot be given
   // different props.
@@ -2524,6 +2493,18 @@ const OfficialDashboard = () => {
                     against today in Manila, not the browser's timezone. */}
                 <div className="stat-card-value">{countUpcoming(events, 'event_date')}</div>
                 <div className="stat-card-label">Upcoming Events</div>
+              </div>
+
+              <div className="stat-card">
+                <div className="stat-card-header"><div className="stat-card-icon yellow"><FaFileAlt /></div></div>
+                <div className="stat-card-value">{documentRequests.filter(request => request.status === 'pending').length}</div>
+                <div className="stat-card-label">Pending Document Requests</div>
+              </div>
+
+              <div className="stat-card">
+                <div className="stat-card-header"><div className="stat-card-icon green"><FaUser /></div></div>
+                <div className="stat-card-value">{residentsList.filter(resident => resident.resident_status === 'active').length}</div>
+                <div className="stat-card-label">Active Residents</div>
               </div>
             </div>
 
@@ -3382,6 +3363,7 @@ const OfficialDashboard = () => {
         )}
 
         {activeTab === 'community-credit' && <CreditManagement canManage={isSecretary || isKapitan} />}
+        {activeTab === 'people-history' && <PeopleHistory canManage={isSecretary || isKapitan} />}
 
         {activeTab === 'officials' && (
           <div>
@@ -3578,78 +3560,7 @@ const OfficialDashboard = () => {
         {/* ========================
             REPORTS TAB
         ======================== */}
-        {activeTab === 'reports' && (
-          <div>
-            <div className="official-dashboard-header">
-              <h1>Reports</h1>
-              <p>Current summaries for retained resident and document-request services.</p>
-            </div>
-
-            <div className="report-summary-grid">
-              <div className="dashboard-card report-stat">
-                <div className="report-stat-number">{documentRequests.length}</div>
-                <div className="report-stat-label">Total Document Requests</div>
-              </div>
-              <div className="dashboard-card report-stat">
-                <div className="report-stat-number">{residentGroups.residents.length}</div>
-                <div className="report-stat-label">Verified Residents</div>
-              </div>
-              <div className="dashboard-card report-stat">
-                <div className="report-stat-number">{residentGroups.requests.length}</div>
-                <div className="report-stat-label">Open Verification Requests</div>
-              </div>
-            </div>
-
-            <div className="dashboard-card" style={{ marginTop: 20 }}>
-              <div className="dashboard-card-header">
-                <h3>Document Requests — Last 6 Months</h3>
-              </div>
-              {monthlyCounts.every((bucket) => bucket.documents === 0) ? (
-                <p className="dashboard-empty">No document requests recorded in the last 6 months yet.</p>
-              ) : (
-                <div className="bar-chart">
-                  {monthlyCounts.map((bucket) => (
-                    <div key={bucket.key} className="bar-chart-col">
-                      <div className="bar-chart-bars">
-                        <div
-                          className="bar bar-doc"
-                          style={{ height: `${(bucket.documents / Math.max(1, ...monthlyCounts.map((item) => item.documents))) * 100}%` }}
-                          title={`${bucket.documents} document request(s)`}
-                        />
-                      </div>
-                      <div className="bar-chart-label">{bucket.label}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="dashboard-card" style={{ marginTop: 20 }}>
-              <div className="dashboard-card-header">
-                <h3>Most Requested Documents</h3>
-              </div>
-              {documentTypeCounts.length === 0 ? (
-                <p className="dashboard-empty">No document requests yet.</p>
-              ) : (
-                <div className="rank-list">
-                  {documentTypeCounts.map(([type, count]) => (
-                    <div key={type} className="rank-row">
-                      <span className="rank-label">{type}</span>
-                      <div className="rank-bar-track">
-                        <div
-                          className="rank-bar-fill"
-                          style={{ width: `${(count / documentTypeCounts[0][1]) * 100}%` }}
-                        />
-                      </div>
-                      <span className="rank-count">{count}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
+        {activeTab === 'reports' && <AnalyticsInsights canAdminister={isSecretary || isKapitan} />}
         {activeTab === 'activity' && (
           <div>
             <div className="official-dashboard-header">
