@@ -1,7 +1,0 @@
-{
-  "git": {
-    "deploymentEnabled": {
-      "analytics-062-ci-test": false
-    }
-  }
-}
