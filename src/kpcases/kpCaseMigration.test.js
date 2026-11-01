@@ -82,7 +82,18 @@ describe('A. the migration', () => {
   // this file. After Tanod editing (047), type ties (048), and public type buckets (049), case support continues in 050-051.
   it('is still 043, still in place, with only the expected later migrations', () => {
     const files = fs.readdirSync(DIR).filter((f) => f.endsWith('.sql')).sort()
-    expect(files).toHaveLength(60)
+    // ⚠️ REDEFINED, not loosened: an exact total stopped being stable once the
+    // reviewed 061-064 migrations landed on separate stacked PR branches (a branch
+    // can hold 060, 063 and 064 but not yet 061-062). The guard's purpose -- no
+    // phase may quietly add an unreviewed migration, and 001-060 stay in place --
+    // is kept by an ALLOWLIST: 001-060 are present in order, every number is
+    // unique, and anything after 060 must be one of the reviewed files below.
+    const reviewedLater = ['061_person_matter_linking.sql', '062_analytics_insights.sql',
+      '063_retire_legacy_module_access.sql', '064_legacy_data_cleanup.sql']
+    expect(files.slice(0, 60).map((f) => f.slice(0, 3)))
+      .toEqual(Array.from({ length: 60 }, (_, i) => String(i + 1).padStart(3, '0')))
+    expect(files.slice(60).filter((f) => !reviewedLater.includes(f))).toEqual([])
+    expect(new Set(files.map((f) => f.slice(0, 3))).size).toBe(files.length)
     expect(files[42]).toBe('043_kp_case_hearings_summons.sql')
     expect(files[43]).toBe('044_incident_blotter_tanod.sql')
     expect(files[44]).toBe('045_public_safety_aggregates.sql')
