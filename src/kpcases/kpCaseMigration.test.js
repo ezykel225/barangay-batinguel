@@ -112,6 +112,7 @@ describe('A. the migration', () => {
     expect(files[57]).toBe('058_targeted_sms.sql')
     expect(files[58]).toBe('059_community_credit_foundation.sql')
     expect(files[59]).toBe('060_community_credit_enrollment.sql')
+    expect(files[60]).toBe('061_person_matter_linking.sql')
   })
 
   it('leaves 001-042 alone', () => {

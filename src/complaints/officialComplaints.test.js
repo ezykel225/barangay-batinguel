@@ -1136,6 +1136,7 @@ describe('L. the architecture the phase committed to', () => {
     expect(files[41]).toBe('042_kp_screening_foundation.sql')
     expect(files[42]).toBe('043_kp_case_hearings_summons.sql')
     expect(files[43]).toBe('044_incident_blotter_tanod.sql')
+    expect(files[61]).toBe('062_analytics_insights.sql')
     expect(files[44]).toBe('045_public_safety_aggregates.sql')
     expect(files[45]).toBe('046_kp_conclude_case.sql')
     expect(files[46]).toBe('047_edit_tanod_member.sql')
@@ -1152,6 +1153,7 @@ describe('L. the architecture the phase committed to', () => {
     expect(files[57]).toBe('058_targeted_sms.sql')
     expect(files[58]).toBe('059_community_credit_foundation.sql')
     expect(files[59]).toBe('060_community_credit_enrollment.sql')
+    expect(files[60]).toBe('061_person_matter_linking.sql')
   })
 })
 
