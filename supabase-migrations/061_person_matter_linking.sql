@@ -1,4 +1,6 @@
--- NOT APPLIED. Requires applied migrations 001-060.
+-- APPLIED. Verified present in production on 2026-10-30 by read-only catalog inspection
+-- (all 32 tables, functions, triggers and indexes this file creates, plus its constraints);
+-- the original application date was not recorded. Requires migrations 001-060.
 -- UUID identity and factual person-history foundation only. No credit events or analytics conclusions.
 begin;
 
