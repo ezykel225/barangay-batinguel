@@ -16,7 +16,14 @@ beforeEach(() => { jest.clearAllMocks(); api.searchPeople.mockResolvedValue([]);
 describe('migration 061 identity and security contracts', () => {
   test('is ordered after 060 and leaves earlier migrations present', () => {
     const files = fs.readdirSync(path.join(process.cwd(), 'supabase-migrations')).filter(f => /^\d{3}_.*\.sql$/.test(f)).sort()
-    expect(files.slice(-3)).toEqual(['060_community_credit_enrollment.sql', '061_person_matter_linking.sql', '062_analytics_insights.sql'])
+    // 061 sits immediately after 060 and before 062, with 001-061 contiguous.
+    // Later reviewed migrations (063, 064) may follow, so 061 is not asserted
+    // to be the newest file; the allowlist in the migration-count guards owns that.
+    const at = files.indexOf('061_person_matter_linking.sql')
+    expect(at).toBe(60)
+    expect(files.slice(at - 1, at + 2)).toEqual(['060_community_credit_enrollment.sql', '061_person_matter_linking.sql', '062_analytics_insights.sql'])
+    expect(files.slice(0, at + 1).map((f) => f.slice(0, 3)))
+      .toEqual(Array.from({ length: at + 1 }, (_, i) => String(i + 1).padStart(3, '0')))
   })
   test('creates external identities, reviewed resident transitions, and exact-one incident links', () => {
     expect(clean).toContain('create table public.external_persons')
