@@ -1,7 +1,7 @@
 import SmsComposer from '../sms/SmsComposer'
 import SmsHistory from '../sms/SmsHistory'
 import ResidentsWorkspace from '../residents/ResidentsWorkspace'
-import { residentPurokOptions, matchesResidentPurok } from '../residents/residentPresentation'
+import { residentPurokOptions, matchesResidentPurok, countActiveResidents } from '../residents/residentPresentation'
 import DocumentRequestDetails from '../documents/DocumentRequestDetails'
 import { useRef, useState, useEffect, useMemo, useCallback } from 'react'
 import {
@@ -440,6 +440,13 @@ const OfficialDashboard = () => {
   const [kapitanStatus, setKapitanStatus] = useState('available')
   const [documentRequests, setDocumentRequests] = useState([])
   const [residentsList, setResidentsList] = useState([])
+  // The Active Residents card. ⚠️ It does NOT read residentsList: those are
+  // `profiles` rows, which carry no resident_status, so filtering them on it
+  // counted 0 for every barangay. resident_status lives on the
+  // barangay_residents directory (migration 054). 'unavailable' is shown as
+  // such rather than as 0, because a failed read is not an empty directory.
+  const [activeResidents, setActiveResidents] = useState({ status: 'loading', count: null })
+  const activeResidentsSeq = useRef(0)
   const [processingVerificationIds, setProcessingVerificationIds] = useState(new Set())
   const [rejectingResident, setRejectingResident] = useState(null)
   const [rejectNotes, setRejectNotes] = useState('')
@@ -923,6 +930,36 @@ const OfficialDashboard = () => {
 
     if (!error) setResidentsList(data || [])
   }
+
+  // ⚠️ community_credit_resident_directory() (migration 059) is the EXISTING
+  // directory reader every ACTIVE official may call -- the same one the
+  // Residents tab uses for non-managers -- so this widens nothing. It refuses
+  // an unlinked or archived official (42501), which the card reports as
+  // unavailable. A sequence number discards an answer overtaken by a newer one.
+  const fetchActiveResidentCount = useCallback(async () => {
+    const seq = ++activeResidentsSeq.current
+    let result
+    try {
+      result = await supabase.rpc('community_credit_resident_directory')
+    } catch (thrown) {
+      result = { data: null, error: thrown }
+    }
+    if (seq !== activeResidentsSeq.current) return
+    const { data, error } = result || {}
+    if (error || !Array.isArray(data)) {
+      setActiveResidents({ status: 'unavailable', count: null })
+      return
+    }
+    setActiveResidents({ status: 'ready', count: countActiveResidents(data) })
+  }, [])
+
+  // Runs on mount and again whenever the resident list is refetched.
+  // Verification, eligibility and Not-a-Resident decisions all refetch that
+  // list, and each can change the directory (migrations 055/056), so the card
+  // is refreshed at the same moments without a polling loop.
+  useEffect(() => {
+    fetchActiveResidentCount()
+  }, [residentsList, fetchActiveResidentCount])
 
   const fetchRegistryEntries = async () => {
     const { data, error } = await supabase
@@ -2479,7 +2516,11 @@ const OfficialDashboard = () => {
             </div>
 
             {/* Stats Cards */}
-            <div className="stats-grid">
+            {/* ⚠️ `dashboard-stats`, the class every grid rule is written
+                for. It was renamed to `stats-grid` in c2ba52d, which no
+                stylesheet defines, so the four cards fell back to block
+                flow and stacked down the left of a wide screen. */}
+            <div className="dashboard-stats">
               <div className="stat-card">
                 <div className="stat-card-header">
                   <div className="stat-card-icon green">
@@ -2512,8 +2553,19 @@ const OfficialDashboard = () => {
 
               <div className="stat-card">
                 <div className="stat-card-header"><div className="stat-card-icon green"><FaUser /></div></div>
-                <div className="stat-card-value">{residentsList.filter(resident => resident.resident_status === 'active').length}</div>
+                {activeResidents.status === 'ready' ? (
+                  <div className="stat-card-value">{activeResidents.count}</div>
+                ) : (
+                  <div className="stat-card-value">
+                    <span className="stat-card-value-pending">
+                      {activeResidents.status === 'loading' ? 'Loading...' : 'Unavailable'}
+                    </span>
+                  </div>
+                )}
                 <div className="stat-card-label">Active Residents</div>
+                {activeResidents.status === 'unavailable' && (
+                  <p className="stat-card-note" role="status">The resident directory could not be loaded.</p>
+                )}
               </div>
             </div>
 
