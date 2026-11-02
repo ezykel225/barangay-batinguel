@@ -131,6 +131,14 @@ body {
   color: var(--primary);
 }
 
+/* The retry panel ProtectedRoute shows when a role lookup could not be completed.
+   It reuses .protected-loading's centred column and only sizes its heading. */
+.protected-loading .protected-retry-title {
+  margin: 0;
+  font-size: 1.25rem;
+  text-align: center;
+}
+
 .protected-spinner {
   width: 40px;
   height: 40px;

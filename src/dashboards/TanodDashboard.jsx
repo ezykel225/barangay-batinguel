@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import toast from 'react-hot-toast'
 import { loadMyTanodIdentity, loadMyDuty, loadMyReports, checkIn, checkOut } from '../tanod/tanodPortalApi'
 import { attendanceOpen, dutyDate, dutyState, dutyTime, manilaInputNow, shiftIsCurrent } from '../tanod/tanodDuty'
 import { INCIDENT_TYPE_KEYS, incidentTypeLabel, incidentStatusLabel } from '../incidents/incidentLabels'
@@ -100,7 +101,12 @@ export default function TanodDashboard() {
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
   return <div className="dashboard-layout tanod-portal">
     <Sidebar role="tanod" activeTab={tab} setActiveTab={setTab} tanodName={identity ? compactTanodName(profile, identity.display_name) : ''} tanodPhoto={profile?.photo_url || ''}
-      onTanodLogout={async () => { await logout(); navigate('/login', { replace: true }) }} />
+      onTanodLogout={async () => {
+        // Leave only when the sign-out succeeded; otherwise the session is still live.
+        const result = await logout()
+        if (result?.error) { toast.error('Could not log out. Check your connection and try again.'); return }
+        navigate('/login', { replace: true })
+      }} />
     <main id="main-content" className="dashboard-main" tabIndex={-1}><div className="td-content">
       <header className="resident-dashboard-header td-page-header">
         <div>

@@ -18,6 +18,7 @@ import './Login.css'
 import { useModalA11y } from '../components/useModalA11y'
 import { safeReturnTo } from '../utils/returnTo'
 import { dashboardForRole, isSupportedRole } from '../utils/authRoles'
+import { classifyRoleLookup } from '../utils/roleLookup'
 import {
   BARANGAY_CONTACT,
   BARANGAY_OFFICE_HOURS,
@@ -143,7 +144,7 @@ const Login = () => {
       }
 
       // Step 2 - Get role from profiles table
-      const { data: profile, error: profileError } =
+      const { data: profile, error: profileError, status: profileStatus } =
         await withTimeout(
           supabase
             .from('profiles')
@@ -154,8 +155,18 @@ const Login = () => {
           LOCK_TIMEOUT_MESSAGE
         )
 
-      if (profileError || !profile) {
-        setError('Profile not found. Please contact admin.')
+      // Fail closed on every failure, but name the right one. A dropped connection
+      // used to read "Profile not found", which sent people to an administrator
+      // for what was a network blip. A retired role (nurse) is reported below.
+      const lookup = classifyRoleLookup({ data: profile, error: profileError, status: profileError ? profileStatus : 200 })
+      if (lookup.kind === 'missing' || lookup.kind === 'transient' || lookup.kind === 'auth' || lookup.kind === 'failed') {
+        setError(
+          lookup.kind === 'missing'
+            ? 'Profile not found. Please contact barangay administration.'
+            : lookup.kind === 'transient'
+              ? 'We could not reach the barangay system to confirm your account. Check your connection and try again.'
+              : 'Sign-in could not be completed. Please try again.'
+        )
         await supabase.auth.signOut()
         setLoading(false)
         return
