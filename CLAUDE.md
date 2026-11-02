@@ -59,7 +59,7 @@ migration 052), and three of them have a portal:
 | `official` | `/official`, 15 tabs | Position powers (Punong Barangay, Secretary, Treasurer) resolve through `official_account_links` (MASTER-A), never by name or `committee` |
 | `resident` | `/resident`, 5 tabs (Dashboard, Document Requests, Complaints, Community Credit, Settings) | Self-signup; lands on Home after login |
 | `tanod` | `/tanod` (Overview, My Duty, Report Incident, My Reports, Settings) | Account provisioned by trusted administration (052) and linked one-to-one to a Tanod **roster** record (migration 044) through the private `tanod_account_links` table, the same pattern as `official_account_links` |
-| `nurse` | **none** | Retired. `utils/authRoles.js` treats it as unsupported: sign-in succeeds at Supabase and is then signed out with "no supported portal role". ⚠️ **The SMS permission check still grants a nurse health-source broadcasts** (`sms_may_manage` in 058) and is reachable over the API with valid credentials. Ban the nurse account in Supabase Auth when 063 is applied; removing that branch needs a separately approved migration |
+| `nurse` | **none** | Retired. `utils/authRoles.js` treats it as unsupported: sign-in succeeds at Supabase and is then signed out with "no supported portal role". ⚠️ **Until migration 065 is applied, the SMS permission check still grants a nurse health-source broadcasts** (`sms_may_manage` in 058), reachable over the API with valid credentials. 065 removes that branch (see the table below). Ban the nurse account in Supabase Auth and sign out its sessions as well, as defence in depth: 065 closes SMS, not the account's other signed-in surfaces |
 
 There is still no `admin` role (see *User roles*).
 
@@ -68,7 +68,7 @@ The Official Portal's tabs are `utils/officialTabs.js`, kept equal to
 that is not on that list, including a stored notification `link_tab`, opens
 the Dashboard. The resident equivalent is `utils/residentTabs.js`.
 
-### Migrations 047–064 and their real status
+### Migrations 047–065 and their real status
 
 `supabase-migrations/` is a record, not a runner. ⚠️ **Several headers
 still read "NOT APPLIED" for migrations that are in production**, and the
@@ -85,10 +85,22 @@ below is the evidence-based one.
 | 062 | Analytics & Insights (4 functions, 1 index) | **NOT APPLIED.** PR #56. Additive; 89/89 local behavioral assertions. Must be applied before #56's frontend deploys. There is no rollback script, so recovery is a frontend rollback |
 | 063 | Retire legacy module access (revokes, 13 policies dropped) | **NOT APPLIED.** PR #53. 24/24 local assertions. Apply in a maintenance window, after both future bookings are resolved, **immediately before** #52 is merged. Emergency-only rollback: `supabase-tests/063_rollback_contingency.sql`, validated round-trip, needs separate approval |
 | 064 | Legacy data cleanup (deletes the retired modules' rows) | **NOT APPLIED, and it refuses to run as shipped** (placeholder approval values). PR #54 only; it is not on the 063 branch. 29/29 local assertions. It needs the Secretary's approval, retention authority, a private export with a rehearsed restore, and **separate explicit authorization**. It is outside the 062/063 deployment |
+| 065 | Retire the nurse SMS permission (`sms_may_manage` only) | **NOT APPLIED to production. Validated locally.** Removes the 058 branch that let a `nurse` profile manage `health_event` / `medical_program` SMS; the official announcement/event branch is unchanged. **Depends on 063, NOT on 064** — it may be applied before, after or without 064. One function body changes: signature, owner, SECURITY DEFINER, `search_path` and ACL are kept, and no SMS row, audit row, Auth account or Edge Function is touched. Fail-closed: direct connection only, 063 must be applied, the current body must be exactly 058's (or already 065's, which makes a re-run a verification only), and no health-source live broadcast may have a `pending`/`attempting` recipient. Apply it straight after 063, in the same maintenance window, before #52 is merged. Emergency-only rollback: `supabase-tests/065_rollback_contingency.sql`, which **reopens the nurse permission** and refuses without a typed acknowledgement. Harness: `supabase-tests/065_retire_nurse_sms_behavioral.sql`, built by `065_build_test_runner.mjs` from the migration's own DO body. **Local PostgreSQL validation passed on 2026-11-02** (the isolated `supabase/postgres:17.6.1.136` test database, migrations 001–063, synthetic fixtures only): full acceptance passed; the negative control detected all **22** expected failures (N2 and N5 pass without 065 by design, because 058 already refused the nurse on announcement sources); the emergency rollback round trip R1–R3 passed; regressions **062 89/89, 063 24/24, 064 29/29**; and both orders, **065 then 064** and **064 then 065**, passed in synthetic transactions that ended in ROLLBACK. ⚠️ R2 compares the function body after CRLF→LF normalisation only, because a database built from a Windows checkout stores 058 with CRLF; every attribute is still compared exactly. Production application needs its own separate approval |
 
 Merge order, with **"Create a merge commit"** every time:
 `main ← #52 ← #55 ← #56 ← #53 ← #54`. Each upper PR is retargeted to
-`main` just before it is merged.
+`main` just before it is merged. The 065 branch stacks on #57 (Phase 1
+fixes), which stacks on #53, so it does not wait for #54.
+
+⚠️ **064 may be absent while 065 is present, and that is the ONLY gap
+allowed.** `scripts/ci/migrationSequence.mjs` is the one home of the
+migration-directory rule, shared by `check-analytics-062.mjs` and the three
+Jest migration guards: numbers unique, no gap from 001, every file after
+060 one of the reviewed names, and 064 the single number that may be
+missing — only while 065 is there. An unreviewed 066, a renamed file, a
+duplicate or any other gap fails. Holding a security fix behind a data
+deletion that needs separate authorization would be backwards; that is the
+whole reason for the exception.
 
 ---
 
