@@ -240,6 +240,22 @@ test('sidebar logout preserves the existing authenticated logout action', async 
   fireEvent.click(screen.getByRole('button', { name: 'Logout' }))
   await waitFor(() => expect(logout).toHaveBeenCalledTimes(1))
 })
+// Phase 2: leave the portal only when the sign-out succeeded. A failed sign-out leaves
+// the session in storage, so pretending otherwise would be a false logout.
+test('a failed Tanod logout stays in the portal and says so; a successful one goes to /login', async () => {
+  const { Routes, Route } = require('react-router-dom')
+  const toastError = jest.spyOn(require('react-hot-toast').default, 'error').mockImplementation(() => {})
+  const logout = jest.fn().mockResolvedValueOnce({ error: { message: 'Failed to fetch' } }).mockResolvedValueOnce({ error: null })
+  require('../context/AuthContext').useAuth.mockReturnValue({ logout })
+  render(<MemoryRouter initialEntries={['/tanod']}><Routes><Route path="/tanod" element={<TanodDashboard />} /><Route path="/login" element={<p>Login page</p>} /></Routes></MemoryRouter>)
+  await ready()
+  fireEvent.click(screen.getByRole('button', { name: 'Logout' }))
+  await waitFor(() => expect(toastError).toHaveBeenCalledWith('Could not log out. Check your connection and try again.'))
+  expect(screen.queryByText('Login page')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Logout' }))
+  expect(await screen.findByText('Login page')).toBeInTheDocument()
+  toastError.mockRestore()
+})
 test('own duty reader takes no identity parameter; check-in is explicit and duplicate clicks are prevented', async () => {
   let finish
   api.checkIn.mockImplementation(() => new Promise((resolve) => { finish = resolve }))

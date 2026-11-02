@@ -9,10 +9,13 @@
 // and aria-controls since it was written. These tests hold the public
 // twin to the same contract.
 
-import { render, screen, fireEvent } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import toast from 'react-hot-toast'
 import Navbar from './Navbar'
 import { E_SERVICES, SERVICE_GROUPS } from '../constants/eServices'
+
+jest.mock('react-hot-toast', () => ({ __esModule: true, default: Object.assign(jest.fn(), { error: jest.fn(), success: jest.fn() }) }))
 
 const mockUseAuth = jest.fn(() => ({ user: null, role: null, loading: false, logout: async () => {} }))
 jest.mock('../context/AuthContext', () => ({ useAuth: () => mockUseAuth() }))
@@ -27,6 +30,7 @@ const toggle = () => screen.getByRole('button', { name: /navigation menu/i })
 
 beforeEach(() => {
   mockUseAuth.mockReturnValue({ user: null, role: null, loading: false, logout: async () => {} })
+  toast.error.mockClear()
 })
 
 describe('unsupported authenticated accounts', () => {
@@ -39,6 +43,43 @@ describe('unsupported authenticated accounts', () => {
     expect(screen.getAllByRole('button', { name: 'Logout' }).length).toBeGreaterThan(0)
     expect(screen.queryByRole('link', { name: 'Login' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /Resident Dashboard|Official Dashboard|Nurse/i })).not.toBeInTheDocument()
+  })
+})
+
+// Phase 2 auth stability: a role lookup that could not be completed is not a retired
+// role, and logout leaves the page only when Supabase confirmed the sign-out.
+describe('session problems are reported as what they are', () => {
+  const renderAt = (path) => render(
+    <MemoryRouter initialEntries={[path]}>
+      <Routes>
+        <Route path="/" element={<p>Home page</p>} />
+        <Route path="*" element={<Navbar />} />
+      </Routes>
+    </MemoryRouter>,
+  )
+
+  it('does not call an unconfirmed role "no longer supported"', () => {
+    mockUseAuth.mockReturnValue({ user: { id: 'official-account' }, role: null, roleStatus: 'unavailable', loading: false, logout: jest.fn() })
+    renderNavbar()
+    expect(screen.queryByText(/account role is no longer supported/i)).not.toBeInTheDocument()
+  })
+
+  it('a failed logout stays on the page and says so', async () => {
+    const logout = jest.fn().mockResolvedValue({ error: { message: 'Failed to fetch' } })
+    mockUseAuth.mockReturnValue({ user: { id: 'nurse-account' }, role: null, roleStatus: 'unsupported', loading: false, logout })
+    renderAt('/announcements')
+    fireEvent.click(screen.getAllByRole('button', { name: 'Logout' })[0])
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Could not log out. Check your connection and try again.'))
+    expect(screen.queryByText('Home page')).not.toBeInTheDocument()
+  })
+
+  it('a successful logout goes home', async () => {
+    const logout = jest.fn().mockResolvedValue({ error: null })
+    mockUseAuth.mockReturnValue({ user: { id: 'nurse-account' }, role: null, roleStatus: 'unsupported', loading: false, logout })
+    renderAt('/announcements')
+    fireEvent.click(screen.getAllByRole('button', { name: 'Logout' })[0])
+    expect(await screen.findByText('Home page')).toBeInTheDocument()
+    expect(toast.error).not.toHaveBeenCalled()
   })
 })
 
