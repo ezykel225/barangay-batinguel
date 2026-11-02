@@ -37,11 +37,13 @@ describe('settlePersonRecord: analytics never hide the history', () => {
   const history = { identity: { kind: 'resident', id: 'r1' }, incidents: [] }
   test('both succeed', async () => {
     await expect(settlePersonRecord(async () => history, async () => ({ summary: {} })))
-      .resolves.toEqual({ ...history, analytics: { summary: {} }, analyticsUnavailable: false })
+      .resolves.toEqual({ ...history, analytics: { summary: {} }, analyticsUnavailable: false, analyticsError: null })
   })
   test('failed analytics still return the history, marked unavailable', async () => {
-    await expect(settlePersonRecord(async () => history, async () => { throw new Error('down') }))
-      .resolves.toEqual({ ...history, analytics: null, analyticsUnavailable: true })
+    // The failure is carried through so the resident profile can tell an absent RPC from an outage.
+    const down = Object.assign(new Error('down'), { code: 'PGRST202' })
+    await expect(settlePersonRecord(async () => history, async () => { throw down }))
+      .resolves.toEqual({ ...history, analytics: null, analyticsUnavailable: true, analyticsError: down })
   })
   test('a failed history rejects with its own error, even when analytics succeed', async () => {
     const refused = Object.assign(new Error('refused'), { code: '42501' })

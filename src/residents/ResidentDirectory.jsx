@@ -94,7 +94,7 @@ export default function ResidentDirectory({ canManage = true, profiles = [], onE
       </table>}
       {!filtered.length && <p>{rows.length ? 'No residents match the current filters.' : 'No barangay resident records have been added yet.'}</p>}</>}
     {confirmation}
-    {view && <ResidentProfileDialog key={view.id} resident={view} profile={profiles.find(p=>p.id===view.profile_id)} onClose={()=>setView(null)} onEdit={canManage?()=>{const row=view;setView(null);setTimeout(()=>openForm(row),0)}:null}/>}
+    {view && <ResidentProfileDialog key={view.id} resident={view} profile={profiles.find(p=>p.id===view.profile_id)} canViewRestricted={canManage} onClose={()=>setView(null)} onEdit={canManage?()=>{const row=view;setView(null);setTimeout(()=>openForm(row),0)}:null}/>}
     {form && <div className="directory-dialog"><DialogShell open titleId={titleId} title={form.id ? 'Edit Resident' : 'Add Resident'} initialFocusRef={firstRef} busy={busy} onCancel={() => setForm(null)}
       header={<header className="directory-modal-header"><h2 id={titleId}>{form.id ? 'Edit Resident' : 'Add Resident'}</h2><button type="button" aria-label="Close resident form" disabled={busy} onClick={() => setForm(null)}>×</button></header>}>
       <form onSubmit={save} className="directory-form"><div className="directory-fields">
