@@ -20,6 +20,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event'
 import fs from 'fs'
 import path from 'path'
+import { migrationSequenceProblems, REVIEWED_AFTER_060 } from '../../scripts/ci/migrationSequence.mjs'
 
 jest.mock('../supabase/supabaseClient', () => ({
   supabase: { from: jest.fn(), rpc: jest.fn(), storage: { from: jest.fn() } },
@@ -1127,11 +1128,13 @@ describe('L. the architecture the phase committed to', () => {
     // phase may quietly add an unreviewed migration, and 001-060 stay in place --
     // is kept by an ALLOWLIST: 001-060 are present in order, every number is
     // unique, and anything after 060 must be one of the reviewed files below.
-    const reviewedLater = ['061_person_matter_linking.sql', '062_analytics_insights.sql',
-      '063_retire_legacy_module_access.sql', '064_legacy_data_cleanup.sql']
+    // The reviewed list now lives in scripts/ci/migrationSequence.mjs, the one home of
+    // the rule (it adds 065, and records why 064 alone may be absent while 065 is there).
+    const reviewedLater = REVIEWED_AFTER_060
     expect(files.slice(0, 60).map((f) => f.slice(0, 3)))
       .toEqual(Array.from({ length: 60 }, (_, i) => String(i + 1).padStart(3, '0')))
     expect(files.slice(60).filter((f) => !reviewedLater.includes(f))).toEqual([])
+    expect(migrationSequenceProblems(files)).toEqual([])
     expect(new Set(files.map((f) => f.slice(0, 3))).size).toBe(files.length)
     expect(files[41]).toBe('042_kp_screening_foundation.sql')
     expect(files[42]).toBe('043_kp_case_hearings_summons.sql')

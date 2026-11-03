@@ -9,6 +9,7 @@
 
 import fs from 'fs'
 import path from 'path'
+import { migrationSequenceProblems, REVIEWED_AFTER_060 } from '../../scripts/ci/migrationSequence.mjs'
 
 const DIR = path.join(__dirname, '..', '..', 'supabase-migrations')
 const FILE = '044_incident_blotter_tanod.sql'
@@ -47,11 +48,13 @@ describe('A. the migration file', () => {
     // phase may quietly add an unreviewed migration, and 001-060 stay in place --
     // is kept by an ALLOWLIST: 001-060 are present in order, every number is
     // unique, and anything after 060 must be one of the reviewed files below.
-    const reviewedLater = ['061_person_matter_linking.sql', '062_analytics_insights.sql',
-      '063_retire_legacy_module_access.sql', '064_legacy_data_cleanup.sql']
+    // The reviewed list now lives in scripts/ci/migrationSequence.mjs, the one home of
+    // the rule (it adds 065, and records why 064 alone may be absent while 065 is there).
+    const reviewedLater = REVIEWED_AFTER_060
     expect(files.slice(0, 60).map((f) => f.slice(0, 3)))
       .toEqual(Array.from({ length: 60 }, (_, i) => String(i + 1).padStart(3, '0')))
     expect(files.slice(60).filter((f) => !reviewedLater.includes(f))).toEqual([])
+    expect(migrationSequenceProblems(files)).toEqual([])
     expect(new Set(files.map((f) => f.slice(0, 3))).size).toBe(files.length)
     expect(files[43]).toBe(FILE)
     expect(files[44]).toBe('045_public_safety_aggregates.sql')

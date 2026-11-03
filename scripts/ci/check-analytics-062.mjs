@@ -13,6 +13,7 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
+import { migrationSequenceProblems } from './migrationSequence.mjs'
 
 const failures = []
 const passes = []
@@ -27,7 +28,10 @@ const migrationDir = 'supabase-migrations'
 const migrations = readdirSync(migrationDir).filter((f) => /^\d{3}_.+\.sql$/.test(f)).sort()
 const numbers = migrations.map((f) => Number(f.slice(0, 3)))
 check(new Set(numbers).size === numbers.length, 'migration numbers are unique')
-check(numbers.every((n, i) => n === i + 1), `migrations are contiguous from 001 (found ${numbers.length})`)
+// One rule, shared with the Jest guards: no gap from 001 except that 064 may be absent
+// while 065 is present, and every file after 060 is a reviewed one (see migrationSequence.mjs).
+const sequenceProblems = migrationSequenceProblems(migrations)
+check(sequenceProblems.length === 0, `migrations run from 001 with no unpermitted gap and no unreviewed file (found ${numbers.length})${sequenceProblems.length ? ': ' + sequenceProblems.join('; ') : ''}`)
 check(migrations.some((f) => f.startsWith('062_')), 'migration 062 is present')
 
 // ── 2. Migration 062: objects and security declarations ────────────────────
