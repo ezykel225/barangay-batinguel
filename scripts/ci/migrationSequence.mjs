@@ -18,6 +18,10 @@
 // the nurse SMS permission) is a security fix that depends on 063 alone. Holding the
 // security fix behind a data deletion would be backwards, so 065 may land first. Every
 // other gap still fails.
+//
+// 066 (People & History privacy) replaces 062's person_analytics and 061's
+// person_history, so it follows 065 in this directory. It is independent of 064:
+// with 064 absent the permitted 064 gap still applies, because 065 is present.
 
 export const REVIEWED_AFTER_060 = Object.freeze([
   '061_person_matter_linking.sql',
@@ -25,6 +29,7 @@ export const REVIEWED_AFTER_060 = Object.freeze([
   '063_retire_legacy_module_access.sql',
   '064_legacy_data_cleanup.sql',
   '065_retire_nurse_sms_permissions.sql',
+  '066_person_history_privacy.sql',
 ])
 
 // number that may be missing -> the number whose presence permits it
