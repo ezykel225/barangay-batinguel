@@ -30,7 +30,6 @@ export const OFFICIAL_TABS = Object.freeze([
   'residents',
   'community-credit',
   'officials',
-  'reports',
   'activity',
   'settings',
 ])
@@ -40,7 +39,16 @@ export const DEFAULT_OFFICIAL_TAB = 'dashboard'
 // Tabs that were folded into another tab. A bookmarked or stored id opens the
 // tab that now holds the same workflow instead of the Dashboard.
 // `people-history`: People & History now lives in Incidents & Blotter.
-export const MOVED_OFFICIAL_TABS = Object.freeze({ 'people-history': 'incidents' })
+// `reports`: Analytics & Insights now lives in Safety Map & Analytics.
+export const MOVED_OFFICIAL_TABS = Object.freeze({ 'people-history': 'incidents', reports: 'safety-map' })
+
+// Which internal section of the destination tab a moved id should open, so an old
+// Analytics & Insights link lands on that section rather than on the map.
+export const MOVED_OFFICIAL_SECTIONS = Object.freeze({ reports: 'analytics' })
+export const movedOfficialSection = (requested) => (
+  typeof requested === 'string' && Object.prototype.hasOwnProperty.call(MOVED_OFFICIAL_SECTIONS, requested)
+    ? MOVED_OFFICIAL_SECTIONS[requested] : null
+)
 
 export const resolveOfficialTab = (requested) => {
   if (OFFICIAL_TABS.includes(requested)) return requested
