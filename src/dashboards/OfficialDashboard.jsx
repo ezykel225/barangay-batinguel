@@ -49,7 +49,6 @@ import IncidentsPanel from '../incidents/IncidentsPanel'
 import TanodPanel from '../tanod/TanodPanel'
 import SafetyMapPanel from '../safetymap/SafetyMapPanel'
 import CreditManagement from '../communityCredit/CreditManagement'
-import PeopleHistory from '../people/PeopleHistory'
 import AnalyticsInsights from '../analytics/AnalyticsInsights'
 import { canGenerate } from '../documents/documentRegistry'
 import {
@@ -3424,7 +3423,6 @@ const OfficialDashboard = () => {
         )}
 
         {activeTab === 'community-credit' && <CreditManagement canManage={isSecretary || isKapitan} />}
-        {activeTab === 'people-history' && <PeopleHistory canManage={isSecretary || isKapitan} />}
 
         {activeTab === 'officials' && (
           <div>

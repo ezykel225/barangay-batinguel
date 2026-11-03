@@ -4,6 +4,7 @@ import DeviceLocation from './DeviceLocation'
 import { DialogShell } from '../components/OfficialArchiveDialog'
 import IncidentKpLink from '../casesupport/IncidentKpLink'
 import IncidentParties from '../people/IncidentParties'
+import PeopleHistory from '../people/PeopleHistory'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   FaClipboardList, FaExclamationTriangle, FaInfoCircle, FaLock, FaMapMarkerAlt, FaPlus,
@@ -359,6 +360,13 @@ const IncidentsPanel = ({ canAdminister = false, confirm }) => {
           </>
         )}
       </div>
+
+      {/* People & identity records: the former People & History tab. Search, view
+          history, and -- for records administrators -- add external people and
+          verify or correct resident links. The database enforces every write. */}
+      <section className="dashboard-card inc-people-card" aria-label="People and identity records">
+        <PeopleHistory embedded canManage={canAdminister} />
+      </section>
 
       {showForm && <div className="inc-modal inc-record-modal">
         <DialogShell open titleId="inc-record-title" title="Record Incident" busy={Boolean(busy)} onCancel={() => setShowForm(false)} initialFocusRef={recordCloseRef}

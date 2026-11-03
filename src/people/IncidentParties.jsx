@@ -39,5 +39,5 @@ export default function IncidentParties({ incidentId, canManage }) {
       <div className="modal-buttons"><button type="button" className="btn-cancel" onClick={reset}>Cancel</button><button className="btn-add" disabled={busy||!role||!selected}>{dialog==='add'?'Add person':'Save changes'}</button></div></form>
       {externalMode&&<div className="incident-external-panel"><h4>Add new external person</h4><form onSubmit={createAndSelect}>{[['firstName','First name'],['middleName','Middle name'],['lastName','Last name'],['suffix','Suffix'],['barangay','Barangay'],['city','City / Municipality'],['address','Address (optional)']].map(([key,text])=><label key={key}>{text}<input value={external[key]} required={key==='firstName'||key==='lastName'} onChange={e=>setExternal({...external,[key]:e.target.value})}/></label>)}<div className="modal-buttons"><button type="button" className="btn-cancel" onClick={()=>setExternalMode(false)}>Back</button><button className="btn-add" disabled={busy}>Save and select</button></div></form></div>}
     </DialogShell>}
-    {history&&<PersonDialog data={history} onClose={()=>setHistory(null)}/>}</section>
+    {history&&<PersonDialog data={history} canManage={canManage} onIdentityChanged={()=>view({person_kind:history.identity.kind,person_id:history.identity.id})} onClose={()=>setHistory(null)}/>}</section>
 }
