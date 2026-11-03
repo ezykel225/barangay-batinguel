@@ -147,13 +147,13 @@ describe('A. role="official"', () => {
   // ⚠️ A DEFINITION CHANGE, NOT A LOOSENED ASSERTION: the guard still
   // compares the WHOLE list by equality, so a fourteenth surface added
   // without a decision still fails here.
-  it('renders the fifteen retained Official destinations', () => {
+  it('renders the fourteen retained Official destinations', () => {
     const { container } = renderSidebar('official')
     expect(navItems(container)).toEqual([
       'Dashboard', 'Announcements', 'Events',
       'Document Requests', 'Complaints',
       'Incidents & Blotter', 'Tanod Operations', 'Safety Map & Analytics',
-      'Residents', 'People & History', 'Community Credit', 'Officials Directory',
+      'Residents', 'Community Credit', 'Officials Directory',
       // Remediation C: the nav item names the page it opens (X1: headings
       // match the nav). The tab id is still 'reports'.
       'Analytics & Insights', 'Activity Log', 'Settings',
@@ -332,7 +332,7 @@ describe('the mobile drawer', () => {
   it('offers the Official destinations to an official', async () => {
     const { container } = renderSidebar('official')
     await openDrawer()
-    expect(drawerItems(container)).toHaveLength(15)
+    expect(drawerItems(container)).toHaveLength(14)
     expect(drawerItems(container)).toContain('Officials Directory')
     expect(drawerItems(container)).not.toContain('Voter Reference List')
     // The drawer is the WHOLE of navigation on a phone, so a tab that

@@ -28,3 +28,14 @@ export const saveIncidentParty = ({ id = null, incidentId, kind, personId, role,
   p_external_person_id: kind === 'external' ? personId : null,
   p_role: role, p_address_snapshot: '', p_involvement_note: note || '', p_outcome_status: outcome,
 })
+// Verified identity links (061). Records administrators only -- the database
+// refuses everybody else with 42501 (person_history_require_admin). A link is
+// always an explicit choice by an official; nothing here matches by name.
+export const linkExternalToResident = (externalId, residentId, note) => rpc('link_external_person_to_resident', {
+  p_external_person_id: externalId, p_resident_id: residentId, p_note: note || null,
+})
+// A correction REPLACES the current link and writes the previous one to the
+// immutable correction history; a reason is required by the database.
+export const correctExternalResidentLink = (externalId, residentId, reason) => rpc('correct_external_person_resident_link', {
+  p_external_person_id: externalId, p_new_resident_id: residentId, p_reason: reason,
+})

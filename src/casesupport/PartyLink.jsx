@@ -26,7 +26,7 @@ export default function PartyLink({ party, onChanged }) {
     <label>Find resident or external person for {party.full_name_snapshot}<input className="modal-form-input" value={query} onChange={(e) => setQuery(e.target.value)} /></label>
     <button type="button" className="btn-add btn-sm" disabled={busy || query.trim().length < 3} onClick={() => run(async () => {
       const rows = await caseRpc('search_people', { p_search: query.trim() }); setResults(rows || [])
-      if (!rows?.length) setMessage('No matching UUID-backed identity. Create an external person in People & History first.')
+      if (!rows?.length) setMessage('No matching UUID-backed identity. Create an external person in Incidents & Blotter → People & identity records first.')
     })}>Search people</button>
     <ul>{results.map((r) => <li key={`${r.person_kind}-${r.person_id}`}>
       {r.full_name} ({r.person_kind}) <small style={{ overflowWrap: 'anywhere' }}>{r.person_id}</small>{' '}

@@ -220,7 +220,14 @@ describe('C. who may administer records', () => {
   it('renders nothing disabled in place of being withheld', async () => {
     const { container } = mount({ canAdminister: false })
     await openDetail()
-    expect(container.querySelectorAll('[disabled]')).toHaveLength(0)
+    // The embedded people section's Search button is disabled until two
+    // characters are typed -- input validation, not a withheld permission --
+    // so it is excluded here; its records-administrator action is checked below.
+    const disabled = [...container.querySelectorAll('[disabled]')].filter((el) => !el.closest('.inc-people-card'))
+    expect(disabled).toHaveLength(0)
+    const people = container.querySelector('.inc-people-card')
+    expect(people).not.toBeNull()
+    expect(within(people).queryByRole('button', { name: 'Add external person' })).not.toBeInTheDocument()
   })
 
   it('offers the records controls with the flag', async () => {

@@ -28,7 +28,6 @@ export const OFFICIAL_TABS = Object.freeze([
   'tanod',
   'safety-map',
   'residents',
-  'people-history',
   'community-credit',
   'officials',
   'reports',
@@ -38,5 +37,13 @@ export const OFFICIAL_TABS = Object.freeze([
 
 export const DEFAULT_OFFICIAL_TAB = 'dashboard'
 
-export const resolveOfficialTab = (requested) =>
-  (OFFICIAL_TABS.includes(requested) ? requested : DEFAULT_OFFICIAL_TAB)
+// Tabs that were folded into another tab. A bookmarked or stored id opens the
+// tab that now holds the same workflow instead of the Dashboard.
+// `people-history`: People & History now lives in Incidents & Blotter.
+export const MOVED_OFFICIAL_TABS = Object.freeze({ 'people-history': 'incidents' })
+
+export const resolveOfficialTab = (requested) => {
+  if (OFFICIAL_TABS.includes(requested)) return requested
+  if (typeof requested === 'string' && Object.prototype.hasOwnProperty.call(MOVED_OFFICIAL_TABS, requested)) return MOVED_OFFICIAL_TABS[requested]
+  return DEFAULT_OFFICIAL_TAB
+}

@@ -86,7 +86,10 @@ describe('every way of opening a tab goes through the allowlist', () => {
   // lets you do. The position gates on the restricted tabs are unchanged.
   it('leaves the position gates on the restricted tabs in place', () => {
     expect(code).toMatch(/activeTab === 'community-credit' && <CreditManagement canManage=\{isSecretary \|\| isKapitan\} \/>/)
-    expect(code).toMatch(/activeTab === 'people-history' && <PeopleHistory canManage=\{isSecretary \|\| isKapitan\} \/>/)
+    // People & History moved into Incidents & Blotter; its manage flag is the
+    // same records-administrator gate, passed through IncidentsPanel.
+    expect(code).toMatch(/activeTab === 'incidents' && \(\s*<IncidentsPanel canAdminister=\{isSecretary \|\| isKapitan\}/)
+    expect(code).not.toMatch(/people-history/)
     expect(code).toMatch(/activeTab === 'reports' && <AnalyticsInsights canAdminister=\{isSecretary \|\| isKapitan\} \/>/)
     expect(stripComments(read('utils/officialTabs.js'))).not.toMatch(/isSecretary|isKapitan|isTreasurer|position|supabase/)
   })
