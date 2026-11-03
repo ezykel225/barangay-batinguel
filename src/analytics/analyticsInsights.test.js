@@ -34,7 +34,9 @@ describe('Phase 4 analytics contract',()=>{
     expect(person).toContain('Contributing records')
     expect(reports).toContain('Analytics &amp; Insights')
     expect(reports).toContain('do not predict behavior or determine wrongdoing')
-    expect(map).toContain('loadBarangayAnalytics({ from, to, category: type })')
+    // Redefined: the map no longer calls 062 itself; it embeds the one Analytics & Insights.
+    expect(map).toContain('<AnalyticsInsights embedded canAdminister={canAdminister}')
+    expect(map).not.toContain('loadBarangayAnalytics')
     expect(person).toContain('historical_review?.requires_review===true')
     expect(person).toContain('Last 30 days')
     expect(person).toContain('Last 90 days')
@@ -58,7 +60,9 @@ describe('Phase 4 analytics contract',()=>{
     expect(sql.replace(/--[^\n]*/g,'')).not.toMatch(/\bcommittee\b/i)
     // The frontend flag mirrors current_official_may_administer_records().
     const dashboard=read('src/dashboards/OfficialDashboard.jsx')
-    expect(dashboard).toContain("<AnalyticsInsights canAdminister={isSecretary || isKapitan} />")
+    // The same flag now reaches Analytics & Insights through Safety Map & Analytics.
+    expect(dashboard).toContain('<SafetyMapPanel canAdminister={isSecretary || isKapitan}')
+    expect(read('src/safetymap/SafetyMapPanel.jsx')).toContain('<AnalyticsInsights embedded canAdminister={canAdminister}')
     const reports=read('src/analytics/AnalyticsInsights.jsx')
     expect(reports).toContain("if(!canAdminister)setDisputes(RESTRICTED)")
     expect(reports).not.toMatch(/Promise\.all\(\[loadBarangayAnalytics/)
@@ -68,7 +72,11 @@ describe('Phase 4 analytics contract',()=>{
     const reports=read('src/analytics/AnalyticsInsights.jsx')
     const dashboard=read('src/dashboards/OfficialDashboard.jsx')
     // X1: a heading matches the nav item that leads to it.
-    expect(sidebar).toContain("{ id: 'reports', label: 'Analytics & Insights'")
+    // Redefined: Analytics & Insights is a tab of Safety Map & Analytics, not a sidebar entry;
+    // a stored `reports` id is redirected there.
+    expect(sidebar).not.toContain("label: 'Analytics & Insights'")
+    expect(sidebar).toContain("{ id: 'safety-map', label: 'Safety Map & Analytics'")
+    expect(read('src/utils/officialTabs.js')).toContain("reports: 'safety-map'")
     expect(sidebar).not.toContain("label: 'Reports'")
     expect(reports).toContain('<h1>Analytics &amp; Insights</h1>')
     expect(dashboard).not.toMatch(/\{false\s*&&/)

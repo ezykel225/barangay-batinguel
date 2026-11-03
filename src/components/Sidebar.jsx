@@ -7,7 +7,6 @@ import {
   FaClipboardList,
   FaUsers,
   FaUserFriends,
-  FaChartBar,
   FaHistory,
   FaFileAlt,
   FaCog,
@@ -266,7 +265,6 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderActio
     { id: 'residents', label: 'Residents', icon: <FaUserFriends /> },
     { id: 'community-credit', label: 'Community Credit', icon: <FaStar /> },
     { id: 'officials', label: 'Officials Directory', icon: <FaUsers /> },
-    { id: 'reports', label: 'Analytics & Insights', icon: <FaChartBar /> },
     { id: 'activity', label: 'Activity Log', icon: <FaHistory /> },
     { id: 'settings', label: 'Settings', icon: <FaCog /> },
   ]

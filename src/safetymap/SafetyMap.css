@@ -104,3 +104,15 @@
   .smap-bars li { grid-template-columns: minmax(0, 1fr) auto; }
   .smap-bar-track { grid-column: 1 / -1; }
 }
+
+/* Safety Map & Analytics: one module, three tabs. */
+.smap-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px;border-bottom:2px solid #e2e8f0}
+.smap-tabs [role=tab]{min-height:44px;padding:10px 16px;border:1px solid transparent;border-bottom:3px solid transparent;margin-bottom:-2px;background:none;font:inherit;font-weight:600;color:#334155;cursor:pointer;border-radius:8px 8px 0 0}
+.smap-tabs [role=tab]:hover{background:#f1f5f9}
+.smap-tabs [role=tab][aria-selected=true]{color:#1e3a8a;border-bottom-color:#1d4ed8;background:#eff6ff}
+.smap-tabs [role=tab]:focus-visible{outline:3px solid #1d4ed8;outline-offset:2px}
+.smap-scope{margin:0 0 14px;font-size:14px;color:#334155;display:flex;gap:6px;align-items:flex-start}
+.smap-scope svg{flex-shrink:0;margin-top:3px}
+.smap-crosslink{margin:12px 0 0;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.ai-embedded-intro{margin:4px 0 14px}.ai-embedded-intro h2{margin:0 0 4px}.ai-embedded-intro p{margin:0 0 4px}.ai-embedded-intro small{color:#475569}
+@media(max-width:480px){.smap-tabs [role=tab]{flex:1 1 auto;padding:10px 10px}}

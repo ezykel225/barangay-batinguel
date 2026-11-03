@@ -49,7 +49,6 @@ import IncidentsPanel from '../incidents/IncidentsPanel'
 import TanodPanel from '../tanod/TanodPanel'
 import SafetyMapPanel from '../safetymap/SafetyMapPanel'
 import CreditManagement from '../communityCredit/CreditManagement'
-import AnalyticsInsights from '../analytics/AnalyticsInsights'
 import { canGenerate } from '../documents/documentRegistry'
 import {
   actionCellIsEmpty,
@@ -86,7 +85,7 @@ import {
 import MonthCalendar from '../components/MonthCalendar'
 import { buildEventCalendar, describeEventDay, eventsOnDate } from '../utils/eventCalendar'
 import { MONTH_NAMES, monthOf, parseDateKey, toDateKey } from '../utils/monthGrid'
-import { resolveOfficialTab } from '../utils/officialTabs'
+import { movedOfficialSection, resolveOfficialTab } from '../utils/officialTabs'
 import '../components/Sidebar.css'
 import './OfficialDashboard.css'
 
@@ -396,7 +395,14 @@ const OfficialDashboard = () => {
   // value matched no branch below and left an empty main area. An unknown id
   // now opens the Dashboard instead. This grants nothing: each tab still
   // applies its own position flags, and RLS decides every read and write.
-  const openTab = useCallback((tab) => setActiveTab(resolveOfficialTab(tab)), [])
+  // Safety Map & Analytics' internal tab. Held here so a moved id such as
+  // `reports` can open its Analytics & Insights section directly.
+  const [safetySection, setSafetySection] = useState('map')
+  const openTab = useCallback((tab) => {
+    setActiveTab(resolveOfficialTab(tab))
+    const section = movedOfficialSection(tab)
+    if (section) setSafetySection(section)
+  }, [])
 
   // ── Notifications ──────────────────────────────────────────────────
   //
@@ -3081,7 +3087,7 @@ const OfficialDashboard = () => {
           <TanodPanel canAdminister={isSecretary || isKapitan} />
         )}
 
-        {activeTab === 'safety-map' && <SafetyMapPanel />}
+        {activeTab === 'safety-map' && <SafetyMapPanel canAdminister={isSecretary || isKapitan} section={safetySection} onSectionChange={setSafetySection} />}
         {activeTab === 'residents' && (
           <div>
             <div className="official-dashboard-header">
@@ -3619,7 +3625,6 @@ const OfficialDashboard = () => {
         {/* ========================
             REPORTS TAB
         ======================== */}
-        {activeTab === 'reports' && <AnalyticsInsights canAdminister={isSecretary || isKapitan} />}
         {activeTab === 'activity' && (
           <div>
             <div className="official-dashboard-header">

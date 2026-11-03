@@ -110,6 +110,9 @@ const mount = () => render(<SafetyMapPanel />)
 // that had nothing to do with escaping.
 const ready = () => screen.findByText(/incidents? plotted/)
 const caption = () => screen.getByText(/incidents? plotted/).textContent
+// Repeated locations, observations and coverage gaps are on the Patrol Coverage tab of
+// the consolidated module; the map tab is the default.
+const openPatrol = async () => { await ready(); fireEvent.click(screen.getByRole('tab', { name: 'Patrol Coverage' })); await screen.findByRole('heading', { name: /Repeated locations and patrol coverage/ }) }
 
 describe('most common type ties', () => {
   it('displays both demo ties and avoids attributing all incidents to a winner', async () => {
@@ -119,7 +122,7 @@ describe('most common type ties', () => {
       ...repeatRows('Clear winner',{disturbance:1,traffic_accident:3}),
     ] })
     mount()
-    await ready()
+    await openPatrol()
     for (const name of ['Demo eight', 'Demo five']) {
       const row = screen.getAllByText(name).find((el) => el.closest('tr')).closest('tr')
       expect(within(row).getByText('Disturbance / Traffic accident (tie)')).toBeInTheDocument()
@@ -133,7 +136,7 @@ describe('most common type ties', () => {
   it('displays three tied types without choosing a single winner', async () => {
     install({ incident_map_points: repeatRows('Three-way tie',{disturbance:2,public_safety_hazard:2,traffic_accident:2}) })
     mount()
-    await ready()
+    await openPatrol()
     expect(screen.getByText('Multiple types (tie)')).toBeInTheDocument()
   })
 })
@@ -280,7 +283,7 @@ describe('D. the numbers are counts', () => {
 describe('E. the observations', () => {
   it('reports what was recorded and asks for a review', async () => {
     mount()
-    await ready()
+    await openPatrol()
     const observations = screen.getByRole('heading', { name: 'Observations' })
       .nextElementSibling
     expect(observations.textContent).toMatch(/5 traffic .*incidents recorded at Rizal Street/i)
@@ -289,7 +292,7 @@ describe('E. the observations', () => {
 
   it('tells nobody to do anything', async () => {
     mount()
-    await ready()
+    await openPatrol()
     const observations = screen.getByRole('heading', { name: 'Observations' })
       .nextElementSibling.textContent.toLowerCase()
     ;['must ', 'should ', 'install', 'build a', 'deploy', 'assign more', 'arrest',
@@ -318,7 +321,7 @@ describe('F. the coverage gaps', () => {
   // list without it would read as a staffing failure.
   it('renders the caveat beside the list when there is a gap', async () => {
     mount()
-    await ready()
+    await openPatrol()
     expect(screen.getByText(/Matched by exact area wording only/)).toBeInTheDocument()
     const gaps = screen.getByRole('heading', { name: /no matching patrol area/i })
     expect(gaps).toBeInTheDocument()
@@ -333,14 +336,14 @@ describe('F. the coverage gaps', () => {
       ],
     })
     mount()
-    await ready()
+    await openPatrol()
     expect(screen.getByText(/Matched by exact area wording only/)).toBeInTheDocument()
     expect(screen.getByText(/Every repeated location has a patrol area/)).toBeInTheDocument()
   })
 
   it('names the uncovered repeated location and not the covered one', async () => {
     mount()
-    await ready()
+    await openPatrol()
     const list = screen.getByText(/no patrol area written this way/).closest('ul')
     expect(within(list).getByText('Colon Street')).toBeInTheDocument()
     expect(within(list).queryByText('Rizal Street')).not.toBeInTheDocument()
@@ -376,8 +379,12 @@ describe('G. filtering', () => {
     mount()
     await ready()
     expect(caption()).toMatch(/^0 incidents plotted\./)
-    expect(screen.getAllByText('No incidents in this range.').length).toBeGreaterThan(0)
-    expect(screen.getByText(/No location has more than one recorded incident/))
+    // Redefined: the type/status/trend lists moved to Analytics & Insights (no second copy),
+    // so the map tab's empty state is its caption and its zero total.
+    expect(caption()).toContain('No recorded incidents match these filters.')
+    expect(screen.getByText('Incidents recorded').closest('.smap-stat')).toHaveTextContent('0')
+    fireEvent.click(screen.getByRole('tab', { name: 'Patrol Coverage' }))
+    expect(await screen.findByText(/No location has more than one recorded incident/))
       .toBeInTheDocument()
   })
 })
