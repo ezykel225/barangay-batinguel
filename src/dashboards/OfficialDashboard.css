@@ -798,6 +798,79 @@
   }
 }
 
+/* ── The four stat cards: columns follow the CONTENT width ─────────────
+ *
+ * ⚠️ Sized by a container query on the overview block, not by the
+ * viewport. The content area is the viewport minus a sidebar that is
+ * either 260px or 72px collapsed, so one viewport width can be two very
+ * different card widths: 1024 gives 700px expanded and 888px collapsed.
+ *
+ *   >= 840px of content   four columns   (1280 / 1440 desktop)
+ *   480-839px             two columns    (1024 desktop, tablets)
+ *   <  480px              one column     (phones)
+ *
+ * The default below is the TWO-column layout, so a browser without
+ * container queries still gets a usable grid rather than four cramped
+ * cards or one long stack.
+ *
+ * ⚠️ (0,2,0) on purpose. Sidebar.css declares `.dashboard-stats` at
+ * (0,1,0), three times, inside media queries, and a media query adds no
+ * specificity -- so an equal-specificity rule here would win or lose on
+ * which file the bundler emits last (the X2 cascade lesson). Sidebar.css
+ * is not edited: it holds the protected table-to-card block.
+ *
+ * minmax(0, 1fr), never a bare 1fr: a bare track cannot shrink below its
+ * content's min-content width, which is the single biggest finding X2
+ * recorded. Grid rows stretch by default, so every card in a row is the
+ * same height whatever its label wraps to.
+ */
+.dashboard-overview-top {
+  container-type: inline-size;
+}
+
+.dashboard-overview-top > .dashboard-stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.dashboard-overview-top > .dashboard-stats > .stat-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+@container (min-width: 840px) {
+  .dashboard-overview-top > .dashboard-stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 20px;
+  }
+}
+
+@container (max-width: 479.98px) {
+  .dashboard-overview-top > .dashboard-stats {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+}
+
+/* A word in place of a number, for the Active Residents card while it
+   loads or when the directory could not be read. Smaller than a count so
+   "Unavailable" is never mistaken for one. It is a span INSIDE the
+   ordinary .stat-card-value, so the line keeps a count's height (the
+   parent's strut) and the label below does not move between states. */
+.dashboard-overview-top .stat-card-value-pending {
+  font-size: var(--fs-16);
+  font-weight: 600;
+  color: #5f6775;
+}
+
+.dashboard-overview-top .stat-card-note {
+  margin-top: 6px;
+  font-size: var(--fs-12);
+  color: #5f6775;
+  overflow-wrap: anywhere;
+}
+
 /* ── The compact Punong Barangay status (post-X3) ─────────────────────
  *
  * Replaces the full-width gradient panel that used to sit on the

@@ -59,7 +59,15 @@ describe('retired module scope cleanup', () => {
     ;['Announcements', 'Upcoming Events', 'Pending Document Requests', 'Active Residents']
       .forEach((label) => expect(dashboard).toContain(`>${label}<`))
     expect(dashboard).toContain("documentRequests.filter(request => request.status === 'pending').length")
-    expect(dashboard).toContain("residentsList.filter(resident => resident.resident_status === 'active').length")
+    // ⚠️ REDEFINED, not loosened. This used to pin
+    // `residentsList.filter(resident => resident.resident_status === 'active')`,
+    // which counted `profiles` rows on a column profiles does not have, so it
+    // read 0 for every barangay. Active Residents now comes from the
+    // barangay_residents directory through the shared predicate; the old
+    // expression is asserted GONE. See officialDashboardKpis.test.js.
+    expect(dashboard).toContain("supabase.rpc('community_credit_resident_directory')")
+    expect(dashboard).toContain('countActiveResidents(data)')
+    expect(dashboard).not.toMatch(/residentsList\.filter\([^)]*resident_status/)
     expect(dashboard).not.toMatch(/stat-card-label[^\n]*(?:Reservation|Waste|Health)/i)
   })
 

@@ -11,9 +11,14 @@ export const residentPurokOptions = rows => {
   rows.forEach(row => { const label=purokLabel(row.purok); const key=purokKey(row.purok); if(key && !labels.has(key)) labels.set(key,label) })
   return [...labels].map(([value,label])=>({value,label})).sort((a,b)=>a.label.localeCompare(b.label,undefined,{numeric:true,sensitivity:'base'}))
 }
+// ONE definition of an active resident: a barangay_residents directory record whose
+// resident_status is 'active' (migration 054). The Residents tab summary and the
+// Official Dashboard's Active Residents card both read it, so they cannot disagree.
+export const isActiveDirectoryResident = row => row?.resident_status === 'active'
+export const countActiveResidents = rows => rows.filter(isActiveDirectoryResident).length
 export const directorySummary = rows => [
   ['Total Residents',rows.length],
-  ['Active Residents',rows.filter(r=>r.resident_status==='active').length],
+  ['Active Residents',countActiveResidents(rows)],
   ['With Mobile Number',rows.filter(r=>String(r.mobile_number||'').trim()).length],
   ['Linked Online Accounts',rows.filter(r=>r.profile_id).length],
 ]
