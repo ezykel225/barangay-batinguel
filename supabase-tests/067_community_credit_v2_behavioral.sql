@@ -192,8 +192,8 @@ begin
   perform pg_temp.check(4,pg_temp.ok(a) and pg_temp.refused(b,'42501') and pg_temp.refused(c) and pg_temp.refused(d,'42501') and pg_temp.ok(e)
       and pg_temp.refused(f) and not pg_temp.ok(g) and not pg_temp.ok(h)
       and exists(select 1 from public.community_credit_policies where id=v2 and policy_model='participation_v2' and status='draft'
-        and base_score=0 and minimum_score=0 and maximum_score=100 and prepared_by=sec and approved_by=pun),
-    'V2 policy: 0/0/100 draft, self-approval refused, approved by the other, then immutable; V1 paths cannot edit or activate it');
+        and base_score=100 and minimum_score=0 and maximum_score=100 and prepared_by=sec and approved_by=pun),
+    'V2 policy: 100/0/100 draft, self-approval refused, approved by the other, then immutable; V1 paths cannot edit or activate it');
 
   -- ── TEST 5. V2 rules: only earned community-activity rules, two-person approval, immutable once approved.
   a:=pg_temp.q(sec,'select jsonb_agg(to_jsonb(x)) from public.community_credit_v2_prototype_rules() x');
@@ -282,7 +282,7 @@ begin
   perform pg_temp.check(10,pg_temp.ok(a) and pg_temp.refused(b) and t=pg_temp.fp_v1(v1)
       and (select status from public.community_credit_policies where id=v1)='retired' and (select status from public.community_credit_policies where id=v2)='active'
       and (select count(*) from public.community_credit_enrollments where policy_id=v2)=(select count(*) from public.barangay_residents where resident_status='active')
-      and (select bool_and(starting_score=0 and enrollment_source='policy_transition') from public.community_credit_enrollments where policy_id=v2)
+      and (select bool_and(starting_score=100 and enrollment_source='policy_transition') from public.community_credit_enrollments where policy_id=v2)
       and not exists(select 1 from public.community_credit_enrollments where policy_id=v2 and resident_id=r_inactive)
       and not exists(select 1 from public.community_credit_events where policy_id=v2)
       and exists(select 1 from public.community_credit_transitions where id=tr and status='completed' and prepared_by=sec and approved_by=pun),
@@ -296,13 +296,13 @@ begin
   b:=pg_temp.q(sec,format('select public.community_credit_profile(%L)',r_inactive));
   c:=pg_temp.q(res,'select public.my_community_credit_policy_history()');
   perform pg_temp.check(11,pg_temp.ok(a) and a#>>'{data,profile,status}'='enrolled' and a#>>'{data,profile,policy_model}'='participation_v2'
-      and (a#>>'{data,profile,gauge,value}')::int=0 and (a#>>'{data,profile,points_recorded}')::int=0 and a#>>'{data,profile,milestone,code}'='none'
-      and (a#>>'{data,profile,has_previous_policies}')::boolean and a#>>'{data,profile,transition_notice}' like '%not a penalty%'
+      and (a#>>'{data,profile,gauge,value}')::int=100 and (a#>>'{data,profile,current_score}')::int=100 and (a#>>'{data,profile,points_recorded}')::int=0 and a#>>'{data,profile,milestone,code}'='none'
+      and (a#>>'{data,profile,has_previous_policies}')::boolean and a#>>'{data,profile,transition_notice}' like '%100 points%'
       and not (a->'data'->'profile' ? 'negative_event_count') and jsonb_array_length(a#>'{data,profile,gauge,milestones}')=6
       and pg_temp.ok(b) and b#>>'{data,status}'='not_enrolled' and jsonb_typeof(b#>'{data,gauge,value}')='null'
       and pg_temp.ok(c) and jsonb_array_length(c#>'{data,policies}')=1 and (c#>>'{data,policies,0,final_score}')::int=95
       and c#>>'{data,policies,0,label}'='Previous policy (retired)',
-    'V2 gauge: enrolled 0 with milestone none; not-enrolled returns a null value; V1 record kept as Previous policy (retired) at 95');
+    'V2 gauge: enrolled 100 with milestone none; not-enrolled returns a null value; V1 record kept as Previous policy (retired) at 95');
 
   -- ── TEST 12. Activities: administrators only, approved enabled rules only, immutable.
   a:=pg_temp.q(kag,format('select public.create_community_credit_activity(%L,%L,''x'',now(),null,null,''sheet'')',gen_random_uuid(),rules->>'CLEANUP_DRIVE'));
@@ -482,9 +482,9 @@ begin
   begin insert into public.barangay_residents(id,first_name,last_name,purok,resident_status) values(pg_temp.u('r_later'),'P067','Later','P067 Area','active');
   exception when others then null; end;
   begin update public.barangay_residents set resident_status='active' where id=r_inactive; exception when others then null; end;
-  perform pg_temp.check(22,exists(select 1 from public.community_credit_enrollments where resident_id=pg_temp.u('r_later') and policy_id=v2 and starting_score=0 and enrollment_source='resident_created')
-      and exists(select 1 from public.community_credit_enrollments where resident_id=r_inactive and policy_id=v2 and starting_score=0 and enrollment_source='resident_reactivated'),
-    'resident creation and reactivation enroll in the active participation policy at 0');
+  perform pg_temp.check(22,exists(select 1 from public.community_credit_enrollments where resident_id=pg_temp.u('r_later') and policy_id=v2 and starting_score=100 and enrollment_source='resident_created')
+      and exists(select 1 from public.community_credit_enrollments where resident_id=r_inactive and policy_id=v2 and starting_score=100 and enrollment_source='resident_reactivated'),
+    'resident creation and reactivation enroll in the active participation policy at 100');
 
   -- ── TEST 23. Aggregate: ordinary officials see milestone buckets with small counts suppressed.
   a:=pg_temp.q(kag,'select public.community_credit_aggregate()');
@@ -510,9 +510,9 @@ begin
   if to_regprocedure('public.barangay_safety_analytics(date,date,text,text,text)') is not null then
     a:=pg_temp.q(sec,'select public.barangay_safety_analytics(null,null,null,null,''all'')');
     perform pg_temp.check(25,pg_temp.ok(a) and (a#>>'{data,community_credit,configured}')::boolean
-        and a#>'{data,community_credit,starting_score_distribution}'=jsonb_build_array(jsonb_build_object('score',0,'residents',
+        and a#>'{data,community_credit,starting_score_distribution}'=jsonb_build_array(jsonb_build_object('score',100,'residents',
           (select count(*) from public.community_credit_enrollments where policy_id=v2))),
-      '062 analytics still works: V2 starting scores all 0');
+      '062 analytics still works: V2 starting scores all 100');
   else
     perform pg_temp.check(25,true,'062 not installed in this database: compatibility not applicable');
   end if;
@@ -568,8 +568,15 @@ reset role;
 do $report$
 declare failed text;
 begin
+  if (select count(*) from t067_results)<>28 or exists(
+    select n from generate_series(1,28) s(n) except select test from t067_results
+  ) then raise exception 'Incomplete migration-067 assertion set'; end if;
   select string_agg(format('TEST %s FAILED: %s',test,label),E'\n' order by test) into failed from t067_results where not ok;
   if current_setting('t067.mode',true)='negctrl' then
+    if coalesce((select string_agg(test::text,',' order by test) from t067_results where not ok),'')
+       is distinct from current_setting('t067.expected_failures',true) then
+      raise exception 'Negative-control mismatch: expected %, actual %',current_setting('t067.expected_failures',true),failed;
+    end if;
     raise notice 'NEGATIVE CONTROL failing tests: %',coalesce((select string_agg(test::text,',' order by test) from t067_results where not ok),'none');
   elsif failed is not null then
     raise exception E'%',failed;

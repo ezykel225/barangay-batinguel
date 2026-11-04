@@ -31,6 +31,11 @@ describe('the migration directory rule', () => {
     expect(migrationSequenceProblems([...base, ...reviewed(61, 62, 63, 64, 65, 66)])).toEqual([])
   })
 
+  it('accepts the reviewed 067 after 066, with or without 064', () => {
+    expect(migrationSequenceProblems([...base, ...reviewed(61, 62, 63, 65, 66, 67)])).toEqual([])
+    expect(migrationSequenceProblems([...base, ...reviewed(61, 62, 63, 64, 65, 66, 67)])).toEqual([])
+  })
+
   it('refuses 066 when 065 is not there to permit the 064 gap', () => {
     expect(migrationSequenceProblems([...base, ...reviewed(61, 62, 63, 66)]))
       .toEqual(['missing migration 064', 'missing migration 065'])

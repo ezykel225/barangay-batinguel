@@ -1,5 +1,5 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { FaBars, FaTimes, FaUser } from 'react-icons/fa'
 import { useAuth } from '../context/AuthContext'
 import EServicesMenu from './EServicesMenu'
@@ -22,10 +22,29 @@ const E_SERVICE_PATHS = [
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false)
+  const menuToggleRef = useRef(null)
   const location = useLocation()
   const navigate = useNavigate()
   const { user, role, roleStatus, loading: authLoading, logout } = useAuth()
   const [residentProfile, setResidentProfile] = useState(null)
+
+  useEffect(() => { setIsOpen(false) }, [location.pathname, location.search])
+  useEffect(() => {
+    const closeOnDesktop = () => { if (window.innerWidth > 1024) setIsOpen(false) }
+    window.addEventListener('resize', closeOnDesktop)
+    return () => window.removeEventListener('resize', closeOnDesktop)
+  }, [])
+  useEffect(() => {
+    if (!isOpen) return undefined
+    const closeOnEscape = event => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      setIsOpen(false)
+      menuToggleRef.current?.focus()
+    }
+    document.addEventListener('keydown', closeOnEscape)
+    return () => document.removeEventListener('keydown', closeOnEscape)
+  }, [isOpen])
 
   useEffect(() => {
     if (role === 'resident' && user?.id) {
@@ -178,6 +197,7 @@ const Navbar = () => {
         <button
           type="button"
           className="navbar-toggle"
+          ref={menuToggleRef}
           onClick={toggleMenu}
           aria-expanded={isOpen}
           aria-controls="navbar-mobile-menu"

@@ -13,7 +13,7 @@ const percent = (value, max) => (max > 0 && value > 0 ? Math.max(2, Math.round((
 
 export function DataTable({ caption, rows, valueLabel = 'Records' }) {
   return <details className="ai-table"><summary>Show data table</summary>
-    <div className="ai-table-scroll"><table className="ai-data-table"><caption className="visually-hidden">{caption}</caption>
+    <div className="ai-table-scroll" role="region" aria-label={`${caption} data table`} tabIndex={0}><table className="ai-data-table"><caption className="visually-hidden">{caption}</caption>
       <thead><tr><th scope="col">Label</th><th scope="col">{valueLabel}</th></tr></thead>
       <tbody>{rows.map((row) => <tr key={row.key}><th scope="row">{row.label}</th><td>{row.total}</td></tr>)}</tbody></table></div>
   </details>

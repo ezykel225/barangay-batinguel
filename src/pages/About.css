@@ -139,7 +139,7 @@
   display: grid;
   /* auto-fit collapses to one column on a phone without a media
      query, and the 300px floor stops a card squeezing its labels. */
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
   gap: 20px;
 }
 

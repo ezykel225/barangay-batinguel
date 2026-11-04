@@ -1,43 +1,33 @@
 import { useEffect, useState } from 'react'
 import { getMyCreditProfile, getResidentCreditProfile } from './communityCreditApi'
+import CreditGauge from './CreditGauge'
+import CreditCorrections from './CreditCorrections'
 import './CommunityCredit.css'
 
-const dateTime = value => value ? new Intl.DateTimeFormat('en-PH',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Manila'}).format(new Date(value)) : 'None'
-const sourceLabel = value => String(value || '').replaceAll('_',' ').replace(/\b\w/g, c => c.toUpperCase())
-
+const dateTime = value => value && Number.isFinite(Date.parse(value)) ? new Intl.DateTimeFormat('en-PH',{dateStyle:'medium',timeZone:'Asia/Manila'}).format(new Date(value)) : 'Not recorded'
+const label = value => String(value || '').replaceAll('_',' ')
 export default function CreditProfile({ residentId, showResident = false }) {
-  const [state,setState] = useState({loading:true,data:null,error:''})
-  useEffect(()=>{ let live=true; setState({loading:true,data:null,error:''});
-    const request=residentId?getResidentCreditProfile(residentId):getMyCreditProfile()
-    request.then(data=>{if(live)setState({loading:false,data:residentId?data:data?.profile,error:''})})
-      .catch(()=>{if(live)setState({loading:false,data:null,error:'Community credit information is unavailable. Please try again later.'})})
-    return()=>{live=false}
-  },[residentId])
-  if(state.loading)return <p role="status">Loading community credit profile...</p>
-  if(state.error)return <p role="alert">{state.error}</p>
-  if(!residentId && state.data==null)return <div className="credit-empty"><h2>Community Credit</h2><p>Your resident directory record is not yet linked to this account.</p></div>
-  const data=state.data
-  if(!data)return null
-  return <div className="credit-profile">
-    {showResident&&<section className="credit-section" aria-labelledby="credit-resident-heading"><h2 id="credit-resident-heading">Resident</h2><dl className="credit-facts">
-      <div><dt>Full name</dt><dd>{data.resident?.full_name}</dd></div><div><dt>Purok</dt><dd>{data.resident?.purok||'Not recorded'}</dd></div>
-      <div><dt>Resident status</dt><dd>{sourceLabel(data.resident?.resident_status)}</dd></div><div><dt>Account linkage</dt><dd>{data.resident?.account_linked?'Linked':'Not linked'}</dd></div>
-    </dl></section>}
-    <section className="credit-section" aria-labelledby="community-credit-heading"><h2 id="community-credit-heading">Community Credit</h2>
-      {!data.configured?<p className="credit-not-configured">Community credit policy is not configured.</p>:<>
-        {data.enrolled===false?<p className="credit-not-configured">Community credit enrollment has not started for this resident.</p>:<><div className="credit-score" aria-label={`Current community credit score ${data.current_score} out of ${data.maximum_score}`}><strong>{data.current_score}</strong><span>/ {data.maximum_score}</span><small>Current score</small></div>
-        <p className="credit-policy">Policy: {data.policy_name}</p>
-        <dl className="credit-metrics"><div><dt>Credit started</dt><dd>{dateTime(data.credit_started_at)}</dd></div><div><dt>Starting score</dt><dd>{data.starting_score??data.base_score}</dd></div><div><dt>Credit adjustments total</dt><dd>{Number(data.event_total)>0?'+':''}{data.event_total}</dd></div>
-          <div><dt>Positive events</dt><dd>{data.positive_event_count}</dd></div><div><dt>Negative events</dt><dd>{data.negative_event_count}</dd></div>
-          <div><dt>Repair events</dt><dd>{data.repair_event_count}</dd></div><div><dt>Last credit activity</dt><dd>{dateTime(data.last_credit_event_at)}</dd></div></dl></>}
-      </>}
-    </section>
-    {data.enrolled!==false&&<section className="credit-section" aria-labelledby="credit-ledger-heading"><h2 id="credit-ledger-heading">Credit Ledger</h2>
-      {!data.ledger?.length?<p>No credit events recorded.</p>:<div className="credit-table-wrap"><table className="credit-table"><thead><tr><th>Date</th><th>Event</th><th>Category</th><th>Points</th><th>Source</th><th>Verified by</th></tr></thead><tbody>
-        {data.ledger.map(row=><tr key={row.id}><td data-label="Date">{dateTime(row.verified_at)}</td><td data-label="Event">{row.event}</td><td data-label="Category">{sourceLabel(row.category)}</td><td data-label="Points"><span className="credit-points">{row.points>0?'+':''}{row.points}</span></td><td data-label="Source">{row.source_reference||sourceLabel(row.source)}</td><td data-label="Verified by">{row.verified_by}</td></tr>)}
-      </tbody></table></div>}
-    </section>}
-    {showResident&&<section className="credit-section credit-safety-placeholder" aria-labelledby="credit-safety-heading"><h2 id="credit-safety-heading">Public-Safety History</h2><p>Resident incident and KP analytics will appear here once verified person-linking and outcome review are enabled.</p></section>}
-  </div>
+ const [state,setState] = useState({loading:true,data:null,error:''})
+ useEffect(()=>{let live=true;setState({loading:true,data:null,error:''});(residentId?getResidentCreditProfile(residentId):getMyCreditProfile()).then(data=>{if(live)setState({loading:false,data:residentId?data:data?.profile,error:''})}).catch(()=>{if(live)setState({loading:false,data:null,error:'Community credit information is unavailable. Please try again later.'})});return()=>{live=false}},[residentId])
+ if(state.loading)return <p role="status">Loading community credit profile...</p>
+ if(state.error)return <p role="alert">{state.error}</p>
+ const data=state.data
+ if(!data)return <div className="credit-empty"><h2>Community Credit</h2><p>Your resident directory record is not yet linked to this account.</p></div>
+ const v2=data.policy_model==='participation_v2'
+ const enrolled=data.configured&&data.enrolled!==false&&data.status!=='not_enrolled'
+ const ledger=data.ledger||[]
+ return <div className="credit-profile">
+  <section className="credit-section"><h2>Community Credit</h2>
+   {!data.configured?<p>Community credit policy is not configured.</p>:!enrolled?<p>Community credit enrollment has not started for this resident.</p>:<>
+    <div className="credit-hero"><CreditGauge value={data.current_score} maximum={data.maximum_score}/><div><span className="credit-model">{v2?'Active V2 · Participation':'Active V1 · Legacy policy'}</span><h3>{data.policy_name}</h3><p>Your current score comes from the active policy and verified server records.</p>{!v2&&<p>Participation V2 is not active for this profile.</p>}<dl className="credit-facts"><div><dt>Starting score</dt><dd>{data.starting_score??data.base_score??'Not recorded'}</dd></div><div><dt>Credit started</dt><dd>{dateTime(data.credit_started_at)}</dd></div></dl></div></div>
+    {data.transition_notice&&<p className="credit-notice">{data.transition_notice}</p>}<p>Reports, complaints, blotters and incident involvement do not automatically affect credit scores. {data.service_notice||'This score does not determine access to essential barangay services.'}</p>
+   </>}
+  </section>
+  {showResident&&<section className="credit-section"><h2>Resident</h2><p>{data.resident?.full_name} · {data.resident?.purok||'Purok not recorded'}</p><p>{label(data.resident?.resident_status)}</p></section>}
+  {enrolled&&<>
+   <section className="credit-section"><h2>Community participation history</h2>{!v2?<p>Participation history is available when a V2 participation policy is active. Existing V1 adjustments remain below.</p>:<><p>Recorded participation points: <strong>{data.points_recorded??'Not recorded'}</strong>. Positive records remain in your history even at the score ceiling.</p>{!ledger.length&&!data.participations_without_points?.length?<p>No participation records.</p>:<ul className="credit-history">{ledger.filter(r=>r.kind!=='reversal').map(r=><li key={r.id}><strong>{r.activity_title||r.event}</strong><span>{r.activity_reference} · {dateTime(r.activity_date)} · {r.reversed?'Reversed':label(r.kind)}</span></li>)}{data.participations_without_points?.map((r,i)=><li key={`${r.activity_reference}-${i}`}><strong>{r.activity_title}</strong><span>{r.activity_reference} · {label(r.state)} · No points awarded</span></li>)}</ul>}</>}</section>
+   <section className="credit-section"><h2>Credit Ledger</h2><p>Credit adjustment ledger — verified entries and reversals.</p>{!ledger.length?<p>No credit events recorded.</p>:<div className="credit-table-wrap" tabIndex="0" aria-label="Credit adjustment ledger"><table className="credit-table"><thead><tr><th>Date</th><th>Event</th><th>Category</th><th>Points</th><th>Source</th><th>Verified by</th></tr></thead><tbody>{ledger.map(r=><tr key={r.id}><td data-label="Date">{dateTime(r.verified_at)}</td><td data-label="Event">{r.event}{r.reason&&<p>{r.reason}</p>}</td><td data-label="Category">{label(r.kind||r.category)}</td><td data-label="Points">{r.points>0?'+':''}{r.points}</td><td data-label="Source">{r.activity_reference||r.source_reference||label(r.source)}</td><td data-label="Verified by">{r.verified_by}</td></tr>)}</tbody></table></div>}</section>
+   {!residentId&&<CreditCorrections activeV2={v2} ledger={ledger}/>}
+  </>}
+ </div>
 }
-

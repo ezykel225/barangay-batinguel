@@ -185,3 +185,10 @@
   outline: 3px solid #1e3a8a;
   outline-offset: -3px;
 }
+
+/* At 320px: 288px dialog minus 16px stage padding cannot fit a 318px
+   (0.40 scale) sheet. Shrink the preview box and sheet together. */
+@media (max-width: 360px) {
+  .doc-preview-scale { width: calc(210mm * 0.33); min-height: calc(297mm * 0.33); }
+  .doc-preview-stage .doc-page { transform: scale(0.33); }
+}

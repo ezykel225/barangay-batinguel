@@ -11,12 +11,18 @@
 -- separate, two-person, audited transition (section 7) that nobody runs here.
 --
 -- ── 2. THE V2 MODEL (PROTOTYPE, PENDING FORMAL BARANGAY APPROVAL) ────────────
---   * starting score 0, minimum 0, maximum 100 (a CHECK, not a convention);
---   * points are EARNED only, for verified participation in approved
+--   * starting score 100, minimum 0, maximum 100 (a CHECK, not a convention);
+--   * points are EARNED for verified participation in approved
 --     community activities (source 'community_activity', category 'positive');
---   * no negative, repair, incident, KP or complaint rule can exist on a V2
---     policy, and nothing reduces points except a reasoned reversal of an
---     award recorded in error;
+--   * positive participation points contribute up to the 100-point ceiling;
+--   * complaints, blotter entries and incident reports alone never deduct
+--     points; no automatic assumptions or inferences from incident patterns;
+--   * future deductions require specifically defined violations after
+--     responsibility is formally established through an appropriate,
+--     documented finding, notice, and opportunity to challenge (pending formal
+--     ordinance approval; no punitive rules may be activated until approved);
+--   * full resident correction and appeal request workflow;
+--   * no essential barangay services may be restricted based on score;
 --   * no decay and no automatic penalty;
 --   * lifetime points never reset; each rule has an annual cap counted on the
 --     Asia/Manila calendar year of the activity's START date;
@@ -111,7 +117,7 @@ alter table public.community_credit_policies
   add column approved_by uuid references public.profiles(id) on delete restrict,
   add column approved_at timestamptz,
   add constraint community_credit_policies_v2_score_model
-    check (policy_model<>'participation_v2' or (base_score=0 and minimum_score=0 and maximum_score=100)),
+    check (policy_model<>'participation_v2' or (base_score=100 and minimum_score=0 and maximum_score=100)),
   add constraint community_credit_policies_v2_approval
     check (policy_model<>'participation_v2' or (prepared_by is not null and (status='draft' or approved_by is not null))),
   add constraint community_credit_policies_independent_approval
@@ -456,12 +462,8 @@ declare v_policy public.community_credit_policies%rowtype; v_inserted uuid;
 begin
   select * into v_policy from public.community_credit_policies where status='active';
   if not found then return false; end if;
-  if v_policy.policy_model='participation_v2' then
-    if v_policy.base_score<>0 or v_policy.minimum_score<>0 or v_policy.maximum_score<>100 then
-      raise exception 'A participation policy must use the 0 / 0 / 100 score model';
-    end if;
-  elsif v_policy.base_score<>100 or v_policy.minimum_score<>0 or v_policy.maximum_score<>100 then
-    raise exception 'The active policy must use the approved 100 / 0 / 100 score model';
+  if v_policy.base_score<>100 or v_policy.minimum_score<>0 or v_policy.maximum_score<>100 then
+    raise exception 'The policy must use the approved 100 / 0 / 100 score model';
   end if;
   if p_source not in ('active_resident_batch','resident_created','resident_reactivated') then raise exception 'Invalid enrollment source'; end if;
   if not exists(select 1 from public.barangay_residents r where r.id=p_resident_id and r.resident_status='active') then return false; end if;
@@ -478,12 +480,8 @@ begin
   perform public.community_credit_require_admin();
   select * into v_policy from public.community_credit_policies where id=p_policy_id and status='active' for update;
   if not found then raise exception 'Active policy unavailable'; end if;
-  if v_policy.policy_model='participation_v2' then
-    if v_policy.base_score<>0 or v_policy.minimum_score<>0 or v_policy.maximum_score<>100 then
-      raise exception 'A participation policy must use the 0 / 0 / 100 score model';
-    end if;
-  elsif v_policy.base_score<>100 or v_policy.minimum_score<>0 or v_policy.maximum_score<>100 then
-    raise exception 'The active policy must use the approved 100 / 0 / 100 score model';
+  if v_policy.base_score<>100 or v_policy.minimum_score<>0 or v_policy.maximum_score<>100 then
+    raise exception 'The policy must use the approved 100 / 0 / 100 score model';
   end if;
   insert into public.community_credit_enrollments(resident_id,policy_id,starting_score,enrollment_source,created_by)
   select r.id,v_policy.id,v_policy.base_score,'active_resident_batch',auth.uid() from public.barangay_residents r where r.resident_status='active'
@@ -592,7 +590,7 @@ begin
   perform public.community_credit_require_admin();
   if p_id is null then
     insert into public.community_credit_policies(name,description,base_score,minimum_score,maximum_score,policy_model,prepared_by,created_by,updated_by)
-    values(btrim(p_name),coalesce(btrim(p_description),''),0,0,100,'participation_v2',auth.uid(),auth.uid(),auth.uid()) returning id into v_id;
+    values(btrim(p_name),coalesce(btrim(p_description),''),100,0,100,'participation_v2',auth.uid(),auth.uid(),auth.uid()) returning id into v_id;
     insert into public.activity_log(action,entity_type,entity_id,subject) values('added','community_credit_policy',v_id,'Participation policy prepared');
   else
     update public.community_credit_policies set name=btrim(p_name),description=coalesce(btrim(p_description),''),prepared_by=auth.uid(),
@@ -957,7 +955,7 @@ begin
   end if;
   select coalesce(sum(e.points_delta_snapshot),0) into v_total from public.community_credit_events e
     where e.resident_id=p_resident_id and e.policy_id=v_policy.id and e.verified_at>=v_enrollment.started_at;
-  v_score:=greatest(0,least(100,v_total))::int;
+  v_score:=greatest(0,least(100,v_enrollment.starting_score+v_total))::int;
   select coalesce(jsonb_agg(jsonb_build_object('id',e.id,'kind',case when e.reverses_event_id is not null then 'reversal'
       when e.reaward_of_event_id is not null then 'reaward' else 'award' end,'event',e.rule_title_snapshot,'rule_code',e.rule_code_snapshot,
     'points',e.points_delta_snapshot,'activity_reference',a.reference,'activity_title',a.title,'activity_date',a.activity_date,
@@ -971,7 +969,7 @@ begin
   where e.resident_id=p_resident_id and e.policy_id=v_policy.id and e.verified_at>=v_enrollment.started_at;
   return jsonb_build_object('configured',true,'enrolled',true,'status','enrolled','policy_model','participation_v2',
     'resident_id',v_resident.id,'resident',v_res,'policy_id',v_policy.id,'policy_name',v_policy.name,'policy_description',v_policy.description,
-    'credit_started_at',v_enrollment.started_at,'starting_score',0,'minimum_score',0,'maximum_score',100,
+    'credit_started_at',v_enrollment.started_at,'starting_score',v_enrollment.starting_score,'minimum_score',0,'maximum_score',100,
     'points_recorded',v_total,'current_score',v_score,'at_maximum',v_total>=100,'milestone',public.community_credit_milestone(v_total),
     'active_award_count',(select count(*) from public.community_credit_participations x where x.resident_id=p_resident_id and x.policy_id=v_policy.id and x.state='awarded'),
     'last_award_at',(select max(e.verified_at) from public.community_credit_events e where e.resident_id=p_resident_id and e.policy_id=v_policy.id and e.event_kind='positive'),
@@ -985,7 +983,7 @@ begin
       'activity_date',a.activity_date,'state',x.state) order by a.activity_date desc) from public.community_credit_participations x
       join public.community_credit_activities a on a.id=x.activity_id where x.resident_id=p_resident_id and x.policy_id=v_policy.id and x.state in ('verified','capped')),'[]'::jsonb),
     'ledger',v_ledger,'has_previous_policies',v_prev,
-    'transition_notice',case when v_prev then 'This is a new participation measure that starts at 0 points for everyone. It is not a penalty or a deduction. Your record under the previous policy is kept.' end,
+    'transition_notice',case when v_prev then 'This policy starts at 100 points for everyone. Verified participation contributes positive points up to the 100-point ceiling. Your record under the previous policy is kept.' end,
     'service_notice','Participation points recognise volunteering. They do not affect eligibility for any barangay service.',
     'gauge',jsonb_build_object('status','enrolled','model','participation_v2','value',v_score,'minimum',0,'maximum',100,'points_recorded',v_total,
       'at_maximum',v_total>=100,'milestone',public.community_credit_milestone(v_total),'milestones',public.community_credit_milestones()));

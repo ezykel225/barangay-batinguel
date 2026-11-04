@@ -227,7 +227,7 @@ describe('Community Credit tab',()=>{
     expect(supabase.rpc).not.toHaveBeenCalledWith('community_credit_profile',expect.anything())
     fireEvent.click(tab('Community Credit'))
     expect(await screen.findByLabelText('Current community credit score 100 out of 100')).toBeInTheDocument()
-    expect(screen.getByText('Policy: Community Credit v1')).toBeInTheDocument()
+    expect(screen.getByRole('heading',{name:'Community Credit v1'})).toBeInTheDocument()
     expect(screen.getByText('No credit events recorded.')).toBeInTheDocument()
     expect(supabase.rpc).toHaveBeenCalledWith('community_credit_profile',{p_resident_id:resident.id})
     expect(screen.queryByText(/Public-Safety History/)).not.toBeInTheDocument()

@@ -18,6 +18,7 @@
 }
 
 .event-details-card {
+  overflow-wrap: anywhere;
   background: white;
   border-radius: var(--radius-lg);
   padding: 28px;

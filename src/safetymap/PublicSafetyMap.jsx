@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import { removeLeafletMap } from './removeLeafletMap'
+import { observeMapSize } from './observeMapSize'
 import 'leaflet/dist/leaflet.css'
 
 import {
@@ -77,7 +78,8 @@ const PublicSafetyMap = ({ zones = [], zoneTypes = [], height = 420 }) => {
     }).addTo(map)
     map.setView([9.3068, 123.3054], 14)
     mapRef.current = map
-    return () => { removeLeafletMap(map); mapRef.current = null; layerRef.current = null }
+    const stopResize = observeMapSize(map, containerRef.current)
+    return () => { stopResize(); removeLeafletMap(map); mapRef.current = null; layerRef.current = null }
   }, [])
 
   useEffect(() => {

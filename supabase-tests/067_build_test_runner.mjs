@@ -23,10 +23,18 @@ import path from 'path'
 const root = process.cwd()
 const read = (...p) => fs.readFileSync(path.join(root, ...p), 'utf8').replace(/\r\n/g, '\n')
 
-// Under the restored 059/060 bodies (V1 visibility, V1-only enrollment, the
-// V1-only ledger guard and the V1 profile) these contracts must fail; the
-// rest (new tables, new functions, triggers, catalog) must still pass.
-export const EXPECTED_NEGCTRL_FAILURES = Object.freeze([3, 7, 11, 14, 15, 16, 17, 18, 19, 20, 22, 23, 26, 28])
+// Mutation control, NOT a complete V1 installation: retain V2 tables, constraints,
+// grants and RPCs, replacing only the five shared function bodies. Isolated
+// single-function PostgreSQL controls establish the exact causal failure sets.
+// Enrollment remains compatible because both models now start at 100.
+export const NEGCTRL_MUTATIONS = Object.freeze([
+  { name: 'community_credit_may_view_resident', failures: [3] },
+  { name: 'community_credit_enroll_resident', failures: [] },
+  { name: 'community_credit_enroll_active_residents', failures: [] },
+  { name: 'community_credit_guard_event', failures: [17, 18, 19, 20, 21] },
+  { name: 'community_credit_profile', failures: [1, 2, 11, 15, 16, 26] },
+])
+export const EXPECTED_NEGCTRL_FAILURES = Object.freeze([...new Set(NEGCTRL_MUTATIONS.flatMap(m => m.failures))].sort((a,b) => a-b))
 
 export const RESTORED_BODY_MARKERS = Object.freeze({ start: '-- From 059_community_credit_foundation.sql', end: '-- End of restored bodies' })
 
@@ -57,23 +65,31 @@ export function buildRunners() {
   const marker = "set local timezone='UTC';\n"
   if (!harness.includes(marker)) throw new Error('harness start marker not found')
   // FUNCTION replacers: in a replacement string `$$` means a literal `$`.
-  const negctrl = harness.replace(marker, () => `${marker}set local t067.mode='negctrl';\n-- NEGATIVE CONTROL: restore the 059/060 bodies inside this transaction.\n${bodies}\n`)
+  const control = (sql, expected) => harness.replace(marker, () => `${marker}set local t067.mode='negctrl';\nset local t067.expected_failures='${expected.join(',')}';\n-- MUTATION CONTROL: selected historical bodies, retaining V2 schema/RPCs.\n${sql}\n`)
+  const negctrl = control(bodies, EXPECTED_NEGCTRL_FAILURES)
   if (!negctrl.includes(bodies)) throw new Error('negative control does not carry the restored bodies verbatim')
   const applyMarker = '-- @@APPLY_067@@'
   if (install.split(applyMarker).length !== 2) throw new Error('install marker must appear exactly once')
   const body = migrationBody()
   const installRun = install.replace(applyMarker, () => `-- 067 body, verbatim, inside this transaction:\n${body}`)
   if (!installRun.includes(body)) throw new Error('install check does not carry the 067 body verbatim')
-  return { run: harness, negctrl, install: installRun }
+  const chunks = bodies.split(/(?=create or replace function public\.)/).filter(s => s.startsWith('create or replace'))
+  if (chunks.length !== NEGCTRL_MUTATIONS.length) throw new Error('Unexpected restored-function count')
+  const mutations = NEGCTRL_MUTATIONS.map((m, i) => {
+    if (!chunks[i].startsWith(`create or replace function public.${m.name}(`)) throw new Error('Mutation order mismatch')
+    return { name: m.name, sql: control(chunks[i], m.failures) }
+  })
+  return { run: harness, negctrl, install: installRun, mutations }
 }
 
 if (process.argv[1] && path.basename(process.argv[1]) === '067_build_test_runner.mjs') {
   const out = process.argv[2]
   if (!out) { console.error('usage: node 067_build_test_runner.mjs <output-dir>'); process.exit(2) }
-  const { run, negctrl, install } = buildRunners()
+  const { run, negctrl, install, mutations } = buildRunners()
   fs.mkdirSync(out, { recursive: true })
   fs.writeFileSync(path.join(out, '067-run.sql'), run)
   fs.writeFileSync(path.join(out, '067-negctrl.sql'), negctrl)
   fs.writeFileSync(path.join(out, '067-install.sql'), install)
+  for (const m of mutations) fs.writeFileSync(path.join(out, `067-control-${m.name}.sql`), m.sql)
   console.log(`wrote 067-run.sql, 067-negctrl.sql and 067-install.sql; the negative control must fail exactly: ${EXPECTED_NEGCTRL_FAILURES.join(',')}`)
 }

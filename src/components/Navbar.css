@@ -233,23 +233,31 @@
 }
 
 .navbar-mobile.open {
-  display: flex;
+  display: none;
 }
 
 /* Responsive */
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
+  .navbar-mobile.open { display: flex; }
   .navbar-menu {
     display: none;
   }
 
   .navbar-toggle {
     display: block;
+    flex: 0 0 44px;
+    min-height: 44px;
   }
 
   .navbar-container {
     padding: 12px 20px;
   }
 }
+
+.navbar-logo { min-width: 0; }
+.navbar-logo-icon { flex-shrink: 0; }
+.navbar-logo-text { min-width: 0; overflow-wrap: anywhere; }
+.navbar-container { gap: 12px; }
 /* ⚠️ A PADDED WRAPPER IS NOT A TARGET, and the drawer's own links were
    21px tall -- under WCAG 2.2 SC 2.5.8's 24px minimum.
 
