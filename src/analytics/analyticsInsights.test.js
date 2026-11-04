@@ -75,7 +75,7 @@ describe('Phase 4 analytics contract',()=>{
     expect(dashboard).not.toMatch(/monthlyCounts|documentTypeCounts|<h1>Reports<\/h1>/)
   })
   test('history and analytics load together without one failure hiding the other (Remediation C)',()=>{
-    for (const file of ['src/analytics/AnalyticsInsights.jsx','src/people/PeopleHistory.jsx','src/people/ResidentHistory.jsx']) {
+    for (const file of ['src/analytics/AnalyticsInsights.jsx','src/people/PeopleHistory.jsx','src/residents/ResidentProfileDialog.jsx']) {
       const text=read(file)
       expect(text).toContain('settlePersonRecord(')
       expect(text).not.toMatch(/Promise\.all\(/)

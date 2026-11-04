@@ -1,9 +1,10 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import PeopleHistory from './PeopleHistory'
-import ResidentHistory from './ResidentHistory'
+import ResidentProfileDialog from '../residents/ResidentProfileDialog'
 import * as api from './peopleApi'
 
 jest.mock('./peopleApi')
+jest.mock('../communityCredit/CreditProfile', () => () => null)
 jest.mock('../components/PortalDetailsDialog', () => ({ title, children, onClose }) => <div role="dialog" aria-label={title}>{children}<button onClick={onClose}>Close</button></div>)
 
 // Remediation C: a failed analytics request must not hide a person's history.
@@ -77,21 +78,26 @@ describe('People & History', () => {
   })
 })
 
+// The resident profile's History and Analytics tabs replaced ResidentHistory;
+// the same Remediation C rule holds there.
+const resident = { id: 'r1', first_name: 'Ana', last_name: 'Santos', resident_status: 'active', purok: '1' }
 describe('Resident profile linked history', () => {
   test('shows the history when only the analytics fail', async () => {
     api.loadPersonAnalytics.mockRejectedValue(down())
-    render(<ResidentHistory residentId="r1" />)
+    render(<ResidentProfileDialog resident={resident} onClose={() => {}} />)
+    fireEvent.click(screen.getByRole('tab', { name: 'History' }))
     expect(await screen.findByText('INC-2026-AAAAAA')).toBeInTheDocument()
-    expect(screen.queryByText(/History is unavailable/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Linked history is unavailable/)).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('tab', { name: 'Analytics' }))
-    expect(screen.getByRole('alert')).toHaveTextContent(/Analytics are unavailable for this person right now/)
+    expect(screen.getByRole('alert')).toHaveTextContent(/Resident analytics are unavailable right now/)
   })
 
   test('a failed history replaces the loading message with the unavailable message', async () => {
     api.loadPersonHistory.mockRejectedValue(down())
-    render(<ResidentHistory residentId="r1" />)
-    expect(screen.getByText('Loading verified links…')).toBeInTheDocument()
-    expect(await screen.findByText(/History is unavailable or your account cannot view it/)).toBeInTheDocument()
-    expect(screen.queryByText('Loading verified links…')).not.toBeInTheDocument()
+    render(<ResidentProfileDialog resident={resident} onClose={() => {}} />)
+    fireEvent.click(screen.getByRole('tab', { name: 'History' }))
+    expect(screen.getByText('Loading linked history...')).toBeInTheDocument()
+    expect(await screen.findByText(/Linked history is unavailable or your account cannot view it/)).toBeInTheDocument()
+    expect(screen.queryByText('Loading linked history...')).not.toBeInTheDocument()
   })
 })

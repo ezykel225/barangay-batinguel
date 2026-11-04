@@ -12,5 +12,8 @@ export const settlePersonRecord = async (loadHistory, loadAnalytics) => {
     ...history.value,
     analytics: analytics.status === 'fulfilled' ? analytics.value : null,
     analyticsUnavailable: analytics.status === 'rejected',
+    // Additive: the failure itself, so a caller can tell "not installed"
+    // (migration 062 not applied) from "not permitted" or an outage.
+    analyticsError: analytics.status === 'rejected' ? analytics.reason : null,
   }
 }
