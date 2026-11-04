@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import EServicesMenu from './EServicesMenu'
 import { SERVICE_GROUPS } from '../constants/eServices'
 import { supabase } from '../supabase/supabaseClient'
+import toast from 'react-hot-toast'
 import './Navbar.css'
 
 // Every destination the E-Services menu can reach, so the navbar can
@@ -23,7 +24,7 @@ const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
-  const { user, role, loading: authLoading, logout } = useAuth()
+  const { user, role, roleStatus, loading: authLoading, logout } = useAuth()
   const [residentProfile, setResidentProfile] = useState(null)
 
   useEffect(() => {
@@ -45,13 +46,23 @@ const Navbar = () => {
     setIsOpen(!isOpen)
   }
 
+  // Navigate away only when Supabase confirms the sign-out. A failed sign-out leaves
+  // the session in storage, so pretending otherwise shows a signed-out page that a
+  // reload signs straight back in.
   const handleLogout = async () => {
-    await logout()
+    const result = await logout()
+    if (result?.error) {
+      toast.error('Could not log out. Check your connection and try again.')
+      return
+    }
     navigate('/')
   }
 
   const isLoggedInResident = role === 'resident' && !!user
-  const isUnsupportedAccount = !!user && !authLoading && !role
+  // "No longer supported" is a definitive answer from the database. A lookup that
+  // could not be completed (roleStatus 'unavailable') is not that, and must not be
+  // presented as a retired role.
+  const isUnsupportedAccount = !!user && !authLoading && !role && roleStatus !== 'unavailable'
 
   return (
     <nav className="navbar">
