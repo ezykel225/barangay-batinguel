@@ -5,10 +5,8 @@ import { residentPurokOptions, matchesResidentPurok } from '../residents/residen
 import DocumentRequestDetails from '../documents/DocumentRequestDetails'
 import { useRef, useState, useEffect, useMemo, useCallback } from 'react'
 import {
-  FaClipboardList,
   FaBullhorn,
   FaCalendarAlt,
-  FaUsers,
   FaUser,
   FaUserTie,
   FaPlus,
@@ -55,8 +53,6 @@ import {
   actionCellIsEmpty,
   documentRequestActions,
   documentRequestSubject,
-  reservationActions,
-  reservationSubject,
 } from '../utils/rowActions'
 import { useConfirm } from '../components/ConfirmDialog'
 import {
@@ -71,15 +67,12 @@ import {
   manilaToday,
   documentStatusClass,
   documentStatusLabel,
-  reservationStatusClass,
-  reservationStatusLabel,
 } from '../utils/displayLabels'
 import {
   RESIDENT_GROUPS,
   RESIDENT_SEARCH_FIELDS,
   REGISTRY_SEARCH_FIELDS,
   filterDocumentRequests,
-  RESERVATION_SEARCH_FIELDS,
   PUROK_FILTER_UNLISTED,
   describeVerification,
   filterRows,
@@ -88,16 +81,7 @@ import {
   normalizeName,
   purokShortLabel,
 } from '../utils/residentGroups'
-import {
-  EXCEPTION_BADGE_LABEL,
-  isExceptionRequest,
-} from '../utils/reservationWindow'
 import MonthCalendar from '../components/MonthCalendar'
-import {
-  buildReservationCalendar,
-  describeReservationDay,
-  reservationsOnDate,
-} from '../utils/reservationCalendar'
 import { buildEventCalendar, describeEventDay, eventsOnDate } from '../utils/eventCalendar'
 import { MONTH_NAMES, monthOf, parseDateKey, toDateKey } from '../utils/monthGrid'
 import '../components/Sidebar.css'
@@ -145,11 +129,6 @@ const DOC_ACTION_ICONS = {
   generate: <FaPrint />,
 }
 
-const RESERVATION_ACTION_ICONS = {
-  approve: <FaCheck />,
-  deny: <FaTimes />,
-}
-
 // Queue | Calendar, Table | Calendar. One control, two tabs.
 const ViewToggle = ({ label, value, options, onChange }) => (
   <div className="view-toggle" role="group" aria-label={label}>
@@ -168,19 +147,12 @@ const ViewToggle = ({ label, value, options, onChange }) => (
 )
 
 // Search box + one optional dropdown + result count + reset. Shared by
-// the Residents tab, the Voter Reference List tab and the Reservations
-// queue, which is why the dropdown is a prop rather than the purok select
-// it started as: Reservations needs the status filter in that slot.
+// retained directory and request views, so the dropdown remains generic.
 //
 // `selectFilter` is { label, value, onChange, options: [{ value, label }] }
 // or absent, in which case only the search box is rendered.
 //
-// `toggleFilter` is { label, checked, onChange } or absent: one checkbox
-// for a yes/no narrowing that is not a status. Reservations uses it for
-// office-hours exceptions, which cut across every status -- a pending
-// exception and an approved one are both exceptions -- so it could not
-// be another entry in the status dropdown without making two different
-// dimensions look like one.
+// `toggleFilter` is { label, checked, onChange } or absent.
 //
 // ⚠️ Declared at module scope, NOT inside OfficialDashboard. A component
 // defined in a render body is a brand-new component type on every
@@ -286,10 +258,6 @@ const PUROK_FILTER_OPTIONS = [
   { value: PUROK_FILTER_UNLISTED, label: 'Blank or not on the list' },
 ]
 
-// The reservation status dropdown. `cancelled` is new here: a resident
-// may cancel their own pending or approved booking, so those rows exist
-// and were visible under "All Statuses" -- but there was no way to filter
-// to them, and no way to filter them out.
 // The five stored values of document_requests.status, in the order a
 // request moves through them. Wording comes from displayLabels so the
 // filter cannot name a status differently from the badge beside it.
@@ -300,14 +268,6 @@ const DOCUMENT_FILTER_OPTIONS = [
   { value: 'ready_for_pickup', label: documentStatusLabel('ready_for_pickup') },
   { value: 'claimed', label: documentStatusLabel('claimed') },
   { value: 'declined', label: documentStatusLabel('declined') },
-]
-
-const RESERVATION_FILTER_OPTIONS = [
-  { value: 'all', label: 'All Statuses' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'approved', label: 'Approved' },
-  { value: 'declined', label: 'Declined' },
-  { value: 'cancelled', label: 'Cancelled' },
 ]
 
 // One editable day of an official's consultation hours.
@@ -462,13 +422,11 @@ const OfficialDashboard = () => {
       .forEach((n) => { markNotificationRead(n) })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, notifications])
-  const [reservations, setReservations] = useState([])
   const [announcements, setAnnouncements] = useState([])
   const [events, setEvents] = useState([])
   const [officialsList, setOfficialsList] = useState([])
   const [kapitanStatus, setKapitanStatus] = useState('available')
   const [documentRequests, setDocumentRequests] = useState([])
-  const [wasteSchedule, setWasteSchedule] = useState([])
   const [residentsList, setResidentsList] = useState([])
   const [processingVerificationIds, setProcessingVerificationIds] = useState(new Set())
   const [rejectingResident, setRejectingResident] = useState(null)
@@ -491,21 +449,15 @@ const OfficialDashboard = () => {
   const [newRegistryEntry, setNewRegistryEntry] = useState({
     full_name: '', purok: '', household_number: '', contact_number: '',
   })
-  const [loading, setLoading] = useState(true)
   // Guards every modal Save/Add/Delete action against double-fires from
   // fast repeated clicks (each action sets this while its request is in
   // flight and buttons are disabled/relabelled while true).
   const [submitting, setSubmitting] = useState(false)
-  // Tracks reservation ids currently being approved/declined so a fast
-  // double-click on the same row can't fire the update twice.
-  const [processingReservationIds, setProcessingReservationIds] = useState(new Set())
 
   // Filters
-  const [reservationFilter, setReservationFilter] = useState('all')
   // Office-hours exceptions only. Separate from the status filter
   // because the two compose: "pending exceptions" is the queue an
   // official actually works through.
-  const [reservationExceptionsOnly, setReservationExceptionsOnly] = useState(false)
 
   // ── Calendar views ──
   //
@@ -513,16 +465,8 @@ const OfficialDashboard = () => {
   // way to look at the same records, never a replacement for the
   // management interface: approving, declining, searching, filtering and
   // reading a resident's details all stay in the queue and the table.
-  const [reservationView, setReservationView] = useState('queue')
   const [eventView, setEventView] = useState('table')
-  const [calendarDate, setCalendarDate] = useState('')
   const [eventCalendarDate, setEventCalendarDate] = useState('')
-  const [reservationMonth, setReservationMonth] = useState(() => monthOf(manilaToday()))
-  // Set by the calendar when an official asks to work one date in the
-  // queue. A separate filter rather than a search term, because
-  // RESERVATION_SEARCH_FIELDS does not include preferred_date -- putting
-  // a date in the search box would match nothing.
-  const [reservationDateFilter, setReservationDateFilter] = useState('')
   const [eventMonth, setEventMonth] = useState(() => monthOf(manilaToday()))
   // ── Document Requests filtering ────────────────────────────────────
   //
@@ -533,7 +477,6 @@ const OfficialDashboard = () => {
   const [documentQuery, setDocumentQuery] = useState('')
   const [documentFilter, setDocumentFilter] = useState('all')
 
-  const [reservationQuery, setReservationQuery] = useState('')
   const [announcementFilter, setAnnouncementFilter] = useState('all')
   const [eventFilter, setEventFilter] = useState('all')
 
@@ -583,7 +526,6 @@ const OfficialDashboard = () => {
   const [archivedOfficials, setArchivedOfficials] = useState([])
   const [archivingOfficial, setArchivingOfficial] = useState(null)
   const [restoringOfficial, setRestoringOfficial] = useState(null)
-  const [showWasteModal, setShowWasteModal] = useState(false)
 
   // ── Modal accessibility ────────────────────────────────────────────
   //
@@ -594,13 +536,12 @@ const OfficialDashboard = () => {
   // nothing.
   useModalA11y(
     showAnnouncementModal || showEventModal || showOfficialModal ||
-    showWasteModal || showRegistryModal || !!decliningRequest ||
+    showRegistryModal || !!decliningRequest ||
     !!viewingId || !!ineligibleResident || !!rejectingResident,
     () => {
       setShowAnnouncementModal(false)
       setShowEventModal(false)
       setShowOfficialModal(false)
-      setShowWasteModal(false)
       setShowRegistryModal(false)
       setDecliningRequest(null)
       setViewingId(null)
@@ -608,17 +549,7 @@ const OfficialDashboard = () => {
       setRejectingResident(null)
     }
   )
-  const [editingWaste, setEditingWaste] = useState(null)
   const [processingDocRequestIds, setProcessingDocRequestIds] = useState(new Set())
-
-  const [newWasteEntry, setNewWasteEntry] = useState({
-    purok: '',
-    waste_type: 'Biodegradable',
-    day_of_week: '',
-    time_label: '',
-    notes: '',
-    display_order: 0,
-  })
 
   const [newAnnouncement, setNewAnnouncement] = useState({
     title: '',
@@ -649,14 +580,12 @@ const OfficialDashboard = () => {
   // ──────────────────────────────────────────────────────
 
   useEffect(() => {
-    fetchReservations()
     fetchAnnouncements()
     fetchEvents()
     fetchKapitanStatus()
     fetchOfficialsList()
     fetchArchivedOfficials()
     fetchDocumentRequests()
-    fetchWasteSchedule()
     fetchResidentsList()
     fetchRegistryEntries()
     // fetchActivityLog() is deliberately NOT called here. The effect
@@ -841,28 +770,6 @@ const OfficialDashboard = () => {
       setSubmitting(false)
     }
   }
-
-  const fetchReservations = async () => {
-    // Newest submission first, which is the existing and intended order:
-    // the queue is worked from the top and a booking made this morning
-    // should not be below one from last month.
-    //
-    // `id` is a tie-break, not a change of order. `created_at` alone is
-    // not a total order -- two rows sharing a timestamp have no defined
-    // relative position, and Postgres may return them either way round
-    // between fetches, so a row could swap places after an unrelated
-    // refetch. Sorting on the primary key after it makes the list
-    // deterministic without moving anything a reader would notice.
-    const { data, error } = await supabase
-      .from('reservations')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .order('id', { ascending: false })
-
-    if (!error) setReservations(data)
-    setLoading(false)
-  }
-
   const fetchAnnouncements = async () => {
     const { data, error } = await supabase
       .from('announcements')
@@ -995,16 +902,6 @@ const OfficialDashboard = () => {
 
     if (!error) setDocumentRequests(data || [])
   }
-
-  const fetchWasteSchedule = async () => {
-    const { data, error } = await supabase
-      .from('waste_schedule')
-      .select('*')
-      .order('display_order', { ascending: true })
-
-    if (!error) setWasteSchedule(data || [])
-  }
-
   const fetchResidentsList = async () => {
     const { data, error } = await supabase
       .from('profiles')
@@ -1542,137 +1439,6 @@ const OfficialDashboard = () => {
     setDecliningRequest(null)
     setDeclineNotes('')
   }
-
-  const handleOpenAddWaste = () => {
-    setEditingWaste(null)
-    setNewWasteEntry({ purok: '', waste_type: 'Biodegradable', day_of_week: '', time_label: '', notes: '', display_order: 0 })
-    setShowWasteModal(true)
-  }
-
-  const handleEditWaste = (entry) => {
-    setEditingWaste(entry)
-    setNewWasteEntry({
-      purok: entry.purok || '',
-      waste_type: entry.waste_type || 'Biodegradable',
-      day_of_week: entry.day_of_week || '',
-      time_label: entry.time_label || '',
-      notes: entry.notes || '',
-      display_order: entry.display_order || 0,
-    })
-    setShowWasteModal(true)
-  }
-
-  const handleSaveWaste = async () => {
-    if (submitting) return
-    if (!newWasteEntry.purok || !newWasteEntry.waste_type || !newWasteEntry.day_of_week) {
-      toast.error('Please fill in Purok, Waste Type, and Day.')
-      return
-    }
-
-    setSubmitting(true)
-    try {
-      if (editingWaste) {
-        const { error } = await supabase
-          .from('waste_schedule')
-          .update({
-            purok: newWasteEntry.purok,
-            waste_type: newWasteEntry.waste_type,
-            day_of_week: newWasteEntry.day_of_week,
-            time_label: newWasteEntry.time_label || null,
-            notes: newWasteEntry.notes || null,
-            display_order: Number(newWasteEntry.display_order) || 0,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', editingWaste.id)
-
-        if (error) {
-          toast.error('Failed to update schedule entry!')
-        } else {
-          toast.success('Schedule entry updated!')
-          logActivity({
-            action: 'edited',
-            entityType: 'waste_schedule',
-            entityId: editingWaste.id,
-            subject: `${newWasteEntry.purok} — ${newWasteEntry.waste_type} (${newWasteEntry.day_of_week})`,
-          })
-          setShowWasteModal(false)
-          fetchWasteSchedule()
-        }
-      } else {
-        // Readback returns the new id so the audit entry can point at the
-        // row. Safe here: this table's SELECT policy covers whoever may
-        // insert, so a successful insert is always readable by its author.
-        const { data: inserted, error } = await supabase
-          .from('waste_schedule')
-          .insert([{
-            purok: newWasteEntry.purok,
-            waste_type: newWasteEntry.waste_type,
-            day_of_week: newWasteEntry.day_of_week,
-            time_label: newWasteEntry.time_label || null,
-            notes: newWasteEntry.notes || null,
-            display_order: Number(newWasteEntry.display_order) || 0,
-            created_by: user?.id ?? null,
-          }])
-          .select('id')
-          .single()
-
-        if (error) {
-          toast.error('Failed to add schedule entry!')
-        } else if (!inserted?.id) {
-          toast.error('Saved, but the schedule entry could not be read back. Refresh to confirm it is there.')
-        } else {
-          toast.success('Schedule entry added!')
-          logActivity({
-            action: 'added',
-            entityType: 'waste_schedule',
-            entityId: inserted.id,
-            subject: `${newWasteEntry.purok} — ${newWasteEntry.waste_type} (${newWasteEntry.day_of_week})`,
-          })
-          setShowWasteModal(false)
-          fetchWasteSchedule()
-        }
-      }
-      setEditingWaste(null)
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const handleDeleteWaste = async (entry) => {
-    const ok = await confirm({
-      title: 'Remove this collection schedule?',
-      message: `${entry.purok} — ${entry.waste_type} on ${entry.day_of_week} will be `
-        + 'removed. This schedule is shown publicly on the home page, so residents '
-        + 'will no longer see a collection day for it.',
-      confirmLabel: 'Remove schedule',
-    })
-    if (!ok) return
-
-    // .select() matters here: RLS filters rows rather than raising, so a
-    // blocked delete comes back as success with zero rows affected. Without
-    // this check the toast reports a removal that never happened.
-    const { data, error } = await supabase
-      .from('waste_schedule')
-      .delete()
-      .eq('id', entry.id)
-      .select('id')
-
-    if (error) {
-      toast.error('Failed to delete schedule entry!')
-    } else if (!data || data.length === 0) {
-      toast.error('Nothing was removed — you may not have permission to change the schedule.')
-    } else {
-      toast.success('Schedule entry removed!')
-      logActivity({
-        action: 'deleted',
-        entityType: 'waste_schedule',
-        entityId: entry.id,
-        subject: `${entry.purok} — ${entry.waste_type} (${entry.day_of_week})`,
-      })
-      fetchWasteSchedule()
-    }
-  }
-
   // Display orders currently held by ACTIVE officials, and the lowest
   // free positive integer. Used to validate Add/Edit and to block a
   // restore into an occupied position -- never to renumber anybody.
@@ -1698,9 +1464,6 @@ const OfficialDashboard = () => {
   // the state the missing-Kagawad incident left behind for a month.
   const punongBarangayName = officialsList
     .find((o) => o.position === 'Punong Barangay')?.full_name || ''
-  // Only the Treasurer approves/denies court reservations — they're the
-  // one who actually receives the GCash payment and can verify it.
-  const isTreasurer = officialInfo?.position === 'Barangay Treasurer'
   // Only the Secretary approves/denies document requests — they manage
   // administrative documents and official records.
   const isSecretary = officialInfo?.position === 'Barangay Secretary'
@@ -1717,10 +1480,9 @@ const OfficialDashboard = () => {
   // ⚠️ The buttons carried `disabled={processing*Ids.has(id)}` and a
   // menu item has no disabled state -- deliberately, because an item a
   // caller may not choose is absent rather than greyed. The double-write
-  // protection was never the attribute: `withDocRequestGuard`,
-  // `handleApproveReservation` and `handleDeclineReservation` each
-  // return immediately when the row is already in their processing set,
-  // and they still do. What is lost is the visual hint on a slow write,
+  // protection was never the attribute: `withDocRequestGuard` returns
+  // immediately when the row is already in its processing set. What is
+  // lost is the visual hint on a slow write,
   // and the alternative -- swapping the trigger for a "Working..."
   // label -- would unmount the element the menu has just restored focus
   // to, which is the detached-opener defect `useModalA11y` exists to
@@ -1736,15 +1498,9 @@ const OfficialDashboard = () => {
     generate: (req) => setDocumentRequestToPrint(req),
   }
 
-  const reservationActionHandlers = {
-    approve: (res) => handleApproveReservation(res),
-    deny: (res) => handleDeclineReservation(res),
-  }
-
-  // The two queues' items: shape from the pure module, icon from the map
-  // above, behaviour from the handlers above. Nothing here decides who
-  // may do what -- `documentRequestActions` returns an empty list for a
-  // non-Secretary and `reservationActions` for a non-Treasurer.
+  // Queue items: shape from the pure module, icon from the map above,
+  // behaviour from the handlers above. `documentRequestActions` returns
+  // an empty list for a non-Secretary.
   const docRequestMenuItems = (req) => documentRequestActions({
     status: req.status,
     isSecretary,
@@ -1764,16 +1520,6 @@ const OfficialDashboard = () => {
   }))
 
   const viewedDocumentRequest = documentRequests.find((request) => request.id === viewedDocumentRequestId)
-
-  const reservationMenuItems = (res) => reservationActions({
-    status: res.status,
-    isTreasurer,
-  }).map((item) => ({
-    ...item,
-    icon: RESERVATION_ACTION_ICONS[item.key],
-    onSelect: () => reservationActionHandlers[item.key]?.(res),
-  }))
-
   // Display name: first name only for greeting
   const firstName = userProfile?.full_name
     ? userProfile.full_name.replace(/^Hon\.\s*/i, '').split(' ')[0]
@@ -1785,49 +1531,6 @@ const OfficialDashboard = () => {
       ? `${officialInfo.position} — ${officialInfo.committee}`
       : officialInfo.position
     : ''
-
-  // Texts the resident that their reservation was approved or declined.
-  // A failed text is never allowed to fail the approval itself — the row
-  // is already updated by this point — but the official does need to know
-  // it didn't arrive, otherwise they assume the resident was told and
-  // nobody follows up.
-  //
-  // Only the reservation id is sent. The Edge Function reads the name,
-  // number, date, time and status from the row itself, so nothing that
-  // reaches the resident's phone comes from this client. That is what
-  // stops anyone holding the publishable key — which ships in this
-  // bundle — from using the function to text arbitrary numbers at the
-  // barangay's expense. The approved/declined wording is decided there
-  // too, from the row's own status, so this no longer passes one.
-  const notifyResident = async (reservation) => {
-    const cannotReach = (reason) => {
-      console.warn('SMS not sent:', reason)
-      toast('Saved, but the text message could not be sent — please contact the resident directly.', {
-        icon: '📵',
-        duration: 6000,
-      })
-    }
-
-    try {
-      const { data, error } = await supabase.functions.invoke('notify-reservation-sms', {
-        body: { reservation_id: reservation.id },
-      })
-
-      if (error) {
-        console.error('SMS notify error:', error)
-        cannotReach(error.message || 'the notification service returned an error')
-        return
-      }
-
-      if (data && data.sent === false) {
-        cannotReach(data.reason || 'unknown reason')
-      }
-    } catch (err) {
-      console.error('SMS notify error:', err)
-      cannotReach(err.message || 'the notification service could not be reached')
-    }
-  }
-
   // Appends to the append-only audit trail. Deliberately fire-and-
   // forget with its own error handling: a logging failure should never
   // block or roll back the actual action the official just took.
@@ -1838,118 +1541,6 @@ const OfficialDashboard = () => {
   // client-supplied name is one a client can make up -- a resident was
   // able to file entries reading "Barangay Secretary / verified".
   // Sending them anyway would just be a value that looks authoritative
-  // and is silently thrown away.
-  const withReservationGuard = async (reservation, action) => {
-    if (processingReservationIds.has(reservation.id)) return
-    setProcessingReservationIds((prev) => new Set(prev).add(reservation.id))
-    try {
-      await action()
-    } finally {
-      setProcessingReservationIds((prev) => {
-        const next = new Set(prev)
-        next.delete(reservation.id)
-        return next
-      })
-    }
-  }
-
-  // ⚠️ Ordering matters here, in this order:
-  //
-  //   1. permission check -- a non-Treasurer must never be asked to
-  //      confirm something they will then be refused;
-  //   2. the in-flight check -- so one row cannot open two dialogs;
-  //   3. the confirmation;
-  //   4. only then withReservationGuard, which takes the per-row lock.
-  //
-  // Putting the dialog inside the guard would hold that lock for as long
-  // as the official took to answer, disabling the row's buttons and the
-  // other decision on it meanwhile. The guard still does its real job:
-  // the write itself cannot run twice.
-  const handleApproveReservation = async (reservation) => {
-    if (!isTreasurer) {
-      toast.error('Only the Treasurer can approve reservations.')
-      return
-    }
-    if (processingReservationIds.has(reservation.id)) return
-    const ok = await confirm({
-      title: 'Approve this reservation?',
-      message: `The court will be held for ${reservation.full_name} on `
-        + `${reservation.preferred_date} at ${reservation.preferred_time}`
-        + `${reservation.duration_hours ? ` for ${reservation.duration_hours} hour(s)` : ''}. `
-        + 'The resident is told the decision, and the slot stays held until somebody '
-        + 'changes it.',
-      confirmLabel: 'Approve booking',
-    })
-    if (!ok) return
-    return withReservationGuard(reservation, async () => {
-      const { data: updated, error } = await supabase
-        .from('reservations')
-        .update({ status: 'approved', reviewed_by: user?.id ?? null, updated_at: new Date().toISOString() })
-        .eq('id', reservation.id)
-        .select('id')
-
-      if (error) {
-        toast.error('Failed to approve reservation!')
-      } else if (!updated || updated.length === 0) {
-        // RLS matched no row, so nothing was written even though the
-        // request itself succeeded. Usually means this account's
-        // profiles.full_name doesn't exactly match its
-        // barangay_officials.full_name, which is what the Treasurer
-        // policy joins on.
-        toast.error('Nothing was saved — your account may not be linked to the Treasurer record. Contact the admin.')
-      } else {
-        toast.success('Reservation approved!')
-        logActivity({
-          action: 'approved',
-          entityType: 'reservation',
-          entityId: reservation.id,
-          subject: `${reservation.full_name} — ${reservation.preferred_date} ${reservation.preferred_time}`,
-        })
-        notifyResident(reservation)
-        fetchReservations()
-      }
-    })
-  }
-
-  const handleDeclineReservation = async (reservation) => {
-    if (!isTreasurer) {
-      toast.error('Only the Treasurer can decline reservations.')
-      return
-    }
-    if (processingReservationIds.has(reservation.id)) return
-    const ok = await confirm({
-      title: 'Decline this reservation?',
-      message: `${reservation.full_name}'s booking for ${reservation.preferred_date} at `
-        + `${reservation.preferred_time} will be declined and the slot released for `
-        + 'someone else. The resident is told the decision.',
-      confirmLabel: 'Decline booking',
-    })
-    if (!ok) return
-    return withReservationGuard(reservation, async () => {
-      const { data: updated, error } = await supabase
-        .from('reservations')
-        .update({ status: 'declined', reviewed_by: user?.id ?? null, updated_at: new Date().toISOString() })
-        .eq('id', reservation.id)
-        .select('id')
-
-      if (error) {
-        toast.error('Failed to decline reservation!')
-      } else if (!updated || updated.length === 0) {
-        toast.error('Nothing was saved — your account may not be linked to the Treasurer record. Contact the admin.')
-      } else {
-        toast.success('Reservation declined!')
-        logActivity({
-          action: 'declined',
-          entityType: 'reservation',
-          entityId: reservation.id,
-          subject: `${reservation.full_name} — ${reservation.preferred_date} ${reservation.preferred_time}`,
-        })
-        notifyResident(reservation)
-        fetchReservations()
-      }
-    })
-  }
-
   const handleUpdateKapitanStatus = async (status) => {
     if (!isKapitan) return
 
@@ -2709,17 +2300,6 @@ const OfficialDashboard = () => {
       setConfirmPassword('')
     }
   }
-
-  const pendingReservations = reservations.filter(r => r.status === 'pending')
-
-  // ── Residents: groups, filters and reconciliation ────────────────
-  //
-  // Every number the Residents tab shows comes from this block, and the
-  // lists it shows come from the same values. A group's tab count is
-  // literally the length of the array rendered when that tab is open,
-  // filters included -- so the count above a list cannot disagree with
-  // the list, which is what a separately-computed total would eventually
-  // do.
   const residentGroups = useMemo(() => groupResidents(residentsList), [residentsList])
 
   const residentFilter = useMemo(
@@ -2750,10 +2330,9 @@ const OfficialDashboard = () => {
 
   // Status and search compose: the status narrows the set, the query
   // narrows what is left. Choosing Pending and typing a name shows that
-  // resident's pending bookings and nothing else.
   //
   // Status first, then the shared `filterRows` -- the same function the
-  // Residents, Voter Reference List and Reservations tabs use, so
+  // Retained resident and document-request views use, so
   // case-insensitivity and whitespace handling are identical across
   // every search box in the portal.
   const visibleDocumentRequests = useMemo(
@@ -2774,52 +2353,6 @@ const OfficialDashboard = () => {
 
   // Same `filterRows` the other two tabs use, so case-insensitivity and
   // whitespace trimming behave identically everywhere and are covered by
-  // the same tests.
-  const visibleReservations = useMemo(() => {
-    const byStatus = reservationFilter === 'all'
-      ? reservations
-      : reservations.filter((r) => r.status === reservationFilter)
-    // ⚠️ isExceptionRequest reads `exception_reason`, never the hour.
-    // Every booking filed before migration 020 starts before 5 PM and
-    // carries no reason, so filtering by hour here would hand the
-    // official the whole of the old queue labelled as exceptions.
-    const byException = reservationExceptionsOnly
-      ? byStatus.filter(isExceptionRequest)
-      : byStatus
-    // Compares the stored date as a string, which is correct for
-    // zero-padded ISO dates and needs no Date at all.
-    const byDate = reservationDateFilter
-      ? byException.filter((r) => toDateKey(r.preferred_date) === reservationDateFilter)
-      : byException
-    return filterRows(byDate, {
-      query: reservationQuery,
-      fields: RESERVATION_SEARCH_FIELDS,
-    })
-  }, [
-    reservations, reservationFilter, reservationExceptionsOnly,
-    reservationDateFilter, reservationQuery,
-  ])
-
-  const exceptionReservationCount = useMemo(
-    () => reservations.filter(isExceptionRequest).length,
-    [reservations]
-  )
-
-  // ⚠️ Built from the `reservations` state this dashboard already
-  // fetched -- the same rows the queue renders. NOT from
-  // get_reservation_slots_range: that RPC is the anonymous view, with
-  // five columns and deliberately no names and no exception_reason, so
-  // an official calling it would be reading a poorer copy of their own
-  // data through a second source.
-  const reservationCalendar = useMemo(
-    () => buildReservationCalendar(reservations),
-    [reservations]
-  )
-  const calendarDayReservations = useMemo(
-    () => reservationsOnDate(reservationCalendar, calendarDate),
-    [reservationCalendar, calendarDate]
-  )
-
   const officialEventCalendar = useMemo(() => buildEventCalendar(events), [events])
   const eventCalendarDayEvents = useMemo(
     () => eventsOnDate(officialEventCalendar, eventCalendarDate),
@@ -2828,19 +2361,6 @@ const OfficialDashboard = () => {
 
   // Today in Manila, for the grid's today marker and its past shading.
   const calendarToday = useMemo(() => manilaToday(), [])
-
-  const reservationFiltersActive =
-    reservationQuery.trim() !== ''
-    || reservationFilter !== 'all'
-    || reservationExceptionsOnly
-    || reservationDateFilter !== ''
-  const resetReservationFilters = () => {
-    setReservationQuery('')
-    setReservationFilter('all')
-    setReservationExceptionsOnly(false)
-    setReservationDateFilter('')
-  }
-
   const visibleRegistryEntries = useMemo(
     () => filterRows(registryEntries, {
       query: registryQuery, purok: registryPurok, fields: REGISTRY_SEARCH_FIELDS,
@@ -2890,7 +2410,6 @@ const OfficialDashboard = () => {
         key: `${d.getFullYear()}-${d.getMonth()}`,
         label: `${MONTH_SHORT[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`,
         documents: 0,
-        reservations: 0,
       })
     }
     const indexOf = (dateStr) => {
@@ -2902,12 +2421,8 @@ const OfficialDashboard = () => {
       const i = indexOf(r.created_at)
       if (i !== -1) buckets[i].documents += 1
     })
-    reservations.forEach((r) => {
-      const i = indexOf(r.created_at)
-      if (i !== -1) buckets[i].reservations += 1
-    })
     return buckets
-  }, [documentRequests, reservations])
+  }, [documentRequests])
 
   const documentTypeCounts = useMemo(() => {
     const map = {}
@@ -2916,24 +2431,6 @@ const OfficialDashboard = () => {
     })
     return Object.entries(map).sort((a, b) => b[1] - a[1])
   }, [documentRequests])
-
-  const busiestDays = useMemo(() => {
-    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-    const counts = new Array(7).fill(0)
-    reservations.forEach((r) => {
-      if (!r.preferred_date) return
-      // preferred_date is a plain date string; split it so the day
-      // isn't shifted by the browser's timezone offset.
-      const [y, m, d] = r.preferred_date.split('-').map(Number)
-      if (!y || !m || !d) return
-      counts[new Date(y, m - 1, d).getDay()] += 1
-    })
-    return dayNames.map((name, i) => ({ name, count: counts[i] }))
-  }, [reservations])
-
-  const maxMonthly = Math.max(1, ...monthlyCounts.map((b) => Math.max(b.documents, b.reservations)))
-  const maxDay = Math.max(1, ...busiestDays.map((d) => d.count))
-
   // One definition, rendered twice -- once in the desktop topbar and
   // once in the mobile header -- so the two placements cannot be given
   // different props.
@@ -2942,7 +2439,7 @@ const OfficialDashboard = () => {
       notifications={notifications}
       readIds={notifReadIds}
       loading={notifLoading}
-      onOpenTab={(tab) => setActiveTab(tab)}
+      onOpenTab={setActiveTab}
       onMarkRead={markNotificationRead}
       onMarkAllRead={markAllNotificationsRead}
     />
@@ -3004,19 +2501,7 @@ const OfficialDashboard = () => {
             </div>
 
             {/* Stats Cards */}
-            <div className="dashboard-stats">
-              <div className="stat-card">
-                <div className="stat-card-header">
-                  <div className="stat-card-icon blue">
-                    <FaClipboardList />
-                  </div>
-                </div>
-                <div className="stat-card-value">
-                  {pendingReservations.length}
-                </div>
-                <div className="stat-card-label">Pending Reservations</div>
-              </div>
-
+            <div className="stats-grid">
               <div className="stat-card">
                 <div className="stat-card-header">
                   <div className="stat-card-icon green">
@@ -3039,16 +2524,6 @@ const OfficialDashboard = () => {
                     against today in Manila, not the browser's timezone. */}
                 <div className="stat-card-value">{countUpcoming(events, 'event_date')}</div>
                 <div className="stat-card-label">Upcoming Events</div>
-              </div>
-
-              <div className="stat-card">
-                <div className="stat-card-header">
-                  <div className="stat-card-icon red">
-                    <FaUsers />
-                  </div>
-                </div>
-                <div className="stat-card-value">{reservations.length}</div>
-                <div className="stat-card-label">Total Reservations</div>
               </div>
             </div>
 
@@ -3085,7 +2560,7 @@ const OfficialDashboard = () => {
                   carries the current value, and rendering both put
                   "✅ Available" on screen twice, side by side -- the
                   same near-identical-strings-stacked fault
-                  HEALTH_NURSE_ROLE exists to prevent. A select reports
+                  A select reports
                   its own state; a second copy of it is not information.
                   Measured in the browser before removing it. */}
               {!isKapitan && (
@@ -3116,91 +2591,6 @@ const OfficialDashboard = () => {
             </div>
             </div>
 
-            {/* Pending Reservations */}
-            <div className="dashboard-card">
-              <div className="dashboard-card-header">
-                <h3>Pending Court Reservations</h3>
-                <button
-                  className="view-all-link"
-                  onClick={() => setActiveTab('reservations')}>
-                  View All
-                </button>
-              </div>
-
-              {loading ? (
-                <p className="dashboard-loading">Loading...</p>
-              ) : pendingReservations.length === 0 ? (
-                <p className="dashboard-empty">No pending reservations.</p>
-              ) : (
-                <div className="table-wrapper">
-                  <table className="dashboard-table">
-                    <thead>
-                      <tr>
-                        <th scope="col">Name</th>
-                        <th scope="col">Date</th>
-                        <th scope="col">Time</th>
-                        <th scope="col">Purpose</th>
-                        <th scope="col">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pendingReservations.slice(0, 5).map((res) => (
-                        <tr key={res.id}>
-                          <td data-label="Name">{res.full_name}</td>
-                          <td data-label="Date">{res.preferred_date}</td>
-                          {/* The badge sits with the time, because the
-                              time is what the exception is about. A
-                              booking from before migration 020 has no
-                              reason and gets no badge -- see
-                              isExceptionRequest, which reads the reason
-                              rather than the hour. */}
-                          <td data-label="Time">
-                            {res.preferred_time}
-                            {isExceptionRequest(res) && (
-                              <span
-                                className="badge badge-exception"
-                                title="Starts before 5:00 PM. The resident asked for an office-hours exception; an official decides it."
-                              >
-                                {EXCEPTION_BADGE_LABEL}
-                              </span>
-                            )}
-                          </td>
-                          <td data-label="Purpose">
-                            {res.purpose}
-                            {isExceptionRequest(res) && (
-                              <span className="exception-reason-note">
-                                <strong>Office-hours reason:</strong>{' '}
-                                {res.exception_reason}
-                              </span>
-                            )}
-                          </td>
-                          <td data-label="Action">
-                            {isTreasurer ? (
-                              <>
-                                <button
-                                  className="btn-approve"
-                                  disabled={processingReservationIds.has(res.id)}
-                                  onClick={() => handleApproveReservation(res)}>
-                                  Approve
-                                </button>
-                                <button
-                                  className="btn-deny"
-                                  disabled={processingReservationIds.has(res.id)}
-                                  onClick={() => handleDeclineReservation(res)}>
-                                  Deny
-                                </button>
-                              </>
-                            ) : (
-                              <span className="role-restricted-note">Treasurer only</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
           </div>
         )}
 
@@ -3466,318 +2856,6 @@ const OfficialDashboard = () => {
           </div>
         )}
 
-        {/* ========================
-            RESERVATIONS TAB
-        ======================== */}
-        {activeTab === 'reservations' && (
-          <div>
-            <div className="reservations-header">
-              <h1>Reservations</h1>
-              <p>Review pending court reservations and manage time slots.</p>
-            </div>
-
-            <div className="dashboard-card">
-              <div className="dashboard-card-header">
-                <h3>All Reservations</h3>
-                {/* ⚠️ Queue is the default and stays the management
-                    interface: search, status, the exceptions filter,
-                    Approve and Decline, the resident's contact details
-                    and the exception reason all live there. The calendar
-                    is an additional way to look at the same rows. */}
-                <ViewToggle
-                  label="How to view reservations"
-                  value={reservationView}
-                  onChange={setReservationView}
-                  options={[
-                    { value: 'queue', label: 'Queue', icon: <FaClipboardList aria-hidden="true" /> },
-                    { value: 'calendar', label: 'Calendar', icon: <FaCalendarAlt aria-hidden="true" /> },
-                  ]}
-                />
-              </div>
-
-              {reservationView === 'calendar' && (
-                <div className="dashboard-calendar-layout">
-                  <MonthCalendar
-                    year={reservationMonth.year}
-                    month={reservationMonth.month}
-                    onMonthChange={setReservationMonth}
-                    selectedDate={calendarDate}
-                    onSelectDate={setCalendarDate}
-                    today={calendarToday}
-                    idPrefix="official-reservations"
-                    renderDay={(cell) => describeReservationDay(cell, reservationCalendar)}
-                    caption={'Amber means a booking on that date is still waiting on an '
-                      + 'official. Green means every booking on it has been decided. '
-                      + 'Declined and cancelled bookings release their slots and do not '
-                      + 'make a date look occupied.'}
-                  />
-
-                  {/* Names, purposes and exception reasons go HERE, never
-                      inside a calendar cell. Same information the queue
-                      already shows this official -- nothing new is
-                      exposed, and nothing is exposed publicly. */}
-                  <div className="mcal-day-panel">
-                    {!calendarDate ? (
-                      <p className="mcal-day-empty">
-                        Select a date to see its bookings.
-                      </p>
-                    ) : (
-                      <>
-                        <h4>{longDate(calendarDate)}</h4>
-                        {calendarDayReservations.length === 0 ? (
-                          <p className="mcal-day-empty">No bookings on this date.</p>
-                        ) : (
-                          <>
-                            <div className="mcal-day-list">
-                              {calendarDayReservations.map((res) => (
-                                <div key={res.id} className="mcal-day-item">
-                                  <span className="mcal-day-item-time">
-                                    {res.preferred_time} · {res.duration_hours}h
-                                  </span>
-                                  <span className="mcal-day-item-title">{res.full_name}</span>
-                                  <span className={`badge ${reservationStatusClass(res.status)}`}>
-                                    {reservationStatusLabel(res.status)}
-                                  </span>
-                                  {isExceptionRequest(res) && (
-                                    <span className="badge badge-exception">
-                                      {EXCEPTION_BADGE_LABEL}
-                                    </span>
-                                  )}
-                                  <span className="mcal-day-item-meta">{res.purpose}</span>
-                                </div>
-                              ))}
-                            </div>
-                            {/* Decisions stay in the queue. This takes the
-                                official there with the date already in the
-                                search box, rather than duplicating Approve
-                                and Decline in a second place. */}
-                            <button
-                              type="button"
-                              className="btn-add btn-sm mcal-day-action"
-                              onClick={() => {
-                                setReservationDateFilter(calendarDate)
-                                setReservationView('queue')
-                              }}
-                            >
-                              Open these in the queue
-                            </button>
-                          </>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* ⚠️ The queue is the management interface and the
-                  default. Only its visibility is conditional here --
-                  nothing about the filtering, the ordering, the
-                  Treasurer-only gate or the decision handlers
-                  changed. */}
-              {reservationView === 'queue' && (
-                <>
-                {/* The status dropdown now sits in the shared filter bar
-                    beside the search box, so it reads as one set of controls
-                    narrowing one list. Same options as before plus
-                    Cancelled, and the two compose -- see
-                    visibleReservations. */}
-                <DashboardFilterBar
-                  idPrefix="reservations"
-                  searchLabel="Search reservations by name, contact number, email, purpose or purok"
-                  placeholder="Search reservations..."
-                  query={reservationQuery}
-                  onQueryChange={setReservationQuery}
-                  selectFilter={{
-                    label: 'Filter reservations by status',
-                    value: reservationFilter,
-                    onChange: setReservationFilter,
-                    options: RESERVATION_FILTER_OPTIONS,
-                  }}
-                  toggleFilter={{
-                    label: `Office-hours exceptions only (${exceptionReservationCount})`,
-                    checked: reservationExceptionsOnly,
-                    onChange: setReservationExceptionsOnly,
-                  }}
-                  resultText={
-                    reservationFiltersActive
-                      ? `Showing ${visibleReservations.length} of ${reservations.length}`
-                        + ` ${reservations.length === 1 ? 'reservation' : 'reservations'}`
-                        // Named, because the calendar can set this
-                        // filter and an official arriving in the queue
-                        // would otherwise see a short list with no
-                        // reason given.
-                        + (reservationDateFilter ? ` on ${longDate(reservationDateFilter)}` : '')
-                      : `${reservations.length}`
-                        + ` ${reservations.length === 1 ? 'reservation' : 'reservations'}`
-                  }
-                  onReset={resetReservationFilters}
-                  filtersActive={reservationFiltersActive}
-                />
-
-                {(() => {
-                  // Ordering is newest submission first, set by
-                  // fetchReservations and unchanged; filtering preserves it.
-                  const filteredReservations = visibleReservations
-
-                  return filteredReservations.length === 0 ? (
-                    <p className="dashboard-empty">
-                      {reservationFiltersActive
-                        ? 'No reservations match this search.'
-                        : 'No reservations yet.'}
-                    </p>
-                  ) : (
-                  <div className="table-wrapper">
-                    <table className="dashboard-table">
-                      <thead>
-                        <tr>
-                          <th scope="col">Name</th>
-                          <th scope="col">Phone</th>
-                          <th scope="col">Email</th>
-                          <th scope="col">Purok</th>
-                          <th scope="col">Date</th>
-                          <th scope="col">Time</th>
-                          {/* "Hours" and "Filed" rather than "Duration" and
-                              "Submitted": an uppercase letter-spaced header
-                              was setting the minimum width of a column whose
-                              values are "3h" and a short date, so the header
-                              was costing more room than the data it labels. */}
-                          <th scope="col">Hours</th>
-                          <th scope="col">Purpose</th>
-                          <th scope="col">Filed</th>
-                          <th scope="col">Status</th>
-                          <th scope="col">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredReservations.map((res) => (
-                          <tr
-                            key={res.id}
-                            // ⚠️ CARD MODE ONLY -- see the Document
-                            // Requests table. Only `pending` puts
-                            // anything in the Action cell: the menu for
-                            // the Treasurer, the "Treasurer only" note
-                            // for anybody else. A decided booking
-                            // renders nothing, so below 769px the cell,
-                            // its ACTION heading and the divider above
-                            // it are collapsed rather than left as a
-                            // label with a gap under it.
-                            className={actionCellIsEmpty({
-                              itemCount: reservationMenuItems(res).length,
-                              noteShown: res.status === 'pending' && !isTreasurer,
-                            }) ? 'row-no-actions' : undefined}
-                          >
-                            <td data-label="Name">{res.full_name}</td>
-                            <td data-label="Phone">{res.contact_number || '—'}</td>
-                            {/* Truncated with an ellipsis rather than
-                                wrapped: a 57-character address broken
-                                character-by-character was taking four lines
-                                and making every other row that tall. The
-                                whole address is in the tooltip, and the
-                                truncation is released in card mode where
-                                the value must be complete. */}
-                            <td data-label="Email">
-                              {res.email ? (
-                                <span className="cell-truncate" title={res.email}>
-                                  {res.email}
-                                </span>
-                              ) : '—'}
-                            </td>
-                            {/* The column is already headed Purok, so the
-                                cell says "4" rather than "Purok 4". Display
-                                only -- the stored value is untouched and is
-                                on the cell as a tooltip, which is also how
-                                a legacy free-text spelling stays visible. */}
-                            <td data-label="Purok" title={res.purok || undefined}>
-                              {purokShortLabel(res.purok) || '—'}
-                            </td>
-                            <td data-label="Date">{res.preferred_date}</td>
-                            {/* The badge sits with the time, because the
-                                time is what the exception is about. A
-                                booking from before migration 020 has no
-                                reason and gets no badge -- see
-                                isExceptionRequest, which reads the reason
-                                rather than the hour. */}
-                            <td data-label="Time">
-                              {res.preferred_time}
-                              {isExceptionRequest(res) && (
-                                <span
-                                  className="badge badge-exception"
-                                  title="Starts before 5:00 PM. The resident asked for an office-hours exception; an official decides it."
-                                >
-                                  {EXCEPTION_BADGE_LABEL}
-                                </span>
-                              )}
-                            </td>
-                            <td data-label="Hours">{res.duration_hours}h</td>
-                            <td data-label="Purpose">
-                              {res.purpose}
-                              {isExceptionRequest(res) && (
-                                <span className="exception-reason-note">
-                                  <strong>Office-hours reason:</strong>{' '}
-                                  {res.exception_reason}
-                                </span>
-                              )}
-                            </td>
-                            <td data-label="Filed">
-                              {res.created_at ? new Date(res.created_at).toLocaleDateString() : '—'}
-                            </td>
-                            <td data-label="Status">
-                              {/* Was `badge-${res.status}` with the raw value
-                                  as its text: a cancelled booking produced
-                                  `badge-cancelled`, which no stylesheet
-                                  defined, and an official read "pending"
-                                  where the resident read "Pending". Both now
-                                  come from the shared map. */}
-                              <span className={`badge ${reservationStatusClass(res.status)}`}>
-                                {reservationStatusLabel(res.status)}
-                              </span>
-                            </td>
-                            {/* ⚠️ The two decisions are in a ⋮ menu since
-                                the PR #24 polish pass, and the Treasurer
-                                gate is UNCHANGED: `reservationActions`
-                                returns an empty list for anybody else, so
-                                the note below is what they still see. The
-                                handlers, the notification and the audit
-                                entry are the same ones the buttons
-                                called. Only `pending` is decidable, so a
-                                decided booking renders no trigger at all
-                                rather than an empty menu. */}
-                            <td data-label="Action" className="action-cell">
-                              {res.status === 'pending' && (
-                                isTreasurer ? (
-                                  <ActionMenu
-                                    portal
-                                    subject={reservationSubject({
-                                      dateLabel: longDate(res.preferred_date),
-                                      residentName: res.full_name,
-                                    })}
-                                    items={reservationMenuItems(res)}
-                                  />
-                                ) : (
-                                  <span className="role-restricted-note">Treasurer only</span>
-                                )
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  )
-                })()}
-                </>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ========================
-            KAPITAN STATUS TAB
-            (Only visible to Punong Barangay via Sidebar)
-        ======================== */}
-        {/* ========================
-            DOCUMENT REQUESTS TAB
-        ======================== */}
         {activeTab === 'documents' && (
           <div>
             <div className="official-dashboard-header">
@@ -3963,76 +3041,6 @@ const OfficialDashboard = () => {
         )}
 
         {activeTab === 'safety-map' && <SafetyMapPanel />}
-
-        {activeTab === 'waste' && (
-          <div>
-            <div className="official-dashboard-header">
-              <h1>Waste Management</h1>
-              <p>Manage the public waste collection schedule shown to residents.</p>
-            </div>
-
-            <div className="dashboard-card">
-              <div className="dashboard-card-header">
-                <h3>Collection Schedule</h3>
-                <button className="btn-add" onClick={handleOpenAddWaste}>
-                  <FaPlus /> Add Schedule Entry
-                </button>
-              </div>
-
-              {wasteSchedule.length === 0 ? (
-                <p className="dashboard-empty">No waste schedule entries yet.</p>
-              ) : (
-                <div className="table-wrapper">
-                  <table className="dashboard-table">
-                    <thead>
-                      <tr>
-                        <th scope="col">Purok</th>
-                        <th scope="col">Waste Type</th>
-                        <th scope="col">Day</th>
-                        <th scope="col">Time</th>
-                        <th scope="col">Notes</th>
-                        <th scope="col">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {wasteSchedule.map((entry) => (
-                        <tr key={entry.id}>
-                          <td data-label="Purok">{entry.purok || '—'}</td>
-                          <td data-label="Waste Type">{entry.waste_type}</td>
-                          <td data-label="Day">{entry.day_of_week}</td>
-                          <td data-label="Time">{entry.time_label || '—'}</td>
-                          <td data-label="Notes">{entry.notes || '—'}</td>
-                          <td data-label="Action" className="action-cell">
-                            <ActionMenu
-                              portal
-                              subject={entry.purok || 'this schedule'}
-                              items={[
-                                {
-                                  key: 'edit',
-                                  label: 'Edit',
-                                  icon: <FaEdit />,
-                                  onSelect: () => handleEditWaste(entry),
-                                },
-                                {
-                                  key: 'delete',
-                                  label: 'Delete',
-                                  icon: <FaTrash />,
-                                  danger: true,
-                                  onSelect: () => handleDeleteWaste(entry),
-                                },
-                              ]}
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
         {activeTab === 'residents' && (
           <div>
             <div className="official-dashboard-header">
@@ -4568,13 +3576,13 @@ const OfficialDashboard = () => {
         )}
 
         {/* ========================
-            SETTINGS TAB
+            REPORTS TAB
         ======================== */}
         {activeTab === 'reports' && (
           <div>
             <div className="official-dashboard-header">
               <h1>Reports</h1>
-              <p>Activity trends across document requests and court reservations.</p>
+              <p>Current summaries for retained resident and document-request services.</p>
             </div>
 
             <div className="report-summary-grid">
@@ -4582,16 +3590,6 @@ const OfficialDashboard = () => {
                 <div className="report-stat-number">{documentRequests.length}</div>
                 <div className="report-stat-label">Total Document Requests</div>
               </div>
-              <div className="dashboard-card report-stat">
-                <div className="report-stat-number">{reservations.length}</div>
-                <div className="report-stat-label">Total Reservations</div>
-              </div>
-              {/* Both figures come from the same grouping the Residents tab
-                  lists, so the two tabs cannot report different numbers for
-                  the same thing. "Registered Residents" used to count every
-                  account including the ones established not to be residents
-                  at all, which read as a barangay population figure and was
-                  not one. */}
               <div className="dashboard-card report-stat">
                 <div className="report-stat-number">{residentGroups.residents.length}</div>
                 <div className="report-stat-label">Verified Residents</div>
@@ -4604,87 +3602,50 @@ const OfficialDashboard = () => {
 
             <div className="dashboard-card" style={{ marginTop: 20 }}>
               <div className="dashboard-card-header">
-                <h3>Last 6 Months</h3>
+                <h3>Document Requests — Last 6 Months</h3>
               </div>
-              {monthlyCounts.every((b) => b.documents === 0 && b.reservations === 0) ? (
-                <p className="dashboard-empty">No activity recorded in the last 6 months yet.</p>
+              {monthlyCounts.every((bucket) => bucket.documents === 0) ? (
+                <p className="dashboard-empty">No document requests recorded in the last 6 months yet.</p>
               ) : (
-                <>
-                  <div className="chart-legend">
-                    <span><i className="chart-dot chart-dot-doc" /> Document Requests</span>
-                    <span><i className="chart-dot chart-dot-res" /> Reservations</span>
-                  </div>
-                  <div className="bar-chart">
-                    {monthlyCounts.map((b) => (
-                      <div key={b.key} className="bar-chart-col">
-                        <div className="bar-chart-bars">
-                          <div
-                            className="bar bar-doc"
-                            style={{ height: `${(b.documents / maxMonthly) * 100}%` }}
-                            title={`${b.documents} document request(s)`}
-                          />
-                          <div
-                            className="bar bar-res"
-                            style={{ height: `${(b.reservations / maxMonthly) * 100}%` }}
-                            title={`${b.reservations} reservation(s)`}
-                          />
-                        </div>
-                        <div className="bar-chart-label">{b.label}</div>
+                <div className="bar-chart">
+                  {monthlyCounts.map((bucket) => (
+                    <div key={bucket.key} className="bar-chart-col">
+                      <div className="bar-chart-bars">
+                        <div
+                          className="bar bar-doc"
+                          style={{ height: `${(bucket.documents / Math.max(1, ...monthlyCounts.map((item) => item.documents))) * 100}%` }}
+                          title={`${bucket.documents} document request(s)`}
+                        />
                       </div>
-                    ))}
-                  </div>
-                </>
+                      <div className="bar-chart-label">{bucket.label}</div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
 
-            <div className="report-two-col">
-              <div className="dashboard-card">
-                <div className="dashboard-card-header">
-                  <h3>Most Requested Documents</h3>
-                </div>
-                {documentTypeCounts.length === 0 ? (
-                  <p className="dashboard-empty">No document requests yet.</p>
-                ) : (
-                  <div className="rank-list">
-                    {documentTypeCounts.map(([type, count]) => (
-                      <div key={type} className="rank-row">
-                        <span className="rank-label">{type}</span>
-                        <div className="rank-bar-track">
-                          <div
-                            className="rank-bar-fill"
-                            style={{ width: `${(count / documentTypeCounts[0][1]) * 100}%` }}
-                          />
-                        </div>
-                        <span className="rank-count">{count}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+            <div className="dashboard-card" style={{ marginTop: 20 }}>
+              <div className="dashboard-card-header">
+                <h3>Most Requested Documents</h3>
               </div>
-
-              <div className="dashboard-card">
-                <div className="dashboard-card-header">
-                  <h3>Busiest Reservation Days</h3>
-                </div>
-                {reservations.length === 0 ? (
-                  <p className="dashboard-empty">No reservations yet.</p>
-                ) : (
-                  <div className="rank-list">
-                    {busiestDays.map((d) => (
-                      <div key={d.name} className="rank-row">
-                        <span className="rank-label">{d.name}</span>
-                        <div className="rank-bar-track">
-                          <div
-                            className="rank-bar-fill rank-bar-alt"
-                            style={{ width: `${(d.count / maxDay) * 100}%` }}
-                          />
-                        </div>
-                        <span className="rank-count">{d.count}</span>
+              {documentTypeCounts.length === 0 ? (
+                <p className="dashboard-empty">No document requests yet.</p>
+              ) : (
+                <div className="rank-list">
+                  {documentTypeCounts.map(([type, count]) => (
+                    <div key={type} className="rank-row">
+                      <span className="rank-label">{type}</span>
+                      <div className="rank-bar-track">
+                        <div
+                          className="rank-bar-fill"
+                          style={{ width: `${(count / documentTypeCounts[0][1]) * 100}%` }}
+                        />
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                      <span className="rank-count">{count}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -5175,8 +4136,8 @@ const OfficialDashboard = () => {
                     something broken. This one names only what is still
                     the case. */}
                 <p className="modal-form-hint">
-                  A position decides who may approve document requests and
-                  court reservations, so it is assigned directly in the
+                  A position decides who may perform protected administrative
+                  actions, so it is assigned directly in the
                   database rather than from this form.
                 </p>
               </div>
@@ -5201,8 +4162,8 @@ const OfficialDashboard = () => {
                     sentence says where they are assigned instead. */}
                 <p className="modal-form-hint">
                   {POWERED_POSITIONS.join(', ')} are assigned directly in
-                  the database, because they decide who may approve
-                  document requests and reservations.
+                  the database, because they decide who may perform
+                  protected administrative actions.
                 </p>
               </div>
             )}
@@ -5251,84 +4212,6 @@ const OfficialDashboard = () => {
           </div>
         </div>
       )}
-
-      {showWasteModal && (
-        <div className="modal-overlay">
-          <div className="modal" role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="offdlg-4-title">
-            <h3 id="offdlg-4-title">{editingWaste ? 'Edit Schedule Entry' : 'Add Schedule Entry'}</h3>
-
-            <div className="modal-form-group">
-              <label htmlFor="off-purok" className="modal-form-label">Purok</label>
-              <input id="off-purok"
-                type="text"
-                className="modal-form-input"
-                placeholder="e.g. Purok 3"
-                value={newWasteEntry.purok}
-                onChange={(e) => setNewWasteEntry({ ...newWasteEntry, purok: e.target.value })}
-              />
-            </div>
-
-            <div className="modal-form-group">
-              <label htmlFor="off-waste-type" className="modal-form-label">Waste Type</label>
-              <select id="off-waste-type"
-                className="modal-form-input"
-                value={newWasteEntry.waste_type}
-                onChange={(e) => setNewWasteEntry({ ...newWasteEntry, waste_type: e.target.value })}
-              >
-                <option value="Biodegradable">Biodegradable</option>
-                <option value="Non-biodegradable">Non-biodegradable</option>
-                <option value="Recyclable">Recyclable</option>
-              </select>
-            </div>
-
-            <div className="modal-form-group">
-              <label htmlFor="off-day-of-week" className="modal-form-label">Day of Week</label>
-              <select id="off-day-of-week"
-                className="modal-form-input"
-                value={newWasteEntry.day_of_week}
-                onChange={(e) => setNewWasteEntry({ ...newWasteEntry, day_of_week: e.target.value })}
-              >
-                <option value="">Select day</option>
-                {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
-                  <option key={day} value={day}>{day}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="modal-form-group">
-              <label htmlFor="off-time-optional" className="modal-form-label">Time (optional)</label>
-              <input id="off-time-optional"
-                type="text"
-                className="modal-form-input"
-                placeholder="e.g. 6:00 AM - 8:00 AM"
-                value={newWasteEntry.time_label}
-                onChange={(e) => setNewWasteEntry({ ...newWasteEntry, time_label: e.target.value })}
-              />
-            </div>
-
-            <div className="modal-form-group">
-              <label htmlFor="off-notes-optional" className="modal-form-label">Notes (optional)</label>
-              <input id="off-notes-optional"
-                type="text"
-                className="modal-form-input"
-                placeholder="e.g. Segregate before collection"
-                value={newWasteEntry.notes}
-                onChange={(e) => setNewWasteEntry({ ...newWasteEntry, notes: e.target.value })}
-              />
-            </div>
-
-            <div className="modal-buttons">
-              <button className="btn-cancel" onClick={() => { setShowWasteModal(false); setEditingWaste(null) }}>
-                Cancel
-              </button>
-              <button className="btn-save" onClick={handleSaveWaste} disabled={submitting}>
-                {submitting ? 'Saving...' : editingWaste ? 'Update Entry' : 'Save Entry'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {showRegistryModal && (
         <div className="modal-overlay">
           <div className="modal" role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="offdlg-5-title">

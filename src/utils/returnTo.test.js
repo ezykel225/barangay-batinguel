@@ -29,14 +29,13 @@ describe('the list itself', () => {
 describe('safeReturnTo', () => {
   it('returns a path that is on the list', () => {
     expect(safeReturnTo('/e-services')).toBe('/e-services')
-    expect(safeReturnTo('/reservation')).toBe('/reservation')
     expect(safeReturnTo('/resident?tab=documents')).toBe('/resident?tab=documents')
   })
 
   it('accepts a percent-encoded form of a listed path', () => {
     expect(safeReturnTo(encodeURIComponent('/resident?tab=documents')))
       .toBe('/resident?tab=documents')
-    expect(safeReturnTo('%2Ftrack-reservation')).toBe('/track-reservation')
+    expect(safeReturnTo('%2Fe-services')).toBe('/e-services')
   })
 
   it('falls back when there is nothing to go back to', () => {
@@ -110,8 +109,15 @@ describe('safeReturnTo', () => {
 
   it('trims surrounding whitespace on an otherwise listed path', () => {
     expect(safeReturnTo('  /e-services  ')).toBe('/e-services')
-    expect(safeReturnTo('\n/reservation\t')).toBe('/reservation')
   })
+
+  it.each(['/reservation', '/track-reservation', '/health-center'])(
+    'rejects the retired destination %s',
+    (destination) => {
+      expect(safeReturnTo(destination)).toBe('/')
+      expect(loginHrefFor(destination)).toBe('/login')
+    },
+  )
 })
 
 describe('loginHrefFor', () => {

@@ -32,7 +32,6 @@ const codeOnly = (source) => source
 
 const OFFICIAL = read('dashboards/OfficialDashboard.jsx')
 const RESIDENT = read('dashboards/ResidentDashboard.jsx')
-const NURSE = read('dashboards/NurseDashboard.jsx')
 
 describe('only the Official Dashboard can reach the generator', () => {
   it('is imported there', () => {
@@ -47,14 +46,6 @@ describe('only the Official Dashboard can reach the generator', () => {
     expect(RESIDENT).not.toContain('documents/DocumentPreview')
     expect(RESIDENT).not.toContain('documentRegistry')
     expect(RESIDENT).not.toContain('DocumentPreview')
-  })
-
-  // The nurse has no role in the document-request workflow at all --
-  // she cannot even read `document_requests`.
-  it('is NOT reachable from the Nurse Dashboard', () => {
-    expect(NURSE).not.toContain('documents/DocumentPreview')
-    expect(NURSE).not.toContain('documentRegistry')
-    expect(NURSE).not.toContain('DocumentPreview')
   })
 
   // Nothing public prints a document.

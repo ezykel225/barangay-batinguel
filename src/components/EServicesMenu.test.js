@@ -22,7 +22,7 @@ describe('the E-Services dropdown', () => {
     render(<MemoryRouter><EServicesMenu /></MemoryRouter>)
     const trigger = screen.getByRole('button', { name: 'E-Services' })
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByRole('link', { name: nameOf('Court Reservation') })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: nameOf('Track a Complaint') })).not.toBeInTheDocument()
   })
 
   it('opens on click and points aria-controls at the panel that appears', () => {
@@ -118,7 +118,7 @@ describe('the E-Services dropdown', () => {
 
   it('closes when a service is chosen, so the panel does not cover the new page', () => {
     open()
-    fireEvent.click(screen.getByRole('link', { name: nameOf('Court Reservation') }))
+    fireEvent.click(screen.getByRole('link', { name: nameOf('Track a Complaint') }))
     expect(screen.getByRole('button', { name: 'E-Services' }))
       .toHaveAttribute('aria-expanded', 'false')
   })

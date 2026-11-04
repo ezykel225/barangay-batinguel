@@ -61,7 +61,7 @@ const Footer = () => {
           </p>
           <p>
             The system may collect personal information such as name, contact number, email address,
-            reservation details, payment reference details, and uploaded supporting documents solely
+            service request details and uploaded supporting documents solely
             for processing barangay-related services.
           </p>
           <p>
@@ -84,7 +84,7 @@ const Footer = () => {
             forms and submissions.
           </p>
           <p>
-            Reservations, payments, and uploaded documents are subject to barangay verification and approval.
+            Service requests and uploaded documents are subject to barangay verification and approval.
           </p>
           <p>
             Submission of false, misleading, or fraudulent information may result in rejection of requests

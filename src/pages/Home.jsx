@@ -1,9 +1,9 @@
 import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import { FaBullhorn, FaCalendarAlt, FaLeaf, FaRecycle, FaTrashAlt } from 'react-icons/fa'
+import { FaBullhorn, FaCalendarAlt } from 'react-icons/fa'
 import { MdAnnouncement } from 'react-icons/md'
 import { supabase } from '../supabase/supabaseClient'
-import { announcementExcerpt, nextCollection } from '../utils/homeSections'
+import { announcementExcerpt } from '../utils/homeSections'
 import {
   BARANGAY_CONTACT, BARANGAY_NAME, BARANGAY_OFFICE_HOURS, telHref,
 } from '../constants/barangay'
@@ -16,29 +16,15 @@ import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import './Home.css'
 
-const wasteTypeIcon = (type = '') => {
-  const t = type.toLowerCase()
-  if (t.includes('bio')) return <FaLeaf />
-  if (t.includes('recycl')) return <FaRecycle />
-  return <FaTrashAlt />
-}
-
 const Home = () => {
   const [announcements, setAnnouncements] = useState([])
   const [events, setEvents] = useState([])
-  const [wasteSchedule, setWasteSchedule] = useState([])
-  // The full weekly grid, folded away behind the summary. Closed by
-  // default: the question somebody scrolls to this section to answer is
-  // "when is my rubbish collected", and the summary answers it.
-  const [wasteOpen, setWasteOpen] = useState(false)
   const [loadingAnnouncements, setLoadingAnnouncements] = useState(true)
   const [loadingEvents, setLoadingEvents] = useState(true)
-  const [loadingWaste, setLoadingWaste] = useState(true)
 
   useEffect(() => {
     fetchAnnouncements()
     fetchEvents()
-    fetchWasteSchedule()
   }, [])
 
   const fetchAnnouncements = async () => {
@@ -96,30 +82,6 @@ const Home = () => {
     }
   }
 
-  const fetchWasteSchedule = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('waste_schedule')
-        .select('*')
-        .order('display_order', { ascending: true })
-
-      if (error) {
-        console.error('Waste schedule error:', error)
-      } else {
-        setWasteSchedule(data || [])
-      }
-    } catch (err) {
-      console.error('Fetch waste schedule error:', err)
-    } finally {
-      setLoadingWaste(false)
-    }
-  }
-
-  // Null when no row carries a weekday this application recognises, and
-  // the section then renders the grid alone rather than a fabricated
-  // summary. See `utils/homeSections.js`.
-  const next = nextCollection(wasteSchedule)
-
   return (
     <div className="home">
       <Navbar />
@@ -138,24 +100,19 @@ const Home = () => {
           </span>
           <h1>Welcome to Barangay Batinguel</h1>
           <p>
-            Your digital gateway for community updates and neighborhood
-            health wellness.
+            Your digital gateway for community updates, safety information,
+            documents, and complaint services.
           </p>
           {/* ⚠️ THE PRIMARY ACTION IS THE CATALOGUE, NOT ONE SERVICE.
-              It was "Book a Reservation", which made the covered court
+              It previously promoted one retired service above
               the headline errand of the whole barangay -- above
               requesting a document, which is the reason most residents
               open this site, and above tracking a request they have
               already filed. `/e-services` is the one doorway that
-              reaches all of them, and X5 removed Court Reservation
-              from the top-level navigation for the same reason.
-              Health Center stays secondary, unchanged. */}
+              reaches all of them. */}
           <div className="hero-buttons">
             <Link to="/e-services" className="hero-btn-primary">
               View E-Services
-            </Link>
-            <Link to="/health-center" className="hero-btn-secondary">
-              Health Center
             </Link>
           </div>
         </div>
@@ -163,7 +120,7 @@ const Home = () => {
 
       {/* ⚠️ E-SERVICES SITS WHERE THE HISTORY USED TO. Somebody arriving
           at a barangay portal is usually there to DO something --
-          reserve the court, request a document, check on a request --
+          request a document, file a complaint, check on a request --
           and the home page opened with three paragraphs of history, a
           map, a facts table and a school card before any of it.
 
@@ -181,7 +138,7 @@ const Home = () => {
           </div>
 
           <div className="home-services-grid">
-            {E_SERVICES.filter(service => ['court-reservation', 'track-reservation', 'file-complaint', 'track-complaint', 'request-document'].includes(service.key)).map((service) => (
+            {E_SERVICES.filter(service => ['file-complaint', 'track-complaint', 'request-document', 'my-requests'].includes(service.key)).map((service) => (
               <Link
                 key={service.key}
                 to={service.to}
@@ -331,7 +288,7 @@ const Home = () => {
                           one click away and unchanged. The card printed
                           the whole body, so one long announcement made
                           its card several times the height of the two
-                          beside it and pushed the events and waste
+                          beside it and pushed later sections
                           sections off the screen. */}
                       <p className="announcement-card-excerpt">
                         {announcementExcerpt(item.description)}
@@ -394,120 +351,6 @@ const Home = () => {
               ))}
             </div>
           )}
-        </div>
-      </section>
-
-      <section className="waste-schedule-section">
-        <div className="section-container">
-          <div className="section-header">
-            <h2>
-              <FaTrashAlt /> Waste Collection Schedule
-            </h2>
-          </div>
-
-          {loadingWaste ? (
-            <div className="loading-text">Loading schedule...</div>
-          ) : wasteSchedule.length === 0 ? (
-            <div className="empty-text">No waste collection schedule has been posted yet.</div>
-          ) : (
-            <>
-            {/* ⚠️ THE SUMMARY IS DERIVED FROM THE ROWS, AND IS ABSENT
-                WHEN IT CANNOT BE. `waste_schedule.day_of_week` holds a
-                weekday name and the schedule recurs weekly, so the next
-                collection IS answerable from what is stored --
-                `nextCollection` returns null rather than a guess if no
-                row carries a weekday this application recognises, and
-                this renders nothing at all in that case. Nothing here
-                is hard-coded: no day, no purok, no time. */}
-            {next && (
-              <div className="waste-next">
-                <span className="waste-next-label">Next collection</span>
-                <strong className="waste-next-day">
-                  {next.label}
-                  {next.label !== next.weekday && ` · ${next.weekday}`}
-                </strong>
-                <ul className="waste-next-list">
-                  {next.rows.map((row) => (
-                    <li key={row.id} className="waste-next-row">
-                      <span className="waste-next-icon" aria-hidden="true">
-                        {wasteTypeIcon(row.waste_type)}
-                      </span>
-                      <span className="waste-next-purok">{row.purok || 'Other'}</span>
-                      <span className="waste-next-type">{row.waste_type}</span>
-                      {row.time_label && (
-                        <span className="waste-next-time">{row.time_label}</span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-                {/* A row whose day is not a weekday name is counted,
-                    not hidden -- a summary that quietly drops rows
-                    looks complete while being short. */}
-                {next.skipped > 0 && (
-                  <p className="waste-next-note">
-                    {next.skipped} other {next.skipped === 1 ? 'entry' : 'entries'} in
-                    the schedule {next.skipped === 1 ? 'does' : 'do'} not record a
-                    weekday. See the full schedule below.
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* ⚠️ A real disclosure -- a <button> with `aria-expanded`
-                and `aria-controls` -- and NOT a link. There is no public
-                waste-schedule route in `App.js`, and `path="*"` renders
-                Home, so a "View Full Waste Schedule" link would land a
-                resident back on this page looking like the page was
-                broken. The full grid is already here; it is now folded
-                behind the summary instead of being the whole section. */}
-            <button
-              type="button"
-              className="waste-toggle"
-              aria-expanded={wasteOpen}
-              aria-controls="waste-full-schedule"
-              onClick={() => setWasteOpen((open) => !open)}
-            >
-              {wasteOpen ? 'Hide the full weekly schedule' : 'View the full weekly schedule'}
-            </button>
-
-            <div
-              className="waste-schedule-home-grid"
-              id="waste-full-schedule"
-              hidden={!wasteOpen}
-            >
-              {Object.entries(
-                wasteSchedule.reduce((acc, row) => {
-                  const key = row.purok || 'Other'
-                  if (!acc[key]) acc[key] = []
-                  acc[key].push(row)
-                  return acc
-                }, {})
-              ).map(([purok, rows]) => (
-                <div key={purok} className="waste-schedule-home-card">
-                  <h3>{purok}</h3>
-                  {rows.map((row) => (
-                    <div key={row.id} className="waste-schedule-home-row">
-                      <span className="waste-schedule-home-icon">
-                        {wasteTypeIcon(row.waste_type)}
-                      </span>
-                      <div>
-                        <div className="waste-schedule-home-type">{row.waste_type}</div>
-                        <div className="waste-schedule-home-time">
-                          {row.day_of_week}{row.time_label ? ` — ${row.time_label}` : ''}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-            </>
-          )}
-
-          <div className="waste-schedule-home-notice">
-            Please segregate your waste at source. Uncollected or unsegregated waste
-            may be left behind by collection trucks.
-          </div>
         </div>
       </section>
 

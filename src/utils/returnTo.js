@@ -43,11 +43,8 @@ export const RETURN_TO_PATHS = [
   '/',
   '/e-services',
   '/officials',
-  '/health-center',
   '/announcements',
   '/events',
-  '/reservation',
-  '/track-reservation',
   ...E_SERVICES.map((service) => service.to),
 ]
 

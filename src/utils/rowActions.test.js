@@ -258,16 +258,9 @@ describe('every key this module emits is wired in the dashboard', () => {
     DOCUMENT_ACTION_KEYS.forEach((key) => expect(body).toContain(`${key}:`))
   })
 
-  it('has a reservation handler for each reservation key', () => {
-    const body = mapBody('reservationActionHandlers')
-    RESERVATION_ACTION_KEYS.forEach((key) => expect(body).toContain(`${key}:`))
-  })
-
-  it('has an icon for each key of both', () => {
+  it('has an icon for each retained document key', () => {
     const docIcons = mapBody('DOC_ACTION_ICONS')
     DOCUMENT_ACTION_KEYS.forEach((key) => expect(docIcons).toContain(`${key}:`))
-    const resIcons = mapBody('RESERVATION_ACTION_ICONS')
-    RESERVATION_ACTION_KEYS.forEach((key) => expect(resIcons).toContain(`${key}:`))
   })
 
   // ⚠️ The handlers are the EXISTING ones. A menu item that called a
@@ -282,29 +275,19 @@ describe('every key this module emits is wired in the dashboard', () => {
     expect(body).toContain('setDocumentRequestToPrint(req)')
   })
 
-  it('routes the reservation items to the existing decision handlers', () => {
-    const body = mapBody('reservationActionHandlers')
-    expect(body).toContain('handleApproveReservation(res)')
-    expect(body).toContain('handleDeclineReservation(res)')
-  })
-
   // ⚠️ The position gates are untouched, and both cells still render
   // their existing note for an official who lacks the position.
-  it('still gates both cells on the unchanged position flags', () => {
+  it('still gates the retained document cell on the Secretary position', () => {
     expect(OFFICIAL).toMatch(
       /const isSecretary = officialInfo\?\.position === 'Barangay Secretary'/,
     )
-    expect(OFFICIAL).toMatch(
-      /const isTreasurer = officialInfo\?\.position === 'Barangay Treasurer'/,
-    )
     expect(OFFICIAL).toContain('<span className="role-restricted-note">Secretary only</span>')
-    expect(OFFICIAL).toContain('<span className="role-restricted-note">Treasurer only</span>')
   })
 
   // ⚠️ `portal` is required in a table: `.table-wrapper` has
   // `overflow: auto` and clips an absolutely-positioned menu, which was
   // measured at 69px past the wrapper and not painted at all.
-  it('passes portal on both queue menus', () => {
+  it('passes portal on the retained document queue menu', () => {
     // Every <ActionMenu ... /> element, sliced to its own closing tag,
     // so neither assertion depends on how the items are spelled at the
     // call site -- the shape the first version of this test did depend
@@ -314,9 +297,8 @@ describe('every key this module emits is wired in the dashboard', () => {
       at = OFFICIAL.indexOf('<ActionMenu', at + 1)) {
       elements.push(OFFICIAL.slice(at, OFFICIAL.indexOf('/>', at)))
     }
-    const queue = elements.filter((el) =>
-      el.includes('documentRequestSubject') || el.includes('reservationSubject'))
-    expect(queue).toHaveLength(2)
+    const queue = elements.filter((el) => el.includes('documentRequestSubject'))
+    expect(queue).toHaveLength(1)
     // ⚠️ `.table-wrapper` has `overflow: auto` and clips an
     // absolutely-positioned menu -- measured at 69px past the wrapper
     // and not painted at all. `portal` is what lifted that.
@@ -329,7 +311,6 @@ describe('every key this module emits is wired in the dashboard', () => {
   // which are still there.
   it('keeps the re-entrancy guards that the disabled attribute was not', () => {
     expect(OFFICIAL).toContain('if (processingDocRequestIds.has(requestId)) return')
-    expect(OFFICIAL).toContain('if (processingReservationIds.has(reservation.id)) return')
   })
 })
 
@@ -415,9 +396,9 @@ describe('the card-mode rule is wired and scoped', () => {
     path.join(__dirname, '..', 'dashboards', 'OfficialDashboard.jsx'), 'utf8',
   )
 
-  it('marks the row from the shared predicate in both queues', () => {
-    expect(OFFICIAL.match(/actionCellIsEmpty\(\{/g)).toHaveLength(2)
-    expect(OFFICIAL.match(/'row-no-actions'/g)).toHaveLength(2)
+  it('marks the retained document row from the shared predicate', () => {
+    expect(OFFICIAL.match(/actionCellIsEmpty\(\{/g)).toHaveLength(1)
+    expect(OFFICIAL.match(/'row-no-actions'/g)).toHaveLength(1)
   })
 
   it('hides the cell and the divider above it', () => {

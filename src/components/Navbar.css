@@ -273,3 +273,9 @@
   min-height: 24px;
   padding: 2px 0;
 }
+.navbar-unsupported-role {
+  max-width: 260px;
+  color: #7f1d1d;
+  font-size: 0.78rem;
+  line-height: 1.3;
+}

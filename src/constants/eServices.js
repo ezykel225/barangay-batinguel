@@ -41,23 +41,6 @@ export const SERVICE_ACCESS = {
 // uses, per the notifications rule in CLAUDE.md.
 export const E_SERVICES = [
   {
-    key: 'court-reservation',
-    label: 'Court Reservation',
-    to: '/reservation',
-    access: 'guest',
-    summary: 'Reserve the covered court without creating an account.',
-    cta: 'Reserve Court',
-  },
-  {
-    key: 'track-reservation',
-    label: 'Track a Court Reservation',
-    to: '/track-reservation',
-    access: 'guest',
-    summary: 'Check what has happened to a booking using its reference number'
-      + ' and the contact number it was made with.',
-    cta: 'Track a Booking',
-  },
-  {
     // ⚠️ "Track a Complaint", not "Track a Case". P3 creates complaints
     // and decides nothing about them -- no jurisdiction, no mediation,
     // no KP eligibility -- so calling it a case would assert a decision

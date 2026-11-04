@@ -110,8 +110,7 @@ describe('the current official is resolved through the stable mapping', () => {
   // privilege on that table (030) and adding one would publish which
   // auth account belongs to which named person.
   it('never queries official_account_links from the client', () => {
-    const src = ['dashboards/OfficialDashboard.jsx', 'dashboards/NurseDashboard.jsx',
-      'dashboards/ResidentDashboard.jsx', 'components/Sidebar.jsx',
+    const src = ['dashboards/OfficialDashboard.jsx', 'dashboards/ResidentDashboard.jsx', 'components/Sidebar.jsx',
       'pages/Officials.jsx', 'context/AuthContext.jsx']
     src.forEach((file) => {
       expect(read(file)).not.toContain("from('official_account_links')")
@@ -174,12 +173,11 @@ describe('the position flags still derive from the ID-resolved row', () => {
   // id, which the tests above establish.
   it('reads officialInfo.position and nothing else', () => {
     expect(OFFICIAL).toContain("const isKapitan = officialInfo?.position === 'Punong Barangay'")
-    expect(OFFICIAL).toContain("const isTreasurer = officialInfo?.position === 'Barangay Treasurer'")
     expect(OFFICIAL).toContain("const isSecretary = officialInfo?.position === 'Barangay Secretary'")
   })
 
   it('does not derive any of them from a name', () => {
-    ;['isKapitan', 'isTreasurer', 'isSecretary'].forEach((flag) => {
+    ;['isKapitan', 'isSecretary'].forEach((flag) => {
       const at = OFFICIAL.indexOf(`const ${flag} = `)
       expect(at).toBeGreaterThan(-1)
       const line = OFFICIAL.slice(at, OFFICIAL.indexOf('\n', at))
@@ -191,7 +189,7 @@ describe('the position flags still derive from the ID-resolved row', () => {
 describe('the sidebar resolves the official the same way', () => {
   const DRAWER = SIDEBAR.slice(
     SIDEBAR.indexOf("if (role === 'official') {"),
-    SIDEBAR.indexOf("} else if (role === 'nurse')"),
+    SIDEBAR.indexOf("} else if (role === 'resident')"),
   )
 
   it('uses the RPC and the primary key', () => {

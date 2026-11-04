@@ -405,7 +405,7 @@ const Login = () => {
               </div>
             ) : (
               <p className="login-note login-note-standalone">
-                Official and health centre accounts are created by the barangay.
+                Barangay personnel accounts are created by the barangay.
                 There is no staff sign-up — ask at the Barangay Hall if you need
                 one.
               </p>
@@ -440,8 +440,8 @@ const Login = () => {
           <div className="login-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="logindlg-1-title">
             <h2 id="logindlg-1-title">Reset your password</h2>
             <p>
-              Enter the email address your account uses — resident, official
-              or health centre staff. We'll send a password reset link to it.
+              Enter the email address your account uses. We'll send a password
+              reset link to it.
             </p>
             <p className="login-modal-note">
               The reply is the same whether or not an account exists, so this

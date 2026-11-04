@@ -103,7 +103,7 @@ beforeEach(() => {
 // The label sets, written out rather than imported, so a change to the
 // component's own arrays has to be made here too deliberately.
 const OFFICIAL_ONLY = [
-  'Announcements', 'Waste Management', 'Officials Directory',
+  'Announcements', 'Officials Directory',
   'Residents', 'Reports', 'Activity Log',
 ]
 const NURSE_ONLY = ['Medicines', 'Availability', 'Health Events']
@@ -112,7 +112,7 @@ const NURSE_ONLY = ['Medicines', 'Availability', 'Health Events']
 // tab of its own, so the label is no longer evidence that the resident
 // nav was substituted. 'My Reservations' still is -- it exists in
 // exactly one of the three arrays -- which is what this set is for.
-const RESIDENT_ONLY = ['My Reservations']
+const RESIDENT_ONLY = []
 
 const renderSidebar = (role) => render(
   <MemoryRouter>
@@ -147,13 +147,12 @@ describe('A. role="official"', () => {
   // ⚠️ A DEFINITION CHANGE, NOT A LOOSENED ASSERTION: the guard still
   // compares the WHOLE list by equality, so a fourteenth surface added
   // without a decision still fails here.
-  it('renders the sixteen Official destinations', () => {
+  it('renders the fourteen retained Official destinations', () => {
     const { container } = renderSidebar('official')
     expect(navItems(container)).toEqual([
-      'Dashboard', 'Announcements', 'Events', 'Reservations',
+      'Dashboard', 'Announcements', 'Events',
       'Document Requests', 'Complaints',
       'Incidents & Blotter', 'Tanod Operations', 'Safety Map & Analytics',
-      'Waste Management',
       'Officials Directory', 'Residents', 'Community Credit',
       'Reports', 'Activity Log', 'Settings',
     ])
@@ -175,33 +174,22 @@ describe('A. role="official"', () => {
   })
 })
 
-describe('B. role="nurse"', () => {
-  it('renders the six Health Center destinations', () => {
+describe('B. unsupported nurse role', () => {
+  it('fails closed with no portal destinations', () => {
     const { container } = renderSidebar('nurse')
-    expect(navItems(container)).toEqual([
-      'Dashboard', 'Medical Programs', 'Medicines', 'Availability', 'Health Events', 'Settings',
-    ])
-  })
-
-  it('renders no Official destination', () => {
-    const { container } = renderSidebar('nurse')
-    OFFICIAL_ONLY.forEach((label) => expect(navItems(container)).not.toContain(label))
-  })
-
-  it('names the portal as the Health Center Portal', () => {
-    renderSidebar('nurse')
-    expect(screen.getByRole('complementary', { name: 'Health Center Portal sidebar' })).toBeInTheDocument()
+    expect(navItems(container)).toEqual([])
+    expect(screen.getByText('Dashboard navigation is unavailable for this account.')).toBeInTheDocument()
   })
 })
 
 describe('C. role="resident"', () => {
-  it('renders the six Resident destinations', () => {
+  it('renders the five retained Resident destinations', () => {
     const { container } = renderSidebar('resident')
     expect(navItems(container)).toEqual([
       // ⚠️ `Complaints` was added by P3-B1, which also added
       // 'complaints' to RESIDENT_TABS -- residentTabs.test.js is what
       // holds those two arrays together.
-      'Dashboard', 'Document Requests', 'My Reservations', 'Complaints', 'Community Credit', 'Settings',
+      'Dashboard', 'Document Requests', 'Complaints', 'Community Credit', 'Settings',
     ])
   })
 
@@ -300,9 +288,9 @@ describe('the privileged identity lookup', () => {
     expect(supabase.rpc).toHaveBeenCalledWith('official_id_for_current_user')
   })
 
-  it('is not attempted for a nurse or a resident', async () => {
+  it('is not attempted for an unsupported nurse role', async () => {
     renderSidebar('nurse')
-    await screen.findByRole('complementary', { name: 'Health Center Portal sidebar' })
+    await screen.findByText('Dashboard navigation is unavailable for this account.')
     expect(supabase.rpc).not.toHaveBeenCalled()
   })
 
@@ -342,7 +330,7 @@ describe('the mobile drawer', () => {
   it('offers the Official destinations to an official', async () => {
     const { container } = renderSidebar('official')
     await openDrawer()
-    expect(drawerItems(container)).toHaveLength(16)
+    expect(drawerItems(container)).toHaveLength(14)
     expect(drawerItems(container)).toContain('Officials Directory')
     expect(drawerItems(container)).not.toContain('Voter Reference List')
     // The drawer is the WHOLE of navigation on a phone, so a tab that
