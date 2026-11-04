@@ -28,3 +28,23 @@ export const nextFilters = (current, key, value) => {
   }
   return next
 }
+
+// Which honest state a failed analytics request is in. Never the raw error.
+//   denied         42501 -- this account may not read the section.
+//   not_installed  the function does not exist yet (PostgREST PGRST202, or
+//                  PostgreSQL 42883): migration 062 is not applied.
+//   network        the request never reached the database.
+//   failed         anything else.
+export const NOT_INSTALLED_CODES = Object.freeze(['PGRST202', '42883'])
+export const analyticsProblem = (error) => {
+  if (isAccessDenied(error)) return 'denied'
+  if (NOT_INSTALLED_CODES.includes(error?.code)) return 'not_installed'
+  if (error?.network) return 'network'
+  return 'failed'
+}
+export const PROBLEM_MESSAGES = Object.freeze({
+  denied: 'This section is not available for this account.',
+  not_installed: 'This section needs the analytics database update (migration 062), which is not installed yet.',
+  network: 'The analytics service could not be reached. Check the connection and try again.',
+  failed: 'This section is unavailable right now. Try again.',
+})
