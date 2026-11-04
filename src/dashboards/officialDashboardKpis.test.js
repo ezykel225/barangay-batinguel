@@ -41,9 +41,10 @@ const DIRECTORY = [
   { id: 'r4', first_name: 'Dan', last_name: 'Cuatro', resident_status: 'active' },
 ]
 
-let directoryResult, position, rpcCalls, fromTables
+let directoryResult, position, rpcCalls, fromTables, kapitanResult
 beforeEach(() => {
   jest.clearAllMocks()
+  kapitanResult = { data: null, error: null }
   directoryResult = async () => ({ data: DIRECTORY, error: null })
   position = 'Kagawad'
   rpcCalls = []
@@ -68,7 +69,7 @@ beforeEach(() => {
       select: () => builder, eq: () => builder, order: () => builder, limit: () => builder,
       not: () => builder, is: () => builder, in: () => builder, gte: () => builder,
       single: async () => ({ data: table === 'kapitan_status' ? { status: 'available' } : { id: 'staff', full_name: 'Records Staff', role: 'official' }, error: null }),
-      maybeSingle: async () => ({ data: { id: 'official-id', full_name: 'Records Staff', position }, error: null }),
+      maybeSingle: async () => table === 'kapitan_status' ? kapitanResult : ({ data: { id: 'official-id', full_name: 'Records Staff', position }, error: null }),
       then: (resolve, reject) => Promise.resolve({ data: rows, error: null }).then(resolve, reject),
     }
     return builder
@@ -239,4 +240,16 @@ describe('one definition of an active resident', () => {
     expect(source).not.toMatch(/residentsList\.filter\([^)]*resident_status/)
     expect(source).toMatch(/countActiveResidents\(data\)/)
   })
+})
+
+ test('unpublished Kapitan status does not claim availability', async () => { show(); expect(await screen.findByText('Status not published')).toBeInTheDocument() })
+ test('published Kapitan status is displayed', async () => { kapitanResult = { data: {status:'available'}, error:null }; show(); expect(await screen.findByText(/Available/, {selector:'.kapitan-compact-state'})).toBeInTheDocument() })
+ test('unexpected Kapitan query error stays distinct from unpublished', async () => { const log=jest.spyOn(console,'error').mockImplementation(()=>{}); kapitanResult={data:null,error:{code:'42501'}}; try { show(); expect(await screen.findByText('Status unavailable')).toBeInTheDocument(); expect(log).toHaveBeenCalledWith('Kapitan status query failed:',kapitanResult.error) } finally {log.mockRestore()} })
+test('Punong cannot update an unpublished status row', async () => {
+  position = 'Punong Barangay'
+  show()
+  const select = await screen.findByLabelText('Set your availability status')
+  await waitFor(() => expect(select).toHaveValue(''))
+  expect(select).toBeDisabled()
+  expect(within(select).getByText('Status not published')).toBeInTheDocument()
 })

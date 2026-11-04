@@ -5,6 +5,7 @@ import {
 } from 'react-icons/fa'
 import { MdVerified } from 'react-icons/md'
 import { supabase } from '../supabase/supabaseClient'
+import { readKapitanStatus } from '../utils/kapitanStatus'
 import { PUNONG_BARANGAY_LABEL } from '../constants/barangay'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
@@ -26,7 +27,7 @@ const getIcon = (position) => {
 const Officials = () => {
   const [officials, setOfficials] = useState([])
   const [schedule, setSchedule] = useState([])
-  const [kapitanStatus, setKapitanStatus] = useState('available')
+  const [kapitanStatus, setKapitanStatus] = useState('loading')
   const [availability, setAvailability] = useState([])
   // Which cards have their week opened. Keyed by official id, so one
   // card's disclosure cannot open another's -- and closed by default,
@@ -113,13 +114,14 @@ const Officials = () => {
 
   const fetchKapitanStatus = async () => {
     try {
-      const { data, error } = await supabase
-        .from('kapitan_status')
-        .select('status')
-        .single()
-      if (!error && data) setKapitanStatus(data.status)
+      const { data, error } = await readKapitanStatus(supabase)
+      if (error) {
+        console.error('Kapitan status query failed:', error)
+        setKapitanStatus('error')
+      } else setKapitanStatus(data?.status ?? null)
     } catch (err) {
       console.error('Kapitan status error:', err)
+      setKapitanStatus('error')
     }
   }
 
@@ -149,7 +151,7 @@ const Officials = () => {
     'out-of-office': { label: 'Out of Office', className: 'on-field' },
     'on-leave': { label: 'On Leave', className: 'unavailable' },
   }
-  const statusInfo = kapitanStatusConfig[kapitanStatus] || kapitanStatusConfig['available']
+  const statusInfo = kapitanStatusConfig[kapitanStatus] || { label: kapitanStatus === 'loading' ? 'Loading status...' : kapitanStatus === 'error' ? 'Status unavailable' : 'Status not published', className: 'unavailable' }
 
   const availabilityByOfficial = groupByOfficial(availability)
   const today = manilaWeekday()

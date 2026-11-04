@@ -153,3 +153,27 @@ production changes, V2 activation, migration 064, pushes, merges or deployment.
 - `docs/responsive-audit.md`
 
 Earlier uncommitted Community Credit and migration-validation changes remain preserved.
+
+## User-reported Chrome evidence — 2026-11-04
+
+The user manually tested the isolated synthetic app at `127.0.0.1:3001` and
+reported the following results. These are manual results, not automated browser
+passes. Earlier screenshots were reviewed in conversation according to the
+supplied QA history; they are not available as repository artifacts and were
+not independently re-inspected during this documentation checkpoint.
+
+| Screen | Width | Reported evidence / outcome | Limits |
+| --- | --- | --- | --- |
+| Official Dashboard | 1024px | Refresh: kapitan_status HTTP 200; “Status not published” displayed | Other widths/error/published states not browser-certified |
+| Resident Community Credit | 1024px | Correction submission succeeded and appeared as `submitted` | Independent review/resolution and duplicate-submit UI not certified |
+| Incident Map | Not specified | TEST ONLY marker rendered; popup opened with fictional incident details | Do not infer width, zoom/keyboard/resize behavior |
+| Incidents & Blotter | 375px | Record Incident dialog fitted; native required validation blocked incomplete submission; count unchanged | Successful submission, Cancel/scroll/focus return remain unverified |
+| Mobile navigation | Not specified | Escape closed the menu | Open/backdrop/route close/focus return and exact width unverified |
+| Resident Community Credit | 320, 375, 414, 768, 1024, 1280, 1440, 1920px | Earlier screenshot-based visual layout checks reported complete | Does not certify all data states or interactions at each width |
+| Selected Official screens: Community Credit, Incidents & Blotter, Incident Map, Analytics & Insights, Patrol Coverage | 375, 1024px | Earlier visual layout checks reported complete | Does not certify every tab/control/workflow |
+
+The original P matrix above covers broader state combinations; these selected
+visual/interaction results do not turn its entire rows into PASS. All other
+public pages, portal tabs, shared components, data states and widths still need
+the recorded browser evidence required by that matrix. Full application-wide
+browser certification is **not complete**.
