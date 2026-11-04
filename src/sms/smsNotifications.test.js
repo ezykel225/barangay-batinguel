@@ -62,3 +62,9 @@ test('unauthorized batch cannot reach worker or provider',async()=>{
  const caller={rpc:async()=>({error:{message:'denied'}})},worker={rpc:jest.fn()},fetchImpl=jest.fn();await expect(processBatch({caller,worker,broadcastId:'b',actorId:'a',token:'mock',fetchImpl})).rejects.toThrow('Not authorized');expect(worker.rpc).not.toHaveBeenCalled();expect(fetchImpl).not.toHaveBeenCalled()
 })
 test('encoding estimate distinguishes Unicode costs',()=>{expect(estimateSegments('a'.repeat(161)).segments).toBe(2);expect(estimateSegments('🙂'.repeat(36)).segments).toBe(2)})
+// The skipped-phone breakdown is separated by a middle dot, as the eligible/recipient line above it is.
+// A literal '?' shipped there once (an encoding round-trip), and reads as a missing value.
+test('preview separates the skipped-phone counts with a middle dot, never a stray question mark',async()=>{
+ render(<SmsComposer sourceType="announcement" draft={{title:'Public notice'}}/>);fireEvent.click(screen.getByLabelText('Send SMS when this content is published'));await userEvent.click(screen.getByRole('button',{name:'Preview SMS'}))
+ const note=await screen.findByText(/^Missing:/);expect(note).toHaveTextContent('Missing: 0 · Invalid: 0 · Duplicate destinations: 0');expect(note.textContent).not.toMatch(/\?/)
+})

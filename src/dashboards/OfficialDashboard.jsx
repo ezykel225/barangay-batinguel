@@ -87,6 +87,7 @@ import {
 import MonthCalendar from '../components/MonthCalendar'
 import { buildEventCalendar, describeEventDay, eventsOnDate } from '../utils/eventCalendar'
 import { MONTH_NAMES, monthOf, parseDateKey, toDateKey } from '../utils/monthGrid'
+import { resolveOfficialTab } from '../utils/officialTabs'
 import '../components/Sidebar.css'
 import './OfficialDashboard.css'
 
@@ -389,6 +390,14 @@ const OfficialDashboard = () => {
   const eventSms = useRef(null)
 
   const [activeTab, setActiveTab] = useState('dashboard')
+
+  // ⚠️ Every tab change goes through the allowlist in utils/officialTabs.js.
+  // A notification's `link_tab` is stored data, and notifications written
+  // for a retired module still name that module's tab. Set directly, such a
+  // value matched no branch below and left an empty main area. An unknown id
+  // now opens the Dashboard instead. This grants nothing: each tab still
+  // applies its own position flags, and RLS decides every read and write.
+  const openTab = useCallback((tab) => setActiveTab(resolveOfficialTab(tab)), [])
 
   // ── Notifications ──────────────────────────────────────────────────
   //
@@ -2408,7 +2417,7 @@ const OfficialDashboard = () => {
       notifications={notifications}
       readIds={notifReadIds}
       loading={notifLoading}
-      onOpenTab={setActiveTab}
+      onOpenTab={openTab}
       onMarkRead={markNotificationRead}
       onMarkAllRead={markAllNotificationsRead}
     />
@@ -2421,7 +2430,7 @@ const OfficialDashboard = () => {
       <Sidebar
         role="official"
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={openTab}
         badges={{
           documents: pendingDocRequestCount,
           residents: awaitingVerificationCount,
