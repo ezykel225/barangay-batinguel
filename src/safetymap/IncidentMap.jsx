@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import { removeLeafletMap } from './removeLeafletMap'
+import { observeMapSize } from './observeMapSize'
 import 'leaflet/dist/leaflet.css'
 
 import { incidentTypeLabel, incidentStatusLabel, incidentDateTime } from '../incidents/incidentLabels'
@@ -79,7 +80,8 @@ const IncidentMap = ({ points = [], hotspots = [], coveredKeys = [], height = 42
     // centre, not an asserted boundary.
     map.setView([9.3068, 123.3054], 15)
     mapRef.current = map
-    return () => { removeLeafletMap(map); mapRef.current = null; layerRef.current = null }
+    const stopResize = observeMapSize(map, containerRef.current)
+    return () => { stopResize(); removeLeafletMap(map); mapRef.current = null; layerRef.current = null }
   }, [])
 
   useEffect(() => {

@@ -9,6 +9,16 @@ const rpc = async (name, args) => {
 export const getResidentCreditProfile = residentId => rpc('community_credit_profile', { p_resident_id: residentId })
 export const getMyCreditProfile = () => rpc('my_community_credit_profile')
 export const getCreditAdminState = () => rpc('community_credit_admin_state')
+export const getCreditDirectory = () => rpc('community_credit_resident_directory')
+export const getCreditActivities = () => rpc('community_credit_activities_list', { p_year: null })
+export const getMyCorrections = () => rpc('my_community_credit_correction_requests')
+export const getAdminCorrections = () => rpc('community_credit_correction_requests_admin', { p_status: null })
+export const submitCreditCorrection = args => rpc('submit_community_credit_correction_request', args)
+export const creditWorkflow = (name, args) => {
+  const allowed = ['save_community_credit_v2_policy','approve_community_credit_v2_policy','save_community_credit_v2_rule','approve_community_credit_v2_rule','create_community_credit_activity','verify_community_credit_participation','award_community_credit_participation','reverse_community_credit_award','reaward_community_credit_participation','resolve_community_credit_correction_request']
+  if (!allowed.includes(name)) return Promise.reject(new Error('Unsupported credit workflow'))
+  return rpc(name, args)
+}
 export const saveCreditPolicy = policy => rpc('save_community_credit_policy', {
   p_id: policy.id || null, p_name: policy.name, p_description: policy.description || '',
   p_base_score: Number(policy.base_score), p_minimum_score: Number(policy.minimum_score), p_maximum_score: Number(policy.maximum_score),

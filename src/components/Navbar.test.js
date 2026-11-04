@@ -228,3 +228,24 @@ describe('the Community Safety entry', () => {
       .toBeGreaterThan(0)
   })
 })
+
+describe('responsive public navigation lifecycle', () => {
+  it('Escape closes the menu and returns keyboard focus to the toggle', () => {
+    renderNavbar(); fireEvent.click(toggle())
+    const menu = document.getElementById('navbar-mobile-menu')
+    menu.querySelector('a').focus()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(toggle()).toHaveAttribute('aria-expanded', 'false')
+    expect(toggle()).toHaveFocus()
+    expect(menu).not.toHaveClass('open')
+  })
+  it('resizing to desktop closes the menu and returning to mobile keeps it closed', () => {
+    const previous = window.innerWidth
+    renderNavbar(); fireEvent.click(toggle())
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1280 }); fireEvent(window, new Event('resize'))
+    expect(toggle()).toHaveAttribute('aria-expanded', 'false')
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 375 }); fireEvent(window, new Event('resize'))
+    expect(document.getElementById('navbar-mobile-menu')).not.toHaveClass('open')
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: previous })
+  })
+})

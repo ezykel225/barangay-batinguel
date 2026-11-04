@@ -7,14 +7,14 @@ jest.mock('./communityCreditApi')
 
 const profile={configured:true,resident:{full_name:'Test Resident',purok:'1',resident_status:'active',account_linked:true},policy_name:'Fixture policy',base_score:70,event_total:12,current_score:82,minimum_score:0,maximum_score:100,positive_event_count:2,negative_event_count:1,repair_event_count:1,last_credit_event_at:'2026-10-20T00:00:00Z',ledger:[]}
 
-beforeEach(()=>jest.resetAllMocks())
+beforeEach(()=>{jest.resetAllMocks();api.getCreditDirectory.mockResolvedValue([]);api.getCreditActivities.mockResolvedValue([]);api.getAdminCorrections.mockResolvedValue([])})
 
 test('renders a configured server-calculated score and empty ledger',async()=>{
  api.getResidentCreditProfile.mockResolvedValue(profile)
  render(<CreditProfile residentId="00000000-0000-0000-0000-000000000001" showResident/>)
  expect(await screen.findByLabelText('Current community credit score 82 out of 100')).toBeInTheDocument()
  expect(screen.getByText('No credit events recorded.')).toBeInTheDocument()
- expect(screen.getByText(/verified person-linking and outcome review/)).toBeInTheDocument()
+ expect(screen.getByText(/Active V1/)).toBeInTheDocument()
 })
 
 test('renders enrollment start and the approved 100-point model',async()=>{

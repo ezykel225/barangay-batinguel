@@ -30,6 +30,7 @@ export const REVIEWED_AFTER_060 = Object.freeze([
   '064_legacy_data_cleanup.sql',
   '065_retire_nurse_sms_permissions.sql',
   '066_person_history_privacy.sql',
+  '067_community_credit_v2.sql',
 ])
 
 // number that may be missing -> the number whose presence permits it

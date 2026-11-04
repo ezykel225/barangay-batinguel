@@ -1,0 +1,58 @@
+﻿Captured 2026-11-04; analysis snapshot only.
+Branch: claude/community-credit-v2-schema
+HEAD: 38aab1393c2d24df26f752118b5ec5e868103568
+
+Tracked changes:
+scripts/ci/migrationSequence.mjs
+src/analytics/AnalyticsCharts.jsx
+src/communityCredit/CommunityCredit.css
+src/communityCredit/CommunityCredit.test.jsx
+src/communityCredit/CreditManagement.jsx
+src/communityCredit/CreditProfile.jsx
+src/communityCredit/communityCreditApi.js
+src/components/Footer.css
+src/components/Navbar.css
+src/components/Navbar.jsx
+src/components/Navbar.test.js
+src/documents/DocumentPreview.css
+src/migrationSequence.test.js
+src/pages/About.css
+src/pages/AnnouncementDetails.css
+src/pages/EventDetails.css
+src/people/PeopleHistory.css
+src/residents/ResidentProfileDialog.test.js
+src/safetymap/IncidentMap.jsx
+src/safetymap/PublicSafetyMap.jsx
+supabase-migrations/067_community_credit_v2.sql
+supabase-tests/067_build_test_runner.mjs
+supabase-tests/067_community_credit_v2_behavioral.sql
+
+Untracked paths (preserve; not all belong in release):
+docs/community-credit-frontend.md
+docs/final-integration-release-plan.md
+docs/responsive-audit.md
+src/analytics/AnalyticsCharts.accessibility.test.jsx
+src/communityCredit/CommunityCreditV2.test.jsx
+src/communityCredit/CreditCorrections.jsx
+src/communityCredit/CreditGauge.jsx
+src/communityCredit/CreditV2Management.jsx
+src/safetymap/observeMapSize.js
+src/safetymap/observeMapSize.test.js
+supabase-seeds/seed_sms_demo_residents.sql
+supabase-tests/067_concurrency_runner.mjs
+supabase-tests/067_validation.md
+supabase-tests/runners-out/067-control-community_credit_enroll_active_residents.sql
+supabase-tests/runners-out/067-control-community_credit_enroll_resident.sql
+supabase-tests/runners-out/067-control-community_credit_guard_event.sql
+supabase-tests/runners-out/067-control-community_credit_may_view_resident.sql
+supabase-tests/runners-out/067-control-community_credit_profile.sql
+supabase-tests/runners-out/067-install.sql
+supabase-tests/runners-out/067-negctrl-details.sql
+supabase-tests/runners-out/067-negctrl.sql
+supabase-tests/runners-out/067-rollback-ack.sql
+supabase-tests/runners-out/067-run.sql
+supabase-tests/runners-out/probe-0.sql
+supabase-tests/runners-out/probe-1.sql
+supabase-tests/runners-out/probe-2.sql
+supabase-tests/runners-out/probe-3.sql
+supabase-tests/runners-out/probe-4.sql

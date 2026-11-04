@@ -28,6 +28,7 @@ import {
   FaFileAlt,
 } from 'react-icons/fa'
 import { supabase } from '../supabase/supabaseClient'
+import { readKapitanStatus } from '../utils/kapitanStatus'
 import { pathFromPublicUrl } from '../utils/storagePath'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
@@ -442,7 +443,7 @@ const OfficialDashboard = () => {
   const [announcements, setAnnouncements] = useState([])
   const [events, setEvents] = useState([])
   const [officialsList, setOfficialsList] = useState([])
-  const [kapitanStatus, setKapitanStatus] = useState('available')
+  const [kapitanStatus, setKapitanStatus] = useState('loading')
   const [documentRequests, setDocumentRequests] = useState([])
   const [residentsList, setResidentsList] = useState([])
   // The Active Residents card. ⚠️ It does NOT read residentsList: those are
@@ -813,12 +814,12 @@ const OfficialDashboard = () => {
   }
 
   const fetchKapitanStatus = async () => {
-    const { data, error } = await supabase
-      .from('kapitan_status')
-      .select('*')
-      .single()
+    const { data, error } = await readKapitanStatus(supabase)
 
-    if (!error && data) setKapitanStatus(data.status)
+    if (error) {
+      console.error('Kapitan status query failed:', error)
+      setKapitanStatus('error')
+    } else setKapitanStatus(data?.status ?? null)
   }
 
   // Active officials, for the current directory and the public page.
@@ -1637,7 +1638,7 @@ const OfficialDashboard = () => {
 
   const kapitanStatusDisplay = (statusValue) => {
     const found = KAPITAN_STATUS_OPTIONS.find((o) => o.value === statusValue)
-    return found ? `${found.emoji} ${found.label}` : 'Unknown'
+    return found ? `${found.emoji} ${found.label}` : statusValue === 'loading' ? 'Loading status...' : statusValue === 'error' ? 'Status unavailable' : 'Status not published'
   }
 
   const handleAddOfficial = async () => {
@@ -2624,9 +2625,11 @@ const OfficialDashboard = () => {
                   <select
                     id="kapitan-status-select"
                     className="kapitan-compact-select"
-                    value={kapitanStatus}
+                    value={kapitanStatus ?? ''}
+                    disabled={!KAPITAN_STATUS_OPTIONS.some(option => option.value === kapitanStatus)}
                     onChange={(event) => handleUpdateKapitanStatus(event.target.value)}
                   >
+                    {!KAPITAN_STATUS_OPTIONS.some(option => option.value === kapitanStatus) && <option value={kapitanStatus ?? ''}>{kapitanStatusDisplay(kapitanStatus)}</option>}
                     {KAPITAN_STATUS_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.emoji} {option.label}
