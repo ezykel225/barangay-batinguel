@@ -27,9 +27,13 @@ describe('retired module scope cleanup', () => {
     ;[
       'Dashboard', 'Announcements', 'Events', 'Document Requests', 'Complaints',
       'Incidents & Blotter', 'Tanod Operations', 'Safety Map & Analytics',
-      'Officials Directory', 'Residents', 'Community Credit', 'Analytics & Insights',
+      'Officials Directory', 'Residents', 'Community Credit',
       'Activity Log', 'Settings',
     ].forEach((label) => expect(sidebar).toContain(`label: '${label}'`))
+    // Analytics & Insights is retained as a tab of Safety Map & Analytics, not as a
+    // sidebar entry of its own.
+    expect(sidebar).not.toContain("label: 'Analytics & Insights'")
+    expect(source('safetymap/SafetyMapPanel.jsx')).toContain("['analytics', 'Analytics & Insights']")
     expect(sidebar).not.toMatch(/label: '(?:Reservations|My Reservations|Waste Management)'/)
     expect(sidebar).not.toMatch(/const nurseNavItems\s*=/)
     expect(RESIDENT_TABS).not.toContain('reservations')
@@ -49,9 +53,10 @@ describe('retired module scope cleanup', () => {
     expect(dashboard).not.toMatch(/reservation|court|booking/i)
     expect(dashboard).not.toMatch(/waste(?:_schedule| management)?/i)
     // Remediation C: the old Reports implementation was unreachable ({false && ...})
-    // and was removed; the 'reports' tab now renders AnalyticsInsights.
-    ;['Announcements', 'Events', 'Document Requests', 'Complaints', 'CreditManagement', 'AnalyticsInsights', 'Activity Log', 'Settings']
+    // and was removed. Analytics & Insights is now reached through SafetyMapPanel.
+    ;['Announcements', 'Events', 'Document Requests', 'Complaints', 'CreditManagement', 'SafetyMapPanel', 'Activity Log', 'Settings']
       .forEach((label) => expect(dashboard).toContain(label))
+    expect(source('safetymap/SafetyMapPanel.jsx')).toContain('<AnalyticsInsights embedded')
   })
 
   test('Official Dashboard fills its overview with retained, loaded data only', () => {

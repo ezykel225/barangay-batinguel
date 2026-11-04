@@ -67,7 +67,9 @@ describe('every way of opening a tab goes through the allowlist', () => {
   const code = stripComments(read('dashboards/OfficialDashboard.jsx'))
 
   it('defines one opener that resolves before it sets the tab', () => {
-    expect(code).toMatch(/const openTab = useCallback\(\(tab\) => setActiveTab\(resolveOfficialTab\(tab\)\), \[\]\)/)
+    // Redefined: the opener also picks the internal section a moved id names
+    // (`reports` -> Analytics & Insights), and still resolves before it sets the tab.
+    expect(code).toMatch(/const openTab = useCallback\(\(tab\) => \{\s*setActiveTab\(resolveOfficialTab\(tab\)\)\s*const section = movedOfficialSection\(tab\)\s*if \(section\) setSafetySection\(section\)\s*\}, \[\]\)/)
   })
 
   it('hands that opener to the notification bell and to the sidebar', () => {
@@ -90,7 +92,9 @@ describe('every way of opening a tab goes through the allowlist', () => {
     // same records-administrator gate, passed through IncidentsPanel.
     expect(code).toMatch(/activeTab === 'incidents' && \(\s*<IncidentsPanel canAdminister=\{isSecretary \|\| isKapitan\}/)
     expect(code).not.toMatch(/people-history/)
-    expect(code).toMatch(/activeTab === 'reports' && <AnalyticsInsights canAdminister=\{isSecretary \|\| isKapitan\} \/>/)
+    // Analytics & Insights moved into Safety Map & Analytics; the same gate is passed through.
+    expect(code).toMatch(/activeTab === 'safety-map' && <SafetyMapPanel canAdminister=\{isSecretary \|\| isKapitan\}/)
+    expect(code).not.toMatch(/activeTab === 'reports'/)
     expect(stripComments(read('utils/officialTabs.js'))).not.toMatch(/isSecretary|isKapitan|isTreasurer|position|supabase/)
   })
 })

@@ -27,8 +27,14 @@ const recordedDate=value=>incidentDate(value)||'Not recorded'
 const Problem=({kind})=>kind==='denied'||kind==='not_installed'?<p role="note" className="analytics-caveat">{PROBLEM_MESSAGES[kind]}</p>:<p role="alert">{PROBLEM_MESSAGES[kind]||PROBLEM_MESSAGES.failed}</p>
 const Kpi=({value,label})=><div><strong>{value}</strong><span>{label}</span></div>
 
-export default function AnalyticsInsights({canAdminister=false}){
-  const [filters,setFilters]=useState(BLANK)
+// embedded: rendered as a tab of Safety Map & Analytics, under that module's own h1.
+// filters/onFiltersChange: optional; the module holds the filters so they survive a
+// tab change and share the incident category with the map. Without them the page
+// keeps its own state, exactly as before.
+export default function AnalyticsInsights({canAdminister=false,embedded=false,filters:heldFilters,onFiltersChange}){
+  const [ownFilters,setOwnFilters]=useState(BLANK)
+  const filters=heldFilters?{...BLANK,...heldFilters}:ownFilters
+  const setFilters=next=>{const value=typeof next==='function'?next(filters):next;if(onFiltersChange)onFiltersChange(value);else setOwnFilters(value)}
   const [records,setRecords]=useState({status:LOADING,rows:[],check:null,problem:''})
   const [summary,setSummary]=useState({status:LOADING,data:null,problem:''})
   const [disputes,setDisputes]=useState([])
@@ -77,7 +83,7 @@ export default function AnalyticsInsights({canAdminister=false}){
     finally{opening.current=false;setOpeningHistory(false)}}
   const shownRecords=showAllRecords?filtered:filtered.slice(0,RECORD_PREVIEW)
 
-  return <div className="analytics-insights"><header className="official-dashboard-header"><h1>Analytics &amp; Insights</h1><p>Descriptive patterns from recorded barangay incidents and verified linked records.</p><small>These summaries do not predict behavior or determine wrongdoing.</small></header>
+  return <div className="analytics-insights">{embedded?<div className="ai-embedded-intro"><h2>Analytics &amp; Insights</h2><p>Descriptive patterns from recorded barangay incidents and verified linked records.</p><small>These summaries do not predict behavior or determine wrongdoing.</small></div>:<header className="official-dashboard-header"><h1>Analytics &amp; Insights</h1><p>Descriptive patterns from recorded barangay incidents and verified linked records.</p><small>These summaries do not predict behavior or determine wrongdoing.</small></header>}
     <section className="dashboard-card analytics-filters" aria-label="Analytics filters"><h2>Filters</h2>
       <div className="ai-filter-grid">
         <label>Period<select aria-label="Time window" value={filters.window} onChange={e=>update('window',e.target.value)}>{PERIODS.map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
