@@ -104,7 +104,7 @@ beforeEach(() => {
 // component's own arrays has to be made here too deliberately.
 const OFFICIAL_ONLY = [
   'Announcements', 'Officials Directory',
-  'Residents', 'Reports', 'Activity Log',
+  'Residents', 'Analytics & Insights', 'Activity Log',
 ]
 const NURSE_ONLY = ['Medicines', 'Availability', 'Health Events']
 // ⚠️ 'Complaints' LEFT THIS LIST IN P3-B2, and it was removed rather
@@ -154,7 +154,9 @@ describe('A. role="official"', () => {
       'Document Requests', 'Complaints',
       'Incidents & Blotter', 'Tanod Operations', 'Safety Map & Analytics',
       'Residents', 'People & History', 'Community Credit', 'Officials Directory',
-      'Reports', 'Activity Log', 'Settings',
+      // Remediation C: the nav item names the page it opens (X1: headings
+      // match the nav). The tab id is still 'reports'.
+      'Analytics & Insights', 'Activity Log', 'Settings',
     ])
   })
 

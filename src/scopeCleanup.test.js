@@ -27,7 +27,7 @@ describe('retired module scope cleanup', () => {
     ;[
       'Dashboard', 'Announcements', 'Events', 'Document Requests', 'Complaints',
       'Incidents & Blotter', 'Tanod Operations', 'Safety Map & Analytics',
-      'Officials Directory', 'Residents', 'Community Credit', 'Reports',
+      'Officials Directory', 'Residents', 'Community Credit', 'Analytics & Insights',
       'Activity Log', 'Settings',
     ].forEach((label) => expect(sidebar).toContain(`label: '${label}'`))
     expect(sidebar).not.toMatch(/label: '(?:Reservations|My Reservations|Waste Management)'/)
@@ -48,7 +48,9 @@ describe('retired module scope cleanup', () => {
     const dashboard = source('dashboards/OfficialDashboard.jsx')
     expect(dashboard).not.toMatch(/reservation|court|booking/i)
     expect(dashboard).not.toMatch(/waste(?:_schedule| management)?/i)
-    ;['Announcements', 'Events', 'Document Requests', 'Complaints', 'CreditManagement', 'Reports', 'Activity Log', 'Settings']
+    // Remediation C: the old Reports implementation was unreachable ({false && ...})
+    // and was removed; the 'reports' tab now renders AnalyticsInsights.
+    ;['Announcements', 'Events', 'Document Requests', 'Complaints', 'CreditManagement', 'AnalyticsInsights', 'Activity Log', 'Settings']
       .forEach((label) => expect(dashboard).toContain(label))
   })
 

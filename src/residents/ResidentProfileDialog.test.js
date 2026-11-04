@@ -42,9 +42,10 @@ test('Edit opens existing form with original unformatted saved values',async()=>
  render(<ResidentDirectory profiles={[profile]}/>);fireEvent.click(await screen.findByRole('button',{name:'Ana Cruz'}));fireEvent.click(screen.getByRole('button',{name:'Edit Resident'}))
  await screen.findByRole('dialog',{name:'Edit Resident'})
  expect(screen.getByLabelText('Birth date (optional)')).toHaveValue('1965-03-22');expect(screen.getByLabelText('Mobile number (optional)')).toHaveValue('09982971260')
- expect(supabase.rpc).toHaveBeenCalledTimes(3)
+ expect(supabase.rpc).toHaveBeenCalledTimes(4)
  expect(supabase.rpc).toHaveBeenCalledWith('community_credit_profile',{p_resident_id:resident.id})
  expect(supabase.rpc).toHaveBeenCalledWith('person_history',{p_person_kind:'resident',p_person_id:resident.id})
+ expect(supabase.rpc).toHaveBeenCalledWith('person_analytics',{p_person_kind:'resident',p_person_id:resident.id,p_from:null,p_to:null,p_window:'all'})
 })
 test('Escape, close label, scroll lock and focus return survive presentation wrapper',async()=>{
  function Harness(){const [open,setOpen]=useState(false);return <><button onClick={()=>setOpen(true)}>Open profile</button>{open&&<ResidentProfileDialog resident={resident} onClose={()=>setOpen(false)} onEdit={()=>{}}/>}</>}

@@ -14,3 +14,19 @@ node_modules/
 # misc
 .DS_Store
 npm-debug.log*
+
+# Supabase CLI local state: project link metadata and CLI caches. Never commit.
+/supabase/.temp/
+/supabase/.branches/
+
+# Database dumps, checkpoints, schema exports and connection credentials.
+# Production-derived schema must never enter this repository. Migrations
+# (supabase-migrations/NNN_*.sql) and harnesses (supabase-tests/*.sql) are
+# NOT matched by these patterns.
+*.dump
+schema.raw.sql
+schema.restore.sql
+.pgpass
+pgpass.conf
+prod-ca-*.crt
+supabase-tests/*.log

@@ -2,12 +2,20 @@ import { supabase } from '../supabase/supabaseClient'
 
 const rpc = async (name, args) => {
   const { data, error } = await supabase.rpc(name, args)
-  if (error) throw new Error('The people-history operation could not be completed.')
+  if (error) {
+    // Keep the SQLSTATE so callers can tell a 42501 refusal from an outage.
+    const failure = new Error('The people-history operation could not be completed.')
+    failure.code = error.code
+    throw failure
+  }
   return data
 }
 
 export const searchPeople = (query) => rpc('search_people', { p_search: query.trim() })
 export const loadPersonHistory = (kind, id) => rpc('person_history', { p_person_kind: kind, p_person_id: id })
+export const loadPersonAnalytics = (kind, id, { from = null, to = null, window = 'all' } = {}) => rpc('person_analytics', {
+  p_person_kind: kind, p_person_id: id, p_from: from || null, p_to: to || null, p_window: window,
+})
 export const createExternalPerson = (form) => rpc('save_external_person', {
   p_id: null, p_first_name: form.firstName, p_middle_name: form.middleName || '',
   p_last_name: form.lastName, p_suffix: form.suffix || '', p_recorded_barangay: form.barangay || '',

@@ -1,0 +1,112 @@
+# Analytics & Insights (migration 062): static source checks, Jest and the
+# production build.
+#
+# ⚠️ WHAT THIS WORKFLOW DOES NOT DO: it does NOT run the 89 behavioral SQL
+# assertions in supabase-tests/062_analytics_behavioral.sql. Those need
+# PostgreSQL holding the real post-061 schema, and this repository cannot
+# rebuild that schema: migrations 001-061 are a record, not a runner (001
+# assumes tables created in the Supabase dashboard), and a production schema
+# dump must never be committed or uploaded. The harness is run locally against
+# an isolated database and its result is recorded in the migration header.
+#
+# This file replaces analytics-062-postgres-test.yml, which replayed 001-061 on
+# an empty database and failed at 001 ("relation reservations does not exist").
+name: Analytics 062 static checks, Jest and build
+
+# Runs on pull requests (from any branch) and on pushes to main, only when a
+# file it checks has changed. The two path lists must stay identical.
+on:
+  pull_request:
+    paths:
+      - 'supabase-migrations/**'
+      - 'supabase-tests/**'
+      - 'src/**'
+      - 'public/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'scripts/ci/**'
+      - '.github/workflows/analytics-062-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'supabase-migrations/**'
+      - 'supabase-tests/**'
+      - 'src/**'
+      - 'public/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'scripts/ci/**'
+      - '.github/workflows/analytics-062-ci.yml'
+  workflow_dispatch:
+
+# Read-only token; no job writes to the repository, issues or packages.
+permissions:
+  contents: read
+
+concurrency:
+  group: analytics-062-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static-checks:
+    name: Migration 062 and harness source checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      # Actions are pinned to full commit SHAs; the comment names the release.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26.4.0'
+          package-manager-cache: false
+      - name: Static checks (no database)
+        run: node scripts/ci/check-analytics-062.mjs
+      - name: Record scope in the job summary
+        if: always()
+        run: |
+          {
+            echo '### Migration 062 static checks'
+            echo 'Source checks only. The 89 behavioral SQL assertions are **not** run in CI;'
+            echo 'they require the local isolated PostgreSQL harness (see supabase-tests/README.md).'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  jest-and-build:
+    name: Jest and production build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      CI: 'true'
+      # supabaseClient.js throws at import time without these. They are
+      # deliberately NOT real project values: a loopback URL and a placeholder
+      # key, so no test or build step can reach any Supabase project.
+      REACT_APP_SUPABASE_URL: 'http://127.0.0.1:54321'
+      REACT_APP_SUPABASE_ANON_KEY: 'ci-placeholder-not-a-real-key'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26.4.0'
+          package-manager-cache: false
+      - name: Install exact locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Jest (whole suite, limited workers)
+        run: npm test -- --watchAll=false --maxWorkers=2
+      # With CI=true, react-scripts treats every ESLint warning as a build error.
+      - name: Production build
+        run: npm run build
+      # A missing env var used to dead-code-eliminate the whole app while the build
+      # still exited 0 (~90 kB instead of ~320 kB). Fail loudly instead.
+      - name: Guard against an empty bundle
+        run: |
+          node -e "
+            const fs=require('fs');const dir='build/static/js';
+            const main=fs.readdirSync(dir).find(f=>/^main\..+\.js$/.test(f));
+            if(!main){console.error('No main bundle found');process.exit(1)}
+            const kb=fs.statSync(dir+'/'+main).size/1024;
+            console.log(main+': '+kb.toFixed(1)+' kB (uncompressed)');
+            if(kb<600){console.error('Bundle is suspiciously small; the app may have been eliminated.');process.exit(1)}
+          "
