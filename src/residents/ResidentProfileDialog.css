@@ -19,6 +19,7 @@
 .resident-profile-dialog .resident-profile-section dt { font-size:12px; line-height:1.4; color:#64748b; }
 .resident-profile-dialog .resident-profile-section dd { margin:5px 0 0; font-size:16px; font-weight:600; line-height:1.5; color:#1e293b; }
 .resident-profile-verification { display:inline-block; padding:2px 9px; background:#edf3fc; border:1px solid #dce6f5; border-radius:6px; color:#1e3a8a; font-size:13px; }
+.resident-history { margin-top:20px; padding:16px 18px; border:1px solid #e2e8f0; border-radius:10px; background:#fff; }
 @media(max-width:768px) {
   .resident-profile-dialog .resident-profile-heading { grid-template-columns:80px minmax(0,1fr); gap:16px; }
   .resident-profile-dialog .resident-profile-heading > button { grid-column:2; justify-self:start; }

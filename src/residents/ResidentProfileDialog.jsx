@@ -7,6 +7,8 @@ import { purokLabel } from './residentPresentation'
 import { residentBirthDateLabel, residentMobileLabel } from './residentProfileDisplay'
 import './ResidentProfileDialog.css'
 import CreditProfile from '../communityCredit/CreditProfile'
+import ResidentHistory from '../people/ResidentHistory'
+import '../people/PeopleHistory.css'
 
 export function ResidentAvatar({ resident, profile }) {
   const [failed, setFailed] = useState(false)
@@ -39,6 +41,7 @@ export default function ResidentProfileDialog({resident,profile,onClose,onEdit})
         <dl><div><dt>Online account</dt><dd>{linked}</dd></div><div><dt>Account verification</dt><dd><span className="resident-profile-verification">{profile ? describeVerification(profile.verification_status).label : 'Not available'}</span></dd></div></dl>
       </section>
     </div>
+    <ResidentHistory residentId={resident.id} />
     <CreditProfile residentId={resident.id} showResident />
   </PortalDetailsDialog></div>
 }

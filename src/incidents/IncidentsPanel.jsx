@@ -3,6 +3,7 @@ import OfficialTanodNotes from '../tanod/OfficialTanodNotes'
 import DeviceLocation from './DeviceLocation'
 import { DialogShell } from '../components/OfficialArchiveDialog'
 import IncidentKpLink from '../casesupport/IncidentKpLink'
+import IncidentParties from '../people/IncidentParties'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   FaClipboardList, FaExclamationTriangle, FaInfoCircle, FaLock, FaMapMarkerAlt, FaPlus,
@@ -524,6 +525,7 @@ const IncidentsPanel = ({ canAdminister = false, confirm }) => {
           </dl>
 
           </section>
+          <IncidentParties incidentId={detail.id} canManage={canAdminister} />
           <section className="inc-section" aria-label="Location"><h3>Location</h3>
             <p className="inc-location-description">{detail.location_text}</p>
             <p className="field-note">{detail.latitude !== null && detail.latitude !== undefined ? 'Map location recorded' : 'No map location has been set for this incident.'}</p>

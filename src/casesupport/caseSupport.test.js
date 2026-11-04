@@ -58,14 +58,14 @@ test('manual followups preserve case ID and only save once while pending', async
   await act(async () => finish())
   expect(screen.getByRole('status')).toHaveTextContent('Case status was not changed')
 })
-test('resident linking requires explicit confirmation of a stable ID', async () => {
-  caseRpc.mockResolvedValueOnce([{ record_kind: 'registry', record_id: 'resident-uuid', full_name: 'Sample Resident' }]).mockResolvedValue(null)
+test('person linking requires explicit confirmation of a stable UUID', async () => {
+  caseRpc.mockResolvedValueOnce([{ person_kind: 'resident', person_id: 'resident-uuid', full_name: 'Sample Resident' }]).mockResolvedValue(null)
   render(<PartyLink party={{ id: 'party-uuid', full_name_snapshot: 'Sample' }} />)
-  fireEvent.change(screen.getByLabelText(/Find existing resident/), { target: { value: 'Sam' } })
-  fireEvent.click(screen.getByText('Search resident records'))
-  fireEvent.click(await screen.findByText('Confirm this resident'))
-  await waitFor(() => expect(caseRpc).toHaveBeenCalledWith('link_complaint_party', { p_party_id: 'party-uuid', p_record_kind: 'registry', p_record_id: 'resident-uuid' }))
-  expect(screen.getByText(/not proof of identity/)).toBeInTheDocument()
+  fireEvent.change(screen.getByLabelText(/Find resident or external person/), { target: { value: 'Sample' } })
+  fireEvent.click(screen.getByText('Search people'))
+  fireEvent.click(await screen.findByText('Confirm this identity'))
+  await waitFor(() => expect(caseRpc).toHaveBeenCalledWith('link_complaint_party_identity', { p_party_id: 'party-uuid', p_person_kind: 'resident', p_person_id: 'resident-uuid' }))
+  expect(screen.getByText(/name match never creates/i)).toBeInTheDocument()
 })
 test('additional video evidence uploads once; withdrawal needs a reason', async () => {
   render(<EvidenceActions complaintId="complaint-uuid" attachments={[{ id: 'file-uuid', display_filename: 'proof.pdf' }]} />)

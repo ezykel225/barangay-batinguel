@@ -25,6 +25,7 @@ import {
   FaBoxOpen,
   FaCheckDouble,
   FaPrint,
+  FaFileAlt,
 } from 'react-icons/fa'
 import { supabase } from '../supabase/supabaseClient'
 import { pathFromPublicUrl } from '../utils/storagePath'
@@ -48,6 +49,7 @@ import IncidentsPanel from '../incidents/IncidentsPanel'
 import TanodPanel from '../tanod/TanodPanel'
 import SafetyMapPanel from '../safetymap/SafetyMapPanel'
 import CreditManagement from '../communityCredit/CreditManagement'
+import PeopleHistory from '../people/PeopleHistory'
 import { canGenerate } from '../documents/documentRegistry'
 import {
   actionCellIsEmpty,
@@ -2525,6 +2527,18 @@ const OfficialDashboard = () => {
                 <div className="stat-card-value">{countUpcoming(events, 'event_date')}</div>
                 <div className="stat-card-label">Upcoming Events</div>
               </div>
+
+              <div className="stat-card">
+                <div className="stat-card-header"><div className="stat-card-icon yellow"><FaFileAlt /></div></div>
+                <div className="stat-card-value">{documentRequests.filter(request => request.status === 'pending').length}</div>
+                <div className="stat-card-label">Pending Document Requests</div>
+              </div>
+
+              <div className="stat-card">
+                <div className="stat-card-header"><div className="stat-card-icon green"><FaUser /></div></div>
+                <div className="stat-card-value">{residentsList.filter(resident => resident.resident_status === 'active').length}</div>
+                <div className="stat-card-label">Active Residents</div>
+              </div>
             </div>
 
             {/* ── Punong Barangay status, compact ──────────────────────
@@ -3382,6 +3396,7 @@ const OfficialDashboard = () => {
         )}
 
         {activeTab === 'community-credit' && <CreditManagement canManage={isSecretary || isKapitan} />}
+        {activeTab === 'people-history' && <PeopleHistory canManage={isSecretary || isKapitan} />}
 
         {activeTab === 'officials' && (
           <div>

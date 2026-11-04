@@ -52,6 +52,15 @@ describe('retired module scope cleanup', () => {
       .forEach((label) => expect(dashboard).toContain(label))
   })
 
+  test('Official Dashboard fills its overview with retained, loaded data only', () => {
+    const dashboard = source('dashboards/OfficialDashboard.jsx')
+    ;['Announcements', 'Upcoming Events', 'Pending Document Requests', 'Active Residents']
+      .forEach((label) => expect(dashboard).toContain(`>${label}<`))
+    expect(dashboard).toContain("documentRequests.filter(request => request.status === 'pending').length")
+    expect(dashboard).toContain("residentsList.filter(resident => resident.resident_status === 'active').length")
+    expect(dashboard).not.toMatch(/stat-card-label[^\n]*(?:Reservation|Waste|Health)/i)
+  })
+
   test('Resident Dashboard contains no reservation implementation and retains supported tabs', () => {
     const dashboard = source('dashboards/ResidentDashboard.jsx')
     expect(dashboard).not.toMatch(/reservation|court|booking/i)
