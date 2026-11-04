@@ -26,6 +26,18 @@ describe('the migration directory rule', () => {
     expect(migrationSequenceProblems([...base, ...reviewed(61, 62, 63, 64)])).toEqual([])
   })
 
+  it('accepts the reviewed 066 after 065, with or without 064', () => {
+    expect(migrationSequenceProblems([...base, ...reviewed(61, 62, 63, 65, 66)])).toEqual([])
+    expect(migrationSequenceProblems([...base, ...reviewed(61, 62, 63, 64, 65, 66)])).toEqual([])
+  })
+
+  it('refuses 066 when 065 is not there to permit the 064 gap', () => {
+    expect(migrationSequenceProblems([...base, ...reviewed(61, 62, 63, 66)]))
+      .toEqual(['missing migration 064', 'missing migration 065'])
+    expect(migrationSequenceProblems([...base, ...reviewed(61, 62, 63, 64, 66)]))
+      .toEqual(['missing migration 065'])
+  })
+
   it('refuses an unreviewed 066, alone or after 065', () => {
     expect(migrationSequenceProblems([...base, ...reviewed(61, 62, 63, 64, 65), '066_new.sql']))
       .toEqual(['unreviewed migration 066_new.sql'])
