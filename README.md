@@ -38,14 +38,11 @@ protected routes, email confirmation, and self-service password reset.
 
 ## Tech Stack
 
-- React 19 + React Router v6 (Create React App)
-- Supabase — Auth, Postgres, Storage, Edge Functions
+- React 19 + React Router v6 + Vite
+- Supabase — Auth, Postgres, Storage, Edge Functions (with automatic offline/preview fallback data store)
+- Leaflet for Public Community Safety and Official Incident Maps
 - react-hot-toast for notifications, react-icons for icons
-- Plain CSS, one stylesheet per component
-
-> Tailwind is present in `package.json` and `src/index.css` but is not
-> actually used — the styling is hand-written CSS throughout. It can be
-> removed.
+- Plain CSS with design tokens
 
 ## Getting Started
 
@@ -55,9 +52,13 @@ protected routes, email confirmation, and self-service password reset.
 npm install
 ```
 
-You will see deprecation warnings and a vulnerability count. Both are
-expected: they come from `react-scripts`, and every reported
-vulnerability is in the local development toolchain
+### 2. Start development server
+
+```bash
+npm run dev
+```
+
+The app will be running at `http://localhost:3000`.
 (`webpack-dev-server`), not in anything deployed.
 
 **Do not run `npm audit fix --force`.** It "fixes" them by installing

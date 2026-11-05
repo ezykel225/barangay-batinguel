@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import EServicesMenu from './EServicesMenu'
 import { SERVICE_GROUPS } from '../constants/eServices'
 import { supabase } from '../supabase/supabaseClient'
+import logoImg from '../assets/images/logo.png'
 import './Navbar.css'
 
 // Every destination the E-Services menu can reach, so the navbar can
@@ -62,8 +63,8 @@ const Navbar = () => {
         <Link to="/" className="navbar-logo">
           <div className="navbar-logo-icon">
               <img
-              src={require('../assets/images/logo.png')}
-              alt="Barangay Batinguel Logo"
+                src={logoImg}
+                alt="Barangay Batinguel Logo"
               />
           </div>
           <div className="navbar-logo-text">

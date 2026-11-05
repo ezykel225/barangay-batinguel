@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FaLock, FaEye, FaEyeSlash, FaShieldAlt } from 'react-icons/fa'
 import { supabase } from '../supabase/supabaseClient'
+import logoImg from '../assets/images/logo.png'
 import toast from 'react-hot-toast'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
@@ -104,7 +105,7 @@ const ResetPassword = () => {
             <div className="login-left-logo">
               <div className="login-left-logo-icon">
                 <img
-                  src={require('../assets/images/logo.png')}
+                  src={logoImg}
                   alt="Barangay Batinguel Logo"
                 />
               </div>

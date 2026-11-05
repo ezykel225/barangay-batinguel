@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { FaUser, FaEnvelope, FaPhone, FaMapMarkerAlt, FaLock, FaEye, FaEyeSlash, FaIdCard } from 'react-icons/fa'
 import { supabase } from '../supabase/supabaseClient'
+import logoImg from '../assets/images/logo.png'
 import toast from 'react-hot-toast'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
@@ -260,7 +261,7 @@ const ResidentSignup = () => {
             <div className="login-left-logo">
               <div className="login-left-logo-icon">
                 <img
-                  src={require('../assets/images/logo.png')}
+                  src={logoImg}
                   alt="Barangay Batinguel Logo"
                 />
               </div>

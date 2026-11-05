@@ -1,4 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
+import logoImg from '../assets/images/logo.png'
 import {
   FaShieldAlt,
   FaTachometerAlt,
@@ -411,7 +412,7 @@ const Sidebar = ({ role, activeTab, setActiveTab, badges = {}, mobileHeaderActio
       <header className="dash-mobile-header">
         <Link to="/" className="dash-mobile-brand">
           <img
-            src={require('../assets/images/logo.png')}
+            src={logoImg}
             alt=""
             className="dash-mobile-brand-logo"
           />

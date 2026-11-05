@@ -11,6 +11,7 @@ import {
   FaLock,
 } from 'react-icons/fa'
 import { supabase } from '../supabase/supabaseClient'
+import logoImg from '../assets/images/logo.png'
 import toast from 'react-hot-toast'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
@@ -246,7 +247,7 @@ const Login = () => {
             <div className="login-left-logo">
               <div className="login-left-logo-icon">
                 <img
-                  src={require('../assets/images/logo.png')}
+                  src={logoImg}
                   alt="Barangay Batinguel Logo"
                 />
               </div>
