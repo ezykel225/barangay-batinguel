@@ -1,0 +1,501 @@
+[
+  {
+    "name": "activate_community_credit_policy",
+    "args": [
+      "p_id"
+    ],
+    "types": "uuid",
+    "returns": "jsonb",
+    "definer": true,
+    "config": [
+      "search_path=\"\""
+    ],
+    "auth": true,
+    "anon": false,
+    "service": false
+  },
+  {
+    "name": "approve_community_credit_v2_policy",
+    "args": [
+      "p_id"
+    ],
+    "types": "uuid",
+    "returns": "jsonb",
+    "definer": true,
+    "config": [
+      "search_path=\"\""
+    ],
+    "auth": true,
+    "anon": false,
+    "service": false
+  },
+  {
+    "name": "approve_community_credit_v2_rule",
+    "args": [
+      "p_id"
+    ],
+    "types": "uuid",
+    "returns": "jsonb",
+    "definer": true,
+    "config": [
+      "search_path=\"\""
+    ],
+    "auth": true,
+    "anon": false,
+    "service": false
+  },
+  {
+    "name": "award_community_credit_participation",
+    "args": [
+      "p_request_id",
+      "p_activity_id",
+      "p_resident_id"
+    ],
+    "types": "uuid, uuid, uuid",
+    "returns": "jsonb",
+    "definer": true,
+    "config": [
+      "search_path=\"\""
+    ],
+    "auth": true,
+    "anon": false,
+    "service": false
+  },
+  {
+    "name": "barangay_safety_analytics",
+    "args": [
+      "p_from",
+      "p_to",
+      "p_category",
+      "p_area",
+      "p_window"
+    ],
+    "types": "date, date, text, text, text",
+    "returns": "jsonb",
+    "definer": true,
+    "config": [
+      "search_path=\"\""
+    ],
+    "auth": true,
+    "anon": false,
+    "service": false
+  },
+  {
+    "name": "community_credit_activities_list",
+    "args": [
+      "p_year"
+    ],
+    "types": "integer",
+    "returns": "jsonb",
+    "definer": true,
+    "config": [
+      "search_path=\"\""
+    ],
+    "auth": true,
+    "anon": false,
+    "service": false
+  },
+  {
+    "name": "community_credit_admin_state",
+    "args": [],
+    "types": "",
+    "returns": "jsonb",
+    "definer": true,
+    "config": [
+      "search_path=\"\""
+    ],
+    "auth": true,
+    "anon": false,
+    "service": false
+  },
+  {
+    "name": "community_credit_correction_requests_admin",
+    "args": [
+      "p_status"
+    ],
+    "types": "text",
+    "returns": "jsonb",
+    "definer": true,
+    "config": [
+      "search_path=\"\""
+    ],
+    "auth": true,
+    "anon": false,
+    "service": false
+  },
+  {
+    "name": "community_credit_enroll_active_residents",
+    "args": [
+      "p_policy_id"
+    ],
+    "types": "uuid",
+    "returns": "jsonb",
+    "definer": true,
+    "config": [
+      "search_path=\"\""
+    ],
+    "auth": true,
+    "anon": false,
+    "service": false
+  },
+  {
+    "name": "community_credit_profile",
+    "args": [
+      "p_resident_id"
+    ],
+    "types": "uuid",
+    "returns": "jsonb",
+    "definer": true,
+    "config": [
+      "search_path=\"\""
+    ],
+    "auth": true,
+    "anon": false,
+    "service": false
+  },
+  {
+    "name": "community_credit_resident_directory",
+    "args": [],
+    "types": "",
+    "returns": "TABLE(id uuid, first_name text, middle_name text, last_name text, suffix text, purok text, resident_status text, account_linked boolean)",
+    "definer": true,
+    "config": [
+      "search_path=\"\""
+    ],
+    "auth": true,
+    "anon": false,
+    "service": false
+  },
+  {
+    "name": "create_community_credit_activity",
+    "args": [
+      "p_request_id",
+      "p_rule_id",
+      "p_title",
+      "p_starts_at",
+      "p_ends_at",
+      "p_location_note",
+      "p_evidence_reference"
+    ],
+    "types": "uuid, uuid, text, timestamp with time zone, timestamp with time zone, text, text",
+    "returns": "jsonb",
+    "definer": true,
+    "config": [
+      "search_path=\"\""
+    ],
+    "auth": true,
+    "anon": false,
+    "service": false
+  },
+  {
+    "name": "incident_parties_for",
+    "args": [
+      "p_incident_id"
+    ],
+    "types": "uuid",
+    "returns": "TABLE(id uuid, person_kind text, person_id uuid, name_snapshot text, role text, outcome_status text, outcome_recorded_at timestamp with time zone)",
+    "definer": true,
+    "config": [
+      "search_path=\"\""
+    ],
+    "auth": true,
+    "anon": false,
+    "service": false
+  },
+  {
+    "name": "my_community_credit_correction_requests",
+    "args": [],
+    "types": "",
+    "returns": "jsonb",
+    "definer": true,
+    "config": [
+      "search_path=\"\""
+    ],
+    "auth": true,
+    "anon": false,
+    "service": false
+  },
+  {
+    "name": "my_community_credit_profile",
+    "args": [],
+    "types": "",
+    "returns": "jsonb",
+    "definer": true,
+    "config": [
+      "search_path=\"\""
+    ],
+    "auth": true,
+    "anon": false,
+    "service": false
+  },
+  {
+    "name": "person_analytics",
+    "args": [
+      "p_person_kind",
+      "p_person_id",
+      "p_from",
+      "p_to",
+      "p_window"
+    ],
+    "types": "text, uuid, date, date, text",
+    "returns": "jsonb",
+    "definer": true,
+    "config": [
+      "search_path=\"\""
+    ],
+    "auth": true,
+    "anon": false,
+    "service": false
+  },
+  {
+    "name": "person_history",
+    "args": [
+      "p_person_kind",
+      "p_person_id"
+    ],
+    "types": "text, uuid",
+    "returns": "jsonb",
+    "definer": true,
+    "config": [
+      "search_path=\"\""
+    ],
+    "auth": true,
+    "anon": false,
+    "service": false
+  },
+  {
+    "name": "reaward_community_credit_participation",
+    "args": [
+      "p_request_id",
+      "p_activity_id",
+      "p_resident_id",
+      "p_reason"
+    ],
+    "types": "uuid, uuid, uuid, text",
+    "returns": "jsonb",
+    "definer": true,
+    "config": [
+      "search_path=\"\""
+    ],
+    "auth": true,
+    "anon": false,
+    "service": false
+  },
+  {
+    "name": "repeated_dispute_analytics",
+    "args": [
+      "p_from",
+      "p_to",
+      "p_window"
+    ],
+    "types": "date, date, text",
+    "returns": "jsonb",
+    "definer": true,
+    "config": [
+      "search_path=\"\""
+    ],
+    "auth": true,
+    "anon": false,
+    "service": false
+  },
+  {
+    "name": "resolve_community_credit_correction_request",
+    "args": [
+      "p_id",
+      "p_decision",
+      "p_reason"
+    ],
+    "types": "uuid, text, text",
+    "returns": "jsonb",
+    "definer": true,
+    "config": [
+      "search_path=\"\""
+    ],
+    "auth": true,
+    "anon": false,
+    "service": false
+  },
+  {
+    "name": "retire_community_credit_policy",
+    "args": [
+      "p_id"
+    ],
+    "types": "uuid",
+    "returns": "void",
+    "definer": true,
+    "config": [
+      "search_path=\"\""
+    ],
+    "auth": true,
+    "anon": false,
+    "service": false
+  },
+  {
+    "name": "reverse_community_credit_award",
+    "args": [
+      "p_request_id",
+      "p_event_id",
+      "p_reason"
+    ],
+    "types": "uuid, uuid, text",
+    "returns": "jsonb",
+    "definer": true,
+    "config": [
+      "search_path=\"\""
+    ],
+    "auth": true,
+    "anon": false,
+    "service": false
+  },
+  {
+    "name": "save_community_credit_policy",
+    "args": [
+      "p_id",
+      "p_name",
+      "p_description",
+      "p_base_score",
+      "p_minimum_score",
+      "p_maximum_score"
+    ],
+    "types": "uuid, text, text, integer, integer, integer",
+    "returns": "uuid",
+    "definer": true,
+    "config": [
+      "search_path=\"\""
+    ],
+    "auth": true,
+    "anon": false,
+    "service": false
+  },
+  {
+    "name": "save_community_credit_rule",
+    "args": [
+      "p_id",
+      "p_policy_id",
+      "p_rule_code",
+      "p_title",
+      "p_description",
+      "p_category",
+      "p_source_domain",
+      "p_points_delta",
+      "p_repairable"
+    ],
+    "types": "uuid, uuid, text, text, text, text, text, integer, boolean",
+    "returns": "uuid",
+    "definer": true,
+    "config": [
+      "search_path=\"\""
+    ],
+    "auth": true,
+    "anon": false,
+    "service": false
+  },
+  {
+    "name": "save_community_credit_v2_policy",
+    "args": [
+      "p_id",
+      "p_name",
+      "p_description"
+    ],
+    "types": "uuid, text, text",
+    "returns": "uuid",
+    "definer": true,
+    "config": [
+      "search_path=\"\""
+    ],
+    "auth": true,
+    "anon": false,
+    "service": false
+  },
+  {
+    "name": "save_community_credit_v2_rule",
+    "args": [
+      "p_id",
+      "p_policy_id",
+      "p_rule_code",
+      "p_title",
+      "p_description",
+      "p_points",
+      "p_annual_points_cap",
+      "p_evidence_requirement"
+    ],
+    "types": "uuid, uuid, text, text, text, integer, integer, text",
+    "returns": "uuid",
+    "definer": true,
+    "config": [
+      "search_path=\"\""
+    ],
+    "auth": true,
+    "anon": false,
+    "service": false
+  },
+  {
+    "name": "search_people",
+    "args": [
+      "p_search"
+    ],
+    "types": "text",
+    "returns": "TABLE(person_kind text, person_id uuid, full_name text, secondary_text text, credit_applicable boolean)",
+    "definer": true,
+    "config": [
+      "search_path=\"\""
+    ],
+    "auth": true,
+    "anon": false,
+    "service": false
+  },
+  {
+    "name": "set_community_credit_rule_active",
+    "args": [
+      "p_id",
+      "p_active"
+    ],
+    "types": "uuid, boolean",
+    "returns": "void",
+    "definer": true,
+    "config": [
+      "search_path=\"\""
+    ],
+    "auth": true,
+    "anon": false,
+    "service": false
+  },
+  {
+    "name": "submit_community_credit_correction_request",
+    "args": [
+      "p_request_id",
+      "p_kind",
+      "p_event_id",
+      "p_activity_reference",
+      "p_message"
+    ],
+    "types": "uuid, text, uuid, text, text",
+    "returns": "jsonb",
+    "definer": true,
+    "config": [
+      "search_path=\"\""
+    ],
+    "auth": true,
+    "anon": false,
+    "service": false
+  },
+  {
+    "name": "verify_community_credit_participation",
+    "args": [
+      "p_request_id",
+      "p_activity_id",
+      "p_resident_id",
+      "p_mode",
+      "p_note"
+    ],
+    "types": "uuid, uuid, uuid, text, text",
+    "returns": "jsonb",
+    "definer": true,
+    "config": [
+      "search_path=\"\""
+    ],
+    "auth": true,
+    "anon": false,
+    "service": false
+  }
+]

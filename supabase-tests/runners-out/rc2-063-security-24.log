@@ -1,0 +1,5 @@
+                                         result                                          
+-----------------------------------------------------------------------------------------
+ PASS: all 24 migration-063 behavioral contracts passed; transaction will now roll back.
+(1 row)
+

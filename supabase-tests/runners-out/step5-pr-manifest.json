@@ -1,0 +1,114 @@
+[
+  {
+    "baseRefName": "claude/interactive-analytics-insights",
+    "headRefName": "claude/consolidated-safety-analytics",
+    "headRefOid": "59289af6a243441bd865f946b65fca8a949ff4ed",
+    "isDraft": true,
+    "number": 65,
+    "title": "feat: Consolidate Safety Map and Analytics into One Module"
+  },
+  {
+    "baseRefName": "claude/person-workflow-navigation",
+    "headRefName": "claude/interactive-analytics-insights",
+    "headRefOid": "989e99bdfeb4bf1001e58a80b8888452b2ef5937",
+    "isDraft": true,
+    "number": 64,
+    "title": "feat: Interactive Analytics & Insights with Time Filters and Incident Drilldowns"
+  },
+  {
+    "baseRefName": "claude/person-history-privacy-066",
+    "headRefName": "claude/person-workflow-navigation",
+    "headRefOid": "0c5e1bfc7d1004d6bd1c5a3748ab8a477e632280",
+    "isDraft": true,
+    "number": 63,
+    "title": "feat: Consolidate People & History navigation into Incidents"
+  },
+  {
+    "baseRefName": "claude/unified-resident-profile",
+    "headRefName": "claude/person-history-privacy-066",
+    "headRefOid": "5da7f183849be0c012cf0da0a587fed448386470",
+    "isDraft": true,
+    "number": 62,
+    "title": "fix: Secure People & History privacy and identity accuracy (066)"
+  },
+  {
+    "baseRefName": "claude/official-dashboard-kpi-fix",
+    "headRefName": "claude/unified-resident-profile",
+    "headRefOid": "df1f4ebd71c7e126d1e8a790191f5509f861dbd5",
+    "isDraft": true,
+    "number": 61,
+    "title": "feat: Unified Resident Profile with History, Analytics and Credit"
+  },
+  {
+    "baseRefName": "claude/auth-session-stability",
+    "headRefName": "claude/official-dashboard-kpi-fix",
+    "headRefOid": "d2ef2610df1a76a42d46b830b4ed215a178fec7f",
+    "isDraft": true,
+    "number": 60,
+    "title": "fix: restore official KPI grid and active resident count"
+  },
+  {
+    "baseRefName": "claude/system-fixes-phase1",
+    "headRefName": "claude/auth-session-stability",
+    "headRefOid": "5b7bab5f0452a901ca209fa1f6acd7a98a862a37",
+    "isDraft": true,
+    "number": 59,
+    "title": "fix: prevent authentication deadlocks and false session redirects"
+  },
+  {
+    "baseRefName": "claude/system-fixes-phase1",
+    "headRefName": "claude/retire-nurse-sms-065",
+    "headRefOid": "1c20619f0933cd25abd871e5961fb9405bdc8648",
+    "isDraft": true,
+    "number": 58,
+    "title": "security: retire nurse SMS permissions (migration 065)"
+  },
+  {
+    "baseRefName": "claude/retire-legacy-modules-063",
+    "headRefName": "claude/system-fixes-phase1",
+    "headRefOid": "e18e21881133f9596d92ebb809078ddf9849a5c1",
+    "isDraft": true,
+    "number": 57,
+    "title": "fix: Phase 1 system cleanup and navigation safeguards"
+  },
+  {
+    "baseRefName": "person-matter-linking",
+    "headRefName": "claude/analytics-insights-062",
+    "headRefOid": "a7f22edfbd058ea16bde23ef0b69f81e3f5d3935",
+    "isDraft": true,
+    "number": 56,
+    "title": "DRAFT — DO NOT MERGE: 062 Analytics & Insights (NOT APPLIED)"
+  },
+  {
+    "baseRefName": "community-credit-scope-cleanup",
+    "headRefName": "person-matter-linking",
+    "headRefOid": "ced0978e11fb49735b7e440deee8c6bc7d44c648",
+    "isDraft": true,
+    "number": 55,
+    "title": "DRAFT — 061 Person & Matter Linking (already applied; record + frontend)"
+  },
+  {
+    "baseRefName": "claude/retire-legacy-modules-063",
+    "headRefName": "claude/legacy-data-cleanup-064",
+    "headRefOid": "d0a052e1d8d5846b3fe51e4b4db0ae9c8ca9c3d3",
+    "isDraft": true,
+    "number": 54,
+    "title": "DRAFT — DO NOT MERGE / DO NOT APPLY: migration 064, legacy data cleanup"
+  },
+  {
+    "baseRefName": "claude/analytics-insights-062",
+    "headRefName": "claude/retire-legacy-modules-063",
+    "headRefOid": "f54d1877b1d6dc8445d9acfcb0ed9a27b0438b4a",
+    "isDraft": true,
+    "number": 53,
+    "title": "DRAFT — DO NOT MERGE: migration 063, retire client access to removed modules"
+  },
+  {
+    "baseRefName": "main",
+    "headRefName": "community-credit-scope-cleanup",
+    "headRefOid": "c2ba52d9458d70bf0f49977d8688b93feaefdf73",
+    "isDraft": true,
+    "number": 52,
+    "title": "refactor: align barangay system with revised service scope"
+  }
+]

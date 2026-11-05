@@ -1,0 +1,45 @@
+﻿c2ba52d9458d70bf0f49977d8688b93feaefdf73 refactor: align system scope with community credit focus
+cae63e38e33eb836140b523d5f06774e7c5f5a50 merge: integrate draft PR 52 scope cleanup locally
+0941e65d210430be99f0b7ddc844b9fbea3bef52 feat: add person and matter linking
+ced0978e11fb49735b7e440deee8c6bc7d44c648 docs(061): record verified production status of migration 061
+8e39e1ea839e10f5a29899e05c33f2365b985379 merge: integrate draft PR 55 locally
+2637f9f88a4c0aadde17ff374f28d0a842040596 test: validate analytics migration in isolated CI
+fa770700414c8d3296c03cd8c62fca906f2474f9 test: correct isolated CI setup and disable CI branch deploys
+22cbce3cfcb26ca4717f82114681160f6ca1b6e1 WIP(062): correct analytics SQL and extend the behavioral harness to 89
+8d93a479cded632150a295c8b7bb440c67a4d392 WIP(analytics): frontend authorization, loading and history fixes
+572e75763bfafe248931162ed6d0845ca7657623 WIP(ci): replace the broken 062 database replay with static checks, Jest and build
+a7f22edfbd058ea16bde23ef0b69f81e3f5d3935 chore(062): remove the obsolete CI-branch Vercel rule
+095a1189ccadf9866012926db3de72a9357b9a2c merge: integrate draft PR 56 locally
+a18bb561ff811230194d0f53abe7afd6af19c3a9 feat(063): retire client access to removed modules (NOT APPLIED, untested)
+2d4c9b80b8501c18853071f14f1c119cd5827325 test(063): preserve validated emergency rollback contingency
+1b5b319c16ef201775c440a056f5f78f812f944e docs(063): align header with approved fail-closed cutover order
+3aa60fa6ab2b28f83628438d18191de38dafe281 Merge claude/analytics-insights-062 (#56) into the 063 branch
+f54d1877b1d6dc8445d9acfcb0ed9a27b0438b4a test(063): reconcile migration-order guards with 061/062 integrated
+25f8186582860f557ce7935fc4da550f71362f9b merge: integrate draft PR 53 locally
+e18e21881133f9596d92ebb809078ddf9849a5c1 fix: harden official navigation and remove retired feature references
+eaf1e374c3aa8ef6f10f178388081b3e626bb7a2 merge: integrate draft PR 57 locally
+1c20619f0933cd25abd871e5961fb9405bdc8648 security: retire nurse SMS broadcast permissions
+98778f3e33041b325888a4b3c01387076b8fa761 merge: integrate draft PR 58 locally
+5b7bab5f0452a901ca209fa1f6acd7a98a862a37 fix: stabilize authentication sessions and role recovery
+8176d0e6cdbe64a03bd2effe2bc72a33de74c7de merge: integrate draft PR 59 locally
+d2ef2610df1a76a42d46b830b4ed215a178fec7f fix: restore official KPI grid and active resident count
+ca59f28ad927d764e977eed1708add989f879770 merge: integrate draft PR 60 locally
+df1f4ebd71c7e126d1e8a790191f5509f861dbd5 feat: redesign resident profile with unified tabs
+91407b703f27548bf7835cd78bd27641f142b314 merge: integrate draft PR 61 locally
+b344659a418fbe0a3a5470593e62bfc7da8c8602 Merge branch 'claude/retire-nurse-sms-065' into claude/person-history-privacy-066
+5da7f183849be0c012cf0da0a587fed448386470 fix: secure person history and verified identity analytics
+b6b3c41d49a24efb025e760b1cdcdee59571c6bc merge: integrate draft PR 62 locally
+0c5e1bfc7d1004d6bd1c5a3748ab8a477e632280 feat: integrate people and identity workflows into incidents
+40bf8004e2742f368890dd78af1da90491b60e24 merge: integrate draft PR 63 locally
+989e99bdfeb4bf1001e58a80b8888452b2ef5937 feat: add interactive analytics charts and incident drilldowns
+d29b72d52ae105f68ce2c9caf7f81814742cb7ec merge: integrate draft PR 64 locally
+59289af6a243441bd865f946b65fca8a949ff4ed feat: consolidate safety map and analytics navigation
+d0ea5a930d7d940e98d98d94deb1b491b0fe7a55 merge: integrate draft PR 65 locally
+38aab1393c2d24df26f752118b5ec5e868103568 checkpoint(067): preserve original Codex Community Credit V2 draft
+aea275c43b825f6cb7f52da1e184a46d34a85037 checkpoint: preserve validated community credit and responsive release work
+d73fb89886dac986060378847611c132d9b9d54d fix: separate credit policy state and versioned rule actions
+828ea52bb8a927c495772eb126b9fa6e0fc580f2 fix: handle unpublished kapitan status and record manual QA
+7b47bebdcf8219f20cb1c7d8126ff8dea162528e merge: preserve validated Community Credit responsive and QA candidate
+37652980bb5526356ebedd291e1731faa8199ddf fix: improve resident password targets and preserve automated QA
+da47a83be76d8a4a5ff432abb9afa3ceb6a53ed8 docs: prepare Gemini handoff with deployment safety blocker
+a302b92a1aa6e40068f5d3ea04bbf109a553db9e fix: prepare existing-schema frontend release candidate
