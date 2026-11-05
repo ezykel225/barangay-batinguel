@@ -32,6 +32,25 @@ let reads
 let rpcData
 const resident = { id: 'resident-one', full_name: 'Resident Example', role: 'resident', verification_status: 'verified' }
 
+test('settings password visibility controls support keyboard use without saving', async () => {
+  render(<MemoryRouter><ResidentDashboard /></MemoryRouter>)
+  await userEvent.click(screen.getByRole('button', { name: 'settings navigation' }))
+  const password = screen.getByLabelText('New Password', { exact: true })
+  const confirmation = screen.getByLabelText('Confirm New Password', { exact: true })
+  await userEvent.type(password, 'fictional-unsaved-value')
+  const toggle = screen.getByRole('button', { name: 'Show the new password' })
+  toggle.focus()
+  await userEvent.keyboard('{Enter}')
+  expect(password).toHaveAttribute('type', 'text')
+  expect(toggle).toHaveAttribute('aria-pressed', 'true')
+  expect(confirmation).toHaveAttribute('type', 'password')
+  await userEvent.keyboard(' ')
+  expect(password).toHaveAttribute('type', 'password')
+  expect(password).toHaveValue('fictional-unsaved-value')
+  expect(toggle).toHaveFocus()
+  expect(reads.filter(read => read.mode !== 'read')).toHaveLength(0)
+})
+
 beforeEach(() => {
   reads = []
   rpcData = {}

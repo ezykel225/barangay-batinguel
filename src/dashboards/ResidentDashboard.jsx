@@ -1020,7 +1020,7 @@ const ResidentDashboard = () => {
                     placeholder="Enter new password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    style={{ paddingRight: 40 }}
+                    style={{ paddingRight: 64 }}
                   />
                   <button
                     type="button"
@@ -1031,6 +1031,7 @@ const ResidentDashboard = () => {
                       position: 'absolute', right: 12, background: 'none',
                       border: 'none', cursor: 'pointer', color: '#64748b',
                       fontSize: 15, display: 'flex', alignItems: 'center', padding: 0,
+                      width: 44, height: 44, justifyContent: 'center',
                     }}>
                     {showNew ? <FaEyeSlash /> : <FaEye />}
                   </button>
@@ -1046,7 +1047,7 @@ const ResidentDashboard = () => {
                     placeholder="Confirm new password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    style={{ paddingRight: 40 }}
+                    style={{ paddingRight: 64 }}
                   />
                   <button
                     type="button"
@@ -1057,6 +1058,7 @@ const ResidentDashboard = () => {
                       position: 'absolute', right: 12, background: 'none',
                       border: 'none', cursor: 'pointer', color: '#64748b',
                       fontSize: 15, display: 'flex', alignItems: 'center', padding: 0,
+                      width: 44, height: 44, justifyContent: 'center',
                     }}>
                     {showConfirm ? <FaEyeSlash /> : <FaEye />}
                   </button>

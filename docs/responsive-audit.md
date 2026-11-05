@@ -177,3 +177,21 @@ visual/interaction results do not turn its entire rows into PASS. All other
 public pages, portal tabs, shared components, data states and widths still need
 the recorded browser evidence required by that matrix. Full application-wide
 browser certification is **not complete**.
+
+## Automated Chrome evidence — 2026-11-05
+
+Local Playwright core + installed Chrome now supplies real browser evidence.
+See [automated-browser-qa-20261105.md](automated-browser-qa-20261105.md) for exact
+screens, states, failures/retries, screenshot paths and limits. The final
+settled-state sweep captured 280 states across all eight widths with no
+page-level horizontal overflow or page-level JavaScript errors. Public menu
+Escape/focus, portal focus return, map popups, actual form submissions, role
+boundaries and independent credit actions have the separately listed coverage.
+
+One verified target defect was fixed: Resident Settings password-visibility
+controls were 15×15px; they are now 44×44px and browser-tested at all widths.
+Initial loading-state captures and selector misses were superseded, not counted
+as populated-state passes. Full matrix rows with additional states (valid detail
+records, short-height/nested dialogs, KP transitions, Storage, print, Tanod-user
+flows and assistive-technology review) remain open. Do not translate this broad
+viewport sweep into full workflow/WCAG or production certification.
