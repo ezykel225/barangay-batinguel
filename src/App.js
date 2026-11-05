@@ -31,7 +31,7 @@ function App() {
   return (
     <AuthProvider>
       <Router>
-        <Toaster position="top-right" />
+        <Toaster position="top-right" containerStyle={{ top: 'var(--app-toast-top, 16px)' }} />
 
         {/* First thing in the tab order on every page, so a keyboard or
             screen-reader user can jump straight past the navigation

@@ -298,3 +298,7 @@ a[href^="tel:"] {
 .section-heading svg {
   flex-shrink: 0;
 }
+/* Keep mobile notifications clear of the header navigation controls. */
+@media (max-width: 767px) {
+  :root { --app-toast-top: 80px; }
+}

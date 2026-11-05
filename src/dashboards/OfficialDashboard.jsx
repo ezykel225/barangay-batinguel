@@ -1,4 +1,5 @@
 import SmsComposer from '../sms/SmsComposer'
+import { readKapitanStatus } from '../utils/kapitanStatus'
 import SmsHistory from '../sms/SmsHistory'
 import ResidentsWorkspace from '../residents/ResidentsWorkspace'
 import { residentPurokOptions, matchesResidentPurok } from '../residents/residentPresentation'
@@ -466,7 +467,7 @@ const OfficialDashboard = () => {
   const [announcements, setAnnouncements] = useState([])
   const [events, setEvents] = useState([])
   const [officialsList, setOfficialsList] = useState([])
-  const [kapitanStatus, setKapitanStatus] = useState('available')
+  const [kapitanStatus, setKapitanStatus] = useState('loading')
   const [documentRequests, setDocumentRequests] = useState([])
   const [wasteSchedule, setWasteSchedule] = useState([])
   const [residentsList, setResidentsList] = useState([])
@@ -882,12 +883,11 @@ const OfficialDashboard = () => {
   }
 
   const fetchKapitanStatus = async () => {
-    const { data, error } = await supabase
-      .from('kapitan_status')
-      .select('*')
-      .single()
-
-    if (!error && data) setKapitanStatus(data.status)
+    const { data, error } = await readKapitanStatus(supabase)
+    if (error) {
+      console.error('Could not load Kapitan status:', error)
+      setKapitanStatus('error')
+    } else setKapitanStatus(data?.status ?? null)
   }
 
   // Active officials, for the current directory and the public page.
@@ -1992,7 +1992,7 @@ const OfficialDashboard = () => {
 
   const kapitanStatusDisplay = (statusValue) => {
     const found = KAPITAN_STATUS_OPTIONS.find((o) => o.value === statusValue)
-    return found ? `${found.emoji} ${found.label}` : 'Unknown'
+    return found ? `${found.emoji} ${found.label}` : statusValue === 'loading' ? 'Loading status...' : statusValue === 'error' ? 'Status unavailable' : 'Status not published'
   }
 
   const handleAddOfficial = async () => {
@@ -3102,9 +3102,11 @@ const OfficialDashboard = () => {
                   <select
                     id="kapitan-status-select"
                     className="kapitan-compact-select"
-                    value={kapitanStatus}
+                    value={kapitanStatus ?? ''}
+                    disabled={!KAPITAN_STATUS_OPTIONS.some(option => option.value === kapitanStatus)}
                     onChange={(event) => handleUpdateKapitanStatus(event.target.value)}
                   >
+                    {!KAPITAN_STATUS_OPTIONS.some(option => option.value === kapitanStatus) && <option value={kapitanStatus ?? ''}>{kapitanStatusDisplay(kapitanStatus)}</option>}
                     {KAPITAN_STATUS_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.emoji} {option.label}
