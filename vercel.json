@@ -9,10 +9,16 @@
   "headers": [
     {
       "source": "/(.*)",
-      "headers": {
-        "Cache-Control": "no-store, max-age=0, must-revalidate",
-        "X-Robots-Tag": "noindex, nofollow, noarchive"
-      }
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0, must-revalidate"
+        },
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow, noarchive"
+        }
+      ]
     }
   ],
   "rewrites": [
