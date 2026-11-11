@@ -1,0 +1,24 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "builds": [
+    {
+      "src": "maintenance.html",
+      "use": "@vercel/static"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": {
+        "Cache-Control": "no-store, max-age=0, must-revalidate",
+        "X-Robots-Tag": "noindex, nofollow, noarchive"
+      }
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/maintenance.html"
+    }
+  ]
+}
