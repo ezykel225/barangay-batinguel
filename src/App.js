@@ -2,6 +2,9 @@ import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from './context/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
+import Navbar from './components/Navbar'
+import Footer from './components/Footer'
+import './pages/UnavailableService.css'
 
 // Pages
 import Home from './pages/Home'
@@ -24,7 +27,20 @@ import ResidentDashboard from './dashboards/ResidentDashboard'
 import TanodDashboard from './dashboards/TanodDashboard'
 
 function UnavailableService() {
-  return <main id="main-content" tabIndex={-1}><h1>Service unavailable on this website</h1><p>This service is no longer available through the website. For assistance with an existing record, please contact the Barangay Hall.</p><Link to="/e-services">View available E-Services</Link></main>
+  return (
+    <div className="unavailable-service-page">
+      <Navbar />
+      <main id="main-content" tabIndex={-1}>
+        <section className="unavailable-service-card" aria-labelledby="unavailable-service-title">
+          <p className="unavailable-service-label">Barangay Batinguel E-Services</p>
+          <h1 id="unavailable-service-title">Service unavailable on this website</h1>
+          <p>This service is no longer available through the website. For assistance with an existing record, please contact the Barangay Hall.</p>
+          <Link className="unavailable-service-link" to="/e-services">View available E-Services</Link>
+        </section>
+      </main>
+      <Footer />
+    </div>
+  )
 }
 
 function App() {

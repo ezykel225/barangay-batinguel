@@ -10,7 +10,7 @@ import { E_SERVICES } from './constants/eServices'
 
 jest.mock('./context/AuthContext',()=>({AuthProvider:({children})=>children,useAuth:()=>({user:null,role:null,loading:false})}))
 jest.mock('./supabase/supabaseClient',()=>({supabase:{from:jest.fn(),rpc:jest.fn(),auth:{}}}))
-jest.mock('./components/Footer',()=>()=>null)
+jest.mock('./components/Footer',()=>()=> <footer data-testid="public-footer">Footer</footer>)
 jest.mock('./pages/About',()=>()=> <main>Retained About</main>)
 jest.mock('./pages/Officials',()=>()=> <main>Retained Officials</main>)
 jest.mock('./pages/CommunitySafety',()=>()=> <main>Retained Community Safety</main>)
@@ -32,6 +32,10 @@ beforeEach(()=>{
 test.each(['/reservation','/track-reservation','/health-center','/nurse'])('retired URL %s has intentional handling without database reads',route=>{
   window.history.replaceState({},'',route);render(<App/>);
   expect(screen.getByRole('heading',{name:'Service unavailable on this website'})).toBeInTheDocument()
+  expect(screen.getByRole('navigation')).toBeInTheDocument()
+  expect(screen.getByTestId('public-footer')).toBeInTheDocument()
+  expect(document.querySelector('.unavailable-service-page')).toBeInTheDocument()
+  expect(document.querySelector('.unavailable-service-card')).toBeInTheDocument()
   expect(window.location.pathname).toBe(route)
   expect(screen.getByRole('link',{name:'View available E-Services'})).toHaveAttribute('href','/e-services')
   expect(supabase.from).not.toHaveBeenCalled()
