@@ -1,0 +1,57 @@
+/* Stage 7O: scoped management conventions; no other portal surfaces. */
+.official-service-page{display:grid;gap:18px;min-width:0;color:#183154}
+.official-service-page>.official-dashboard-header{margin:0;padding:0}
+.official-service-page>.official-dashboard-header h1{margin:0;color:#163660;font-size:clamp(24px,2.5vw,29px);line-height:1.25;letter-spacing:-.5px}
+.official-service-page>.official-dashboard-header p{margin:7px 0 0;font-size:13px;color:#52657b;line-height:1.5}
+.official-service-page>.official-service-card{container-type:inline-size;margin:0;min-width:0;padding:18px;border:1px solid #dce6f1;border-radius:12px;box-shadow:0 2px 8px #1b3d6407}
+.official-service-card .dashboard-card-header,.service-card-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin:0 0 14px;padding-bottom:12px;border-bottom:1px solid #e7edf5}
+.official-service-card h2{margin:0;color:#183b69;font-size:17px}
+.service-permission-note{margin:0;color:#52657b;font-size:12px;line-height:1.5;max-width:420px}
+.official-service-card .resident-filter-bar{display:grid;grid-template-columns:minmax(0,1fr) minmax(140px,180px) auto;gap:10px;align-items:center;padding:0;margin:0 0 16px;border:0;background:transparent}
+.official-complaints-page .resident-filter-bar{grid-template-columns:minmax(0,1fr) minmax(130px,160px) minmax(130px,160px) auto}
+.official-service-card .resident-search-field,.official-service-card .filter-select-wrap{min-width:0;max-width:100%;margin:0}
+.official-service-card .resident-search-input,.official-service-card .filter-select{width:100%;min-width:0;max-width:100%;box-sizing:border-box;min-height:44px;background:#fff;border:1px solid #b8cce4;border-radius:7px;color:#23476f;font:inherit;font-size:13px}
+.official-service-card .resident-search-input{padding:8px 40px 8px 34px}
+.official-service-card .filter-select{padding:8px 10px}
+.official-service-card .resident-filter-count,.official-service-card #complaint-queue-search-note{grid-column:1/-1;grid-row:2;margin:0;color:#52657b;font-size:12px}
+.official-service-card .resident-filter-count:empty{display:none}
+.official-service-card .btn-add,.official-service-card .btn-cancel,.official-service-card .resident-filter-reset{min-height:44px;min-width:44px;margin:0;border-radius:7px;padding:8px 12px;white-space:nowrap;font-size:12px;box-sizing:border-box}
+.official-service-card .btn-add{background:#235b9c;color:#fff;border:1px solid #235b9c}
+.official-service-card .btn-cancel,.official-service-card .resident-filter-reset{background:#fff;border:1px solid #b8cce4;color:#234e83}
+.official-service-card .complaint-queue-summary{margin:0 0 14px;padding:8px 10px;border:1px solid #e1e9f4;border-radius:7px;background:#f6f9fd;color:#425a78;font-size:12px}
+.official-service-card .table-wrapper{border:1px solid #e1e9f3;border-radius:9px;max-width:100%;min-width:0}
+.official-service-card .service-table{width:100%;table-layout:fixed;border-collapse:collapse}
+.official-service-card .service-table th{width:auto;padding:10px 8px;background:#f5f8fc;color:#425a78;font-size:11px;font-weight:700;letter-spacing:.15px;vertical-align:middle;text-align:left}
+.official-service-card .service-table td{padding:10px 8px;vertical-align:middle;color:#334e70;font-size:12px;line-height:1.5;overflow-wrap:anywhere;white-space:normal}
+.official-service-card .service-table td.action-cell{display:table-cell}
+.document-request-table .service-col-resident{width:19%}.document-request-table .service-col-document{width:18%}.document-request-table .service-col-purpose{width:auto}.document-request-table .service-col-contact{width:116px}.document-request-table .service-col-status{width:128px}.document-request-table .service-col-submitted{width:106px}.document-request-table .service-col-action{width:64px}
+.complaint-queue-table .service-col-reference{width:25%}.complaint-queue-table .service-col-channel{width:15%}.complaint-queue-table .service-col-status{width:22%}.complaint-queue-table .service-col-received{width:17%}.complaint-queue-table .service-col-updated{width:auto}.complaint-queue-table .service-col-action{width:80px}
+.official-service-card .service-table th:last-child,.official-service-card .service-table td[data-label="Action"]{text-align:center}
+.official-service-card .service-table td[data-label="Contact"]{white-space:nowrap;overflow-wrap:normal}
+.official-service-card .dr-request-open{min-height:44px;max-width:100%;font-size:12px;line-height:1.5;color:#234e83;overflow-wrap:anywhere;text-align:left}
+.official-service-card .service-table td[data-label="Purpose"]{max-width:none;white-space:normal}
+.official-service-card .action-menu-trigger{min-width:44px;min-height:44px}
+.official-service-card .badge,.official-service-card .status-badge{display:inline-block;max-width:100%;box-sizing:border-box;margin:0;padding:3px 7px;border:1px solid #d7e3f3;border-radius:7px;font-size:11px;font-weight:600;line-height:1.5;white-space:normal;overflow-wrap:normal}
+.official-service-card .status-badge[data-status="received"]{color:#475a73;background:#f1f5f9;border-color:#dce4ed}
+.official-service-card .status-badge[data-status="under_review"],.official-service-card .status-badge[data-status="screened"]{color:#275686;background:#edf4fd;border-color:#d4e3f7}
+.official-service-card .complaint-reference{font-size:12px;letter-spacing:.1px;color:#234e83;user-select:text;overflow-wrap:anywhere}
+.official-service-card .dashboard-empty,.official-service-card .complaint-empty{margin:0;padding:22px 12px;color:#52657b;font-size:13px;line-height:1.5}
+.official-service-card .publishing-notice,.official-service-card .complaint-field-error{padding:12px;border:1px solid #dce6f1;border-radius:8px;background:#f5f8fc;color:#425a78;font-size:13px;line-height:1.6}
+.official-service-card :is(button,input,select):focus-visible,.official-service-card .table-wrapper:focus-visible{outline:3px solid #2563eb;outline-offset:3px}
+@container(max-width:850px){
+ .official-service-card .resident-filter-bar,.official-complaints-page .resident-filter-bar{grid-template-columns:minmax(0,1fr) minmax(120px,170px)}
+ .official-service-card .resident-filter-reset,.official-service-card .service-reset{justify-self:start;grid-column:1/-1}
+ .official-service-card .service-table,.official-service-card .service-table tbody{display:block;width:100%}
+ .official-service-card .service-table colgroup,.official-service-card .service-table thead{display:none}
+ .official-service-card .service-table tr{display:block;margin:0 0 10px;padding:10px;border:1px solid #e1e9f3;border-radius:9px;background:#fff;box-shadow:none}
+ .official-service-card .service-table td,.official-service-card .service-table td.action-cell{display:flex;justify-content:space-between;align-items:center;gap:12px;min-width:0;padding:8px 4px;text-align:left;border-bottom:1px solid #edf1f6}
+ .official-service-card .service-table td::before{content:attr(data-label);flex:0 0 32%;max-width:40%;font-size:11px;font-weight:600;color:#52657b;letter-spacing:.2px;text-transform:uppercase}
+ .official-service-card .service-table td:last-child{border-bottom:0}
+ .official-service-card .service-table td[data-label="Contact"]{white-space:nowrap}
+ .official-service-card .service-table td .action-menu{margin-left:auto}
+}
+@container(max-width:450px){.official-service-card .resident-filter-bar,.official-complaints-page .resident-filter-bar{grid-template-columns:minmax(0,1fr)}.official-service-card .resident-filter-count,.official-service-card #complaint-queue-search-note{grid-row:auto}.official-service-card .service-table td:not([data-label="Contact"]):not([data-label="Action"]){flex-direction:column;align-items:flex-start;gap:4px}.official-service-card .service-table td::before{flex:0 1 auto;max-width:100%}}
+@media(max-width:480px){.official-service-page>.official-service-card{padding:14px}.service-permission-note{max-width:100%}}
+@media(prefers-reduced-motion:reduce){.official-service-page *{transition:none!important;animation:none!important}}
+@container(max-width:850px){.official-service-card .service-table tr.row-no-actions td:last-child{display:none}.official-service-card .service-table tr.row-no-actions td:nth-last-child(2){border-bottom:0}}
+.official-service-card .complaint-queue-table td[data-label="Action"] .btn-add{min-width:52px;padding:6px 10px}

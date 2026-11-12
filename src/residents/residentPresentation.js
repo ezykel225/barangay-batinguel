@@ -1,5 +1,14 @@
 // Display/filter normalization only. Never rewrites source purok values.
-import { purokShortLabel } from '../utils/residentGroups'
+import { purokShortLabel, describeVerification } from '../utils/residentGroups'
+export const directoryAccountState = (resident, profiles = []) => {
+  const profile = resident.profile_id ? profiles.find(p => p.id === resident.profile_id) : null
+  return {
+    linked: Boolean(resident.profile_id || resident.account_linked),
+    verification: profile ? describeVerification(profile.verification_status).label : 'Verification unavailable',
+    needsReview: (resident.resident_status === 'active' && profile?.verification_status === 'ineligible') ||
+      (resident.resident_status === 'inactive' && profile?.verification_status === 'verified'),
+  }
+}
 export const purokLabel = value => {
   const raw = purokShortLabel(value)
   return /^\d+$/.test(raw) ? `Purok ${raw}` : raw
@@ -12,8 +21,8 @@ export const residentPurokOptions = rows => {
   return [...labels].map(([value,label])=>({value,label})).sort((a,b)=>a.label.localeCompare(b.label,undefined,{numeric:true,sensitivity:'base'}))
 }
 export const directorySummary = rows => [
-  ['Total Residents',rows.length],
+  ['Directory Records',rows.length],
   ['Active Residents',rows.filter(r=>r.resident_status==='active').length],
   ['With Mobile Number',rows.filter(r=>String(r.mobile_number||'').trim()).length],
-  ['Linked Online Accounts',rows.filter(r=>r.profile_id).length],
+  ['Linked Online Accounts',rows.filter(r=>r.profile_id || r.account_linked).length],
 ]

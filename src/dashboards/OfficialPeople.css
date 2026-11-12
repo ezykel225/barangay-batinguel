@@ -1,0 +1,67 @@
+/* Stage 7R: scoped people workspaces; no shared role/data behavior. */
+:is(.official-directory-page,.official-residents-page) .dashboard-card,.residents-workspace .resident-directory{min-width:0;margin:0;padding:18px;border:1px solid #dce6f1;border-radius:12px;background:#fff;box-shadow:0 2px 8px #1b3d6407}
+:is(.official-directory-page,.official-residents-page) .dashboard-card-header,.residents-workspace .directory-heading{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin:0 0 14px;padding-bottom:12px;border-bottom:1px solid #e7edf5}
+:is(.official-directory-page,.official-residents-page) .dashboard-card-header h3,.residents-workspace h2{margin:0;color:#183b69;font-size:17px;line-height:1.5}
+:is(.official-directory-page,.official-residents-page) :is(.btn-add,.btn-cancel),.residents-workspace .confirm-dialog-confirm{min-height:44px;border-radius:7px;padding:8px 12px;font-size:12px}
+:is(.official-directory-page,.official-residents-page) .btn-add,.residents-workspace .confirm-dialog-confirm{background:#235b9c;color:#fff}
+:is(.official-directory-page,.official-residents-page) .dashboard-table{table-layout:fixed;width:100%;font-size:12px}
+:is(.official-directory-page,.official-residents-page) .table-wrapper{max-width:100%;border:1px solid #e1e9f3;border-radius:9px}
+:is(.official-directory-page,.official-residents-page) .dashboard-table :is(th,td){padding:10px 8px;vertical-align:middle;line-height:1.5;overflow-wrap:anywhere}
+:is(.official-directory-page,.official-residents-page) .dashboard-table th{width:auto;font-size:11px;color:#425a78;background:#f4f8fd}
+.official-directory-page .dashboard-table th:first-child{width:64px}.official-directory-page .dashboard-table th:nth-child(2){width:55px}.official-directory-page .dashboard-table th:nth-child(3){width:21%}.official-directory-page .dashboard-table th:last-child{width:105px}
+.official-directory-page .official-row-photo{width:42px;height:42px;border-radius:50%;object-fit:cover;overflow:hidden}
+.official-directory-page .official-row-photo img{width:100%;height:100%;object-fit:cover}
+:is(.official-directory-page,.official-residents-page) .action-cell{display:table-cell;text-align:center}
+:is(.official-directory-page,.official-residents-page) .action-menu-trigger{min-width:44px;min-height:44px}
+.official-directory-page .official-archive-blocked{display:block;font-size:11px;line-height:1.5;color:#52657b;white-space:normal}
+.residents-workspace{min-width:0;display:grid;gap:16px}
+.residents-workspace .residents-view-switch{margin:0;padding:4px;gap:6px;background:#f1f5fb;border:1px solid #dce6f1;border-radius:9px}
+.residents-workspace .residents-view-switch button{padding:8px 12px;min-height:44px;font-size:12px;border:1px solid transparent;color:#425a78}
+.residents-workspace .residents-view-switch button[aria-pressed=true]{background:#fff;border-color:#d7e3f3;color:#234e83;box-shadow:0 1px 4px #183b6910}
+.resident-scope-note{font-size:12px;color:#52657b;line-height:1.6}
+.resident-scope-note summary{min-height:44px;padding:12px 0;box-sizing:border-box;font-weight:600;color:#234e83;cursor:pointer}
+.resident-scope-note .resident-reference-note{font-size:12px;line-height:1.6;margin:0;padding:10px 12px;border:1px solid #dce6f1;border-radius:8px;background:#f5f8fc}
+.residents-workspace .directory-heading p,.residents-workspace .dashboard-card-note{font-size:12px;color:#52657b;line-height:1.6;margin:6px 0 12px}
+.residents-workspace .directory-summary{grid-auto-rows:1fr;gap:12px;margin:0 0 16px}
+.residents-workspace .directory-summary>div{padding:14px;border:1px solid #dce6f1;border-radius:9px;background:#fff;display:flex;flex-direction:column;justify-content:space-between;gap:10px}
+.residents-workspace .directory-summary dd{margin:0;color:#183b69;font-size:24px;line-height:1.25}
+.residents-workspace .directory-filters{gap:10px;margin:0 0 16px}
+.residents-workspace .directory-filters label{font-size:12px;gap:6px;color:#52657b}
+.residents-workspace :is(.directory-filters,.resident-filter-bar) :is(input,select){font-size:13px;min-height:44px;border:1px solid #b8cce4;border-radius:7px;background:#fff;color:#23476f}
+.residents-workspace .directory-reset{border:1px solid #b8cce4;border-radius:7px;background:#fff;color:#234e83}
+.residents-workspace .directory-table{font-size:12px}
+.residents-workspace .directory-table th{font-size:11px;color:#425a78;background:#f4f8fd}
+.residents-workspace .directory-table :is(th,td){padding:10px 8px;line-height:1.5}
+.residents-workspace :is(.badge,.directory-account-status){font-size:11px;line-height:1.5;white-space:normal}
+.residents-workspace .badge{border-radius:7px;padding:3px 7px}
+.residents-workspace .resident-name-button{min-height:44px}
+.residents-workspace .directory-table .action-menu-trigger{min-width:44px;min-height:44px}
+.official-residents-page .resident-filter-bar{gap:10px;padding:0;background:transparent;border:0}
+.official-residents-page .resident-status-note{font-size:11px;line-height:1.5}
+:is(.official-directory-page,.official-residents-page,.residents-workspace,.official-directory-modal) :is(button,input,select,summary):focus-visible{outline:3px solid #2563eb;outline-offset:3px}
+.official-directory-modal .modal{max-height:88vh;max-height:88dvh;overflow-y:auto;border:1px solid #dce6f1;border-radius:12px}
+.official-directory-modal .modal-form-input{min-height:44px;border:1px solid #b8cce4;border-radius:7px;font-size:13px}
+.official-directory-modal .modal-form-label{font-size:12px;color:#52657b}
+.resident-profile-dialog.resident-profile-refined .portal-details-body{padding:18px}
+.resident-profile-dialog.resident-profile-refined .resident-profile-heading{grid-template-columns:64px minmax(0,1fr) auto;gap:14px;padding-bottom:16px}
+.resident-profile-dialog.resident-profile-refined .resident-profile-avatar{width:64px;height:64px;font-size:24px}
+.resident-profile-dialog.resident-profile-refined .resident-profile-heading .resident-profile-name{font-size:22px;margin:0 0 6px}
+.resident-profile-dialog.resident-profile-refined .resident-profile-purok{font-size:12px;margin-top:6px}
+.resident-profile-dialog.resident-profile-refined .resident-profile-sections{gap:12px;margin-top:16px}
+.resident-profile-dialog.resident-profile-refined .resident-profile-section{padding:14px;border-color:#dce6f1;background:#fff}
+.resident-profile-dialog.resident-profile-refined .resident-profile-section dd{font-size:14px}
+.resident-profile-dialog.resident-profile-refined .resident-profile-section dt{font-size:12px;color:#52657b}
+.resident-profile-dialog.resident-profile-refined .credit-gauge{width:100%;max-width:260px;margin-inline:auto;display:block}
+.resident-profile-dialog.resident-profile-refined .credit-section{padding:14px;border-radius:10px}
+@media(max-width:1024px){:is(.official-directory-page,.official-residents-page) .dashboard-table{font-size:12px}.official-directory-page .dashboard-table th:nth-child(2){width:44px}}
+@media(max-width:768px){:is(.official-directory-page,.official-residents-page) .action-cell{display:flex;text-align:left;flex-wrap:wrap;gap:8px}:is(.official-directory-page,.official-residents-page) .dashboard-table th{width:auto}.resident-profile-dialog.resident-profile-refined .resident-profile-heading{grid-template-columns:64px minmax(0,1fr)}.resident-profile-dialog.resident-profile-refined .resident-profile-heading>button{grid-column:2}}
+@media(max-width:480px){:is(.official-directory-page,.official-residents-page) .dashboard-card,.residents-workspace .resident-directory{padding:14px}.residents-workspace .directory-summary{gap:8px}.residents-workspace .directory-summary>div{padding:12px}.residents-workspace .residents-view-switch button{padding:8px 4px}.resident-profile-dialog.resident-profile-refined .resident-profile-heading{grid-template-columns:56px minmax(0,1fr)}.resident-profile-dialog.resident-profile-refined .resident-profile-avatar{width:56px;height:56px;font-size:21px}.resident-profile-dialog.resident-profile-refined .resident-profile-heading .resident-profile-name{font-size:19px}.resident-profile-dialog.resident-profile-refined .resident-profile-heading>button{grid-column:1/-1}}
+@media(prefers-reduced-motion:reduce){:is(.official-directory-page,.official-residents-page,.resident-profile-dialog) *{transition:none!important;animation:none!important}}
+/* Keep short utility headers intact without constraining long record text. */
+@media(min-width:769px){.official-directory-page .dashboard-table th:nth-child(2){width:68px;white-space:nowrap}}
+.resident-profile-dialog.resident-profile-refined .credit-section h2{font-size:17px;color:#183b69;margin:0 0 12px;line-height:1.5}
+.resident-profile-dialog.resident-profile-refined .credit-policy{font-size:12px;line-height:1.6}
+.resident-profile-dialog.resident-profile-refined .credit-metrics{gap:8px}
+.resident-profile-dialog.resident-profile-refined .credit-metrics>div{padding:10px}
+.official-residents-page .action-cell button{min-height:44px;padding:8px 12px;border-radius:7px;line-height:1.5}
+.official-directory-page .official-row-photo{display:flex;align-items:center;justify-content:center;background:#eff4fb}

@@ -22,6 +22,8 @@ import {
 } from './incidentApi'
 import { loadTanodRoster } from '../tanod/tanodApi'
 import './Incidents.css'
+import '../dashboards/OfficialServices.css'
+import '../dashboards/OfficialOperations.css'
 
 // Combined Phase 2 — the Official Portal's incident queue, the record form and
 // the blotter entry behind each incident.
@@ -237,7 +239,7 @@ const IncidentsPanel = ({ canAdminister = false, confirm }) => {
   const clearFilters = () => { setFilterType(''); setFilterFrom(''); setFilterTo(''); setPage(1) }
 
   return (
-    <div className="inc-page">
+    <div className="inc-page official-service-page official-operations-page">
       <div className="official-dashboard-header">
         <h1>Incidents &amp; Blotter</h1>
         <p>Review recorded incidents and their linked barangay blotter records.</p>
@@ -252,7 +254,7 @@ const IncidentsPanel = ({ canAdminister = false, confirm }) => {
       {!loading && !problem && <section className="inc-overview" aria-label="Current incident results">
         {[[hasFilters ? 'Matching incidents' : 'Total incidents', rows.length], ['Mapped incidents', rows.length - withoutCoordinates], ['Without coordinates', withoutCoordinates], ['Linked blotter records', rows.filter(row => row.blotter_reference).length]].map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}
       </section>}
-      <div className="dashboard-card inc-records-card">
+      <div className="dashboard-card official-service-card inc-records-card">
         <div className="dashboard-card-header">
           <h2 className="section-heading"><FaClipboardList aria-hidden="true" /> Incident records</h2>
           <button
@@ -311,7 +313,7 @@ const IncidentsPanel = ({ canAdminister = false, confirm }) => {
               {withoutCoordinates} {withoutCoordinates === 1 ? 'incident has' : 'incidents have'} no coordinates and {withoutCoordinates === 1 ? 'does' : 'do'} not appear on the map.</span>
             </p>}
             <div className="table-wrapper">
-              <table className="dashboard-table inc-records-table">
+              <table className="dashboard-table service-table inc-records-table">
                 <colgroup>
                   <col className="inc-col-reference" />
                   <col className="inc-col-type" />
@@ -322,8 +324,8 @@ const IncidentsPanel = ({ canAdminister = false, confirm }) => {
                 </colgroup>
                 <thead>
                   <tr>
-                    <th>Reference</th><th>Type</th><th>When</th>
-                    <th>Location</th><th>Status</th><th>Blotter</th>
+                    <th scope="col">Reference</th><th scope="col">Type</th><th scope="col">When</th>
+                    <th scope="col">Location</th><th scope="col">Status</th><th scope="col">Blotter</th>
                   </tr>
                 </thead>
                 <tbody>

@@ -183,6 +183,19 @@ const show = () => render(
   <MemoryRouter><CommunitySafety /></MemoryRouter>
 )
 
+test('public interpretations use only aggregate chart buckets and preserve independent monthly scope', async () => {
+  respond()
+  show()
+  await screen.findByRole('region', { name: 'Recorded incidents by type: descriptive interpretation' })
+  const types = screen.getByRole('region', { name: 'Recorded incidents by type: descriptive interpretation' })
+  expect(types).toHaveTextContent('7 incidents across 2 displayed groups')
+  expect(types).toHaveTextContent('57.14%')
+  expect(screen.getByRole('region', { name: 'Recorded incidents by month: descriptive interpretation' })).toHaveTextContent('independently of the period selector')
+  expect(document.body).not.toHaveTextContent(NARRATIVE)
+  fireEvent.change(screen.getByLabelText('Period'), { target: { value: 'all' } })
+  await waitFor(() => expect(screen.getByRole('region', { name: 'Recorded incidents by type: descriptive interpretation' })).toHaveTextContent('7 incidents'))
+})
+
 const ready = async () => {
   await waitFor(() => expect(
     screen.queryByText(/Loading the community safety map/i)

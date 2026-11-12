@@ -1,17 +1,14 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from './context/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 
 // Pages
 import Home from './pages/Home'
-import Reservation from './pages/Reservation'
 import EServices from './pages/EServices'
-import TrackReservation from './pages/TrackReservation'
 import TrackComplaint from './pages/TrackComplaint'
 import CommunitySafety from './pages/CommunitySafety'
 import About from './pages/About'
-import HealthCenter from './pages/HealthCenter'
 import Officials from './pages/Officials'
 import Login from './pages/Login'
 import ResidentSignup from './pages/ResidentSignup'
@@ -23,9 +20,12 @@ import EventDetails from './pages/EventDetails'
 
 // Dashboards
 import OfficialDashboard from './dashboards/OfficialDashboard'
-import NurseDashboard from './dashboards/NurseDashboard'
 import ResidentDashboard from './dashboards/ResidentDashboard'
 import TanodDashboard from './dashboards/TanodDashboard'
+
+function UnavailableService() {
+  return <main id="main-content" tabIndex={-1}><h1>Service unavailable on this website</h1><p>This service is no longer available through the website. For assistance with an existing record, please contact the Barangay Hall.</p><Link to="/e-services">View available E-Services</Link></main>
+}
 
 function App() {
   return (
@@ -46,8 +46,8 @@ function App() {
           {/* Public Routes */}
           <Route path="/" element={<Home />} />
           <Route path="/e-services" element={<EServices />} />
-          <Route path="/reservation" element={<Reservation />} />
-          <Route path="/track-reservation" element={<TrackReservation />} />
+          <Route path="/reservation" element={<UnavailableService />} />
+          <Route path="/track-reservation" element={<UnavailableService />} />
           {/* ⚠️ Public on purpose: a walk-in complainant has no account.
               The lookup itself is two-factor inside track_complaint(). */}
           <Route path="/track-complaint" element={<TrackComplaint />} />
@@ -62,7 +62,7 @@ function App() {
               the homepage and reads as broken. */}
           <Route path="/community-safety" element={<CommunitySafety />} />
           <Route path="/about" element={<About />} />
-          <Route path="/health-center" element={<HealthCenter />} />
+          <Route path="/health-center" element={<UnavailableService />} />
           <Route path="/officials" element={<Officials />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<ResidentSignup />} />
@@ -88,14 +88,7 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route
-            path="/nurse"
-            element={
-              <ProtectedRoute allowedRole="nurse">
-                <NurseDashboard />
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/nurse" element={<UnavailableService />} />
           <Route
             path="/resident"
             element={

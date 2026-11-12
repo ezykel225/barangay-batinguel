@@ -1,15 +1,22 @@
+import './OfficialServices.css'
+import './OfficialPeople.css'
+import './OfficialRequests.css'
+import './OfficialRemaining.css'
+import { filterPublishingAnnouncements, PublishingTitle, PublishingReadNotice, PublishingEventDate, publishingDate, publishingEventPeriod } from './OfficialPublishingUI'
+import './OfficialPublishing.css'
+import OperationsOverview, { readOverviewRows } from './OperationsOverview'
+import { documentReportMonths, reportCount, reportingDateTime } from './reportingPresentation'
+import DescriptiveInterpretation from '../analytics/DescriptiveInterpretation'
 import SmsComposer from '../sms/SmsComposer'
 import { readKapitanStatus } from '../utils/kapitanStatus'
+import { retiredDashboardTab, retiredWorkflowMessage } from '../utils/dashboardNavigation'
 import SmsHistory from '../sms/SmsHistory'
 import ResidentsWorkspace from '../residents/ResidentsWorkspace'
 import { residentPurokOptions, matchesResidentPurok } from '../residents/residentPresentation'
 import DocumentRequestDetails from '../documents/DocumentRequestDetails'
 import { useRef, useState, useEffect, useMemo, useCallback } from 'react'
 import {
-  FaClipboardList,
-  FaBullhorn,
   FaCalendarAlt,
-  FaUsers,
   FaUser,
   FaUserTie,
   FaPlus,
@@ -56,32 +63,24 @@ import {
   actionCellIsEmpty,
   documentRequestActions,
   documentRequestSubject,
-  reservationActions,
-  reservationSubject,
 } from '../utils/rowActions'
 import { useConfirm } from '../components/ConfirmDialog'
 import {
   ArchiveOfficialDialog,
   RestoreOfficialDialog,
 } from '../components/OfficialArchiveDialog'
-import { PUROKS, PUNONG_BARANGAY_LABEL } from '../constants/barangay'
+import { PUNONG_BARANGAY_LABEL } from '../constants/barangay'
 import {
   activityActionLabel,
   activityEntityLabel,
-  countUpcoming,
   manilaToday,
   documentStatusClass,
   documentStatusLabel,
-  reservationStatusClass,
-  reservationStatusLabel,
 } from '../utils/displayLabels'
 import {
   RESIDENT_GROUPS,
   RESIDENT_SEARCH_FIELDS,
-  REGISTRY_SEARCH_FIELDS,
   filterDocumentRequests,
-  RESERVATION_SEARCH_FIELDS,
-  PUROK_FILTER_UNLISTED,
   describeVerification,
   filterRows,
   groupResidents,
@@ -89,16 +88,9 @@ import {
   normalizeName,
   purokShortLabel,
 } from '../utils/residentGroups'
-import {
-  EXCEPTION_BADGE_LABEL,
-  isExceptionRequest,
-} from '../utils/reservationWindow'
+
 import MonthCalendar from '../components/MonthCalendar'
-import {
-  buildReservationCalendar,
-  describeReservationDay,
-  reservationsOnDate,
-} from '../utils/reservationCalendar'
+
 import { buildEventCalendar, describeEventDay, eventsOnDate } from '../utils/eventCalendar'
 import { MONTH_NAMES, monthOf, parseDateKey, toDateKey } from '../utils/monthGrid'
 import '../components/Sidebar.css'
@@ -146,10 +138,6 @@ const DOC_ACTION_ICONS = {
   generate: <FaPrint />,
 }
 
-const RESERVATION_ACTION_ICONS = {
-  approve: <FaCheck />,
-  deny: <FaTimes />,
-}
 
 // Queue | Calendar, Table | Calendar. One control, two tabs.
 const ViewToggle = ({ label, value, options, onChange }) => (
@@ -281,11 +269,7 @@ const DashboardFilterBar = ({
 // The purok dropdown's options. Blank and off-list share one entry
 // because they are the same job from an official's side: a value that
 // cannot be grouped or matched.
-const PUROK_FILTER_OPTIONS = [
-  { value: 'all', label: 'All Puroks' },
-  ...PUROKS.map((purok) => ({ value: purok, label: purok })),
-  { value: PUROK_FILTER_UNLISTED, label: 'Blank or not on the list' },
-]
+
 
 // The reservation status dropdown. `cancelled` is new here: a resident
 // may cancel their own pending or approved booking, so those rows exist
@@ -303,13 +287,6 @@ const DOCUMENT_FILTER_OPTIONS = [
   { value: 'declined', label: documentStatusLabel('declined') },
 ]
 
-const RESERVATION_FILTER_OPTIONS = [
-  { value: 'all', label: 'All Statuses' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'approved', label: 'Approved' },
-  { value: 'declined', label: 'Declined' },
-  { value: 'cancelled', label: 'Cancelled' },
-]
 
 // One editable day of an official's consultation hours.
 //
@@ -463,13 +440,14 @@ const OfficialDashboard = () => {
       .forEach((n) => { markNotificationRead(n) })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, notifications])
-  const [reservations, setReservations] = useState([])
+
+  const [overviewSources, setOverviewSources] = useState({ documents: { status: 'loading' }, residents: { status: 'loading' }, announcements: { status: 'loading' }, events: { status: 'loading' } })
   const [announcements, setAnnouncements] = useState([])
   const [events, setEvents] = useState([])
   const [officialsList, setOfficialsList] = useState([])
   const [kapitanStatus, setKapitanStatus] = useState('loading')
   const [documentRequests, setDocumentRequests] = useState([])
-  const [wasteSchedule, setWasteSchedule] = useState([])
+
   const [residentsList, setResidentsList] = useState([])
   const [processingVerificationIds, setProcessingVerificationIds] = useState(new Set())
   const [rejectingResident, setRejectingResident] = useState(null)
@@ -487,26 +465,22 @@ const OfficialDashboard = () => {
   const [declineNotes, setDeclineNotes] = useState('')
   const [registryEntries, setRegistryEntries] = useState([])
   const [activityLog, setActivityLog] = useState([])
-  const [showRegistryModal, setShowRegistryModal] = useState(false)
-  const [editingRegistryEntry, setEditingRegistryEntry] = useState(null)
-  const [newRegistryEntry, setNewRegistryEntry] = useState({
-    full_name: '', purok: '', household_number: '', contact_number: '',
-  })
-  const [loading, setLoading] = useState(true)
+
+
   // Guards every modal Save/Add/Delete action against double-fires from
   // fast repeated clicks (each action sets this while its request is in
   // flight and buttons are disabled/relabelled while true).
   const [submitting, setSubmitting] = useState(false)
   // Tracks reservation ids currently being approved/declined so a fast
   // double-click on the same row can't fire the update twice.
-  const [processingReservationIds, setProcessingReservationIds] = useState(new Set())
+
 
   // Filters
-  const [reservationFilter, setReservationFilter] = useState('all')
+
   // Office-hours exceptions only. Separate from the status filter
   // because the two compose: "pending exceptions" is the queue an
   // official actually works through.
-  const [reservationExceptionsOnly, setReservationExceptionsOnly] = useState(false)
+
 
   // ── Calendar views ──
   //
@@ -514,16 +488,16 @@ const OfficialDashboard = () => {
   // way to look at the same records, never a replacement for the
   // management interface: approving, declining, searching, filtering and
   // reading a resident's details all stay in the queue and the table.
-  const [reservationView, setReservationView] = useState('queue')
+
   const [eventView, setEventView] = useState('table')
-  const [calendarDate, setCalendarDate] = useState('')
+
   const [eventCalendarDate, setEventCalendarDate] = useState('')
-  const [reservationMonth, setReservationMonth] = useState(() => monthOf(manilaToday()))
+
   // Set by the calendar when an official asks to work one date in the
   // queue. A separate filter rather than a search term, because
   // RESERVATION_SEARCH_FIELDS does not include preferred_date -- putting
   // a date in the search box would match nothing.
-  const [reservationDateFilter, setReservationDateFilter] = useState('')
+
   const [eventMonth, setEventMonth] = useState(() => monthOf(manilaToday()))
   // ── Document Requests filtering ────────────────────────────────────
   //
@@ -534,7 +508,8 @@ const OfficialDashboard = () => {
   const [documentQuery, setDocumentQuery] = useState('')
   const [documentFilter, setDocumentFilter] = useState('all')
 
-  const [reservationQuery, setReservationQuery] = useState('')
+
+  const [announcementQuery, setAnnouncementQuery] = useState('')
   const [announcementFilter, setAnnouncementFilter] = useState('all')
   const [eventFilter, setEventFilter] = useState('all')
 
@@ -546,8 +521,7 @@ const OfficialDashboard = () => {
   const [residentPurok, setResidentPurok] = useState('all')
   // The Voter Reference List tab has its own pair, so switching tabs does not
   // silently carry a filter across into a different dataset.
-  const [registryQuery, setRegistryQuery] = useState('')
-  const [registryPurok, setRegistryPurok] = useState('all')
+
 
   // Logged-in user info from profiles + barangay_officials
   const [userProfile, setUserProfile] = useState(null)
@@ -584,7 +558,7 @@ const OfficialDashboard = () => {
   const [archivedOfficials, setArchivedOfficials] = useState([])
   const [archivingOfficial, setArchivingOfficial] = useState(null)
   const [restoringOfficial, setRestoringOfficial] = useState(null)
-  const [showWasteModal, setShowWasteModal] = useState(false)
+
 
   // ── Modal accessibility ────────────────────────────────────────────
   //
@@ -595,31 +569,21 @@ const OfficialDashboard = () => {
   // nothing.
   useModalA11y(
     showAnnouncementModal || showEventModal || showOfficialModal ||
-    showWasteModal || showRegistryModal || !!decliningRequest ||
+    !!decliningRequest ||
     !!viewingId || !!ineligibleResident || !!rejectingResident,
     () => {
       setShowAnnouncementModal(false)
       setShowEventModal(false)
       setShowOfficialModal(false)
-      setShowWasteModal(false)
-      setShowRegistryModal(false)
       setDecliningRequest(null)
       setViewingId(null)
       setIneligibleResident(null)
       setRejectingResident(null)
     }
   )
-  const [editingWaste, setEditingWaste] = useState(null)
+
   const [processingDocRequestIds, setProcessingDocRequestIds] = useState(new Set())
 
-  const [newWasteEntry, setNewWasteEntry] = useState({
-    purok: '',
-    waste_type: 'Biodegradable',
-    day_of_week: '',
-    time_label: '',
-    notes: '',
-    display_order: 0,
-  })
 
   const [newAnnouncement, setNewAnnouncement] = useState({
     title: '',
@@ -650,14 +614,14 @@ const OfficialDashboard = () => {
   // ──────────────────────────────────────────────────────
 
   useEffect(() => {
-    fetchReservations()
+
     fetchAnnouncements()
     fetchEvents()
     fetchKapitanStatus()
     fetchOfficialsList()
     fetchArchivedOfficials()
     fetchDocumentRequests()
-    fetchWasteSchedule()
+
     fetchResidentsList()
     fetchRegistryEntries()
     // fetchActivityLog() is deliberately NOT called here. The effect
@@ -843,43 +807,17 @@ const OfficialDashboard = () => {
     }
   }
 
-  const fetchReservations = async () => {
-    // Newest submission first, which is the existing and intended order:
-    // the queue is worked from the top and a booking made this morning
-    // should not be below one from last month.
-    //
-    // `id` is a tie-break, not a change of order. `created_at` alone is
-    // not a total order -- two rows sharing a timestamp have no defined
-    // relative position, and Postgres may return them either way round
-    // between fetches, so a row could swap places after an unrelated
-    // refetch. Sorting on the primary key after it makes the list
-    // deterministic without moving anything a reader would notice.
-    const { data, error } = await supabase
-      .from('reservations')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .order('id', { ascending: false })
-
-    if (!error) setReservations(data)
-    setLoading(false)
-  }
 
   const fetchAnnouncements = async () => {
-    const { data, error } = await supabase
-      .from('announcements')
-      .select('*')
-      .order('date_posted', { ascending: false })
-
-    if (!error) setAnnouncements(data)
+    await readOverviewRows('announcements', supabase.from('announcements')
+      .select('*', { count: 'exact' })
+      .order('date_posted', { ascending: false }), setAnnouncements, setOverviewSources)
   }
 
   const fetchEvents = async () => {
-    const { data, error } = await supabase
-      .from('events')
-      .select('*')
-      .order('event_date', { ascending: true })
-
-    if (!error) setEvents(data)
+    await readOverviewRows('events', supabase.from('events')
+      .select('*', { count: 'exact' })
+      .order('event_date', { ascending: true }), setEvents, setOverviewSources)
   }
 
   const fetchKapitanStatus = async () => {
@@ -988,37 +926,23 @@ const OfficialDashboard = () => {
   }
 
   const fetchDocumentRequests = async () => {
-    const { data, error } = await supabase
-      .from('document_requests')
-      .select('*')
-      .order('created_at', { ascending: false })
-
-    if (!error) setDocumentRequests(data || [])
+    await readOverviewRows('documents', supabase.from('document_requests')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false }), setDocumentRequests, setOverviewSources)
   }
 
-  const fetchWasteSchedule = async () => {
-    const { data, error } = await supabase
-      .from('waste_schedule')
-      .select('*')
-      .order('display_order', { ascending: true })
-
-    if (!error) setWasteSchedule(data || [])
-  }
 
   const fetchResidentsList = async () => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, full_name, contact_number, purok, verification_status, verification_notes, id_document_url, photo_url')
+    await readOverviewRows('residents', supabase.from('profiles')
+      .select('id, full_name, contact_number, purok, verification_status, verification_notes, id_document_url, photo_url', { count: 'exact' })
       .eq('role', 'resident')
-      .order('full_name', { ascending: true })
-
-    if (!error) setResidentsList(data || [])
+      .order('full_name', { ascending: true }), setResidentsList, setOverviewSources)
   }
 
   const fetchRegistryEntries = async () => {
     const { data, error } = await supabase
       .from('residents_registry')
-      .select('*')
+      .select('full_name, purok, household_number')
       .order('full_name', { ascending: true })
 
     if (!error) setRegistryEntries(data || [])
@@ -1097,131 +1021,6 @@ const OfficialDashboard = () => {
     return partial ? { entry: partial, exact: false } : null
   }
 
-  const handleOpenAddRegistryEntry = () => {
-    setEditingRegistryEntry(null)
-    setNewRegistryEntry({ full_name: '', purok: '', household_number: '', contact_number: '' })
-    setShowRegistryModal(true)
-  }
-
-  const handleEditRegistryEntry = (entry) => {
-    setEditingRegistryEntry(entry)
-    setNewRegistryEntry({
-      full_name: entry.full_name || '',
-      purok: entry.purok || '',
-      household_number: entry.household_number || '',
-      contact_number: entry.contact_number || '',
-    })
-    setShowRegistryModal(true)
-  }
-
-  const handleSaveRegistryEntry = async () => {
-    if (submitting) return
-    if (!newRegistryEntry.full_name) {
-      toast.error('Full name is required.')
-      return
-    }
-
-    setSubmitting(true)
-    try {
-      if (editingRegistryEntry) {
-        const { error } = await supabase
-          .from('residents_registry')
-          .update({
-            full_name: newRegistryEntry.full_name,
-            purok: newRegistryEntry.purok || null,
-            household_number: newRegistryEntry.household_number || null,
-            contact_number: newRegistryEntry.contact_number || null,
-          })
-          .eq('id', editingRegistryEntry.id)
-
-        if (error) {
-          toast.error('Failed to update entry!')
-        } else {
-          toast.success('Voter reference entry updated!')
-          logActivity({
-            action: 'edited',
-            entityType: 'registry_entry',
-            entityId: editingRegistryEntry.id,
-            subject: newRegistryEntry.full_name,
-          })
-          setShowRegistryModal(false)
-          fetchRegistryEntries()
-        }
-      } else {
-        // Readback returns the new id so the audit entry can point at the
-        // row. Safe here: this table's SELECT policy covers whoever may
-        // insert, so a successful insert is always readable by its author.
-        const { data: inserted, error } = await supabase
-          .from('residents_registry')
-          .insert([{
-            full_name: newRegistryEntry.full_name,
-            purok: newRegistryEntry.purok || null,
-            household_number: newRegistryEntry.household_number || null,
-            contact_number: newRegistryEntry.contact_number || null,
-            added_by: user?.id ?? null,
-          }])
-          .select('id')
-          .single()
-
-        if (error) {
-          toast.error('Failed to add entry!')
-        } else if (!inserted?.id) {
-          toast.error('Saved, but the new entry could not be read back. Refresh to confirm it is there.')
-        } else {
-          toast.success('Voter reference entry added!')
-          logActivity({
-            action: 'added',
-            entityType: 'registry_entry',
-            entityId: inserted.id,
-            subject: newRegistryEntry.full_name,
-          })
-          setShowRegistryModal(false)
-          fetchRegistryEntries()
-        }
-      }
-      setEditingRegistryEntry(null)
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const handleDeleteRegistryEntry = async (entry) => {
-    const ok = await confirm({
-      title: 'Remove this voter reference entry?',
-      // ⚠️ "the barangay's own resident record" is what this said, which
-      // is the exact framing the Voter Reference List naming exists to
-      // remove: these rows are voter data, not a roll of residents.
-      message: `${entry.full_name} will be removed from the Voter Reference `
-        + 'List. This does not change their account if they have one, but the '
-        + 'name will no longer appear as a voter list match during verification.',
-      confirmLabel: 'Remove entry',
-    })
-    if (!ok) return
-
-    // .select() matters here: RLS filters rows rather than raising, so a
-    // blocked delete comes back as success with zero rows affected. Without
-    // this check the toast reports a removal that never happened.
-    const { data, error } = await supabase
-      .from('residents_registry')
-      .delete()
-      .eq('id', entry.id)
-      .select('id')
-
-    if (error) {
-      toast.error('Failed to delete entry!')
-    } else if (!data || data.length === 0) {
-      toast.error('Nothing was removed — you may not have permission to change the voter reference list.')
-    } else {
-      toast.success('Voter reference entry removed!')
-      logActivity({
-        action: 'deleted',
-        entityType: 'registry_entry',
-        entityId: entry.id,
-        subject: entry.full_name,
-      })
-      fetchRegistryEntries()
-    }
-  }
 
   const handleViewId = async (resident) => {
     if (!resident.id_document_url) {
@@ -1300,7 +1099,7 @@ const OfficialDashboard = () => {
           return
         }
       }
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
         .update({
           verification_status: 'verified',
@@ -1309,9 +1108,15 @@ const OfficialDashboard = () => {
           verification_notes: null,
         })
         .eq('id', resident.id)
+        .select('id')
 
       if (error) {
         toast.error('Failed to verify account!')
+      } else if (!data || data.length === 0) {
+        toast.error('You do not have permission to verify this account, or it no longer exists.')
+      } else if (data.length !== 1 || data[0]?.id !== resident.id) {
+        console.error('Unexpected verify result:', data)
+        toast.error('The verification result was unexpected. Refresh the resident list before trying again.')
       } else {
         toast.success(`${resident.full_name} verified!`)
         logActivity({
@@ -1339,7 +1144,7 @@ const OfficialDashboard = () => {
 
     setSubmitting(true)
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
         .update({
           verification_status: 'rejected',
@@ -1348,9 +1153,15 @@ const OfficialDashboard = () => {
           verification_notes: rejectNotes.trim(),
         })
         .eq('id', rejectingResident.id)
+        .select('id')
 
       if (error) {
         toast.error('Failed to reject account!')
+      } else if (!data || data.length === 0) {
+        toast.error('You do not have permission to reject this account, or it no longer exists.')
+      } else if (data.length !== 1 || data[0]?.id !== rejectingResident.id) {
+        console.error('Unexpected reject result:', data)
+        toast.error('The rejection result was unexpected. Refresh the resident list before trying again.')
       } else {
         toast.success(`${rejectingResident.full_name}'s account rejected.`)
         logActivity({
@@ -1543,135 +1354,6 @@ const OfficialDashboard = () => {
     setDeclineNotes('')
   }
 
-  const handleOpenAddWaste = () => {
-    setEditingWaste(null)
-    setNewWasteEntry({ purok: '', waste_type: 'Biodegradable', day_of_week: '', time_label: '', notes: '', display_order: 0 })
-    setShowWasteModal(true)
-  }
-
-  const handleEditWaste = (entry) => {
-    setEditingWaste(entry)
-    setNewWasteEntry({
-      purok: entry.purok || '',
-      waste_type: entry.waste_type || 'Biodegradable',
-      day_of_week: entry.day_of_week || '',
-      time_label: entry.time_label || '',
-      notes: entry.notes || '',
-      display_order: entry.display_order || 0,
-    })
-    setShowWasteModal(true)
-  }
-
-  const handleSaveWaste = async () => {
-    if (submitting) return
-    if (!newWasteEntry.purok || !newWasteEntry.waste_type || !newWasteEntry.day_of_week) {
-      toast.error('Please fill in Purok, Waste Type, and Day.')
-      return
-    }
-
-    setSubmitting(true)
-    try {
-      if (editingWaste) {
-        const { error } = await supabase
-          .from('waste_schedule')
-          .update({
-            purok: newWasteEntry.purok,
-            waste_type: newWasteEntry.waste_type,
-            day_of_week: newWasteEntry.day_of_week,
-            time_label: newWasteEntry.time_label || null,
-            notes: newWasteEntry.notes || null,
-            display_order: Number(newWasteEntry.display_order) || 0,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', editingWaste.id)
-
-        if (error) {
-          toast.error('Failed to update schedule entry!')
-        } else {
-          toast.success('Schedule entry updated!')
-          logActivity({
-            action: 'edited',
-            entityType: 'waste_schedule',
-            entityId: editingWaste.id,
-            subject: `${newWasteEntry.purok} — ${newWasteEntry.waste_type} (${newWasteEntry.day_of_week})`,
-          })
-          setShowWasteModal(false)
-          fetchWasteSchedule()
-        }
-      } else {
-        // Readback returns the new id so the audit entry can point at the
-        // row. Safe here: this table's SELECT policy covers whoever may
-        // insert, so a successful insert is always readable by its author.
-        const { data: inserted, error } = await supabase
-          .from('waste_schedule')
-          .insert([{
-            purok: newWasteEntry.purok,
-            waste_type: newWasteEntry.waste_type,
-            day_of_week: newWasteEntry.day_of_week,
-            time_label: newWasteEntry.time_label || null,
-            notes: newWasteEntry.notes || null,
-            display_order: Number(newWasteEntry.display_order) || 0,
-            created_by: user?.id ?? null,
-          }])
-          .select('id')
-          .single()
-
-        if (error) {
-          toast.error('Failed to add schedule entry!')
-        } else if (!inserted?.id) {
-          toast.error('Saved, but the schedule entry could not be read back. Refresh to confirm it is there.')
-        } else {
-          toast.success('Schedule entry added!')
-          logActivity({
-            action: 'added',
-            entityType: 'waste_schedule',
-            entityId: inserted.id,
-            subject: `${newWasteEntry.purok} — ${newWasteEntry.waste_type} (${newWasteEntry.day_of_week})`,
-          })
-          setShowWasteModal(false)
-          fetchWasteSchedule()
-        }
-      }
-      setEditingWaste(null)
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const handleDeleteWaste = async (entry) => {
-    const ok = await confirm({
-      title: 'Remove this collection schedule?',
-      message: `${entry.purok} — ${entry.waste_type} on ${entry.day_of_week} will be `
-        + 'removed. This schedule is shown publicly on the home page, so residents '
-        + 'will no longer see a collection day for it.',
-      confirmLabel: 'Remove schedule',
-    })
-    if (!ok) return
-
-    // .select() matters here: RLS filters rows rather than raising, so a
-    // blocked delete comes back as success with zero rows affected. Without
-    // this check the toast reports a removal that never happened.
-    const { data, error } = await supabase
-      .from('waste_schedule')
-      .delete()
-      .eq('id', entry.id)
-      .select('id')
-
-    if (error) {
-      toast.error('Failed to delete schedule entry!')
-    } else if (!data || data.length === 0) {
-      toast.error('Nothing was removed — you may not have permission to change the schedule.')
-    } else {
-      toast.success('Schedule entry removed!')
-      logActivity({
-        action: 'deleted',
-        entityType: 'waste_schedule',
-        entityId: entry.id,
-        subject: `${entry.purok} — ${entry.waste_type} (${entry.day_of_week})`,
-      })
-      fetchWasteSchedule()
-    }
-  }
 
   // Display orders currently held by ACTIVE officials, and the lowest
   // free positive integer. Used to validate Add/Edit and to block a
@@ -1700,7 +1382,7 @@ const OfficialDashboard = () => {
     .find((o) => o.position === 'Punong Barangay')?.full_name || ''
   // Only the Treasurer approves/denies court reservations — they're the
   // one who actually receives the GCash payment and can verify it.
-  const isTreasurer = officialInfo?.position === 'Barangay Treasurer'
+
   // Only the Secretary approves/denies document requests — they manage
   // administrative documents and official records.
   const isSecretary = officialInfo?.position === 'Barangay Secretary'
@@ -1736,10 +1418,6 @@ const OfficialDashboard = () => {
     generate: (req) => setDocumentRequestToPrint(req),
   }
 
-  const reservationActionHandlers = {
-    approve: (res) => handleApproveReservation(res),
-    deny: (res) => handleDeclineReservation(res),
-  }
 
   // The two queues' items: shape from the pure module, icon from the map
   // above, behaviour from the handlers above. Nothing here decides who
@@ -1765,14 +1443,6 @@ const OfficialDashboard = () => {
 
   const viewedDocumentRequest = documentRequests.find((request) => request.id === viewedDocumentRequestId)
 
-  const reservationMenuItems = (res) => reservationActions({
-    status: res.status,
-    isTreasurer,
-  }).map((item) => ({
-    ...item,
-    icon: RESERVATION_ACTION_ICONS[item.key],
-    onSelect: () => reservationActionHandlers[item.key]?.(res),
-  }))
 
   // Display name: first name only for greeting
   const firstName = userProfile?.full_name
@@ -1799,34 +1469,7 @@ const OfficialDashboard = () => {
   // bundle — from using the function to text arbitrary numbers at the
   // barangay's expense. The approved/declined wording is decided there
   // too, from the row's own status, so this no longer passes one.
-  const notifyResident = async (reservation) => {
-    const cannotReach = (reason) => {
-      console.warn('SMS not sent:', reason)
-      toast('Saved, but the text message could not be sent — please contact the resident directly.', {
-        icon: '📵',
-        duration: 6000,
-      })
-    }
 
-    try {
-      const { data, error } = await supabase.functions.invoke('notify-reservation-sms', {
-        body: { reservation_id: reservation.id },
-      })
-
-      if (error) {
-        console.error('SMS notify error:', error)
-        cannotReach(error.message || 'the notification service returned an error')
-        return
-      }
-
-      if (data && data.sent === false) {
-        cannotReach(data.reason || 'unknown reason')
-      }
-    } catch (err) {
-      console.error('SMS notify error:', err)
-      cannotReach(err.message || 'the notification service could not be reached')
-    }
-  }
 
   // Appends to the append-only audit trail. Deliberately fire-and-
   // forget with its own error handling: a logging failure should never
@@ -1839,19 +1482,7 @@ const OfficialDashboard = () => {
   // able to file entries reading "Barangay Secretary / verified".
   // Sending them anyway would just be a value that looks authoritative
   // and is silently thrown away.
-  const withReservationGuard = async (reservation, action) => {
-    if (processingReservationIds.has(reservation.id)) return
-    setProcessingReservationIds((prev) => new Set(prev).add(reservation.id))
-    try {
-      await action()
-    } finally {
-      setProcessingReservationIds((prev) => {
-        const next = new Set(prev)
-        next.delete(reservation.id)
-        return next
-      })
-    }
-  }
+
 
   // ⚠️ Ordering matters here, in this order:
   //
@@ -1865,90 +1496,7 @@ const OfficialDashboard = () => {
   // as the official took to answer, disabling the row's buttons and the
   // other decision on it meanwhile. The guard still does its real job:
   // the write itself cannot run twice.
-  const handleApproveReservation = async (reservation) => {
-    if (!isTreasurer) {
-      toast.error('Only the Treasurer can approve reservations.')
-      return
-    }
-    if (processingReservationIds.has(reservation.id)) return
-    const ok = await confirm({
-      title: 'Approve this reservation?',
-      message: `The court will be held for ${reservation.full_name} on `
-        + `${reservation.preferred_date} at ${reservation.preferred_time}`
-        + `${reservation.duration_hours ? ` for ${reservation.duration_hours} hour(s)` : ''}. `
-        + 'The resident is told the decision, and the slot stays held until somebody '
-        + 'changes it.',
-      confirmLabel: 'Approve booking',
-    })
-    if (!ok) return
-    return withReservationGuard(reservation, async () => {
-      const { data: updated, error } = await supabase
-        .from('reservations')
-        .update({ status: 'approved', reviewed_by: user?.id ?? null, updated_at: new Date().toISOString() })
-        .eq('id', reservation.id)
-        .select('id')
 
-      if (error) {
-        toast.error('Failed to approve reservation!')
-      } else if (!updated || updated.length === 0) {
-        // RLS matched no row, so nothing was written even though the
-        // request itself succeeded. Usually means this account's
-        // profiles.full_name doesn't exactly match its
-        // barangay_officials.full_name, which is what the Treasurer
-        // policy joins on.
-        toast.error('Nothing was saved — your account may not be linked to the Treasurer record. Contact the admin.')
-      } else {
-        toast.success('Reservation approved!')
-        logActivity({
-          action: 'approved',
-          entityType: 'reservation',
-          entityId: reservation.id,
-          subject: `${reservation.full_name} — ${reservation.preferred_date} ${reservation.preferred_time}`,
-        })
-        notifyResident(reservation)
-        fetchReservations()
-      }
-    })
-  }
-
-  const handleDeclineReservation = async (reservation) => {
-    if (!isTreasurer) {
-      toast.error('Only the Treasurer can decline reservations.')
-      return
-    }
-    if (processingReservationIds.has(reservation.id)) return
-    const ok = await confirm({
-      title: 'Decline this reservation?',
-      message: `${reservation.full_name}'s booking for ${reservation.preferred_date} at `
-        + `${reservation.preferred_time} will be declined and the slot released for `
-        + 'someone else. The resident is told the decision.',
-      confirmLabel: 'Decline booking',
-    })
-    if (!ok) return
-    return withReservationGuard(reservation, async () => {
-      const { data: updated, error } = await supabase
-        .from('reservations')
-        .update({ status: 'declined', reviewed_by: user?.id ?? null, updated_at: new Date().toISOString() })
-        .eq('id', reservation.id)
-        .select('id')
-
-      if (error) {
-        toast.error('Failed to decline reservation!')
-      } else if (!updated || updated.length === 0) {
-        toast.error('Nothing was saved — your account may not be linked to the Treasurer record. Contact the admin.')
-      } else {
-        toast.success('Reservation declined!')
-        logActivity({
-          action: 'declined',
-          entityType: 'reservation',
-          entityId: reservation.id,
-          subject: `${reservation.full_name} — ${reservation.preferred_date} ${reservation.preferred_time}`,
-        })
-        notifyResident(reservation)
-        fetchReservations()
-      }
-    })
-  }
 
   const handleUpdateKapitanStatus = async (status) => {
     if (!isKapitan) return
@@ -2710,7 +2258,6 @@ const OfficialDashboard = () => {
     }
   }
 
-  const pendingReservations = reservations.filter(r => r.status === 'pending')
 
   // ── Residents: groups, filters and reconciliation ────────────────
   //
@@ -2726,14 +2273,6 @@ const OfficialDashboard = () => {
     () => ({ query: residentQuery, purok: 'all', fields: RESIDENT_SEARCH_FIELDS }),
     [residentQuery]
   )
-
-  const residentGroupCounts = useMemo(() => {
-    const counts = {}
-    RESIDENT_GROUPS.forEach((group) => {
-      counts[group.id] = filterRows(residentGroups[group.id], residentFilter).filter(r => matchesResidentPurok(r.purok, residentPurok === 'all' ? '' : residentPurok)).length
-    })
-    return counts
-  }, [residentGroups, residentFilter, residentPurok])
 
   const visibleResidents = useMemo(
     () => filterRows(residentGroups[residentGroup], residentFilter).filter(r => matchesResidentPurok(r.purok, residentPurok === 'all' ? '' : residentPurok)),
@@ -2775,35 +2314,7 @@ const OfficialDashboard = () => {
   // Same `filterRows` the other two tabs use, so case-insensitivity and
   // whitespace trimming behave identically everywhere and are covered by
   // the same tests.
-  const visibleReservations = useMemo(() => {
-    const byStatus = reservationFilter === 'all'
-      ? reservations
-      : reservations.filter((r) => r.status === reservationFilter)
-    // ⚠️ isExceptionRequest reads `exception_reason`, never the hour.
-    // Every booking filed before migration 020 starts before 5 PM and
-    // carries no reason, so filtering by hour here would hand the
-    // official the whole of the old queue labelled as exceptions.
-    const byException = reservationExceptionsOnly
-      ? byStatus.filter(isExceptionRequest)
-      : byStatus
-    // Compares the stored date as a string, which is correct for
-    // zero-padded ISO dates and needs no Date at all.
-    const byDate = reservationDateFilter
-      ? byException.filter((r) => toDateKey(r.preferred_date) === reservationDateFilter)
-      : byException
-    return filterRows(byDate, {
-      query: reservationQuery,
-      fields: RESERVATION_SEARCH_FIELDS,
-    })
-  }, [
-    reservations, reservationFilter, reservationExceptionsOnly,
-    reservationDateFilter, reservationQuery,
-  ])
 
-  const exceptionReservationCount = useMemo(
-    () => reservations.filter(isExceptionRequest).length,
-    [reservations]
-  )
 
   // ⚠️ Built from the `reservations` state this dashboard already
   // fetched -- the same rows the queue renders. NOT from
@@ -2811,14 +2322,7 @@ const OfficialDashboard = () => {
   // five columns and deliberately no names and no exception_reason, so
   // an official calling it would be reading a poorer copy of their own
   // data through a second source.
-  const reservationCalendar = useMemo(
-    () => buildReservationCalendar(reservations),
-    [reservations]
-  )
-  const calendarDayReservations = useMemo(
-    () => reservationsOnDate(reservationCalendar, calendarDate),
-    [reservationCalendar, calendarDate]
-  )
+
 
   const officialEventCalendar = useMemo(() => buildEventCalendar(events), [events])
   const eventCalendarDayEvents = useMemo(
@@ -2829,29 +2333,6 @@ const OfficialDashboard = () => {
   // Today in Manila, for the grid's today marker and its past shading.
   const calendarToday = useMemo(() => manilaToday(), [])
 
-  const reservationFiltersActive =
-    reservationQuery.trim() !== ''
-    || reservationFilter !== 'all'
-    || reservationExceptionsOnly
-    || reservationDateFilter !== ''
-  const resetReservationFilters = () => {
-    setReservationQuery('')
-    setReservationFilter('all')
-    setReservationExceptionsOnly(false)
-    setReservationDateFilter('')
-  }
-
-  const visibleRegistryEntries = useMemo(
-    () => filterRows(registryEntries, {
-      query: registryQuery, purok: registryPurok, fields: REGISTRY_SEARCH_FIELDS,
-    }),
-    [registryEntries, registryQuery, registryPurok]
-  )
-  const registryFiltersActive = registryQuery.trim() !== '' || registryPurok !== 'all'
-  const resetRegistryFilters = () => {
-    setRegistryQuery('')
-    setRegistryPurok('all')
-  }
 
   // ── Sidebar badge counts ─────────────────────────────────────────
   //
@@ -2880,34 +2361,9 @@ const OfficialDashboard = () => {
   // ── Reports: derived entirely from data already fetched, so no
   // extra queries are needed for the charts. ──────────────────────
 
-  const monthlyCounts = useMemo(() => {
-    // Last 6 months, oldest first.
-    const buckets = []
-    const now = new Date()
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      buckets.push({
-        key: `${d.getFullYear()}-${d.getMonth()}`,
-        label: `${MONTH_SHORT[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`,
-        documents: 0,
-        reservations: 0,
-      })
-    }
-    const indexOf = (dateStr) => {
-      if (!dateStr) return -1
-      const d = new Date(dateStr)
-      return buckets.findIndex((b) => b.key === `${d.getFullYear()}-${d.getMonth()}`)
-    }
-    documentRequests.forEach((r) => {
-      const i = indexOf(r.created_at)
-      if (i !== -1) buckets[i].documents += 1
-    })
-    reservations.forEach((r) => {
-      const i = indexOf(r.created_at)
-      if (i !== -1) buckets[i].reservations += 1
-    })
-    return buckets
-  }, [documentRequests, reservations])
+
+  const monthlyCounts = useMemo(() => documentReportMonths(documentRequests), [documentRequests])
+  const maxMonthly = Math.max(1, ...monthlyCounts.map(b => b.documents))
 
   const documentTypeCounts = useMemo(() => {
     const map = {}
@@ -2917,22 +2373,6 @@ const OfficialDashboard = () => {
     return Object.entries(map).sort((a, b) => b[1] - a[1])
   }, [documentRequests])
 
-  const busiestDays = useMemo(() => {
-    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-    const counts = new Array(7).fill(0)
-    reservations.forEach((r) => {
-      if (!r.preferred_date) return
-      // preferred_date is a plain date string; split it so the day
-      // isn't shifted by the browser's timezone offset.
-      const [y, m, d] = r.preferred_date.split('-').map(Number)
-      if (!y || !m || !d) return
-      counts[new Date(y, m - 1, d).getDay()] += 1
-    })
-    return dayNames.map((name, i) => ({ name, count: counts[i] }))
-  }, [reservations])
-
-  const maxMonthly = Math.max(1, ...monthlyCounts.map((b) => Math.max(b.documents, b.reservations)))
-  const maxDay = Math.max(1, ...busiestDays.map((d) => d.count))
 
   // One definition, rendered twice -- once in the desktop topbar and
   // once in the mobile header -- so the two placements cannot be given
@@ -2942,7 +2382,7 @@ const OfficialDashboard = () => {
       notifications={notifications}
       readIds={notifReadIds}
       loading={notifLoading}
-      onOpenTab={(tab) => setActiveTab(tab)}
+      onOpenTab={(tab) => { if (retiredDashboardTab(tab)) { toast(retiredWorkflowMessage); setActiveTab('dashboard') } else setActiveTab(tab) }}
       onMarkRead={markNotificationRead}
       onMarkAllRead={markAllNotificationsRead}
     />
@@ -2955,7 +2395,7 @@ const OfficialDashboard = () => {
       <Sidebar
         role="official"
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={tab => { if (retiredDashboardTab(tab)) { toast(retiredWorkflowMessage); setActiveTab('dashboard') } else setActiveTab(tab) }}
         badges={{
           documents: pendingDocRequestCount,
           residents: awaitingVerificationCount,
@@ -2979,104 +2419,18 @@ const OfficialDashboard = () => {
         {/* ========================
             DASHBOARD TAB
         ======================== */}
-        {activeTab === 'dashboard' && (
-          <div>
-            {/* ── The overview's top block ────────────────────────────
-                Heading, the four stat cards and the Punong Barangay
-                status, in ONE container so their arrangement is a
-                responsive layout rather than two copies of an element.
-
-                ⚠️ DOM ORDER IS THE MOBILE ORDER, and it is deliberately
-                left alone: heading, stats, status -- exactly the
-                presentation already accepted at 375px, in plain document
-                flow with no `order` anywhere to go wrong. The wide
-                layout places the status in row 1 column 2 with grid,
-                beside the greeting, and lets the stats span both columns
-                underneath. See .dashboard-overview-top. */}
-            <div className="dashboard-overview-top">
-            <div className="official-dashboard-header">
-              <h1>Official Dashboard</h1>
-              <p>
-                Good day, <strong>{firstName}</strong>
-                {positionLabel ? ` · ${positionLabel}` : ''}.
-                Here is the current pulse of Barangay Batinguel.
-              </p>
-            </div>
-
-            {/* Stats Cards */}
-            <div className="dashboard-stats">
-              <div className="stat-card">
-                <div className="stat-card-header">
-                  <div className="stat-card-icon blue">
-                    <FaClipboardList />
-                  </div>
-                </div>
-                <div className="stat-card-value">
-                  {pendingReservations.length}
-                </div>
-                <div className="stat-card-label">Pending Reservations</div>
-              </div>
-
-              <div className="stat-card">
-                <div className="stat-card-header">
-                  <div className="stat-card-icon green">
-                    <FaBullhorn />
-                  </div>
-                </div>
-                <div className="stat-card-value">{announcements.length}</div>
-                <div className="stat-card-label">Announcements</div>
-              </div>
-
-              <div className="stat-card">
-                <div className="stat-card-header">
-                  <div className="stat-card-icon yellow">
-                    <FaCalendarAlt />
-                  </div>
-                </div>
-                {/* This said "Upcoming Events" while counting every event
-                    ever created, so a barangay with three events last year
-                    and nothing planned still read "3 upcoming". Compared
-                    against today in Manila, not the browser's timezone. */}
-                <div className="stat-card-value">{countUpcoming(events, 'event_date')}</div>
-                <div className="stat-card-label">Upcoming Events</div>
-              </div>
-
-              <div className="stat-card">
-                <div className="stat-card-header">
-                  <div className="stat-card-icon red">
-                    <FaUsers />
-                  </div>
-                </div>
-                <div className="stat-card-value">{reservations.length}</div>
-                <div className="stat-card-label">Total Reservations</div>
-              </div>
-            </div>
-
-            {/* ── Punong Barangay status, compact ──────────────────────
-                The dedicated sidebar tab is gone, so this is now the ONLY
-                place the status is read and set. It therefore carries the
-                Kapitan's own controls rather than linking to them.
-
-                A <select> replaces the four-button grid: one control
-                instead of four, which is what makes it fit on a dashboard
-                row. The options, their order and their wording are
-                unchanged -- KAPITAN_STATUS_OPTIONS is the same constant
-                the grid used, so nothing a user reads has moved.
-
-                ⚠️ The permission is unchanged. `isKapitan` is still the
-                only thing that renders a control, handleUpdateKapitanStatus
-                still returns early for anyone else, and the database
-                policy was not touched. An official who is not the Punong
-                Barangay sees the status and no control, exactly as
-                before. */}
-            <div className="kapitan-compact">
+        {activeTab === 'dashboard' && <OperationsOverview
+          firstName={firstName} positionLabel={positionLabel}
+          documents={documentRequests} residents={residentsList} announcements={announcements} events={events}
+          sources={overviewSources} isSecretary={isSecretary} isKapitan={isKapitan} onNavigate={setActiveTab}
+          availability={<div className="kapitan-compact">
               <div className="kapitan-compact-identity">
                 <FaUserTie className="kapitan-compact-icon" aria-hidden="true" />
                 <div>
-                  <span className="kapitan-compact-role">{PUNONG_BARANGAY_LABEL}</span>
-                  <span className="kapitan-compact-name">
+                  <span className="kapitan-compact-role">{isKapitan ? 'Your availability' : PUNONG_BARANGAY_LABEL}</span>
+                  {!isKapitan && <span className="kapitan-compact-name">
                     {punongBarangayName || 'Barangay Batinguel'}
-                  </span>
+                  </span>}
                 </div>
               </div>
 
@@ -3115,102 +2469,14 @@ const OfficialDashboard = () => {
                   </select>
                 </div>
               )}
-            </div>
-            </div>
-
-            {/* Pending Reservations */}
-            <div className="dashboard-card">
-              <div className="dashboard-card-header">
-                <h3>Pending Court Reservations</h3>
-                <button
-                  className="view-all-link"
-                  onClick={() => setActiveTab('reservations')}>
-                  View All
-                </button>
-              </div>
-
-              {loading ? (
-                <p className="dashboard-loading">Loading...</p>
-              ) : pendingReservations.length === 0 ? (
-                <p className="dashboard-empty">No pending reservations.</p>
-              ) : (
-                <div className="table-wrapper">
-                  <table className="dashboard-table">
-                    <thead>
-                      <tr>
-                        <th scope="col">Name</th>
-                        <th scope="col">Date</th>
-                        <th scope="col">Time</th>
-                        <th scope="col">Purpose</th>
-                        <th scope="col">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pendingReservations.slice(0, 5).map((res) => (
-                        <tr key={res.id}>
-                          <td data-label="Name">{res.full_name}</td>
-                          <td data-label="Date">{res.preferred_date}</td>
-                          {/* The badge sits with the time, because the
-                              time is what the exception is about. A
-                              booking from before migration 020 has no
-                              reason and gets no badge -- see
-                              isExceptionRequest, which reads the reason
-                              rather than the hour. */}
-                          <td data-label="Time">
-                            {res.preferred_time}
-                            {isExceptionRequest(res) && (
-                              <span
-                                className="badge badge-exception"
-                                title="Starts before 5:00 PM. The resident asked for an office-hours exception; an official decides it."
-                              >
-                                {EXCEPTION_BADGE_LABEL}
-                              </span>
-                            )}
-                          </td>
-                          <td data-label="Purpose">
-                            {res.purpose}
-                            {isExceptionRequest(res) && (
-                              <span className="exception-reason-note">
-                                <strong>Office-hours reason:</strong>{' '}
-                                {res.exception_reason}
-                              </span>
-                            )}
-                          </td>
-                          <td data-label="Action">
-                            {isTreasurer ? (
-                              <>
-                                <button
-                                  className="btn-approve"
-                                  disabled={processingReservationIds.has(res.id)}
-                                  onClick={() => handleApproveReservation(res)}>
-                                  Approve
-                                </button>
-                                <button
-                                  className="btn-deny"
-                                  disabled={processingReservationIds.has(res.id)}
-                                  onClick={() => handleDeclineReservation(res)}>
-                                  Deny
-                                </button>
-                              </>
-                            ) : (
-                              <span className="role-restricted-note">Treasurer only</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+            </div>}
+        />}
 
         {/* ========================
             ANNOUNCEMENTS TAB
         ======================== */}
         {activeTab === 'announcements' && (
-          <div>
+          <div className="official-content-page">
             <div className="announcements-header">
               <h1>Announcements</h1>
               <p>Manage your broadcast communications and keep the community informed.</p>
@@ -3218,10 +2484,10 @@ const OfficialDashboard = () => {
 
             <div className="dashboard-card">
               <div className="dashboard-card-header">
-                <h3>All Announcements</h3>
-                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                  <div className="filter-select-wrap">
-                    <FaFilter style={{ fontSize: 12, color: '#6b7280' }} />
+                <h2>All Announcements</h2>
+                <div className="publishing-toolbar">
+                  <label className="publishing-search">Search announcement titles<input type="search" value={announcementQuery} onChange={event => setAnnouncementQuery(event.target.value)} placeholder="Search titles..." /></label>
+                  <label>Category
                     <select
                       className="filter-select"
                       value={announcementFilter}
@@ -3232,43 +2498,48 @@ const OfficialDashboard = () => {
                         <option key={badge} value={badge}>{badge}</option>
                       ))}
                     </select>
-                  </div>
+                  </label>
+                  <button type="button" className="btn-cancel" onClick={() => { setAnnouncementQuery(''); setAnnouncementFilter('all') }} disabled={!announcementQuery && announcementFilter === 'all'}>Reset filters</button>
                   <button className="btn-add" onClick={handleOpenAddAnnouncement}>
                     <FaPlus /> Add Announcement
                   </button>
                 </div>
               </div>
 
+              <PublishingReadNotice state={overviewSources.announcements} name="Announcements" hasRows={announcements.length > 0} />
+              <p className="publishing-result" role="status">{filterPublishingAnnouncements(announcements, announcementQuery, announcementFilter).length} matching loaded announcement(s)</p>
               {(() => {
-                const filteredAnnouncements = announcementFilter === 'all'
-                  ? announcements
-                  : announcements.filter((a) => a.badge === announcementFilter)
+                const filteredAnnouncements = filterPublishingAnnouncements(announcements, announcementQuery, announcementFilter)
+                if (!announcements.length && overviewSources.announcements.status !== 'ready') return null
 
                 return filteredAnnouncements.length === 0 ? (
                   <p className="dashboard-empty">
-                    {announcementFilter === 'all'
+                    {announcementFilter === 'all' && !announcementQuery.trim()
                       ? 'No announcements yet.'
                       : 'No announcements match this filter.'}
                   </p>
                 ) : (
                 <div className="table-wrapper">
-                  <table className="dashboard-table">
+                  <table className="dashboard-table publishing-table publishing-announcements">
+                    <colgroup><col className="publishing-col-title"/><col className="publishing-col-category"/><col className="publishing-col-date"/><col className="publishing-col-sms"/><col className="publishing-col-actions"/></colgroup>
                     <thead>
                       <tr>
                         <th scope="col">Title</th>
-                        <th scope="col">Badge</th>
+                        <th scope="col">Category</th>
                         <th scope="col">Date Posted</th>
+                        <th scope="col">SMS</th>
                         <th scope="col">Action</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredAnnouncements.map((ann) => (
                         <tr key={ann.id}>
-                          <td data-label="Title">{ann.title}<SmsHistory sourceType="announcement" sourceId={ann.id}/></td>
-                          <td data-label="Badge">{ann.badge}</td>
+                          <td data-label="Title"><PublishingTitle>{ann.title}</PublishingTitle></td>
+                          <td data-label="Category"><span className="publishing-badge">{ann.badge || 'Uncategorized'}</span></td>
                           <td data-label="Date Posted">
-                            {new Date(ann.date_posted).toLocaleDateString()}
+                            {publishingDate(ann.date_posted)}
                           </td>
+                          <td data-label="SMS"><SmsHistory sourceType="announcement" sourceId={ann.id}/></td>
                           <td data-label="Action" className="action-cell">
                             <ActionMenu
                               portal
@@ -3308,7 +2579,7 @@ const OfficialDashboard = () => {
             EVENTS TAB
         ======================== */}
         {activeTab === 'events' && (
-          <div>
+          <div className="official-content-page">
             <div className="events-header">
               <h1>Events</h1>
               <p>Manage upcoming neighborhood activities and events.</p>
@@ -3316,8 +2587,8 @@ const OfficialDashboard = () => {
 
             <div className="dashboard-card">
               <div className="dashboard-card-header">
-                <h3>All Events</h3>
-                <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                <h2>All Events</h2>
+                <div className="publishing-toolbar">
                   {/* ⚠️ Table is the default and stays the management
                       interface: Add, Edit and Delete live there. The
                       calendar is an additional visual schedule over the
@@ -3331,10 +2602,10 @@ const OfficialDashboard = () => {
                       { value: 'calendar', label: 'Calendar', icon: <FaCalendarAlt aria-hidden="true" /> },
                     ]}
                   />
-                  <div className="filter-select-wrap">
-                    <FaFilter style={{ fontSize: 12, color: '#6b7280' }} />
+                  <label>Filter events by date (table)
                     <select
                       className="filter-select"
+                      disabled={eventView === 'calendar'}
                       value={eventFilter}
                       onChange={(e) => setEventFilter(e.target.value)}
                     >
@@ -3344,13 +2615,15 @@ const OfficialDashboard = () => {
                       <option value="upcoming">Upcoming</option>
                       <option value="past">Past</option>
                     </select>
-                  </div>
+                  </label>
                   <button className="btn-add" onClick={handleOpenAddEvent}>
                     <FaPlus /> Add Event
                   </button>
                 </div>
               </div>
 
+              <PublishingReadNotice state={overviewSources.events} name="Events" hasRows={events.length > 0} />
+              {eventView === 'calendar' && <p className="publishing-calendar-note">The calendar shows its selected month. Date filtering applies to the table.</p>}
               {eventView === 'calendar' && (
                 <div className="dashboard-calendar-layout">
                   <MonthCalendar
@@ -3378,7 +2651,8 @@ const OfficialDashboard = () => {
                           <div className="mcal-day-list">
                             {eventCalendarDayEvents.map((event) => (
                               <div key={event.id} className="mcal-day-item">
-                                <span className="mcal-day-item-title">{event.title}</span>
+                                <span className="mcal-day-item-title"><PublishingTitle>{event.title}</PublishingTitle></span>
+                                <PublishingEventDate event={event} today={calendarToday} />
                                 {event.location && (
                                   <span className="mcal-day-item-meta">{event.location}</span>
                                 )}
@@ -3410,9 +2684,10 @@ const OfficialDashboard = () => {
                 const filteredEvents = eventFilter === 'all'
                   ? events
                   : eventFilter === 'upcoming'
-                    ? events.filter((ev) => ev.event_date >= todayStr)
-                    : events.filter((ev) => ev.event_date < todayStr)
+                    ? events.filter((ev) => publishingEventPeriod(ev.event_date, todayStr) === 'Upcoming')
+                    : events.filter((ev) => publishingEventPeriod(ev.event_date, todayStr) === 'Past')
 
+                if (!events.length && overviewSources.events.status !== 'ready') return null
                 return filteredEvents.length === 0 ? (
                   <p className="dashboard-empty">
                     {eventFilter === 'all'
@@ -3421,21 +2696,24 @@ const OfficialDashboard = () => {
                   </p>
                 ) : (
                 <div className="table-wrapper">
-                  <table className="dashboard-table">
+                  <table className="dashboard-table publishing-table publishing-events">
+                    <colgroup><col className="publishing-col-title"/><col className="publishing-col-date"/><col className="publishing-col-location"/><col className="publishing-col-sms"/><col className="publishing-col-actions"/></colgroup>
                     <thead>
                       <tr>
                         <th scope="col">Title</th>
-                        <th scope="col">Date</th>
+                        <th scope="col">Date &amp; Time</th>
                         <th scope="col">Location</th>
+                        <th scope="col">SMS</th>
                         <th scope="col">Action</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredEvents.map((event) => (
                         <tr key={event.id}>
-                          <td data-label="Title">{event.title}<SmsHistory sourceType="event" sourceId={event.id}/></td>
-                          <td data-label="Date">{event.event_date}</td>
-                          <td data-label="Location">{event.location}</td>
+                          <td data-label="Title"><PublishingTitle>{event.title}</PublishingTitle></td>
+                          <td data-label="Date & Time"><PublishingEventDate event={event} today={todayStr} /></td>
+                          <td data-label="Location">{event.location || 'Location not recorded'}</td>
+                          <td data-label="SMS"><SmsHistory sourceType="event" sourceId={event.id}/></td>
                           <td data-label="Action" className="action-cell">
                             <ActionMenu
                               portal
@@ -3471,307 +2749,7 @@ const OfficialDashboard = () => {
         {/* ========================
             RESERVATIONS TAB
         ======================== */}
-        {activeTab === 'reservations' && (
-          <div>
-            <div className="reservations-header">
-              <h1>Reservations</h1>
-              <p>Review pending court reservations and manage time slots.</p>
-            </div>
 
-            <div className="dashboard-card">
-              <div className="dashboard-card-header">
-                <h3>All Reservations</h3>
-                {/* ⚠️ Queue is the default and stays the management
-                    interface: search, status, the exceptions filter,
-                    Approve and Decline, the resident's contact details
-                    and the exception reason all live there. The calendar
-                    is an additional way to look at the same rows. */}
-                <ViewToggle
-                  label="How to view reservations"
-                  value={reservationView}
-                  onChange={setReservationView}
-                  options={[
-                    { value: 'queue', label: 'Queue', icon: <FaClipboardList aria-hidden="true" /> },
-                    { value: 'calendar', label: 'Calendar', icon: <FaCalendarAlt aria-hidden="true" /> },
-                  ]}
-                />
-              </div>
-
-              {reservationView === 'calendar' && (
-                <div className="dashboard-calendar-layout">
-                  <MonthCalendar
-                    year={reservationMonth.year}
-                    month={reservationMonth.month}
-                    onMonthChange={setReservationMonth}
-                    selectedDate={calendarDate}
-                    onSelectDate={setCalendarDate}
-                    today={calendarToday}
-                    idPrefix="official-reservations"
-                    renderDay={(cell) => describeReservationDay(cell, reservationCalendar)}
-                    caption={'Amber means a booking on that date is still waiting on an '
-                      + 'official. Green means every booking on it has been decided. '
-                      + 'Declined and cancelled bookings release their slots and do not '
-                      + 'make a date look occupied.'}
-                  />
-
-                  {/* Names, purposes and exception reasons go HERE, never
-                      inside a calendar cell. Same information the queue
-                      already shows this official -- nothing new is
-                      exposed, and nothing is exposed publicly. */}
-                  <div className="mcal-day-panel">
-                    {!calendarDate ? (
-                      <p className="mcal-day-empty">
-                        Select a date to see its bookings.
-                      </p>
-                    ) : (
-                      <>
-                        <h4>{longDate(calendarDate)}</h4>
-                        {calendarDayReservations.length === 0 ? (
-                          <p className="mcal-day-empty">No bookings on this date.</p>
-                        ) : (
-                          <>
-                            <div className="mcal-day-list">
-                              {calendarDayReservations.map((res) => (
-                                <div key={res.id} className="mcal-day-item">
-                                  <span className="mcal-day-item-time">
-                                    {res.preferred_time} · {res.duration_hours}h
-                                  </span>
-                                  <span className="mcal-day-item-title">{res.full_name}</span>
-                                  <span className={`badge ${reservationStatusClass(res.status)}`}>
-                                    {reservationStatusLabel(res.status)}
-                                  </span>
-                                  {isExceptionRequest(res) && (
-                                    <span className="badge badge-exception">
-                                      {EXCEPTION_BADGE_LABEL}
-                                    </span>
-                                  )}
-                                  <span className="mcal-day-item-meta">{res.purpose}</span>
-                                </div>
-                              ))}
-                            </div>
-                            {/* Decisions stay in the queue. This takes the
-                                official there with the date already in the
-                                search box, rather than duplicating Approve
-                                and Decline in a second place. */}
-                            <button
-                              type="button"
-                              className="btn-add btn-sm mcal-day-action"
-                              onClick={() => {
-                                setReservationDateFilter(calendarDate)
-                                setReservationView('queue')
-                              }}
-                            >
-                              Open these in the queue
-                            </button>
-                          </>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* ⚠️ The queue is the management interface and the
-                  default. Only its visibility is conditional here --
-                  nothing about the filtering, the ordering, the
-                  Treasurer-only gate or the decision handlers
-                  changed. */}
-              {reservationView === 'queue' && (
-                <>
-                {/* The status dropdown now sits in the shared filter bar
-                    beside the search box, so it reads as one set of controls
-                    narrowing one list. Same options as before plus
-                    Cancelled, and the two compose -- see
-                    visibleReservations. */}
-                <DashboardFilterBar
-                  idPrefix="reservations"
-                  searchLabel="Search reservations by name, contact number, email, purpose or purok"
-                  placeholder="Search reservations..."
-                  query={reservationQuery}
-                  onQueryChange={setReservationQuery}
-                  selectFilter={{
-                    label: 'Filter reservations by status',
-                    value: reservationFilter,
-                    onChange: setReservationFilter,
-                    options: RESERVATION_FILTER_OPTIONS,
-                  }}
-                  toggleFilter={{
-                    label: `Office-hours exceptions only (${exceptionReservationCount})`,
-                    checked: reservationExceptionsOnly,
-                    onChange: setReservationExceptionsOnly,
-                  }}
-                  resultText={
-                    reservationFiltersActive
-                      ? `Showing ${visibleReservations.length} of ${reservations.length}`
-                        + ` ${reservations.length === 1 ? 'reservation' : 'reservations'}`
-                        // Named, because the calendar can set this
-                        // filter and an official arriving in the queue
-                        // would otherwise see a short list with no
-                        // reason given.
-                        + (reservationDateFilter ? ` on ${longDate(reservationDateFilter)}` : '')
-                      : `${reservations.length}`
-                        + ` ${reservations.length === 1 ? 'reservation' : 'reservations'}`
-                  }
-                  onReset={resetReservationFilters}
-                  filtersActive={reservationFiltersActive}
-                />
-
-                {(() => {
-                  // Ordering is newest submission first, set by
-                  // fetchReservations and unchanged; filtering preserves it.
-                  const filteredReservations = visibleReservations
-
-                  return filteredReservations.length === 0 ? (
-                    <p className="dashboard-empty">
-                      {reservationFiltersActive
-                        ? 'No reservations match this search.'
-                        : 'No reservations yet.'}
-                    </p>
-                  ) : (
-                  <div className="table-wrapper">
-                    <table className="dashboard-table">
-                      <thead>
-                        <tr>
-                          <th scope="col">Name</th>
-                          <th scope="col">Phone</th>
-                          <th scope="col">Email</th>
-                          <th scope="col">Purok</th>
-                          <th scope="col">Date</th>
-                          <th scope="col">Time</th>
-                          {/* "Hours" and "Filed" rather than "Duration" and
-                              "Submitted": an uppercase letter-spaced header
-                              was setting the minimum width of a column whose
-                              values are "3h" and a short date, so the header
-                              was costing more room than the data it labels. */}
-                          <th scope="col">Hours</th>
-                          <th scope="col">Purpose</th>
-                          <th scope="col">Filed</th>
-                          <th scope="col">Status</th>
-                          <th scope="col">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredReservations.map((res) => (
-                          <tr
-                            key={res.id}
-                            // ⚠️ CARD MODE ONLY -- see the Document
-                            // Requests table. Only `pending` puts
-                            // anything in the Action cell: the menu for
-                            // the Treasurer, the "Treasurer only" note
-                            // for anybody else. A decided booking
-                            // renders nothing, so below 769px the cell,
-                            // its ACTION heading and the divider above
-                            // it are collapsed rather than left as a
-                            // label with a gap under it.
-                            className={actionCellIsEmpty({
-                              itemCount: reservationMenuItems(res).length,
-                              noteShown: res.status === 'pending' && !isTreasurer,
-                            }) ? 'row-no-actions' : undefined}
-                          >
-                            <td data-label="Name">{res.full_name}</td>
-                            <td data-label="Phone">{res.contact_number || '—'}</td>
-                            {/* Truncated with an ellipsis rather than
-                                wrapped: a 57-character address broken
-                                character-by-character was taking four lines
-                                and making every other row that tall. The
-                                whole address is in the tooltip, and the
-                                truncation is released in card mode where
-                                the value must be complete. */}
-                            <td data-label="Email">
-                              {res.email ? (
-                                <span className="cell-truncate" title={res.email}>
-                                  {res.email}
-                                </span>
-                              ) : '—'}
-                            </td>
-                            {/* The column is already headed Purok, so the
-                                cell says "4" rather than "Purok 4". Display
-                                only -- the stored value is untouched and is
-                                on the cell as a tooltip, which is also how
-                                a legacy free-text spelling stays visible. */}
-                            <td data-label="Purok" title={res.purok || undefined}>
-                              {purokShortLabel(res.purok) || '—'}
-                            </td>
-                            <td data-label="Date">{res.preferred_date}</td>
-                            {/* The badge sits with the time, because the
-                                time is what the exception is about. A
-                                booking from before migration 020 has no
-                                reason and gets no badge -- see
-                                isExceptionRequest, which reads the reason
-                                rather than the hour. */}
-                            <td data-label="Time">
-                              {res.preferred_time}
-                              {isExceptionRequest(res) && (
-                                <span
-                                  className="badge badge-exception"
-                                  title="Starts before 5:00 PM. The resident asked for an office-hours exception; an official decides it."
-                                >
-                                  {EXCEPTION_BADGE_LABEL}
-                                </span>
-                              )}
-                            </td>
-                            <td data-label="Hours">{res.duration_hours}h</td>
-                            <td data-label="Purpose">
-                              {res.purpose}
-                              {isExceptionRequest(res) && (
-                                <span className="exception-reason-note">
-                                  <strong>Office-hours reason:</strong>{' '}
-                                  {res.exception_reason}
-                                </span>
-                              )}
-                            </td>
-                            <td data-label="Filed">
-                              {res.created_at ? new Date(res.created_at).toLocaleDateString() : '—'}
-                            </td>
-                            <td data-label="Status">
-                              {/* Was `badge-${res.status}` with the raw value
-                                  as its text: a cancelled booking produced
-                                  `badge-cancelled`, which no stylesheet
-                                  defined, and an official read "pending"
-                                  where the resident read "Pending". Both now
-                                  come from the shared map. */}
-                              <span className={`badge ${reservationStatusClass(res.status)}`}>
-                                {reservationStatusLabel(res.status)}
-                              </span>
-                            </td>
-                            {/* ⚠️ The two decisions are in a ⋮ menu since
-                                the PR #24 polish pass, and the Treasurer
-                                gate is UNCHANGED: `reservationActions`
-                                returns an empty list for anybody else, so
-                                the note below is what they still see. The
-                                handlers, the notification and the audit
-                                entry are the same ones the buttons
-                                called. Only `pending` is decidable, so a
-                                decided booking renders no trigger at all
-                                rather than an empty menu. */}
-                            <td data-label="Action" className="action-cell">
-                              {res.status === 'pending' && (
-                                isTreasurer ? (
-                                  <ActionMenu
-                                    portal
-                                    subject={reservationSubject({
-                                      dateLabel: longDate(res.preferred_date),
-                                      residentName: res.full_name,
-                                    })}
-                                    items={reservationMenuItems(res)}
-                                  />
-                                ) : (
-                                  <span className="role-restricted-note">Treasurer only</span>
-                                )
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  )
-                })()}
-                </>
-              )}
-            </div>
-          </div>
-        )}
 
         {/* ========================
             KAPITAN STATUS TAB
@@ -3781,13 +2759,15 @@ const OfficialDashboard = () => {
             DOCUMENT REQUESTS TAB
         ======================== */}
         {activeTab === 'documents' && (
-          <div>
+          <div className="official-service-page official-documents-page">
             <div className="official-dashboard-header">
               <h1>Document Requests</h1>
               <p>Review and process resident requests for barangay documents.</p>
             </div>
 
-            <div className="dashboard-card">
+            <div className="dashboard-card official-service-card">
+              <div className="service-card-heading"><h2>Request queue</h2>{!isSecretary && <p className="service-permission-note">Read-only processing access. Only the Secretary can process requests; request details remain available.</p>}</div>
+              <PublishingReadNotice state={overviewSources.documents} name="Document requests" hasRows={documentRequests.length > 0} />
               {documentRequests.length > 0 && (
                 <DashboardFilterBar
                   idPrefix="documents"
@@ -3817,13 +2797,14 @@ const OfficialDashboard = () => {
                   facts, and showing the first while a filter is applied
                   would tell an official the queue is empty when it is
                   not. */}
-              {documentRequests.length === 0 ? (
+              {documentRequests.length === 0 && overviewSources.documents.status !== 'ready' ? null : documentRequests.length === 0 ? (
                 <p className="dashboard-empty">No document requests yet.</p>
               ) : visibleDocumentRequests.length === 0 ? (
                 <p className="dashboard-empty">No document requests match this search.</p>
               ) : (
                 <div className="table-wrapper">
-                  <table className="dashboard-table">
+                  <table className="dashboard-table service-table document-request-table">
+                    <colgroup><col className="service-col-resident"/><col className="service-col-document"/><col className="service-col-purpose"/><col className="service-col-contact"/><col className="service-col-status"/><col className="service-col-submitted"/><col className="service-col-action"/></colgroup>
                     <thead>
                       <tr>
                         <th scope="col">Resident</th>
@@ -3872,7 +2853,7 @@ const OfficialDashboard = () => {
                             </span>
                           </td>
                           <td data-label="Submitted">
-                            {req.created_at ? new Date(req.created_at).toLocaleDateString() : '—'}
+                            {publishingDate(req.created_at)}
                           </td>
                           {/* ⚠️ A ⋮ MENU SINCE THE PR #24 POLISH PASS,
                               and the header on `ActionMenu` used to name
@@ -3912,7 +2893,7 @@ const OfficialDashboard = () => {
                                 items={actions}
                               />
                             ) : (
-                              <span className="role-restricted-note">Secretary only</span>
+                              <><span className="visually-hidden"><span className="role-restricted-note">Secretary only</span></span><span aria-hidden="true">—</span></>
                             )}
                           </td>
                         </tr>
@@ -3966,85 +2947,17 @@ const OfficialDashboard = () => {
 
         {activeTab === 'safety-map' && <SafetyMapPanel />}
 
-        {activeTab === 'waste' && (
-          <div>
-            <div className="official-dashboard-header">
-              <h1>Waste Management</h1>
-              <p>Manage the public waste collection schedule shown to residents.</p>
-            </div>
-
-            <div className="dashboard-card">
-              <div className="dashboard-card-header">
-                <h3>Collection Schedule</h3>
-                <button className="btn-add" onClick={handleOpenAddWaste}>
-                  <FaPlus /> Add Schedule Entry
-                </button>
-              </div>
-
-              {wasteSchedule.length === 0 ? (
-                <p className="dashboard-empty">No waste schedule entries yet.</p>
-              ) : (
-                <div className="table-wrapper">
-                  <table className="dashboard-table">
-                    <thead>
-                      <tr>
-                        <th scope="col">Purok</th>
-                        <th scope="col">Waste Type</th>
-                        <th scope="col">Day</th>
-                        <th scope="col">Time</th>
-                        <th scope="col">Notes</th>
-                        <th scope="col">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {wasteSchedule.map((entry) => (
-                        <tr key={entry.id}>
-                          <td data-label="Purok">{entry.purok || '—'}</td>
-                          <td data-label="Waste Type">{entry.waste_type}</td>
-                          <td data-label="Day">{entry.day_of_week}</td>
-                          <td data-label="Time">{entry.time_label || '—'}</td>
-                          <td data-label="Notes">{entry.notes || '—'}</td>
-                          <td data-label="Action" className="action-cell">
-                            <ActionMenu
-                              portal
-                              subject={entry.purok || 'this schedule'}
-                              items={[
-                                {
-                                  key: 'edit',
-                                  label: 'Edit',
-                                  icon: <FaEdit />,
-                                  onSelect: () => handleEditWaste(entry),
-                                },
-                                {
-                                  key: 'delete',
-                                  label: 'Delete',
-                                  icon: <FaTrash />,
-                                  danger: true,
-                                  onSelect: () => handleDeleteWaste(entry),
-                                },
-                              ]}
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
 
         {activeTab === 'residents' && (
-          <div>
+          <div className="official-service-page official-residents-page">
             <div className="official-dashboard-header">
               <h1>Residents</h1>
               <p>Manage the barangay resident directory and review online resident accounts.</p>
             </div>
-            <ResidentsWorkspace canManageDirectory={isSecretary || isKapitan} profiles={residentsList} onEligibilityChange={fetchResidentsList}
+            <ResidentsWorkspace canManageDirectory={isSecretary || isKapitan} profiles={residentsList} onEligibilityChange={fetchResidentsList} onAccountGroupChange={setResidentGroup}
               accounts={<>
 
-            <div className="dashboard-card">
+            <div className={`dashboard-card${residentGroup === 'requests' ? ' resident-requests-card' : ''}`}>
               {residentsList.length === 0 ? (
                 <p className="dashboard-empty">No residents have registered yet.</p>
               ) : (
@@ -4054,23 +2967,6 @@ const OfficialDashboard = () => {
                       is keyboard-operable with no arrow-key handling to get
                       wrong. `aria-pressed` carries the selected state to a
                       screen reader, which the green underline does not. */}
-                  <div className="resident-group-tabs" role="group" aria-label="Resident account groups">
-                    {RESIDENT_GROUPS.filter(group => group.id !== 'residents').map((group) => (
-                      <button
-                        key={group.id}
-                        type="button"
-                        className={`resident-group-tab${residentGroup === group.id ? ' is-active' : ''}`}
-                        aria-pressed={residentGroup === group.id}
-                        onClick={() => setResidentGroup(group.id)}
-                      >
-                        {group.label}
-                        <span className="resident-group-tab-count">
-                          {residentGroupCounts[group.id]}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-
                   <p className="dashboard-card-note">{activeResidentGroup.description}</p>
 
                   {/* Why the sidebar badge can read lower than this tab's
@@ -4122,7 +3018,8 @@ const OfficialDashboard = () => {
                     </p>
                   ) : (
                 <div className="table-wrapper">
-                  <table className="dashboard-table">
+                  <table className={`dashboard-table${residentGroup === 'requests' ? ' resident-requests-table' : ''}`}>
+                    {residentGroup === 'requests' && <colgroup><col className="request-col-name" /><col className="request-col-contact" /><col className="request-col-purok" /><col className="request-col-match" /><col className="request-col-verification" /><col className="request-col-id" /><col className="request-col-actions" /></colgroup>}
                     <thead>
                       <tr>
                         <th scope="col">Name</th>
@@ -4131,7 +3028,7 @@ const OfficialDashboard = () => {
                         <th scope="col">Voter List Match</th>
                         <th scope="col">Verification</th>
                         <th scope="col">ID</th>
-                        <th scope="col">Action</th>
+                        <th scope="col">{residentGroup === 'requests' ? 'Actions' : 'Action'}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -4228,7 +3125,14 @@ const OfficialDashboard = () => {
                               </span>
                             )}
                           </td>
-                          <td data-label="Action" className="action-cell">
+                          <td data-label={residentGroup === 'requests' ? 'Actions' : 'Action'} className="action-cell">
+                            {(isSecretary || isKapitan) ? residentGroup === 'requests' ? (
+                              processingVerificationIds.has(resident.id) ? <span className="role-restricted-note" role="status">Processing...</span> : <ActionMenu portal subject={resident.full_name} items={[
+                                ...(resident.verification_status !== 'verified' ? [{ key: 'verify', label: resident.verification_status === 'ineligible' ? 'Reinstate' : 'Verify', onSelect: () => handleVerifyResident(resident) }] : []),
+                                ...(resident.verification_status !== 'rejected' && resident.verification_status !== 'ineligible' ? [{ key: 'reject', label: 'Reject', danger: true, onSelect: () => handleOpenReject(resident) }] : []),
+                                ...(resident.verification_status !== 'ineligible' ? [{ key: 'ineligible', label: 'Not a Resident', danger: true, onSelect: () => handleOpenIneligible(resident) }] : []),
+                              ]} />
+                            ) : <>
                             {resident.verification_status !== 'verified' && (
                               <button
                                 className="btn-approve"
@@ -4259,6 +3163,8 @@ const OfficialDashboard = () => {
                                 Not a Resident
                               </button>
                             )}
+
+                            </> : <span className="role-restricted-note">Read-only</span>}
                           </td>
                         </tr>
                         )
@@ -4272,104 +3178,7 @@ const OfficialDashboard = () => {
             </div>
 
               </>}
-              voterReference={<><h2>Voter Reference List</h2><div className="resident-reference-note"><strong>Reference only.</strong> This list contains available voter records and is not the complete Barangay Resident Directory. A verified barangay resident may not appear here.</div>
-            <div className="dashboard-card">
-              <div className="dashboard-card-header">
-                <h3>Voter Reference Entries</h3>
-                <button className="btn-add" onClick={handleOpenAddRegistryEntry}>
-                  <FaPlus /> Add Voter Entry
-                </button>
-              </div>
 
-              {registryEntries.length === 0 ? (
-                <p className="dashboard-empty">No voter reference entries yet.</p>
-              ) : (
-                <>
-                  <DashboardFilterBar
-                    idPrefix="registry"
-                    searchLabel="Search the voter reference list by name, purok, household number or contact number"
-                    placeholder="Search name, purok, household or contact…"
-                    query={registryQuery}
-                    onQueryChange={setRegistryQuery}
-                    selectFilter={{
-                      label: 'Filter voter reference entries by purok',
-                      value: registryPurok,
-                      onChange: setRegistryPurok,
-                      options: PUROK_FILTER_OPTIONS,
-                    }}
-                    resultText={
-                      registryFiltersActive
-                        ? `Showing ${visibleRegistryEntries.length} of ${registryEntries.length} entries`
-                        : `${registryEntries.length} ${registryEntries.length === 1 ? 'entry' : 'entries'}`
-                    }
-                    onReset={resetRegistryFilters}
-                    filtersActive={registryFiltersActive}
-                  />
-
-                  {visibleRegistryEntries.length === 0 ? (
-                    <p className="dashboard-empty">
-                      No voter reference entries match the search.
-                    </p>
-                  ) : (
-                <div className="table-wrapper">
-                  <table className="dashboard-table">
-                    <thead>
-                      <tr>
-                        <th scope="col">Name</th>
-                        <th scope="col">Purok</th>
-                        <th scope="col">Household #</th>
-                        <th scope="col">Contact</th>
-                        <th scope="col">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {visibleRegistryEntries.map((entry) => (
-                        <tr key={entry.id}>
-                          <td data-label="Name">{entry.full_name}</td>
-                          <td data-label="Purok" title={entry.purok || undefined}>
-                            {purokShortLabel(entry.purok) || '—'}
-                            {entry.purok && !isKnownPurok(entry.purok) && (
-                              <span
-                                className="resident-purok-flag"
-                                title="This spelling is not on the barangay's purok list, so it cannot be grouped or matched. Editing this entry now offers the list."
-                              >
-                                not on the list
-                              </span>
-                            )}
-                          </td>
-                          <td data-label="Household #">{entry.household_number || '—'}</td>
-                          <td data-label="Contact">{entry.contact_number || '—'}</td>
-                          <td data-label="Action" className="action-cell">
-                            <ActionMenu
-                              portal
-                              subject={entry.full_name}
-                              items={[
-                                {
-                                  key: 'edit',
-                                  label: 'Edit',
-                                  icon: <FaEdit />,
-                                  onSelect: () => handleEditRegistryEntry(entry),
-                                },
-                                {
-                                  key: 'delete',
-                                  label: 'Delete',
-                                  icon: <FaTrash />,
-                                  danger: true,
-                                  onSelect: () => handleDeleteRegistryEntry(entry),
-                                },
-                              ]}
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                  )}
-                </>
-              )}
-            </div>
-              </>}
 
             />
           </div>
@@ -4378,8 +3187,8 @@ const OfficialDashboard = () => {
         {activeTab === 'community-credit' && <CreditManagement canManage={isSecretary || isKapitan} />}
 
         {activeTab === 'officials' && (
-          <div>
-            <div className="officials-dir-header">
+          <div className="official-service-page official-directory-page">
+            <div className="officials-dir-header official-dashboard-header">
               <h1>Officials Directory</h1>
               <p>Manage the digital face of your community leadership.</p>
             </div>
@@ -4573,21 +3382,18 @@ const OfficialDashboard = () => {
             SETTINGS TAB
         ======================== */}
         {activeTab === 'reports' && (
-          <div>
+          <div className="official-service-page official-reports-page">
             <div className="official-dashboard-header">
               <h1>Reports</h1>
-              <p>Activity trends across document requests and court reservations.</p>
+              <p>Document request activity and resident account verification. Retired-service statistics are not included.</p>
             </div>
 
             <div className="report-summary-grid">
               <div className="dashboard-card report-stat">
-                <div className="report-stat-number">{documentRequests.length}</div>
+                <div className="report-stat-number">{reportCount(overviewSources.documents, documentRequests.length)}</div>
                 <div className="report-stat-label">Total Document Requests</div>
               </div>
-              <div className="dashboard-card report-stat">
-                <div className="report-stat-number">{reservations.length}</div>
-                <div className="report-stat-label">Total Reservations</div>
-              </div>
+
               {/* Both figures come from the same grouping the Residents tab
                   lists, so the two tabs cannot report different numbers for
                   the same thing. "Registered Residents" used to count every
@@ -4595,26 +3401,28 @@ const OfficialDashboard = () => {
                   at all, which read as a barangay population figure and was
                   not one. */}
               <div className="dashboard-card report-stat">
-                <div className="report-stat-number">{residentGroups.residents.length}</div>
-                <div className="report-stat-label">Verified Residents</div>
+                <div className="report-stat-number">{reportCount(overviewSources.residents, residentGroups.residents.length)}</div>
+                <div className="report-stat-label">Verified Resident Accounts</div>
               </div>
               <div className="dashboard-card report-stat">
-                <div className="report-stat-number">{residentGroups.requests.length}</div>
+                <div className="report-stat-number">{reportCount(overviewSources.residents, residentGroups.requests.length)}</div>
                 <div className="report-stat-label">Open Verification Requests</div>
               </div>
             </div>
 
-            <div className="dashboard-card" style={{ marginTop: 20 }}>
+            <p className="dashboard-card-note">Counts cover complete records accessible to your account. Verified accounts and linked directory records measure different things. Monthly groups use Asia/Manila.</p>
+            <PublishingReadNotice state={overviewSources.residents} name="Resident account reports" hasRows={false} />
+            <div className="dashboard-card report-trend-card">
               <div className="dashboard-card-header">
                 <h3>Last 6 Months</h3>
               </div>
-              {monthlyCounts.every((b) => b.documents === 0 && b.reservations === 0) ? (
+              {overviewSources.documents.status !== 'ready' ? <PublishingReadNotice state={overviewSources.documents} name="Document reports" hasRows={false} /> : monthlyCounts.every((b) => b.documents === 0) ? (
                 <p className="dashboard-empty">No activity recorded in the last 6 months yet.</p>
               ) : (
                 <>
                   <div className="chart-legend">
                     <span><i className="chart-dot chart-dot-doc" /> Document Requests</span>
-                    <span><i className="chart-dot chart-dot-res" /> Reservations</span>
+
                   </div>
                   <div className="bar-chart">
                     {monthlyCounts.map((b) => (
@@ -4625,11 +3433,7 @@ const OfficialDashboard = () => {
                             style={{ height: `${(b.documents / maxMonthly) * 100}%` }}
                             title={`${b.documents} document request(s)`}
                           />
-                          <div
-                            className="bar bar-res"
-                            style={{ height: `${(b.reservations / maxMonthly) * 100}%` }}
-                            title={`${b.reservations} reservation(s)`}
-                          />
+
                         </div>
                         <div className="bar-chart-label">{b.label}</div>
                       </div>
@@ -4639,12 +3443,17 @@ const OfficialDashboard = () => {
               )}
             </div>
 
+            <DescriptiveInterpretation title="Document requests over the last six months"
+              rows={monthlyCounts.map(row => ({ label: row.label, total: row.documents }))}
+              mode="time" unit="document requests" state={overviewSources.documents.status}
+              note="Only valid creation dates inside the six displayed Asia/Manila months are counted. The current month may be partial; counts are not adjusted for month length." />
+
             <div className="report-two-col">
               <div className="dashboard-card">
                 <div className="dashboard-card-header">
                   <h3>Most Requested Documents</h3>
                 </div>
-                {documentTypeCounts.length === 0 ? (
+                {overviewSources.documents.status !== 'ready' ? <p className="dashboard-empty">Document rankings require a complete authorized read.</p> : documentTypeCounts.length === 0 ? (
                   <p className="dashboard-empty">No document requests yet.</p>
                 ) : (
                   <div className="rank-list">
@@ -4662,40 +3471,22 @@ const OfficialDashboard = () => {
                     ))}
                   </div>
                 )}
+                <DescriptiveInterpretation title="Most requested documents"
+                  rows={documentTypeCounts.map(([label, total]) => ({ label, total }))}
+                  unit="document requests" state={overviewSources.documents.status}
+                  note="The denominator is the complete authorized document-request collection, not only the six-month chart." />
               </div>
 
-              <div className="dashboard-card">
-                <div className="dashboard-card-header">
-                  <h3>Busiest Reservation Days</h3>
-                </div>
-                {reservations.length === 0 ? (
-                  <p className="dashboard-empty">No reservations yet.</p>
-                ) : (
-                  <div className="rank-list">
-                    {busiestDays.map((d) => (
-                      <div key={d.name} className="rank-row">
-                        <span className="rank-label">{d.name}</span>
-                        <div className="rank-bar-track">
-                          <div
-                            className="rank-bar-fill rank-bar-alt"
-                            style={{ width: `${(d.count / maxDay) * 100}%` }}
-                          />
-                        </div>
-                        <span className="rank-count">{d.count}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+
             </div>
           </div>
         )}
 
         {activeTab === 'activity' && (
-          <div>
+          <div className="official-service-page official-activity-page">
             <div className="official-dashboard-header">
               <h1>Activity Log</h1>
-              <p>A record of actions taken in the system. Entries cannot be edited or deleted.</p>
+              <p>A record of actions taken in the system. Entries cannot be edited or deleted. Times use Asia/Manila.</p>
             </div>
 
             <div className="dashboard-card">
@@ -4721,7 +3512,7 @@ const OfficialDashboard = () => {
                       {activityLog.map((entry) => (
                         <tr key={entry.id}>
                           <td data-label="When">
-                            {new Date(entry.created_at).toLocaleString()}
+                            {reportingDateTime(entry.created_at)}
                           </td>
                           <td data-label="Who">{entry.actor_name || '—'}</td>
                           <td data-label="Action">
@@ -4753,7 +3544,7 @@ const OfficialDashboard = () => {
         )}
 
         {activeTab === 'settings' && (
-          <div>
+          <div className="official-service-page official-settings-page">
             <div className="official-dashboard-header">
               <h1>Settings</h1>
               <p>Manage your account preferences.</p>
@@ -4771,7 +3562,7 @@ const OfficialDashboard = () => {
                 It is also why there is no "edit somebody else's hours"
                 control anywhere -- not hidden, absent, the same rule
                 ActionMenu follows. */}
-            <div className="dashboard-card" style={{ maxWidth: 760, marginBottom: 20 }}>
+            <div className="dashboard-card settings-hours-card">
               <div className="dashboard-card-header">
                 <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <FaCalendarAlt style={{ color: '#1e3a8a' }} /> My Consultation Hours
@@ -4823,13 +3614,13 @@ const OfficialDashboard = () => {
               )}
             </div>
 
-            <div className="dashboard-card" style={{ maxWidth: 480, marginBottom: 20 }}>
+            <div className="dashboard-card settings-photo-card">
               <div className="dashboard-card-header">
                 <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <FaUser style={{ color: '#1e3a8a' }} /> Profile Photo
                 </h3>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
+              <div className="settings-photo-control" style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
                 <PersonAvatar
                   name={userProfile?.full_name}
                   photoUrl={officialInfo?.photo_url}
@@ -4857,7 +3648,7 @@ const OfficialDashboard = () => {
                     accept="image/*"
                     onChange={handleAvatarChange}
                     disabled={submitting}
-                    style={{ display: 'none' }}
+                    className="visually-hidden"
                   />
                   <p style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>
                     JPG or PNG, shown across the public Officials Directory.
@@ -4866,7 +3657,7 @@ const OfficialDashboard = () => {
               </div>
             </div>
 
-            <div className="dashboard-card" style={{ maxWidth: 480 }}>
+            <div className="dashboard-card settings-password-card">
               <div className="dashboard-card-header">
                 <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <FaLock style={{ color: '#1e3a8a' }} /> Change Password
@@ -4885,7 +3676,7 @@ const OfficialDashboard = () => {
                     placeholder="Enter new password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    style={{ paddingRight: 40 }}
+                    style={{ paddingRight: 56 }}
                   />
                   <button
                     type="button"
@@ -4911,7 +3702,7 @@ const OfficialDashboard = () => {
                     placeholder="Confirm new password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    style={{ paddingRight: 40 }}
+                    style={{ paddingRight: 56 }}
                   />
                   <button
                     type="button"
@@ -4955,7 +3746,7 @@ const OfficialDashboard = () => {
           ANNOUNCEMENT MODAL
       ======================== */}
       {showAnnouncementModal && (
-        <div className="modal-overlay">
+        <div className="modal-overlay official-publishing-modal">
           <div className="modal" role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="offdlg-1-title">
             <h3 id="offdlg-1-title">
               {editingAnnouncement ? 'Edit Announcement' : 'New Announcement'}
@@ -5019,7 +3810,7 @@ const OfficialDashboard = () => {
           EVENT MODAL
       ======================== */}
       {showEventModal && (
-        <div className="modal-overlay">
+        <div className="modal-overlay official-publishing-modal">
           <div className="modal" role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="offdlg-2-title">
             <h3 id="offdlg-2-title">{editingEvent ? 'Edit Event' : 'Add Event'}</h3>
 
@@ -5082,7 +3873,7 @@ const OfficialDashboard = () => {
           OFFICIAL MODAL (Add / Edit)
       ======================== */}
       {showOfficialModal && (
-        <div className="modal-overlay">
+        <div className="modal-overlay official-directory-modal">
           <div className="modal" role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="offdlg-3-title">
             <h3 id="offdlg-3-title">{editingOfficial ? 'Edit Official' : 'Add Official'}</h3>
 
@@ -5177,8 +3968,8 @@ const OfficialDashboard = () => {
                     something broken. This one names only what is still
                     the case. */}
                 <p className="modal-form-hint">
-                  A position decides who may approve document requests and
-                  court reservations, so it is assigned directly in the
+                  A position determines access to protected barangay services,
+                  so it is assigned directly in the
                   database rather than from this form.
                 </p>
               </div>
@@ -5204,7 +3995,7 @@ const OfficialDashboard = () => {
                 <p className="modal-form-hint">
                   {POWERED_POSITIONS.join(', ')} are assigned directly in
                   the database, because they decide who may approve
-                  document requests and reservations.
+                  protected barangay services.
                 </p>
               </div>
             )}
@@ -5254,162 +4045,6 @@ const OfficialDashboard = () => {
         </div>
       )}
 
-      {showWasteModal && (
-        <div className="modal-overlay">
-          <div className="modal" role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="offdlg-4-title">
-            <h3 id="offdlg-4-title">{editingWaste ? 'Edit Schedule Entry' : 'Add Schedule Entry'}</h3>
-
-            <div className="modal-form-group">
-              <label htmlFor="off-purok" className="modal-form-label">Purok</label>
-              <input id="off-purok"
-                type="text"
-                className="modal-form-input"
-                placeholder="e.g. Purok 3"
-                value={newWasteEntry.purok}
-                onChange={(e) => setNewWasteEntry({ ...newWasteEntry, purok: e.target.value })}
-              />
-            </div>
-
-            <div className="modal-form-group">
-              <label htmlFor="off-waste-type" className="modal-form-label">Waste Type</label>
-              <select id="off-waste-type"
-                className="modal-form-input"
-                value={newWasteEntry.waste_type}
-                onChange={(e) => setNewWasteEntry({ ...newWasteEntry, waste_type: e.target.value })}
-              >
-                <option value="Biodegradable">Biodegradable</option>
-                <option value="Non-biodegradable">Non-biodegradable</option>
-                <option value="Recyclable">Recyclable</option>
-              </select>
-            </div>
-
-            <div className="modal-form-group">
-              <label htmlFor="off-day-of-week" className="modal-form-label">Day of Week</label>
-              <select id="off-day-of-week"
-                className="modal-form-input"
-                value={newWasteEntry.day_of_week}
-                onChange={(e) => setNewWasteEntry({ ...newWasteEntry, day_of_week: e.target.value })}
-              >
-                <option value="">Select day</option>
-                {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
-                  <option key={day} value={day}>{day}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="modal-form-group">
-              <label htmlFor="off-time-optional" className="modal-form-label">Time (optional)</label>
-              <input id="off-time-optional"
-                type="text"
-                className="modal-form-input"
-                placeholder="e.g. 6:00 AM - 8:00 AM"
-                value={newWasteEntry.time_label}
-                onChange={(e) => setNewWasteEntry({ ...newWasteEntry, time_label: e.target.value })}
-              />
-            </div>
-
-            <div className="modal-form-group">
-              <label htmlFor="off-notes-optional" className="modal-form-label">Notes (optional)</label>
-              <input id="off-notes-optional"
-                type="text"
-                className="modal-form-input"
-                placeholder="e.g. Segregate before collection"
-                value={newWasteEntry.notes}
-                onChange={(e) => setNewWasteEntry({ ...newWasteEntry, notes: e.target.value })}
-              />
-            </div>
-
-            <div className="modal-buttons">
-              <button className="btn-cancel" onClick={() => { setShowWasteModal(false); setEditingWaste(null) }}>
-                Cancel
-              </button>
-              <button className="btn-save" onClick={handleSaveWaste} disabled={submitting}>
-                {submitting ? 'Saving...' : editingWaste ? 'Update Entry' : 'Save Entry'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showRegistryModal && (
-        <div className="modal-overlay">
-          <div className="modal" role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="offdlg-5-title">
-            <h3 id="offdlg-5-title">{editingRegistryEntry ? 'Edit Voter Reference Entry' : 'Add Voter Reference Entry'}</h3>
-
-            <div className="modal-form-group">
-              <label htmlFor="off-full-name-2" className="modal-form-label">Full Name</label>
-              <input id="off-full-name-2"
-                type="text"
-                className="modal-form-input"
-                placeholder="e.g. Juan Dela Cruz"
-                value={newRegistryEntry.full_name}
-                onChange={(e) => setNewRegistryEntry({ ...newRegistryEntry, full_name: e.target.value })}
-              />
-            </div>
-
-            <div className="modal-form-group">
-              <label className="modal-form-label" htmlFor="registry-entry-purok">Purok</label>
-              {/* The barangay's own list, not a text box. Free text here is
-                  what produced the five different spellings of one purok
-                  already in the data, none of which can be grouped or
-                  matched against anything.
-
-                  An entry that already holds an off-list value keeps it as
-                  an extra option, selected: the dropdown must not silently
-                  drop what the barangay recorded the moment somebody opens
-                  the form to change a phone number. Correcting it is a
-                  deliberate choice from the list. */}
-              <select
-                id="registry-entry-purok"
-                className="modal-form-input"
-                value={newRegistryEntry.purok}
-                onChange={(e) => setNewRegistryEntry({ ...newRegistryEntry, purok: e.target.value })}
-              >
-                <option value="">Select a purok</option>
-                {PUROKS.map((purok) => (
-                  <option key={purok} value={purok}>{purok}</option>
-                ))}
-                {newRegistryEntry.purok && !isKnownPurok(newRegistryEntry.purok) && (
-                  <option value={newRegistryEntry.purok}>
-                    {newRegistryEntry.purok} (as recorded — not on the list)
-                  </option>
-                )}
-              </select>
-            </div>
-
-            <div className="modal-form-group">
-              <label htmlFor="off-household-number-optional" className="modal-form-label">Household Number (optional)</label>
-              <input id="off-household-number-optional"
-                type="text"
-                className="modal-form-input"
-                placeholder="e.g. HH-0012"
-                value={newRegistryEntry.household_number}
-                onChange={(e) => setNewRegistryEntry({ ...newRegistryEntry, household_number: e.target.value })}
-              />
-            </div>
-
-            <div className="modal-form-group">
-              <label htmlFor="off-contact-number-optional-2" className="modal-form-label">Contact Number (optional)</label>
-              <input id="off-contact-number-optional-2"
-                type="text"
-                className="modal-form-input"
-                placeholder="09xx xxx xxxx"
-                value={newRegistryEntry.contact_number}
-                onChange={(e) => setNewRegistryEntry({ ...newRegistryEntry, contact_number: e.target.value })}
-              />
-            </div>
-
-            <div className="modal-buttons">
-              <button className="btn-cancel" onClick={() => { setShowRegistryModal(false); setEditingRegistryEntry(null) }}>
-                Cancel
-              </button>
-              <button className="btn-save" onClick={handleSaveRegistryEntry} disabled={submitting}>
-                {submitting ? 'Saving...' : editingRegistryEntry ? 'Update Entry' : 'Save Entry'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ⚠️ The preview owns its own dialog semantics and its own
           `useModalA11y` call, rather than joining the nine-modal list

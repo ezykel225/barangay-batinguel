@@ -304,7 +304,7 @@ describe('migration 028 and the dashboard agree on which positions carry power',
 
   it('the dashboard gates on those same three strings', () => {
     expect(OFFICIAL).toContain("officialInfo?.position === 'Punong Barangay'")
-    expect(OFFICIAL).toContain("officialInfo?.position === 'Barangay Treasurer'")
+    expect(OFFICIAL).not.toContain("const isTreasurer =")
     expect(OFFICIAL).toContain("officialInfo?.position === 'Barangay Secretary'")
   })
 })

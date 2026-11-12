@@ -1,5 +1,5 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { FaBars, FaTimes, FaUser } from 'react-icons/fa'
 import { useAuth } from '../context/AuthContext'
 import EServicesMenu from './EServicesMenu'
@@ -21,6 +21,18 @@ const E_SERVICE_PATHS = [
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false)
+  const menuTriggerRef = useRef(null)
+
+  useEffect(() => {
+    if (!isOpen) return
+    const handleEscape = (event) => {
+      if (event.key !== 'Escape') return
+      setIsOpen(false)
+      menuTriggerRef.current?.focus()
+    }
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [isOpen])
   const location = useLocation()
   const navigate = useNavigate()
   const { user, role, logout } = useAuth()
@@ -90,14 +102,6 @@ const Navbar = () => {
               Officials
             </Link>
           </li>
-          <li>
-            <Link
-              to="/health-center"
-              className={location.pathname === '/health-center'
-                ? 'active' : ''}>
-              Health Center
-            </Link>
-          </li>
           {/* ⚠️ A PUBLIC entry, deliberately NOT an E-Services item.
               E-Services is the transaction catalogue -- every entry in
               it is something a visitor asks the barangay to DO, and
@@ -165,6 +169,7 @@ const Navbar = () => {
         <button
           type="button"
           className="navbar-toggle"
+          ref={menuTriggerRef}
           onClick={toggleMenu}
           aria-expanded={isOpen}
           aria-controls="navbar-mobile-menu"
@@ -187,11 +192,6 @@ const Navbar = () => {
         <li>
           <Link to="/officials" onClick={toggleMenu}>
             Officials
-          </Link>
-        </li>
-        <li>
-          <Link to="/health-center" onClick={toggleMenu}>
-            Health Center
           </Link>
         </li>
         <li>

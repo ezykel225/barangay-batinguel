@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { activateCreditPolicy,enrollActiveResidents,getCreditAdminState,retireCreditPolicy,saveCreditPolicy,saveCreditRule,setCreditRuleActive } from './communityCreditApi'
 import { DialogShell } from '../components/OfficialArchiveDialog'
 import './CommunityCredit.css'
+import '../dashboards/OfficialServices.css'
+import '../dashboards/OfficialRemaining.css'
 
 const blankPolicy={name:'',description:'',base_score:100,minimum_score:0,maximum_score:100}
 const blankRule=policyId=>({policy_id:policyId||'',rule_code:'',title:'',description:'',category:'positive',source_domain:'community_activity',points_delta:'',repairable:false})
@@ -12,10 +14,10 @@ export default function CreditManagement({canManage}){
  const policyNameRef=useRef(null),rulePolicyRef=useRef(null)
  const load=()=>{setLoading(true);getCreditAdminState().then(v=>{setData(v||{policies:[],rules:[]});setError('')}).catch(()=>setError('Community credit administration is unavailable.')).finally(()=>setLoading(false))}
  useEffect(()=>{if(canManage)load()},[canManage]) // eslint-disable-line react-hooks/exhaustive-deps
- if(!canManage)return <section className="dashboard-card"><h2>Community Credit</h2><p>The Barangay Secretary or Punong Barangay manages credit policies and rules.</p></section>
+ if(!canManage)return <section className="dashboard-card official-credit-readonly"><h2>Community Credit</h2><p>The Barangay Secretary or Punong Barangay manages credit policies and rules.</p></section>
  const act=async(fn,message)=>{if(busy)return;setBusy(true);setError('');try{const result=await fn();setNotice(typeof message==='function'?message(result):message);setPolicy(null);setRule(null);load()}catch{setError('The change was not saved. Review the values, policy state, and your permission.')}finally{setBusy(false)}}
  const active=data.policies.find(p=>p.status==='active'),drafts=data.policies.filter(p=>p.status==='draft')
- return <div className="credit-admin">
+ return <div className="credit-admin official-service-page official-credit-page">
   <div className="official-dashboard-header"><h1>Community Credit</h1><p>Configure future verified credit-event policy and rules.</p></div>
   <p className="credit-warning" role="note">Credit rules define future verified credit events. Reports, complaints and incidents do not affect a resident’s score until a separate verified outcome review is completed.</p>
   {notice&&<p role="status">{notice}</p>}{error&&<p role="alert">{error}</p>}{loading?<p role="status">Loading policies and rules...</p>:<>

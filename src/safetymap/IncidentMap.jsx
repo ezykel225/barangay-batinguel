@@ -79,7 +79,11 @@ const IncidentMap = ({ points = [], hotspots = [], coveredKeys = [], height = 42
     // centre, not an asserted boundary.
     map.setView([9.3068, 123.3054], 15)
     mapRef.current = map
-    return () => { removeLeafletMap(map); mapRef.current = null; layerRef.current = null }
+    // The sidebar and responsive layout can resize the canvas without a window
+    // resize. Re-measure only; retain the current centre, zoom and layers.
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => map.invalidateSize({ pan: false }))
+    observer?.observe(containerRef.current)
+    return () => { observer?.disconnect(); removeLeafletMap(map); mapRef.current = null; layerRef.current = null }
   }, [])
 
   useEffect(() => {

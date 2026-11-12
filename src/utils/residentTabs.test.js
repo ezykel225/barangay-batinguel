@@ -14,7 +14,7 @@ describe('the ?tab= deep link into the resident portal', () => {
   // ⚠️ The load-bearing one. A crafted or stale value must land on the
   // portal's front page, not render an empty portal that looks broken.
   it('falls back to the dashboard for anything it does not recognise', () => {
-    ;['secrets', 'official', '', '../admin', 'DOCUMENTS', '<script>', null, undefined]
+    ;['reservations', 'secrets', 'official', '', '../admin', 'DOCUMENTS', '<script>', null, undefined]
       .forEach((value) => {
         expect(resolveResidentTab(value)).toBe(DEFAULT_RESIDENT_TAB)
       })
@@ -31,7 +31,7 @@ describe('the ?tab= deep link into the resident portal', () => {
       // ⚠️ 'complaints' was added by P3-B1 together with the fifth
       // entry in Sidebar's residentNavItems. This assertion failing is
       // the guard working: the two arrays must not drift.
-      'dashboard', 'documents', 'reservations', 'complaints', 'community-credit', 'settings',
+      'dashboard', 'documents', 'complaints', 'community-credit', 'settings',
     ])
   })
 })

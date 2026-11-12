@@ -62,12 +62,12 @@ beforeEach(() => {
 const show = (element, route = '/') => render(<MemoryRouter initialEntries={[route]}>{element}</MemoryRouter>)
 const navigate = async tab => userEvent.click(screen.getByRole('button', { name: tab + ' navigation' }))
 
-test('Home has five popular services, concise previews, and unchanged destinations', async () => {
+test('Home has retained popular services, concise previews, and unchanged destinations', async () => {
   show(<Home />)
   expect(screen.getByRole('heading', { name: 'Popular E-Services' })).toBeInTheDocument()
   const cards = document.querySelectorAll('.home-service-card')
-  expect(cards).toHaveLength(5)
-  expect([...cards].map(card => card.getAttribute('href'))).toEqual(expect.arrayContaining(['/reservation','/track-reservation','/track-complaint','/resident?tab=complaints','/resident?tab=documents']))
+  expect(cards).toHaveLength(3)
+  expect([...cards].map(card => card.getAttribute('href'))).toEqual(expect.arrayContaining(['/track-complaint','/resident?tab=complaints','/resident?tab=documents']))
   expect(screen.queryByText('My Complaints')).toBeNull()
   expect(screen.getByRole('link', { name: 'View E-Services' })).toHaveAttribute('href', '/e-services')
   expect(screen.getByRole('link', { name: 'View Safety Map' })).toHaveAttribute('href', '/community-safety')
@@ -81,7 +81,7 @@ test('E-Services removes shared authentication strip and preserves each return d
   expect(screen.queryByRole('link', { name: 'Create account' })).toBeNull()
   expect(screen.queryByText('Sign in to continue')).toBeNull()
   expect(screen.getByRole('link', { name: 'Request Document' })).toHaveAttribute('href', '/login?next=%2Fresident%3Ftab%3Ddocuments')
-  expect(screen.getByRole('link', { name: 'Reserve Court' })).toHaveAttribute('href', '/reservation')
+  expect(screen.queryByRole('link', { name: 'Reserve Court' })).not.toBeInTheDocument()
   cleanup()
   useAuth.mockReturnValue({ user, role: 'resident' })
   show(<EServices />)
@@ -148,15 +148,10 @@ test('resident documents search and filters use only loaded owned records', asyn
 
 test('resident reservation View opens correct owned data and restores focus on Escape', async () => {
   show(<ResidentDashboard />, '/resident?tab=reservations')
-  const view = await screen.findByRole('button', { name: 'View reservation RES-EXAMPLE' })
-  await userEvent.click(view)
-  const modal = screen.getByRole('dialog', { name: 'Reservation Details' })
-  expect(within(modal).getByText('Training')).toBeInTheDocument()
-  expect(within(modal).getByText('09123456789')).toBeInTheDocument()
-  expect(within(modal).getByText('RES-EXAMPLE')).toBeInTheDocument()
-  await userEvent.keyboard('{Escape}')
-  expect(screen.queryByRole('dialog')).toBeNull()
-  expect(view).toHaveFocus()
+  await screen.findByRole('heading', { name: /Welcome/ })
+  expect(screen.getByRole('note')).toHaveTextContent('This workflow is no longer available')
+  expect(screen.queryByRole('button', { name: /View reservation/ })).not.toBeInTheDocument()
+  expect(reads.some(row => row.table === 'reservations')).toBe(false)
 })
 
 test('resident dashboard keeps recent requests and summary without redundant Quick Actions', async () => {
@@ -312,12 +307,12 @@ test('resident filing uses fixed header/body/footer and shared focus behavior', 
 })
 
 test('reservation Action omits obsolete placeholder while View still opens details', async () => {
-  tables.reservations = [{ ...reservation, status: 'completed' }]
   show(<ResidentDashboard />, '/resident?tab=reservations')
-  const view = await screen.findByRole('button', { name: 'View reservation RES-EXAMPLE' })
-  expect(view.closest('td')).toHaveTextContent(/^View$/)
-  await userEvent.click(view)
-  expect(screen.getByRole('dialog', { name: 'Reservation Details' })).toBeInTheDocument()
+  await screen.findByRole('heading', { name: /Welcome/ })
+  await userEvent.click(screen.getByRole('button',{name:'reservations navigation'}))
+  expect(screen.queryByRole('dialog',{name:'Reservation Details'})).not.toBeInTheDocument()
+  expect(reads.some(row => row.table === 'reservations')).toBe(false)
+  expect(writes).toHaveLength(0)
 })
 
 test('nurse stock overview counts loaded statuses, prioritizes alerts, limits preview and opens Medicines', async () => {

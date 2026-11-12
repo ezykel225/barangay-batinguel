@@ -1,0 +1,66 @@
+/* Stage 7N conventions: scoped to the two publishing pages and their forms. */
+.official-content-page{display:grid;gap:18px;min-width:0;color:#183154}
+.official-content-page .announcements-header,.official-content-page .events-header{margin:0;padding:0}
+.official-content-page h1{font-size:clamp(24px,2.5vw,29px);line-height:1.25;margin:0;color:#163660;letter-spacing:-.5px}
+.official-content-page .announcements-header p,.official-content-page .events-header p{font-size:13px;color:#52657b;margin:7px 0 0;line-height:1.5}
+.official-content-page>.dashboard-card{margin:0;padding:18px;border:1px solid #dce6f1;border-radius:12px;box-shadow:0 2px 8px #1b3d6407;min-width:0}
+.official-content-page .dashboard-card-header{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px 18px;align-items:center;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #e7edf5}
+.official-content-page .dashboard-card-header h2{font-size:17px;margin:0;color:#183b69}
+.publishing-toolbar{display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap;min-width:0;justify-content:flex-end}
+.publishing-toolbar label{display:grid;gap:5px;font-size:12px;font-weight:600;color:#425a78;min-width:0;max-width:100%}
+.publishing-toolbar input,.publishing-toolbar select{min-height:44px;min-width:0;width:100%;max-width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #b8cce4;border-radius:7px;background:#fff;color:#23476f;font:inherit;font-size:13px}
+.publishing-toolbar .publishing-search{flex:1 1 150px;max-width:220px}
+.publishing-toolbar label:not(.publishing-search){flex:0 1 175px}
+.publishing-toolbar>button,.publishing-toolbar>.view-toggle{flex-shrink:0}
+.official-content-page .btn-add,.official-content-page .btn-cancel{min-height:44px;border-radius:7px;padding:8px 12px;font-size:12px;margin:0;white-space:normal}
+.official-content-page .btn-add{background:#235b9c;color:#fff;border:1px solid #235b9c}
+.official-content-page .view-toggle{margin:0;min-width:0}
+.official-content-page .view-toggle button{min-height:44px;padding:8px 12px;font-size:12px}
+.publishing-result,.publishing-calendar-note{font-size:12px;color:#52657b;margin:0 0 12px;line-height:1.5}
+.publishing-notice{font-size:13px;line-height:1.6;padding:12px;background:#f5f8fd;border:1px solid #dce6f1;border-radius:8px;color:#425a78;margin:0 0 12px}
+.official-content-page .dashboard-empty{padding:24px 12px;margin:0;color:#52657b;font-size:13px}
+.official-content-page .table-wrapper{max-width:100%;border:1px solid #e4ebf3;border-radius:9px}
+.official-content-page .dashboard-table{width:100%;table-layout:fixed}
+.official-content-page .dashboard-table th{background:#f5f8fc;color:#425a78;font-size:11px;font-weight:700;letter-spacing:.2px;padding:11px 12px}
+.official-content-page .dashboard-table td{font-size:13px;padding:12px;vertical-align:middle;border-color:#e9eef5;overflow-wrap:anywhere}
+.official-content-page .publishing-table th{width:auto}
+.publishing-announcements .publishing-col-title{width:50%}
+.publishing-announcements .publishing-col-category{width:20%}
+.publishing-announcements .publishing-col-date{width:auto}
+.publishing-events .publishing-col-title{width:30%}
+.publishing-events .publishing-col-date{width:23%}
+.publishing-events .publishing-col-location{width:auto}
+.publishing-table .publishing-col-sms{width:76px}
+.publishing-table .publishing-col-actions{width:64px}
+.official-content-page .publishing-table td,.official-content-page .publishing-table th{padding:10px 8px;vertical-align:middle}
+.official-content-page .publishing-table td[data-label="SMS"],.official-content-page .publishing-table th:nth-last-child(2),.official-content-page .publishing-table td.action-cell,.official-content-page .publishing-table th:last-child{text-align:center}
+.official-content-page .publishing-table .sms-history-button{white-space:nowrap;overflow-wrap:normal;word-break:normal;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;min-width:52px;width:52px;min-height:44px;height:44px;padding:6px 8px;box-sizing:border-box;line-height:1}
+.publishing-title{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-weight:600;line-height:1.6;color:#23476f;overflow-wrap:anywhere}
+.publishing-title:focus{display:block;-webkit-line-clamp:unset;overflow:visible}
+.publishing-badge{display:inline-block;max-width:100%;box-sizing:border-box;font-size:11px;font-weight:600;line-height:1.5;padding:3px 8px;border:1px solid #d7e4f4;border-radius:6px;color:#315b8c;background:#eef4fc;overflow-wrap:anywhere}
+.publishing-period-past{color:#52657b;background:#f3f5f8;border-color:#dce3ec}
+.publishing-date{display:flex;flex-wrap:wrap;gap:3px 6px;align-items:center}
+.publishing-date>span:first-child{flex:1 1 100%}
+.publishing-date>.publishing-badge,.publishing-date small{white-space:nowrap}
+.publishing-time-missing{font-weight:400}
+.publishing-date small{font-size:11px;color:#52657b}
+.official-content-page .sms-history-button{min-height:44px;min-width:44px;font-size:11px}
+.official-content-page .action-menu-trigger{min-height:44px;min-width:44px}
+.official-content-page .dashboard-calendar-layout{min-width:0}
+.official-content-page :is(button,input,select,.publishing-title):focus-visible,.official-publishing-modal :is(button,input,select,textarea):focus-visible{outline:3px solid #2563eb;outline-offset:3px}
+.official-publishing-modal .modal{border:1px solid #dce6f1;border-radius:12px;max-width:min(600px,100%);box-sizing:border-box}
+.official-publishing-modal .modal-form-input{min-height:44px;border-radius:7px;border-color:#b8cce4}
+.official-publishing-modal .modal-actions{display:flex;gap:10px;flex-wrap:wrap}
+.official-publishing-modal .modal-actions button{min-height:44px}
+@media(max-width:768px){.publishing-toolbar{justify-content:flex-start;flex-basis:100%}.official-content-page .dashboard-table{table-layout:auto}.official-content-page .dashboard-table th:first-child{width:auto}.official-content-page .dashboard-calendar-layout{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:480px){.official-content-page>.dashboard-card{padding:14px}.publishing-toolbar{align-items:stretch}.publishing-toolbar label,.publishing-toolbar .publishing-search{flex:1 1 100%;max-width:100%}.official-content-page .dashboard-card-header{gap:12px}.official-content-page .view-toggle{display:flex;max-width:100%}.official-content-page .dashboard-table td{padding:10px 12px}.official-content-page .dashboard-table td[data-label="SMS"]{display:flex;align-items:center;gap:10px}.publishing-title{-webkit-line-clamp:3}.official-publishing-modal .modal{padding:16px}}
+@media(prefers-reduced-motion:reduce){.official-content-page *,.official-publishing-modal *{transition:none!important;animation:none!important}}
+@media(min-width:769px){.official-content-page .publishing-table{min-width:560px}.official-content-page .publishing-table td.action-cell{display:table-cell}}
+@media(max-width:1100px){.publishing-announcements .publishing-col-title{width:48%}.publishing-announcements .publishing-col-category{width:18%}}
+@media(max-width:900px){.official-content-page .dashboard-card-header{grid-template-columns:minmax(0,1fr)}.publishing-toolbar{justify-content:flex-start}}
+@media(max-width:768px){.publishing-table colgroup{display:none}.official-content-page .publishing-table{min-width:0}.official-content-page .publishing-table td[data-label="SMS"],.official-content-page .publishing-table td.action-cell{text-align:left}.official-content-page .publishing-table .sms-history-button{margin-left:auto}}
+.official-publishing-modal .modal-buttons{display:flex;gap:10px;flex-wrap:wrap}
+.official-publishing-modal .modal-buttons button{min-height:44px;border-radius:7px;font-size:13px}
+.official-publishing-modal .modal-form-textarea{border:1px solid #b8cce4;border-radius:7px;min-height:100px}
+.official-publishing-modal .btn-save{background:#235b9c;color:#fff}
+@media(max-width:768px){.official-content-page .dashboard-table tr{padding:10px;margin-bottom:10px;box-shadow:none}.official-content-page .dashboard-table td[data-label="SMS"],.official-content-page .dashboard-table td[data-label="Action"]{flex-direction:row;justify-content:space-between;align-items:center}.official-content-page .dashboard-table td{padding:8px 4px}}

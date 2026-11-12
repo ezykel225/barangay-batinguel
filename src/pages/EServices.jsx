@@ -81,8 +81,8 @@ const EServices = () => {
             <p>
               Visit the Barangay Hall during office hours, or see the contact
               details at the bottom of this page. Document requests are
-              processed by the Barangay Secretary and court reservations by
-              the Barangay Treasurer.
+              processed by the Barangay Secretary. For complaint assistance,
+              please contact authorized barangay personnel.
             </p>
           </aside>
         </section>

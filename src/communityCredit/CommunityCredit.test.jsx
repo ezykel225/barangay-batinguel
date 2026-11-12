@@ -9,6 +9,22 @@ const profile={configured:true,resident:{full_name:'Test Resident',purok:'1',res
 
 beforeEach(()=>jest.resetAllMocks())
 
+test('resident gauge preserves V1 metrics and read-only ledger using the own-profile RPC', async()=>{
+ api.getMyCreditProfile.mockResolvedValue({profile:{...profile,starting_score:100,credit_started_at:'2026-10-01T00:00:00Z',ledger:[{id:'unit-ledger',event:'Unit test adjustment',category:'positive',points:12,source:'community_activity',verified_by:'Unit test verifier',verified_at:'2026-10-20T00:00:00Z'}]}})
+ render(<CreditProfile />)
+ expect(await screen.findByRole('img',{name:/Current community credit score 82 out of 100/})).toBeInTheDocument()
+ for(const [label,value] of [['Starting score','100'],['Credit adjustments total','+12'],['Positive events','2'],['Negative events','1'],['Repair events','1']]){
+  expect(screen.getByText(label).nextSibling).toHaveTextContent(value)
+ }
+ expect(screen.getByText('Last credit activity').nextSibling).not.toHaveTextContent('None')
+ expect(screen.getByText('Credit started').nextSibling).not.toHaveTextContent('None')
+ expect(screen.getByText('Policy: Fixture policy')).toBeInTheDocument()
+ expect(screen.getByText('Unit test adjustment')).toBeInTheDocument()
+ expect(screen.queryByRole('button')).not.toBeInTheDocument()
+ expect(api.getMyCreditProfile).toHaveBeenCalledWith()
+ expect(api.getResidentCreditProfile).not.toHaveBeenCalled()
+})
+
 test('renders a configured server-calculated score and empty ledger',async()=>{
  api.getResidentCreditProfile.mockResolvedValue(profile)
  render(<CreditProfile residentId="00000000-0000-0000-0000-000000000001" showResident/>)

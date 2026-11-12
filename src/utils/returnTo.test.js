@@ -27,16 +27,23 @@ describe('the list itself', () => {
 })
 
 describe('safeReturnTo', () => {
+  it.each(['/reservation','/track-reservation','/health-center','/nurse','/resident?tab=reservations'])('rejects stale retired destination %s, including encoded forms', destination => {
+    for (const value of [destination, encodeURIComponent(destination), ` ${destination} `]) {
+      expect(safeReturnTo(value, '/resident')).toBe('/resident')
+      expect(loginHrefFor(value)).toBe('/login')
+    }
+    expect(RETURN_TO_PATHS).not.toContain(destination)
+  })
   it('returns a path that is on the list', () => {
     expect(safeReturnTo('/e-services')).toBe('/e-services')
-    expect(safeReturnTo('/reservation')).toBe('/reservation')
+    expect(safeReturnTo('/track-complaint')).toBe('/track-complaint')
     expect(safeReturnTo('/resident?tab=documents')).toBe('/resident?tab=documents')
   })
 
   it('accepts a percent-encoded form of a listed path', () => {
     expect(safeReturnTo(encodeURIComponent('/resident?tab=documents')))
       .toBe('/resident?tab=documents')
-    expect(safeReturnTo('%2Ftrack-reservation')).toBe('/track-reservation')
+    expect(safeReturnTo('%2Ftrack-complaint')).toBe('/track-complaint')
   })
 
   it('falls back when there is nothing to go back to', () => {
@@ -110,7 +117,7 @@ describe('safeReturnTo', () => {
 
   it('trims surrounding whitespace on an otherwise listed path', () => {
     expect(safeReturnTo('  /e-services  ')).toBe('/e-services')
-    expect(safeReturnTo('\n/reservation\t')).toBe('/reservation')
+    expect(safeReturnTo('\n/track-complaint\t')).toBe('/track-complaint')
   })
 })
 

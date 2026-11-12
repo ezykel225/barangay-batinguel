@@ -1,3 +1,5 @@
+import '../dashboards/OfficialServices.css'
+import { publishingDate } from '../dashboards/OfficialPublishingUI'
 import PartyLink from '../casesupport/PartyLink'
 import EvidenceActions from '../casesupport/EvidenceActions'
 import SupportHistory from '../casesupport/SupportHistory'
@@ -260,13 +262,13 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
     disposition?.complaintId === selectedId && !detailRestricted ? disposition : null)
 
   return (
-    <div>
+    <div className="official-service-page official-complaints-page">
       <div className="official-dashboard-header">
         <h1>Complaints</h1>
         <p>Record and review complaints brought to the barangay.</p>
       </div>
 
-      <div className="dashboard-card">
+      <div className="dashboard-card official-service-card">
         <div className="dashboard-card-header">
           <h2 className="section-heading"><FaCommentDots aria-hidden="true" /> Complaint queue</h2>
           {/* ⚠️ RENDERED FOR THE BARANGAY SECRETARY ONLY, because
@@ -410,6 +412,7 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
                 ))}
               </select>
             </div>
+            <button type="button" className="btn-cancel service-reset" onClick={() => { setSearch(''); setStatus('all'); setChannel('all') }} disabled={!search && status === 'all' && channel === 'all'}>Reset filters</button>
           </div>
         )}
 
@@ -422,20 +425,21 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
 
         {!loading && !loadError && filtered.length > 0 && (
           <div className="table-wrapper">
-            <table className="dashboard-table">
+            <table className="dashboard-table service-table complaint-queue-table">
+              <colgroup><col className="service-col-reference"/><col className="service-col-channel"/><col className="service-col-status"/><col className="service-col-received"/><col className="service-col-updated"/><col className="service-col-action"/></colgroup>
               <thead>
                 <tr>
-                  <th>Reference</th>
-                  <th>How it arrived</th>
-                  <th>Status</th>
+                  <th scope="col">Reference</th>
+                  <th scope="col">How it arrived</th>
+                  <th scope="col">Status</th>
                   {/* "Date received", not "Received": the status badge in
                       the next column also reads "Received", and two
                       near-identical strings side by side read as a
                       fault -- the defect HEALTH_NURSE_ROLE exists to
                       prevent. */}
-                  <th>Date received</th>
-                  <th>Last updated</th>
-                  <th>Action</th>
+                  <th scope="col">Date received</th>
+                  <th scope="col">Last updated</th>
+                  <th scope="col">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -457,12 +461,12 @@ const OfficialComplaints = ({ isSecretary = false, isKapitan = false }) => {
                       </td>
                       <td data-label="How it arrived">{intakeChannelLabel(row.intake_channel)}</td>
                       <td data-label="Status">
-                        <span className={`status-badge ${badge.className}`} title={row.status}>
+                        <span className={`status-badge ${badge.className}`} data-status={row.status} title={row.status}>
                           {badge.label}
                         </span>
                       </td>
-                      <td data-label="Date received">{complaintDate(row.created_at)}</td>
-                      <td data-label="Last updated">{complaintDate(row.updated_at)}</td>
+                      <td data-label="Date received">{publishingDate(row.created_at)}</td>
+                      <td data-label="Last updated">{publishingDate(row.updated_at)}</td>
                       <td data-label="Action">
                         <button
                           type="button"

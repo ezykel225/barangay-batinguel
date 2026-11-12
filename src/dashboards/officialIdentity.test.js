@@ -174,12 +174,12 @@ describe('the position flags still derive from the ID-resolved row', () => {
   // id, which the tests above establish.
   it('reads officialInfo.position and nothing else', () => {
     expect(OFFICIAL).toContain("const isKapitan = officialInfo?.position === 'Punong Barangay'")
-    expect(OFFICIAL).toContain("const isTreasurer = officialInfo?.position === 'Barangay Treasurer'")
+    expect(OFFICIAL).not.toContain("const isTreasurer =")
     expect(OFFICIAL).toContain("const isSecretary = officialInfo?.position === 'Barangay Secretary'")
   })
 
   it('does not derive any of them from a name', () => {
-    ;['isKapitan', 'isTreasurer', 'isSecretary'].forEach((flag) => {
+    ;['isKapitan', 'isSecretary'].forEach((flag) => {
       const at = OFFICIAL.indexOf(`const ${flag} = `)
       expect(at).toBeGreaterThan(-1)
       const line = OFFICIAL.slice(at, OFFICIAL.indexOf('\n', at))
@@ -191,7 +191,7 @@ describe('the position flags still derive from the ID-resolved row', () => {
 describe('the sidebar resolves the official the same way', () => {
   const DRAWER = SIDEBAR.slice(
     SIDEBAR.indexOf("if (role === 'official') {"),
-    SIDEBAR.indexOf("} else if (role === 'nurse')"),
+    SIDEBAR.indexOf("} else if (role === 'resident')"),
   )
 
   it('uses the RPC and the primary key', () => {

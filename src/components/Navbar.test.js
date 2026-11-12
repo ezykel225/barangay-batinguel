@@ -27,6 +27,33 @@ const renderNavbar = () =>
 const toggle = () => screen.getByRole('button', { name: /navigation menu/i })
 
 describe('the mobile menu button', () => {
+  it('closes on Escape from a drawer link and returns focus to its trigger', () => {
+    const { container } = renderNavbar()
+    fireEvent.click(toggle())
+    const link = container.querySelector('#navbar-mobile-menu a')
+    link.focus()
+    fireEvent.keyDown(link, { key: 'Escape' })
+    expect(toggle()).toHaveAttribute('aria-expanded', 'false')
+    expect(toggle()).toHaveFocus()
+    expect(container.querySelector('#navbar-mobile-menu')).not.toHaveClass('open')
+  })
+
+  it('does not steal focus on Escape when the drawer is closed', () => {
+    const { container } = renderNavbar()
+    const link = container.querySelector('a')
+    link.focus()
+    fireEvent.keyDown(link, { key: 'Escape' })
+    expect(link).toHaveFocus()
+    expect(toggle()).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('still closes when a mobile navigation link is selected', () => {
+    const { container } = renderNavbar()
+    fireEvent.click(toggle())
+    fireEvent.click(container.querySelector('#navbar-mobile-menu a'))
+    expect(toggle()).toHaveAttribute('aria-expanded', 'false')
+  })
+
   it('has an accessible name', () => {
     renderNavbar()
     expect(toggle()).toBeInTheDocument()
@@ -111,13 +138,12 @@ describe('the mobile drawer and the E-Services catalogue', () => {
     })
   })
 
-  it('no longer gives Court Reservation its own top-level entry', () => {
+  it('removes Court Reservation entirely while keeping complaint tracking in E-Services', () => {
     openDrawer()
-    // It is still reachable -- as a service inside E-Services, which is
-    // the point of the change.
-    const courtLinks = screen.getAllByRole('link', { name: /Court Reservation/ })
-    expect(courtLinks.length).toBeGreaterThan(0)
-    courtLinks.forEach((link) => {
+    expect(screen.queryByRole('link', { name: /Court Reservation/ })).not.toBeInTheDocument()
+    const complaintLinks = screen.getAllByRole('link', { name: /Track a Complaint/ })
+    expect(complaintLinks.length).toBeGreaterThan(0)
+    complaintLinks.forEach((link) => {
       expect(link.closest('.navbar-mobile-sublist')).not.toBeNull()
     })
   })

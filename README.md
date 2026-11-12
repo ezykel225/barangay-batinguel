@@ -1,5 +1,9 @@
 # Barangay Batinguel E-System
 
+> Current development workflow: [React with hosted Supabase](docs/supabase-only-development.md).
+> Docker and a local PostgreSQL installation are not required. Older local QA
+> scripts and historical feature descriptions below are not release approval.
+
 A web-based e-processing system for Barangay Batinguel, Dumaguete City,
 built with React and Supabase. Residents can view announcements and
 events, check the health center schedule and which medicines are in

@@ -1,0 +1,56 @@
+/* Stage 7S: remaining Official sections only. No data/permission changes. */
+:is(.official-credit-page,.official-reports-page,.official-activity-page,.official-settings-page)>.dashboard-card,.official-credit-readonly{min-width:0;margin:0;padding:18px;border:1px solid #dce6f1;border-radius:12px;background:#fff;box-shadow:0 2px 8px #1b3d6407}
+:is(.official-credit-page,.official-reports-page,.official-activity-page,.official-settings-page) .dashboard-card-header,.official-credit-page .credit-admin-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding-bottom:12px;margin:0 0 14px;border-bottom:1px solid #e7edf5}
+:is(.official-credit-page,.official-reports-page,.official-activity-page,.official-settings-page) :is(h2,h3),.official-credit-readonly h2{margin:0;color:#183b69;font-size:17px;line-height:1.5}
+.official-credit-page .credit-admin-heading p{font-size:12px;line-height:1.6;color:#52657b;margin:5px 0 0}
+.official-credit-page .credit-warning{margin:0;padding:11px 14px;background:#f4f8fd;border:1px solid #dce6f1;border-radius:8px;color:#425a78;font-size:12px;line-height:1.6}
+.official-credit-page .credit-card-grid{gap:12px}
+.official-credit-page .credit-policy-card{min-width:0;padding:14px;border:1px solid #dce6f1;border-radius:9px;background:#fff;box-shadow:none;gap:12px}
+.official-credit-page .credit-policy-card h3{font-size:15px;margin:8px 0 4px;overflow-wrap:anywhere}
+.official-credit-page .credit-policy-card p{font-size:12px;line-height:1.6;color:#52657b;margin:4px 0}
+.official-credit-page :is(.credit-card-actions,.credit-row-actions){display:flex;flex-wrap:wrap;gap:8px}
+.official-credit-page :is(button,.confirm-dialog-confirm){min-height:44px;padding:8px 12px;font-size:12px;border-radius:7px}
+.official-credit-page .confirm-dialog-confirm{background:#235b9c;color:#fff}
+.official-credit-page .credit-table-wrap{max-width:100%;border:1px solid #e1e9f3;border-radius:9px}
+.official-credit-page .credit-table{font-size:12px;table-layout:fixed}
+.official-credit-page .credit-table :is(th,td){padding:10px 8px;overflow-wrap:anywhere;line-height:1.5}
+.official-credit-page .credit-table th{font-size:11px;background:#f4f8fd;color:#425a78}
+.official-credit-page .badge{font-size:11px;line-height:1.5;border-radius:7px}
+.official-credit-page .credit-inline-form :is(input,select,textarea){min-width:0;min-height:44px;border:1px solid #b8cce4;border-radius:7px;font-size:13px;box-sizing:border-box}
+.official-credit-page .credit-inline-form label{font-size:12px;color:#52657b;line-height:1.5}
+.official-credit-page .credit-inline-form input[type=checkbox]{min-height:20px;width:20px;height:20px}
+.official-reports-page .report-summary-grid{gap:12px;margin:0;grid-auto-rows:1fr}
+.official-reports-page .report-stat{padding:16px;border:1px solid #dce6f1;border-radius:12px;background:#fff;box-shadow:0 2px 8px #1b3d6407;display:flex;flex-direction:column;gap:10px;justify-content:space-between;min-width:0}
+.official-reports-page .report-stat-number{font-size:28px;line-height:1.25;color:#183b69}
+.official-reports-page .report-stat-label{font-size:12px;color:#52657b;line-height:1.5}
+.official-reports-page .report-two-col{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;margin:0}
+.official-reports-page .report-two-col>.dashboard-card{padding:18px;border:1px solid #dce6f1;border-radius:12px;background:#fff;box-shadow:0 2px 8px #1b3d6407}
+.official-reports-page .rank-row{gap:12px;font-size:12px;padding:10px 0}
+.official-reports-page .chart-legend,.official-reports-page .bar-chart-label{font-size:12px;color:#52657b}
+.official-reports-page .dashboard-empty,.official-activity-page .dashboard-empty{font-size:13px;line-height:1.6;color:#52657b;padding:20px 12px}
+.official-activity-page .table-wrapper{max-width:100%;border:1px solid #e1e9f3;border-radius:9px}
+.official-activity-page .dashboard-table{width:100%;table-layout:fixed;font-size:12px}
+.official-activity-page .dashboard-table :is(th,td){padding:10px 8px;line-height:1.6;vertical-align:middle;overflow-wrap:anywhere}
+.official-activity-page .dashboard-table th{width:auto;background:#f4f8fd;color:#425a78;font-size:11px}
+.official-activity-page .dashboard-table th:first-child{width:18%}
+.official-activity-page .dashboard-table th:nth-child(5){width:20%}
+.official-activity-page .badge{display:inline-block;max-width:100%;font-size:11px;white-space:normal;line-height:1.5;border-radius:7px;padding:3px 7px;box-sizing:border-box}
+.official-settings-page{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;max-width:1100px}
+.official-settings-page>.official-dashboard-header,.official-settings-page .settings-hours-card{grid-column:1/-1}
+.official-settings-page :is(input:not(.visually-hidden),select,textarea){min-width:0;min-height:44px;box-sizing:border-box;border:1px solid #b8cce4;border-radius:7px;font-size:13px}
+.official-settings-page .modal-form-label{font-size:12px;color:#52657b}
+.official-settings-page :is(.btn-add,.btn-cancel,button){min-height:44px;border-radius:7px;font-size:12px}
+.official-settings-page .btn-add{background:#235b9c;color:#fff}
+.official-settings-page .availability-day-row{min-width:0}
+.official-settings-page .settings-photo-card .btn-add{display:inline-flex;align-items:center;padding:8px 12px;box-sizing:border-box}
+:is(.official-credit-page,.official-reports-page,.official-activity-page,.official-settings-page) :is(button,input,select,textarea,[tabindex]):focus-visible{outline:3px solid #2563eb;outline-offset:3px}
+@media(max-width:900px){.official-settings-page{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:768px){.official-activity-page .dashboard-table th{width:auto}.official-credit-page .credit-table{table-layout:auto}}
+@media(max-width:480px){:is(.official-credit-page,.official-reports-page,.official-activity-page,.official-settings-page)>.dashboard-card,.official-reports-page .report-two-col>.dashboard-card{padding:14px}.official-credit-page .credit-admin-heading{align-items:flex-start}.official-credit-page .credit-table-wrap{overflow-x:auto}}
+@media(prefers-reduced-motion:reduce){:is(.official-credit-page,.official-reports-page,.official-activity-page,.official-settings-page) *{transition:none!important;animation:none!important}}
+.official-credit-page :is(.credit-card-actions,.credit-row-actions) button{border:1px solid #b8cce4;background:#fff;color:#234e83;box-shadow:none}
+.official-settings-page .settings-password-card button[aria-pressed]{min-width:44px;min-height:44px;justify-content:center;border-radius:7px}
+.official-settings-page .settings-photo-control:focus-within label{outline:3px solid #2563eb;outline-offset:3px}
+.official-settings-page .availability-day{padding:12px;gap:10px;border:1px solid #dce6f1;border-radius:9px;background:#f7faff}
+@media(max-width:480px){.official-reports-page .report-summary-grid{grid-template-columns:minmax(0,1fr)}.official-reports-page .report-stat{flex-direction:row;align-items:center;text-align:left}.official-reports-page .report-stat-label{max-width:70%;margin:0}}
+.official-settings-page .settings-photo-control{position:relative}

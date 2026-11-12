@@ -8,7 +8,7 @@ import { useAuth } from '../context/AuthContext'
 jest.mock('../supabase/supabaseClient',()=>({supabase:{from:jest.fn(),rpc:jest.fn(),auth:{updateUser:jest.fn()},storage:{from:jest.fn()}}}))
 jest.mock('../context/AuthContext',()=>({useAuth:jest.fn()}))
 jest.mock('../components/Sidebar',()=>({setActiveTab})=><button onClick={()=>setActiveTab('settings')}>Open settings</button>)
-jest.mock('../components/NotificationBell',()=>()=>null)
+jest.mock('../components/NotificationBell',()=>({onOpenTab})=><button onClick={()=>onOpenTab('reservations')}>Old booking notification</button>)
 jest.mock('../components/useNotifications',()=>({useNotifications:()=>({notifications:[],readIds:new Set(),badges:{},refresh:jest.fn(),markRead:jest.fn(),markAllRead:jest.fn()})}))
 
 test('password controls have touch targets and keyboard toggling never saves a password',async()=>{
@@ -34,4 +34,7 @@ test('password controls have touch targets and keyboard toggling never saves a p
   await userEvent.keyboard(' ')
   expect(input).toHaveAttribute('type','password')
   expect(supabase.auth.updateUser).not.toHaveBeenCalled()
+  await userEvent.click(screen.getAllByRole('button',{name:'Old booking notification'})[0])
+  expect(screen.getByRole('heading',{name:/Welcome/})).toBeInTheDocument()
+  expect(supabase.from.mock.calls.map(([table])=>table)).not.toContain('reservations')
 })

@@ -69,7 +69,7 @@ const AUDIENCES = [
     label: 'Barangay Personnel',
     heading: 'Personnel sign in',
     help: 'Sign in using your authorized barangay personnel account. '
-      + 'Official, nurse and Tanod accounts are provisioned by authorized administration.',
+      + 'Official and Tanod accounts are provisioned by authorized administration.',
   },
 ]
 
@@ -175,7 +175,7 @@ const Login = () => {
       // and still does -- and what it produced was a correct password
       // reported as "Invalid role selected."
       if (!isSupportedRole(profile.role)) {
-        setError('This account has no supported portal role. Please contact barangay administration.')
+        setError(profile.role === 'nurse' ? 'The Nurse Portal is no longer available on this website. Please contact barangay administration.' : 'This account has no supported portal role. Please contact barangay administration.')
         await supabase.auth.signOut()
         setLoading(false)
         return
@@ -405,7 +405,7 @@ const Login = () => {
               </div>
             ) : (
               <p className="login-note login-note-standalone">
-                Official and health centre accounts are created by the barangay.
+                Official and Tanod accounts are created by the barangay.
                 There is no staff sign-up — ask at the Barangay Hall if you need
                 one.
               </p>
@@ -441,7 +441,7 @@ const Login = () => {
             <h2 id="logindlg-1-title">Reset your password</h2>
             <p>
               Enter the email address your account uses — resident, official
-              or health centre staff. We'll send a password reset link to it.
+              or barangay personnel. We'll send a password reset link to it.
             </p>
             <p className="login-modal-note">
               The reply is the same whether or not an account exists, so this

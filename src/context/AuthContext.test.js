@@ -9,6 +9,6 @@ test.each(['official','nurse','resident','tanod'])('AuthContext obtains %s from 
   supabase.from.mockReturnValue({ select: () => ({ eq: () => ({ single: async () => ({ data: { role } }) }) }) })
   render(<AuthProvider><Reader /></AuthProvider>)
   await act(async () => callback('SIGNED_IN', { user: { id: 'user-a', user_metadata: { role: 'official' } } }))
-  expect(screen.getByText(role)).toBeInTheDocument()
+  expect(screen.getByText(role === 'nurse' ? 'No supported role' : role)).toBeInTheDocument()
   expect(supabase.from).toHaveBeenCalledWith('profiles')
 })

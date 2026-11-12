@@ -17,7 +17,29 @@ beforeEach(() => {
   supabase.auth.signInWithPassword.mockResolvedValue({ data: { user: { id: 'account-a' } }, error: null })
   supabase.auth.signOut.mockResolvedValue({ error: null })
 })
-test.each(['official','nurse','resident','tanod'])('trusted %s role maps to its own dashboard', (role) => {
+
+test('existing Nurse account signs out with explicit retirement message and no portal navigation',async()=>{
+ useAuth.mockReturnValue({user:null,role:null,loading:false})
+ supabase.from.mockReturnValue({select:()=>({eq:()=>({single:async()=>({data:{role:'nurse'},error:null})})})})
+ render(<MemoryRouter initialEntries={['/login']}><Routes><Route path="/login" element={<Login/>}/><Route path="/official" element={<p>Forbidden official</p>}/></Routes></MemoryRouter>)
+ fireEvent.change(screen.getByLabelText('Email'),{target:{value:'retired@example.test'}})
+ fireEvent.change(screen.getByLabelText('Password'),{target:{value:'fictional-local-test'}})
+ fireEvent.submit(screen.getByRole('tabpanel'))
+ await screen.findByText(/The Nurse Portal is no longer available/)
+ expect(supabase.auth.signOut).toHaveBeenCalled()
+ expect(screen.queryByText('Forbidden official')).not.toBeInTheDocument()
+})
+
+test.each(['/reservation','/track-reservation','/health-center','/nurse','/resident?tab=reservations'])('resident login with stale next=%s goes to retained portal without looping',async destination=>{
+  supabase.from.mockReturnValue({select:()=>({eq:()=>({single:async()=>({data:{role:'resident'},error:null})})})})
+  render(<MemoryRouter initialEntries={['/login?next='+encodeURIComponent(destination)]}><Routes><Route path="/login" element={<Login/>}/><Route path="/resident" element={<p>Retained resident portal</p>}/></Routes></MemoryRouter>)
+  fireEvent.change(screen.getByLabelText('Email'),{target:{value:'resident@example.test'}})
+  fireEvent.change(screen.getByLabelText('Password'),{target:{value:'fictional-test-only'}})
+  fireEvent.submit(screen.getByRole('tabpanel'))
+  await screen.findByText('Retained resident portal',{}, {timeout:2000})
+  expect(supabase.auth.signOut).not.toHaveBeenCalled()
+})
+test.each(['official','resident','tanod'])('trusted %s role maps to its own dashboard', (role) => {
   expect(dashboardForRole(role)).toBe(`/${role}`)
   expect(isSupportedRole(role)).toBe(true)
 })
@@ -25,8 +47,8 @@ test.each(['constructor','admin','',null])('unknown role %s fails closed', (role
   expect(dashboardForRole(role)).toBe('/login')
   expect(isSupportedRole(role)).toBe(false)
 })
-for (const role of ['official','nurse','resident','tanod']) {
-  for (const target of ['official','nurse','resident','tanod']) {
+for (const role of ['official','resident','tanod']) {
+  for (const target of ['official','resident','tanod']) {
     test(`${role} cannot acquire ${target} capability through navigation`, () => {
       useAuth.mockReturnValue({ user: { id: 'a' }, role, loading: false })
       render(<MemoryRouter initialEntries={[`/gate`]}><Routes>
@@ -44,7 +66,7 @@ test('signed-out Tanod route requires the same centralized login', () => {
   expect(screen.getByText('Shared login')).toBeInTheDocument()
   expect(screen.queryByText('Secret')).toBeNull()
 })
-test.each(['official','nurse','resident','tanod'])('shared personnel login routes stored %s role, never audience selection', async (role) => {
+test.each(['official','resident','tanod'])('shared personnel login routes stored %s role, never audience selection', async (role) => {
   supabase.from.mockReturnValue({ select: () => ({ eq: () => ({ single: async () => ({ data: { role }, error: null }) }) }) })
   render(<MemoryRouter initialEntries={['/login']}><Routes><Route path="/login" element={<Login />} /><Route path={`/${role}`} element={<p>Correct portal</p>} /></Routes></MemoryRouter>)
   expect(screen.getAllByRole('tab')).toHaveLength(2)

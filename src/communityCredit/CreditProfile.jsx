@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getMyCreditProfile, getResidentCreditProfile } from './communityCreditApi'
+import CreditGauge from './CreditGauge'
 import './CommunityCredit.css'
 
 const dateTime = value => value ? new Intl.DateTimeFormat('en-PH',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Manila'}).format(new Date(value)) : 'None'
@@ -25,7 +26,7 @@ export default function CreditProfile({ residentId, showResident = false }) {
     </dl></section>}
     <section className="credit-section" aria-labelledby="community-credit-heading"><h2 id="community-credit-heading">Community Credit</h2>
       {!data.configured?<p className="credit-not-configured">Community credit policy is not configured.</p>:<>
-        {data.enrolled===false?<p className="credit-not-configured">Community credit enrollment has not started for this resident.</p>:<><div className="credit-score" aria-label={`Current community credit score ${data.current_score} out of ${data.maximum_score}`}><strong>{data.current_score}</strong><span>/ {data.maximum_score}</span><small>Current score</small></div>
+        {data.enrolled===false?<p className="credit-not-configured">Community credit enrollment has not started for this resident.</p>:<><CreditGauge value={data.current_score} maximum={data.maximum_score} />
         <p className="credit-policy">Policy: {data.policy_name}</p>
         <dl className="credit-metrics"><div><dt>Credit started</dt><dd>{dateTime(data.credit_started_at)}</dd></div><div><dt>Starting score</dt><dd>{data.starting_score??data.base_score}</dd></div><div><dt>Credit adjustments total</dt><dd>{Number(data.event_total)>0?'+':''}{data.event_total}</dd></div>
           <div><dt>Positive events</dt><dd>{data.positive_event_count}</dd></div><div><dt>Negative events</dt><dd>{data.negative_event_count}</dd></div>

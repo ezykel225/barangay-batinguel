@@ -1,4 +1,5 @@
 import PublicTanodDuty from '../tanod/PublicTanodDuty'
+import DescriptiveInterpretation from '../analytics/DescriptiveInterpretation'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
@@ -274,6 +275,9 @@ const CommunitySafety = () => {
                     ))}
                   </ul>
                 )}
+                <DescriptiveInterpretation title="Recorded incidents by type" headingLevel={3}
+                  rows={types.map(row => ({ label: incidentTypeLabel(row.incident_type), total: row.total }))}
+                  unit="incidents" note="Only the public aggregate counts for the selected period are described. No hidden incident details are inferred." />
                 {/* ⚠️ These are the barangay's own OPERATIONAL categories, not
                     offence codes, and the page says so where a reader meets
                     them rather than only in a header. */}
@@ -314,6 +318,9 @@ const CommunitySafety = () => {
                     ))}
                   </ul>
                 )}
+                <DescriptiveInterpretation title="Recorded incidents by month" rows={trend.rows} headingLevel={3}
+                  mode="time" unit="incidents"
+                  note="This monthly comparison uses all returned months, independently of the period selector. Omitted months are not assumed to be zero; months may be partial." />
               </>
             )}
 

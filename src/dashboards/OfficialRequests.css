@@ -1,0 +1,19 @@
+/* Stage 7R.1: Requests only; other account groups retain their actions/layout. */
+.official-residents-page .resident-requests-table .request-col-name{width:20%}
+.official-residents-page .resident-requests-table .request-col-contact{width:13%}
+.official-residents-page .resident-requests-table .request-col-purok{width:7%}
+.official-residents-page .resident-requests-table .request-col-match{width:17%}
+.official-residents-page .resident-requests-table .request-col-verification{width:21%}
+.official-residents-page .resident-requests-table .request-col-id{width:auto}
+.official-residents-page .resident-requests-table .request-col-actions{width:70px}
+.official-residents-page .resident-requests-table th:last-child{width:auto;text-align:center}
+.official-residents-page .resident-requests-table td.action-cell{display:table-cell;text-align:center;vertical-align:middle}
+.official-residents-page .resident-requests-table .action-menu{display:inline-block;vertical-align:middle}
+.official-residents-page .resident-requests-table .action-menu-trigger{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;padding:8px;border-radius:7px}
+.official-residents-page .resident-requests-table td[data-label=Contact]{font-variant-numeric:tabular-nums}
+.official-residents-page .resident-requests-table .badge{display:inline-block;max-width:100%;box-sizing:border-box;white-space:normal;font-size:11px;line-height:1.5;padding:3px 7px;border-radius:7px}
+@media(max-width:768px){
+ .official-residents-page .resident-requests-table colgroup{display:none}
+ .official-residents-page .resident-requests-table td.action-cell{display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left}
+ .official-residents-page .resident-requests-table td.action-cell::before{position:static;display:block;flex-shrink:0;width:auto;margin:0}
+}

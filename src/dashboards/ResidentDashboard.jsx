@@ -1,4 +1,4 @@
-import PortalDetailsDialog from '../components/PortalDetailsDialog'
+
 import { filterRows } from '../utils/residentGroups'
 import DocumentRequirements from '../documents/DocumentRequirements.jsx'
 import { useCallback, useState, useEffect } from 'react'
@@ -16,15 +16,15 @@ import { pathFromPublicUrl } from '../utils/storagePath'
 import { BARANGAY_NAME, PUROKS } from '../constants/barangay'
 import { describeVerification } from '../utils/residentGroups'
 import { useConfirm } from '../components/ConfirmDialog'
-import { MONTH_NAMES, parseDateKey } from '../utils/monthGrid'
+
 import {
   DOCUMENT_STATUS_LABELS as STATUS_LABELS,
-  RESERVATION_STATUS_LABELS,
 } from '../utils/displayLabels'
-import { residentStatusLabel } from '../utils/reservationWindow'
+
 import { resolveResidentTab } from '../utils/residentTabs'
+import { retiredDashboardTab, retiredWorkflowMessage } from '../utils/dashboardNavigation'
 import MyComplaints from '../complaints/MyComplaints'
-import { logActivity } from '../utils/activityLog'
+
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 import Sidebar from '../components/Sidebar'
@@ -57,16 +57,13 @@ const DOCUMENT_TYPES = [
 // Manila specifically, not the browser's timezone: the database rule
 // uses Asia/Manila, and if a resident's laptop is set to another zone
 // the button and the database would disagree about what "today" is.
-const todayInManila = () =>
-  new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila' }).format(new Date())
+
 
 // Mirrors the protect_reservation_status trigger: a resident may
 // release a booking that is still pending or already approved, as long
 // as its date hasn't passed. The database enforces this for real -- this
 // only decides whether to show a button that would work.
-const canCancel = (r) =>
-  (r.status === 'pending' || r.status === 'approved') &&
-  r.preferred_date >= todayInManila()
+
 
 // ⚠️ `preferred_date` is a date-only column, and it used to be rendered
 // as `new Date(r.preferred_date).toLocaleDateString()`. That parses the
@@ -79,11 +76,7 @@ const canCancel = (r) =>
 // Found during the calendar work's self-review. Rendered from the
 // characters of the stored date instead. `created_at` elsewhere in this
 // file is a timestamptz, where `new Date()` is the right tool.
-const bookingDate = (value) => {
-  const parsed = parseDateKey(value)
-  if (!parsed) return '—'
-  return `${parsed.day} ${MONTH_NAMES[parsed.month]} ${parsed.year}`
-}
+
 
 const ResidentDashboard = () => {
   const { user } = useAuth()
@@ -122,17 +115,20 @@ const ResidentDashboard = () => {
     return resolveResidentTab(requested)
   })
   const [userProfile, setUserProfile] = useState(null)
+  const [profileError, setProfileError] = useState('')
+  const [profileLoading, setProfileLoading] = useState(false)
   const [requestQuery, setRequestQuery] = useState('')
   const [requestStatus, setRequestStatus] = useState('all')
   const [requestType, setRequestType] = useState('all')
   const [startComplaint, setStartComplaint] = useState(false)
   useEffect(() => { if (activeTab !== 'complaints') setStartComplaint(false) }, [activeTab])
-  const [selectedReservation, setSelectedReservation] = useState(null)
+
   const [requests, setRequests] = useState([])
-  const [myReservations, setMyReservations] = useState([])
+  const [requestsError, setRequestsError] = useState('')
+
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
-  const [cancellingId, setCancellingId] = useState(null)
+
   const [showRequestModal, setShowRequestModal] = useState(false)
 
   // Escape, focus entry and focus restoration for the document-request
@@ -159,12 +155,16 @@ const ResidentDashboard = () => {
   // ──────────────────────────────────────────────────────
 
   const fetchUserProfile = useCallback(async () => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('full_name, first_name, middle_name, last_name, suffix, contact_number, purok, photo_url, verification_status, verification_notes, id_document_url')
-      .eq('id', user.id)
-      .single()
-    if (data) {
+    setProfileLoading(true)
+    setProfileError('')
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('full_name, first_name, middle_name, last_name, suffix, contact_number, purok, photo_url, verification_status, verification_notes, id_document_url')
+        .eq('id', user.id)
+        .single()
+      if (error) throw error
+      if (!data) throw new Error('Resident profile was not returned.')
       setUserProfile(data)
       setDetails({
         first_name: data.first_name || '',
@@ -178,38 +178,46 @@ const ResidentDashboard = () => {
         // on the wrong entry.
         purok: PUROKS.includes(data.purok) ? data.purok : '',
       })
+    } catch (error) {
+      setProfileError(error?.code === '42501'
+        ? 'Your resident profile is not available for this session. Check your account permissions and try again.'
+        : 'Your resident profile could not be loaded. Try again.')
+    } finally {
+      setProfileLoading(false)
     }
   }, [user])
 
   const fetchMyRequests = useCallback(async () => {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('document_requests')
-      .select('*')
-      .eq('resident_id', user.id)
-      .order('created_at', { ascending: false })
-
-    if (!error) setRequests(data || [])
-    setLoading(false)
+    setRequestsError('')
+    try {
+      const { data, error } = await supabase
+        .from('document_requests')
+        .select('*')
+        .eq('resident_id', user.id)
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      setRequests(data || [])
+    } catch (error) {
+      setRequestsError(error?.code === '42501'
+        ? 'Document requests are not available for this account. Check your session and permissions.'
+        : 'Document requests could not be loaded. Try again.')
+    } finally {
+      setLoading(false)
+    }
   }, [user])
 
-  const fetchMyReservations = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('reservations')
-      .select('*')
-      .eq('resident_id', user.id)
-      .order('preferred_date', { ascending: false })
+  const requestReadNotice = requestsError && <div role="alert"><p>{requestsError}</p><button type="button" className="btn-cancel" onClick={fetchMyRequests}>Retry document requests</button></div>
+  const requestCount = count => loading ? 'Loading...' : requestsError ? 'Unavailable' : count
 
-    if (!error) setMyReservations(data || [])
-  }, [user])
 
   useEffect(() => {
     if (user?.id) {
       fetchUserProfile()
       fetchMyRequests()
-      fetchMyReservations()
+
     }
-  }, [user, fetchUserProfile, fetchMyRequests, fetchMyReservations])
+  }, [user, fetchUserProfile, fetchMyRequests])
 
   // ⚠️ THIS NO LONGER FEEDS A BADGE. The sidebar badges now come from
   // the notification read-state (migration 022), so there is ONE
@@ -252,24 +260,9 @@ const ResidentDashboard = () => {
     }
   }
 
-  const markReservationsViewed = async () => {
-    const unseenIds = myReservations.filter(isUnseen).map((r) => r.id)
-    if (unseenIds.length === 0) return
-    const nowIso = new Date().toISOString()
-    const { error } = await supabase
-      .from('reservations')
-      .update({ resident_viewed_at: nowIso })
-      .in('id', unseenIds)
-    if (!error) {
-      setMyReservations((prev) => prev.map((r) =>
-        unseenIds.includes(r.id) ? { ...r, resident_viewed_at: nowIso } : r
-      ))
-    }
-  }
 
   useEffect(() => {
     if (activeTab === 'documents') markRequestsViewed()
-    if (activeTab === 'reservations') markReservationsViewed()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
 
@@ -359,70 +352,6 @@ const ResidentDashboard = () => {
     }
   }
 
-  const handleCancelReservation = async (reservation) => {
-    if (cancellingId) return
-
-    // Releasing an approved booking loses a slot the resident waited
-    // for, so a misclick shouldn't do it silently.
-    //
-    // The shared dialog rather than window.confirm, which is what the
-    // Official and Nurse portals already use -- so a resident gets the
-    // same focus trap, Escape handling, Enter-defaults-to-Cancel and
-    // aria-modal that a native dialog cannot be given.
-    //
-    // ⚠️ cancelLabel is set deliberately. The default pair would read
-    // "Cancel" next to "Cancel booking", which is unreadable when the
-    // action itself is called cancelling.
-    const ok = await confirm({
-      title: 'Cancel this booking?',
-      message: `The court is held for you on ${reservation.preferred_date} at `
-        + `${reservation.preferred_time}. Cancelling releases the slot for someone `
-        + 'else straight away, and booking again means waiting for an official to '
-        + 'approve it again.',
-      confirmLabel: 'Cancel booking',
-      cancelLabel: 'Keep booking',
-    })
-    if (!ok) return
-
-    setCancellingId(reservation.id)
-    try {
-      const { error } = await supabase
-        .from('reservations')
-        .update({ status: 'cancelled', updated_at: new Date().toISOString() })
-        .eq('id', reservation.id)
-
-      if (error) {
-        console.error('Cancel reservation error:', error)
-        toast.error(error.message || 'Failed to cancel reservation.')
-        return
-      }
-
-      // Append to the audit trail so officials can see who cancelled
-      // what and when — a cancellation frees up a slot, so it's worth
-      // recording alongside official actions.
-      //
-      // The actor is stamped by the database from this user's own token
-      // (migration 015), so nothing identifying is sent from here. A
-      // resident may only record `cancelled` on `reservation`, and only
-      // on their own booking — entity_id below is what that is checked
-      // against.
-      // Routed through the shared helper so this write is checked like
-      // every other. Previously the result was not destructured at all,
-      // so a rejected insert was discarded without even a console line.
-      await logActivity({
-        action: 'cancelled',
-        entityType: 'reservation',
-        entityId: reservation.id,
-        subject: `${reservation.preferred_date} ${reservation.preferred_time}`,
-        details: reservation.purpose || null,
-      })
-
-      toast.success('Reservation cancelled. The time slot is now open again.')
-      fetchMyReservations()
-    } finally {
-      setCancellingId(null)
-    }
-  }
 
   const handleIdUpload = async (e) => {
     const file = e.target.files?.[0]
@@ -712,7 +641,7 @@ const ResidentDashboard = () => {
       notifications={notifications}
       readIds={notifReadIds}
       loading={notifLoading}
-      onOpenTab={(tab) => setActiveTab(tab)}
+      onOpenTab={(tab) => { if (retiredDashboardTab(tab)) { toast(retiredWorkflowMessage); setActiveTab('dashboard') } else setActiveTab(resolveResidentTab(tab)) }}
       onMarkRead={markNotificationRead}
       onMarkAllRead={markAllNotificationsRead}
     />
@@ -728,12 +657,21 @@ const ResidentDashboard = () => {
       <Sidebar
         role="resident"
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={tab => { if (retiredDashboardTab(tab)) toast(retiredWorkflowMessage); setActiveTab(resolveResidentTab(tab)) }}
         badges={notifBadges}
         mobileHeaderAction={notificationBell}
       />
 
       <main className="dashboard-main" id="main-content" tabIndex={-1}>
+        {retiredDashboardTab(searchParams.get('tab')) && <p role="note">{retiredWorkflowMessage}</p>}
+        {profileError && (
+          <div role="alert">
+            <p>{profileError}</p>
+            <button type="button" className="btn-cancel" onClick={fetchUserProfile} disabled={profileLoading}>
+              {profileLoading ? 'Retrying profile...' : 'Retry resident profile'}
+            </button>
+          </div>
+        )}
 
         {/* The DESKTOP bell. One place for all four tabs -- there is no
             shared dashboard header component, and four copies would be
@@ -748,7 +686,7 @@ const ResidentDashboard = () => {
           <div>
             <div className="resident-dashboard-header">
               <h1>Welcome, {userProfile?.full_name || 'Resident'}</h1>
-              <p>Request barangay documents and check waste collection schedules.</p>
+              <p>Request barangay documents and follow your existing service requests.</p>
               {/* The account's own status, in the same words the official
                   sees on their Residents tab -- both come from
                   VERIFICATION_STATES. A verified resident previously got no
@@ -774,21 +712,21 @@ const ResidentDashboard = () => {
               <div className="dashboard-card resident-stat-card">
                 <FaFileAlt className="resident-stat-icon" />
                 <div>
-                  <div className="resident-stat-number">{pendingCount}</div>
+                  <div className="resident-stat-number">{requestCount(pendingCount)}</div>
                   <div className="resident-stat-label">Pending Requests</div>
                 </div>
               </div>
               <div className="dashboard-card resident-stat-card">
                 <FaFileAlt className="resident-stat-icon" style={{ color: '#16a34a' }} />
                 <div>
-                  <div className="resident-stat-number">{readyCount}</div>
+                  <div className="resident-stat-number">{requestCount(readyCount)}</div>
                   <div className="resident-stat-label">Ready for Pickup</div>
                 </div>
               </div>
               <div className="dashboard-card resident-stat-card">
                 <FaFileAlt className="resident-stat-icon" style={{ color: '#6b7280' }} />
                 <div>
-                  <div className="resident-stat-number">{requests.length}</div>
+                  <div className="resident-stat-number">{requestCount(requests.length)}</div>
                   <div className="resident-stat-label">Total Requests</div>
                 </div>
               </div>
@@ -808,7 +746,7 @@ const ResidentDashboard = () => {
               </div>
               {loading ? (
                 <p>Loading...</p>
-              ) : requests.length === 0 ? (
+              ) : requestsError ? requestReadNotice : requests.length === 0 ? (
                 <p style={{ color: '#6b7280', fontSize: 13 }}>
                   You haven't requested any documents yet.
                 </p>
@@ -877,10 +815,10 @@ const ResidentDashboard = () => {
                 <label>Status<select className="filter-select" value={requestStatus} onChange={e => setRequestStatus(e.target.value)}><option value="all">All statuses</option>{Object.entries(STATUS_LABELS).map(([key, value]) => <option key={key} value={key}>{value.label}</option>)}</select></label>
                 <label>Document type<select className="filter-select" value={requestType} onChange={e => setRequestType(e.target.value)}><option value="all">All document types</option>{DOCUMENT_TYPES.map(type => <option key={type}>{type}</option>)}</select></label>
               </div>
-              {!loading && requests.length > 0 && filteredRequests.length === 0 && <p>No requests match these filters.</p>}
+              {!loading && !requestsError && requests.length > 0 && filteredRequests.length === 0 && <p>No requests match these filters.</p>}
               {loading ? (
                 <p>Loading...</p>
-              ) : requests.length === 0 ? (
+              ) : requestsError ? requestReadNotice : requests.length === 0 ? (
                 <p style={{ color: '#6b7280', fontSize: 13 }}>
                   You haven't requested any documents yet.
                 </p>
@@ -925,84 +863,6 @@ const ResidentDashboard = () => {
           </div>
         )}
 
-        {activeTab === 'reservations' && (
-          <div>
-            <div className="resident-dashboard-header">
-              <h1>My Reservations</h1>
-              <p>Covered court bookings you've made while logged in.</p>
-            </div>
-
-            <div className="dashboard-card">
-              {myReservations.length === 0 ? (
-                <p style={{ color: '#6b7280', fontSize: 13 }}>
-                  You haven't made any court reservations while logged in yet.
-                </p>
-              ) : (
-                <div className="table-wrapper">
-                  <table className="dashboard-table">
-                    <thead>
-                      <tr>
-                        <th scope="col">Date</th>
-                        <th scope="col">Time</th>
-                        <th scope="col">Purpose</th>
-                        <th scope="col">Status</th>
-                        <th scope="col">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {myReservations.map((r) => (
-                        <tr key={r.id}>
-                          <td data-label="Date">
-                            {bookingDate(r.preferred_date)}
-                          </td>
-                          <td data-label="Time">
-                            {r.preferred_time}{r.end_time ? ` – ${r.end_time}` : ''}
-                          </td>
-                          <td data-label="Purpose">{r.purpose}</td>
-                          <td data-label="Status">
-                            <span className={`badge ${RESERVATION_STATUS_LABELS[r.status]?.className || ''}`}>
-                              {RESERVATION_STATUS_LABELS[r.status]?.label || r.status}
-                            </span>
-                            {/* A pending office-hours request is not the
-                                same prospect as a pending evening
-                                booking: the court is normally reservable
-                                from 5:00 PM, so this one needs a decision
-                                that the other does not. Saying only
-                                "Pending" for both would imply otherwise.
-                                Returns null for every other case --
-                                including a booking filed before migration
-                                020, which carries no reason and is not
-                                relabelled. */}
-                            {residentStatusLabel(r) && (
-                              <span
-                                className="reservation-exception-note"
-                                title={r.exception_reason || undefined}
-                              >
-                                {residentStatusLabel(r)}
-                              </span>
-                            )}
-                          </td>
-                          <td data-label="Action">
-                            <button type="button" className="btn-add btn-sm" onClick={() => setSelectedReservation(r)} aria-label={`View reservation ${r.reference || r.preferred_date}`}>View</button>
-                            {canCancel(r) ? (
-                              <button
-                                className="btn-deny"
-                                disabled={cancellingId === r.id}
-                                onClick={() => handleCancelReservation(r)}
-                              >
-                                {cancellingId === r.id ? 'Cancelling...' : 'Cancel'}
-                              </button>
-                            ) : null}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
 
         {/* ⚠️ A TAB, NOT A NEW ROUTE. The E-Services catalogue
             deep-links here as /resident?tab=complaints, exactly as it
@@ -1014,13 +874,6 @@ const ResidentDashboard = () => {
 
         {activeTab === 'community-credit' && <div><div className="resident-dashboard-header"><h1>Community Credit</h1><p>View your current policy-based score and immutable credit history.</p></div><CreditProfile /></div>}
 
-        {selectedReservation && <PortalDetailsDialog title="Reservation Details" reference={selectedReservation.reference} status={RESERVATION_STATUS_LABELS[selectedReservation.status]?.label || selectedReservation.status} statusClassName={RESERVATION_STATUS_LABELS[selectedReservation.status]?.className || ''} onClose={() => setSelectedReservation(null)}>
-          <dl>{[
-            ['Date', bookingDate(selectedReservation.preferred_date)], ['Time', [selectedReservation.preferred_time, selectedReservation.end_time].filter(Boolean).join(' - ')],
-            ['Purpose', selectedReservation.purpose], ['Submitted', selectedReservation.created_at ? new Date(selectedReservation.created_at).toLocaleDateString() : null],
-            ['Contact number', selectedReservation.contact_number], ['Additional notes', selectedReservation.additional_notes], ['Activity', selectedReservation.activity_type], ['Duration (hours)', selectedReservation.duration_hours], ['Office-hours reason', selectedReservation.exception_reason],
-          ].filter(([, value]) => value).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
-        </PortalDetailsDialog>}
 
         {activeTab === 'settings' && (
           <div>

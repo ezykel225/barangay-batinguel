@@ -1086,10 +1086,9 @@ describe('L. the architecture the phase committed to', () => {
     expect(app).toContain('/track-complaint')
   })
 
-  it('leaves the nurse and resident navigation untouched', () => {
+  it('keeps resident complaint navigation without a retired Nurse portal', () => {
     const sidebar = read('components/Sidebar.jsx')
-    const nurse = /const nurseNavItems = \[([\s\S]*?)\n  \]/.exec(sidebar)[1]
-    expect(nurse).not.toContain('complaints')
+    expect(sidebar).not.toContain('const nurseNavItems')
     const resident = /const residentNavItems = \[([\s\S]*?)\n  \]/.exec(sidebar)[1]
     // The resident has had one since P3-B1; it is the same single entry.
     expect((resident.match(/complaints/g) || [])).toHaveLength(1)
@@ -1122,7 +1121,7 @@ describe('L. the architecture the phase committed to', () => {
   it('lists the expected migrations through 058', () => {
     const dir = path.join(__dirname, '..', '..', 'supabase-migrations')
     const files = fs.readdirSync(dir).filter((f) => f.endsWith('.sql')).sort()
-    expect(files).toHaveLength(60)
+    expect(files).toHaveLength(62)
     expect(files[41]).toBe('042_kp_screening_foundation.sql')
     expect(files[42]).toBe('043_kp_case_hearings_summons.sql')
     expect(files[43]).toBe('044_incident_blotter_tanod.sql')
@@ -1142,6 +1141,8 @@ describe('L. the architecture the phase committed to', () => {
     expect(files[57]).toBe('058_targeted_sms.sql')
     expect(files[58]).toBe('059_community_credit_foundation.sql')
     expect(files[59]).toBe('060_community_credit_enrollment.sql')
+    expect(files[60]).toBe('068_resident_verification_security.sql')
+    expect(files[61]).toBe('069_resident_profile_insert_security.sql')
   })
 })
 

@@ -1,0 +1,4 @@
+.descriptive-interpretation{box-sizing:border-box;min-width:0;max-width:100%;margin-top:14px;padding:12px 14px;border:1px solid #dce6f2;border-left:3px solid #3976c6;border-radius:8px;background:#f7faff;color:#344b68;overflow-wrap:anywhere}
+.descriptive-interpretation h3,.descriptive-interpretation h4{margin:0 0 8px;font-size:14px;line-height:1.5;color:#18365f}
+.descriptive-interpretation p{margin:6px 0;font-size:13px;line-height:1.65}
+@media(max-width:480px){.descriptive-interpretation{padding:10px;margin-top:10px}}

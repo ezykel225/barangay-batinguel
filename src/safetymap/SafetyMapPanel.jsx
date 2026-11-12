@@ -1,17 +1,20 @@
-import { useEffect, useMemo, useState } from 'react'
-import { FaChartBar, FaInfoCircle, FaMapMarkedAlt, FaShieldAlt } from 'react-icons/fa'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { FaInfoCircle, FaMapMarkedAlt, FaShieldAlt } from 'react-icons/fa'
+import SupportedAnalytics, { EMPTY_ANALYTICS_FILTERS } from '../analytics/SupportedAnalytics'
 
-import { INCIDENT_TYPE_KEYS, commonTypeLabel, incidentStatusLabel, incidentTypeLabel } from '../incidents/incidentLabels'
+import { INCIDENT_TYPE_KEYS, commonTypeLabel, incidentTypeLabel } from '../incidents/incidentLabels'
 import IncidentMap from './IncidentMap'
 import {
   COVERAGE_CAVEAT, OBSERVATION_DISCLAIMER, bandFor, coverageGaps, coverageTotals,
-  locationKey, observationFor, plottablePoints, rankHotspots, totalFrom, trendSeries,
+  locationKey, observationFor, plottablePoints, rankHotspots,
 } from './safetyAnalytics'
 import {
   SAFETY_ERRORS, loadCoverageSummary, loadSafetyIncidents,
 } from './safetyApi'
 import { filterSafetyIncidents, safetyAnalyticsFor } from './officialIncidentAnalytics'
 import './SafetyMap.css'
+import '../dashboards/OfficialServices.css'
+import './OfficialSafetyMap.css'
 
 // Combined Phase 2 — the internal safety map and the descriptive analytics.
 //
@@ -34,7 +37,20 @@ import './SafetyMap.css'
 // prediction -- see `safetyAnalytics.js` for why, and for the rule that an
 // observation may prompt a review and may never recommend an action.
 
+export const SAFETY_SECTIONS = Object.freeze([['map', 'Incident Map'], ['analytics', 'Analytics & Insights'], ['patrol', 'Patrol Coverage']])
+
 const SafetyMapPanel = () => {
+  const [section, setSection] = useState('map')
+  const [analyticsFilters, setAnalyticsFilters] = useState({ ...EMPTY_ANALYTICS_FILTERS })
+  const tabRefs = useRef({})
+  const onTabKey = (event, index) => {
+    const nextIndex = { ArrowRight: (index + 1) % 3, ArrowLeft: (index + 2) % 3, Home: 0, End: 2 }[event.key]
+    if (nextIndex === undefined) return
+    event.preventDefault()
+    const key = SAFETY_SECTIONS[nextIndex][0]
+    setSection(key)
+    tabRefs.current[key]?.focus()
+  }
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [type, setType] = useState('')
@@ -58,17 +74,15 @@ const SafetyMapPanel = () => {
     setCoverage(null)
     setCoverageProblem('')
     loadCoverageSummary({ from, to }).then(rows => { if (live) setCoverage({ from, to, rows }) })
-      .catch(() => { if (live) setCoverageProblem(SAFETY_ERRORS.analyticsFailed) })
+      .catch(() => { if (live) setCoverageProblem('Patrol coverage could not be loaded. Try again in a moment.') })
     return () => { live = false }
   }, [from, to])
   const filteredIncidents = useMemo(() => filterSafetyIncidents(incidents, { type, from, to }), [incidents, type, from, to])
-  const { points, byType, byStatus, monthly, locations, mapHotspots } = useMemo(() => safetyAnalyticsFor(filteredIncidents), [filteredIncidents])
+  const { points, locations, mapHotspots } = useMemo(() => safetyAnalyticsFor(filteredIncidents), [filteredIncidents])
   const coverage = coverageResult?.from === from && coverageResult?.to === to ? coverageResult.rows : []
-  const total = totalFrom(byType)
   const hotspots = rankHotspots(locations)
   const gaps = coverageGaps(locations, coverage)
   const cover = coverageTotals(coverage)
-  const trend = trendSeries(monthly)
   const peak = hotspots.reduce((max, h) => Math.max(max, Number(h.total) || 0), 0)
   const coveredKeys = coverage.map((row) => row.area_key || locationKey(row.area_label))
 
@@ -76,11 +90,19 @@ const SafetyMapPanel = () => {
   const unmapped = filteredIncidents.length - plotted
 
   return (
-    <div>
+    <div className="official-service-page official-safety-page">
       <div className="official-dashboard-header">
         <h1>Safety Map &amp; Analytics</h1>
         <p>Where incidents were recorded, how often, and which areas have patrols.</p>
       </div>
+
+      <div className="smap-tabs" role="tablist" aria-label="Safety Map and Analytics sections">
+        {SAFETY_SECTIONS.map(([key, label], index) => <button key={key} type="button" role="tab"
+          id={`smap-tab-${key}`} aria-controls={`smap-panel-${key}`} aria-selected={section === key}
+          tabIndex={section === key ? 0 : -1} ref={element => { tabRefs.current[key] = element }}
+          onClick={() => setSection(key)} onKeyDown={event => onTabKey(event, index)}>{label}</button>)}
+      </div>
+      <details className="smap-scope"><summary>Filter scope and data limitations</summary><p className="smap-note" role="note">Incident Map and Patrol Coverage share incident type and dates. Patrol assignments use those dates independently; incident type does not filter assignments. Analytics &amp; Insights has its own period, category and recorded-area filters. Map locations group wording without case or spacing differences; analytics areas use the area note first and otherwise exact trimmed location text.</p></details>
 
       {(problem || coverageProblem) && (
         <p className="smap-problem" role="alert">
@@ -88,14 +110,10 @@ const SafetyMapPanel = () => {
         </p>
       )}
 
-      <div className="dashboard-card">
-        <div className="dashboard-card-header">
-          <h2 className="section-heading"><FaMapMarkedAlt aria-hidden="true" /> Incident map</h2>
-        </div>
-
+      <div className="dashboard-card smap-tab-panel" hidden={section === 'analytics'}>
         <div className="resident-filter-bar smap-filters">
           <div className="filter-select-wrap">
-            <label className="visually-hidden" htmlFor="smap-type">Filter the map by incident type</label>
+            <label htmlFor="smap-type">Filter the map by incident type</label>
             <select id="smap-type" className="filter-select" value={type}
               onChange={(e) => setType(e.target.value)}>
               <option value="">All types</option>
@@ -105,23 +123,30 @@ const SafetyMapPanel = () => {
             </select>
           </div>
           <div className="filter-select-wrap">
-            <label className="visually-hidden" htmlFor="smap-from">Map from date</label>
+            <label htmlFor="smap-from">Map from date</label>
             <input id="smap-from" className="filter-select" type="date" value={from}
               onChange={(e) => setFrom(e.target.value)} />
           </div>
           <div className="filter-select-wrap">
-            <label className="visually-hidden" htmlFor="smap-to">Map up to date</label>
+            <label htmlFor="smap-to">Map up to date</label>
             <input id="smap-to" className="filter-select" type="date" value={to}
               onChange={(e) => setTo(e.target.value)} />
           </div>
           <button type="button" className="btn-cancel" onClick={() => { setType(''); setFrom(''); setTo('') }}>Reset filters</button>
         </div>
+      </div>
 
+      <section className="dashboard-card smap-tab-panel" role="tabpanel" id="smap-panel-map" aria-labelledby="smap-tab-map" hidden={section !== 'map'} tabIndex={0}>
+        <div className="dashboard-card-header"><h2 className="section-heading"><FaMapMarkedAlt aria-hidden="true" /> Incident map</h2></div>
         {loading ? (
           <p className="complaint-empty">Loading the map...</p>
-        ) : (
+        ) : problem ? <p className="complaint-empty">Incident map data is unavailable.</p> : section === 'map' ? (
           <>
             <IncidentMap points={points} hotspots={mapHotspots} coveredKeys={coveredKeys} />
+            <div className="smap-stats">
+              <div className="smap-stat"><span className="smap-stat-value">{filteredIncidents.length}</span><span className="smap-stat-label">Incidents recorded</span></div>
+              <div className="smap-stat"><span className="smap-stat-value">{hotspots.length}</span><span className="smap-stat-label">Locations with more than one</span></div>
+            </div>
             <p className="smap-caption">
               {plotted} incident{plotted === 1 ? '' : 's'} plotted.
               {filteredIncidents.length === 0 ? ' No recorded incidents match these filters.' : unmapped > 0 ? ` ${unmapped} matching incident${unmapped === 1 ? ' has' : 's have'} no usable coordinates and ${unmapped === 1 ? 'is' : 'are'} not on the map; ${unmapped === 1 ? 'it is' : 'they are'} still recorded and counted.` : ''}
@@ -133,96 +158,24 @@ const SafetyMapPanel = () => {
               <li><span className="smap-key smap-key-covered" aria-hidden="true" /> Solid ring: a patrol area matches</li>
             </ul>
           </>
-        )}
-      </div>
+        ) : null}
+      </section>
 
-      <div className="dashboard-card">
-        <div className="dashboard-card-header">
-          <h2 className="section-heading"><FaChartBar aria-hidden="true" /> Incident summary</h2>
-        </div>
-
-        <p className="smap-note" role="note">
-          <FaInfoCircle aria-hidden="true" /> {OBSERVATION_DISCLAIMER}
-        </p>
-
-        <div className="smap-stats">
-          <div className="smap-stat">
-            <span className="smap-stat-value">{total}</span>
-            <span className="smap-stat-label">Incidents recorded</span>
-          </div>
-          <div className="smap-stat">
-            <span className="smap-stat-value">{hotspots.length}</span>
-            <span className="smap-stat-label">Locations with more than one</span>
-          </div>
-          <div className="smap-stat">
-            <span className="smap-stat-value">{cover.assignments}</span>
-            <span className="smap-stat-label">Active patrol assignments</span>
-          </div>
-          <div className="smap-stat">
-            <span className="smap-stat-value">{cover.areas}</span>
-            <span className="smap-stat-label">Areas with a patrol</span>
-          </div>
-        </div>
-
-        <h3>By type</h3>
-        {byType.length === 0 ? (
-          <p className="complaint-empty">No incidents in this range.</p>
-        ) : (
-          <ul className="smap-bars">
-            {byType.map((row) => (
-              <li key={row.incident_type}>
-                <span className="smap-bar-label">{incidentTypeLabel(row.incident_type)}</span>
-                <span className="smap-bar-track">
-                  <span
-                    className="smap-bar-fill"
-                    style={{ width: `${total ? Math.round((row.total / total) * 100) : 0}%` }}
-                  />
-                </span>
-                <span className="smap-bar-value">{row.total}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <h3>By status</h3>
-        {byStatus.length === 0 ? (
-          <p className="complaint-empty">No incidents in this range.</p>
-        ) : (
-          <ul className="smap-chips">
-            {byStatus.map((row) => (
-              <li key={row.status}>
-                <span className={`kp-badge kp-badge-${row.status}`}>
-                  {incidentStatusLabel(row.status)}
-                </span>
-                <strong>{row.total}</strong>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <h3>Over time</h3>
-        {trend.rows.length === 0 ? (
-          <p className="complaint-empty">No incidents in this range.</p>
-        ) : (
-          <ul className="smap-trend">
-            {trend.rows.map((row) => (
-              <li key={row.monthKey}>
-                <span className="smap-trend-bar"
-                  style={{ height: `${trend.peak ? Math.max(6, Math.round((row.total / trend.peak) * 90)) : 6}px` }}
-                  aria-hidden="true" />
-                <span className="smap-trend-label">{row.label}</span>
-                <span className="smap-trend-value">{row.total}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      <div className="dashboard-card">
+      <section className="smap-tab-panel" role="tabpanel" id="smap-panel-analytics" aria-labelledby="smap-tab-analytics" hidden={section !== 'analytics'} tabIndex={0}>
+        {section === 'analytics' && <SupportedAnalytics filters={analyticsFilters} onFiltersChange={setAnalyticsFilters} />}
+      </section>
+      <section className="dashboard-card smap-tab-panel" role="tabpanel" id="smap-panel-patrol" aria-labelledby="smap-tab-patrol" hidden={section !== 'patrol'} tabIndex={0}>
         <div className="dashboard-card-header">
           <h2 className="section-heading"><FaShieldAlt aria-hidden="true" /> Repeated locations and patrol coverage</h2>
         </div>
+        <p className="smap-note" role="note">{OBSERVATION_DISCLAIMER}</p>
+        <p className="smap-note" role="note">Active assignments are records marked active in the selected assignment-date range, not attendance or live patrol locations. Incident occurrence dates use the same selected range. Text-label matches do not establish geographic containment or show that patrols caused changes in incident counts.</p>
 
+        {loading || (!coverageResult && !coverageProblem) ? <p role="status">Loading patrol coverage...</p> : problem || coverageProblem ? <p>Patrol comparisons are unavailable.</p> : <>
+        <div className="smap-stats">
+          <div className="smap-stat"><span className="smap-stat-value">{cover.assignments}</span><span className="smap-stat-label">Active patrol assignments</span></div>
+          <div className="smap-stat"><span className="smap-stat-value">{cover.areas}</span><span className="smap-stat-label">Areas with a patrol</span></div>
+        </div>
         {hotspots.length === 0 ? (
           <p className="complaint-empty">
             No location has more than one recorded incident in this range.
@@ -289,7 +242,8 @@ const SafetyMapPanel = () => {
             ))}
           </ul>
         )}
-      </div>
+        </>}
+      </section>
     </div>
   )
 }

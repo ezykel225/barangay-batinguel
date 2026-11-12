@@ -16,6 +16,8 @@ import {
   setAssignmentActive, setTanodActive, tanodMessage, updateTanodMember,
 } from './tanodApi'
 import './Tanod.css'
+import '../dashboards/OfficialServices.css'
+import '../dashboards/OfficialOperations.css'
 
 // Existing official roster and schedule management. Account linking is separate
 // from roster membership; assignments never imply attendance or live tracking.
@@ -162,7 +164,7 @@ const TanodPanel = ({ canAdminister = false }) => {
             </fieldset>
           </form>
   )
-  return <div className="tnd-operations">
+  return <div className="tnd-operations official-service-page official-operations-page">
     <div className="official-dashboard-header"><h1>Tanod Operations</h1><p>Manage the Tanod roster, account access, and patrol schedules.</p></div>
     {problem && !managed && <p className="tnd-problem" role="alert"><FaInfoCircle aria-hidden="true" /> {problem}</p>}
     <div className="tnd-summary" aria-label="Tanod operations summary">
@@ -173,11 +175,12 @@ const TanodPanel = ({ canAdminister = false }) => {
       <button type="button" aria-pressed={tab === 'roster'} onClick={() => setTab('roster')}>Roster &amp; Accounts</button>
       <button type="button" aria-pressed={tab === 'schedule'} onClick={() => setTab('schedule')}>Patrol Schedule</button>
     </div>
-    {tab === 'roster' ? <section className="dashboard-card" aria-labelledby="tnd-roster-heading">
+    {tab === 'roster' ? <section className="dashboard-card official-service-card" aria-labelledby="tnd-roster-heading">
       <div className="dashboard-card-header"><h2 id="tnd-roster-heading" className="section-heading"><FaUserShield aria-hidden="true" /> Roster &amp; Accounts</h2>
         {canAdminister && <button type="button" className="btn-add" disabled={Boolean(busy)} aria-expanded={memberOpen && !editingId} aria-controls="tnd-member-form" onClick={() => { setMemberOpen(!memberOpen || Boolean(editingId)); setEditingId(null); setMember(blankMember()) }}><FaPlus aria-hidden="true" /> {memberOpen && !editingId ? 'Close Add form' : 'Add Tanod'}</button>}
       </div>
-      {loading ? <p role="status">Loading roster...</p> : !roster.length ? <p className="complaint-empty">No Tanod members on the roster yet.</p> : <div className="table-wrapper"><table className="dashboard-table">
+      {loading ? <p role="status">Loading roster...</p> : !roster.length ? <p className="complaint-empty">No Tanod members on the roster yet.</p> : <div className="table-wrapper"><table className="dashboard-table service-table tnd-roster-table">
+        <colgroup><col className="tnd-col-name" /><col className="tnd-col-account" /><col className="tnd-col-state" /><col className="tnd-col-assignments" />{canAdminister && <col className="tnd-col-actions" />}</colgroup>
         <thead><tr><th scope="col">Tanod</th><th scope="col">Account</th><th scope="col">State</th><th scope="col">Active assignments</th>{canAdminister && <th scope="col">Actions</th>}</tr></thead>
         <tbody>{roster.map((t) => <tr key={t.id}>
           <td data-label="Tanod"><strong>{t.full_name}</strong><small className="tnd-subline">{t.area_note || 'Not recorded'}</small></td>
@@ -197,7 +200,7 @@ const TanodPanel = ({ canAdminister = false }) => {
       </TanodManageDialog>}
       {canAdminister && memberOpen && !managed && memberForm}
       {!canAdminister && <p className="complaint-no-actions" role="note">{TANOD_RESTRICTED_NOTE}</p>}
-    </section> : <section className="dashboard-card" aria-labelledby="tnd-schedule-heading">
+    </section> : <section className="dashboard-card official-service-card" aria-labelledby="tnd-schedule-heading">
       <div className="dashboard-card-header"><h2 id="tnd-schedule-heading" className="section-heading"><FaShieldAlt aria-hidden="true" /> Patrol Schedule</h2>
         {canAdminister && <button type="button" className="btn-add" disabled={Boolean(busy)} aria-expanded={scheduleOpen} aria-controls="tnd-assign-form" onClick={() => setScheduleOpen(!scheduleOpen)}><FaPlus aria-hidden="true" /> {scheduleOpen ? 'Close schedule form' : 'Schedule Patrol'}</button>}
       </div>

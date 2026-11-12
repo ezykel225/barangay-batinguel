@@ -6,10 +6,12 @@ import ActionMenu from '../components/ActionMenu'
 import { useConfirm } from '../components/ConfirmDialog'
 import { emptyResident, filterResidents, residentName, residentPayload, validMobile } from './directoryData'
 import { manilaToday } from '../utils/displayLabels'
-import { directorySummary, purokLabel, residentPurokOptions } from './residentPresentation'
+import { directoryAccountState, directorySummary, residentPurokOptions } from './residentPresentation'
+import { purokShortLabel } from '../utils/residentGroups'
+import { PUROKS } from '../constants/barangay'
 import './ResidentDirectory.css'
 
-export default function ResidentDirectory({ canManage = true, profiles = [], onEligibilityChange }) {
+export default function ResidentDirectory({ canManage = false, profiles = [], onEligibilityChange, initialStatus = '' }) {
   const [confirm, confirmation] = useConfirm()
   const eligibilityLock = useRef(false)
   const refreshKey = profiles.map(p => `${p.id}:${p.verification_status}`).join('|')
@@ -17,7 +19,7 @@ export default function ResidentDirectory({ canManage = true, profiles = [], onE
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
-  const [status, setStatus] = useState('')
+  const [status, setStatus] = useState(initialStatus)
   const [purok, setPurok] = useState('')
   const [form, setForm] = useState(null)
   const [view, setView] = useState(null)
@@ -81,16 +83,16 @@ export default function ResidentDirectory({ canManage = true, profiles = [], onE
     <div className="directory-heading"><div><h2>Barangay Residents</h2><p>{canManage?'Manage resident details and explicit online-account links.':'Open a resident profile for legitimate barangay use.'}</p></div>
       {canManage&&<button className="confirm-dialog-confirm" onClick={() => openForm(null)} disabled={loading || !!error}>Add Resident</button>}</div>
     {notice && <p role="status">{notice}</p>}{error && <p role="alert">{error}</p>}
-    {!loading && !error && <dl className="directory-summary">{directorySummary(rows).map(([label,value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>}
+    {!loading && !error && <dl className="directory-summary">{directorySummary(rows).filter(([label])=>canManage || label !== 'With Mobile Number').map(([label,value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>}
     <div className={`directory-filters${search.trim() || status || purok ? ' has-filters' : ''}`}><label>Search residents<input placeholder="Search residents..." value={search} onChange={e => setSearch(e.target.value)} type="search" /></label>
       <label>Resident status<select value={status} onChange={e => setStatus(e.target.value)}><option value="">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
       <label>Purok filter<select value={purok} onChange={e => setPurok(e.target.value)}><option value="">All Puroks</option>{residentPurokOptions(rows).map(p => <option key={p.value} value={p.value}>{p.label}</option>)}</select></label>{(search.trim() || status || purok) && <button type="button" className="directory-reset" onClick={() => { setSearch(''); setStatus(''); setPurok('') }}>Clear filters</button>}</div>
     {loading ? <p role="status">Loading resident directory...</p> : !error && <><p>{search.trim() || status || purok ? `Showing ${filtered.length} of ${rows.length} residents` : `${rows.length} ${rows.length === 1 ? 'resident' : 'residents'}`}</p>
       {filtered.length > 0 && <table className="directory-table"><thead><tr><th scope="col">Resident name</th><th scope="col">Purok</th><th scope="col">Status</th><th scope="col">Online account</th><th scope="col">Actions</th></tr></thead>
-        <tbody>{filtered.map(r => <tr key={r.id}><td data-label="Resident name"><button className="resident-name-button" onClick={()=>setView(r)}>{residentName(r)}</button></td><td data-label="Purok">{purokLabel(r.purok) || 'Not recorded'}</td><td data-label="Status"><span className={`badge ${r.resident_status === 'active' ? 'badge-approved' : 'badge-pending'}`}>{r.resident_status === 'active' ? 'Active' : 'Inactive'}</span></td><td data-label="Online account">{r.account_linked || r.profile_id ? 'Explicitly linked' : 'Not linked'}</td><td data-label="Actions"><ActionMenu portal label={`Actions for ${residentName(r)}`} subject={residentName(r)} items={[
+        <tbody>{filtered.map(r => { const account = directoryAccountState(r, profiles); return <tr key={r.id}><td data-label="Resident name"><button className="resident-name-button" onClick={()=>setView(r)}>{residentName(r)}</button></td><td data-label="Purok" title={r.purok || ''}>{purokShortLabel(r.purok) || 'Not recorded'}</td><td data-label="Status"><span className={`badge ${r.resident_status === 'active' ? 'badge-approved' : 'badge-pending'}`}>{r.resident_status === 'active' ? 'Active' : r.resident_status === 'inactive' ? 'Inactive' : 'Unrecognized'}</span></td><td data-label="Online account">{account.linked ? <><span>Explicitly linked</span><small className="directory-account-status">{account.verification}</small>{account.needsReview && <small className="directory-account-status">Directory/account eligibility disagree; review required.</small>}</> : 'Not linked'}</td><td data-label="Actions"><ActionMenu portal label={`Actions for ${residentName(r)}`} subject={residentName(r)} items={[
           {key:'profile',label:'View resident profile',onSelect:()=>setView(r)},
           ...(canManage?[{key:'edit',label:'Edit resident',onSelect:()=>openForm(r)},{key:'eligibility',label:r.resident_status==='active'?'Mark as Not Resident':'Reactivate resident',danger:r.resident_status==='active',onSelect:()=>changeEligibility(r)}]:[]),
-        ]}/></td></tr>)}</tbody>
+         ]}/></td></tr>})}</tbody>
       </table>}
       {!filtered.length && <p>{rows.length ? 'No residents match the current filters.' : 'No barangay resident records have been added yet.'}</p>}</>}
     {confirmation}
@@ -104,9 +106,9 @@ export default function ResidentDirectory({ canManage = true, profiles = [], onE
         <label>Suffix (optional)<input name="suffix" maxLength={30} value={form.suffix || ''} onChange={change} /></label>
         <label>Birth date (optional)<input type="date" max={manilaToday()} name="birth_date" value={form.birth_date} onChange={change} /></label>
         <label>Mobile number (optional)<input type="tel" name="mobile_number" maxLength={30} value={form.mobile_number || ''} onChange={change} /></label>
-        <label>Purok (optional)<input name="purok" maxLength={100} value={form.purok || ''} onChange={change} /></label>
+        <label>Purok (optional)<select name="purok" value={form.purok || ''} onChange={change}><option value="">Not recorded</option>{form.purok && !PUROKS.includes(form.purok) && <option value={form.purok}>{form.purok} (current recorded value)</option>}{PUROKS.map(value=><option key={value} value={value}>{value}</option>)}</select></label>
         <div><strong>Resident status</strong><p>{form.resident_status === 'active' ? 'Active' : 'Inactive'}</p><small>Use the resident actions menu to change eligibility.</small></div>
-      </div><p className="directory-note">A phone and online account are optional. Purok is recorded as provided; the official vocabulary is not yet confirmed. Account linking is not available in this form.</p>
+      </div><p className="directory-note">A phone and online account are optional. Purok choices reuse the application's existing list, whose geographic completeness still needs barangay confirmation. A legacy recorded value is preserved unless explicitly changed. Account linking is not available in this form.</p>
       {formError && <p role="alert">{formError}</p>}<div className="directory-actions"><button className="confirm-dialog-cancel" type="button" disabled={busy} onClick={() => setForm(null)}>Cancel</button><button className="confirm-dialog-confirm" disabled={busy}>{busy ? 'Saving...' : 'Save resident'}</button></div></form>
     </DialogShell></div>}
   </section>

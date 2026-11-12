@@ -91,7 +91,11 @@ const install = (overrides = {}) => {
   const table = { incident_map_points: mapRows, incident_queue: mapRows, tanod_coverage_summary: COVERAGE, ...overrides }
   supabase.rpc.mockImplementation((fn, args) => {
     rpcCalls.push([fn, args])
-    return Promise.resolve({ data: table[fn] ?? [], error: null })
+    const rows = table[fn] ?? []
+    const response = Promise.resolve({ data: rows, error: null })
+    response.order = () => response
+    response.range = (start,end) => Promise.resolve({data:rows.slice(start,end+1),error:null,count:rows.length})
+    return response
   })
 }
 
@@ -110,6 +114,53 @@ const mount = () => render(<SafetyMapPanel />)
 // that had nothing to do with escaping.
 const ready = () => screen.findByText(/incidents? plotted/)
 const caption = () => screen.getByText(/incidents? plotted/).textContent
+
+describe('supported three-tab navigation', () => {
+  it('uses linked panels and roving keyboard focus with wraparound, Home and End', async () => {
+    mount(); await ready()
+    const tabs = screen.getAllByRole('tab')
+    expect(tabs.map(tab=>tab.textContent)).toEqual(['Incident Map','Analytics & Insights','Patrol Coverage'])
+    expect(screen.getAllByRole('tabpanel')).toHaveLength(1)
+    tabs[0].focus()
+    for (const [key,index] of [['ArrowRight',1],['End',2],['ArrowRight',0],['ArrowLeft',2],['Home',0]]) {
+      fireEvent.keyDown(document.activeElement,{key})
+      expect(tabs[index]).toHaveFocus()
+      expect(tabs[index]).toHaveAttribute('aria-selected','true')
+      expect(tabs[index]).toHaveAttribute('tabindex','0')
+      expect(screen.getByRole('tabpanel')).toHaveAttribute('id',tabs[index].getAttribute('aria-controls'))
+    }
+  })
+
+  it('retains map filters while analytics independently reads the same authorized queue', async () => {
+    mount(); await ready()
+    fireEvent.change(screen.getByLabelText('Filter the map by incident type'),{target:{value:'traffic_accident'}})
+    fireEvent.click(screen.getByRole('tab',{name:'Analytics & Insights'}))
+    expect((await within(screen.getByRole('tabpanel')).findByText('Incident records')).closest('div')).toHaveTextContent('8')
+    expect(within(screen.getByRole('tabpanel')).getByRole('heading',{name:'Incidents over time'})).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Incident category'),{target:{value:'threat'}})
+    expect(within(screen.getByRole('tabpanel')).queryByText('Active patrol assignments')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab',{name:'Patrol Coverage'}))
+    expect(within(screen.getByRole('tabpanel')).getByText('Active patrol assignments').closest('.smap-stat')).toHaveTextContent('3')
+    fireEvent.click(screen.getByRole('tab',{name:'Incident Map'}))
+    expect(screen.getByLabelText('Filter the map by incident type')).toHaveValue('traffic_accident')
+    expect(caption()).toMatch(/5 incidents plotted/)
+    fireEvent.click(screen.getByRole('tab',{name:'Analytics & Insights'}))
+    expect(screen.getByLabelText('Incident category')).toHaveValue('threat')
+    expect([...new Set(fnNames())].sort()).toEqual(['incident_map_points','incident_queue','tanod_coverage_summary'])
+  })
+
+  it('does not present failed patrol reads as zero assignments or an uncovered location', async () => {
+    const initial = supabase.rpc.getMockImplementation()
+    supabase.rpc.mockImplementation((fn,args)=>fn==='tanod_coverage_summary'?Promise.resolve({data:null,error:{code:'42501'}}):initial(fn,args))
+    const warning=jest.spyOn(console,'warn').mockImplementation(()=>{})
+    mount(); await ready()
+    fireEvent.click(screen.getByRole('tab',{name:'Patrol Coverage'}))
+    expect(await screen.findByText('Patrol comparisons are unavailable.')).toBeVisible()
+    expect(within(screen.getByRole('tabpanel')).queryByText('Active patrol assignments')).not.toBeInTheDocument()
+    expect(within(screen.getByRole('tabpanel')).queryByText(/no patrol area written this way/)).not.toBeInTheDocument()
+    warning.mockRestore()
+  })
+})
 
 describe('most common type ties', () => {
   it('displays both demo ties and avoids attributing all incidents to a winner', async () => {
@@ -281,6 +332,7 @@ describe('E. the observations', () => {
   it('reports what was recorded and asks for a review', async () => {
     mount()
     await ready()
+    fireEvent.click(screen.getByRole('tab', { name: 'Patrol Coverage' }))
     const observations = screen.getByRole('heading', { name: 'Observations' })
       .nextElementSibling
     expect(observations.textContent).toMatch(/5 traffic .*incidents recorded at Rizal Street/i)
@@ -290,6 +342,7 @@ describe('E. the observations', () => {
   it('tells nobody to do anything', async () => {
     mount()
     await ready()
+    fireEvent.click(screen.getByRole('tab', { name: 'Patrol Coverage' }))
     const observations = screen.getByRole('heading', { name: 'Observations' })
       .nextElementSibling.textContent.toLowerCase()
     ;['must ', 'should ', 'install', 'build a', 'deploy', 'assign more', 'arrest',
@@ -319,6 +372,7 @@ describe('F. the coverage gaps', () => {
   it('renders the caveat beside the list when there is a gap', async () => {
     mount()
     await ready()
+    fireEvent.click(screen.getByRole('tab', { name: 'Patrol Coverage' }))
     expect(screen.getByText(/Matched by exact area wording only/)).toBeInTheDocument()
     const gaps = screen.getByRole('heading', { name: /no matching patrol area/i })
     expect(gaps).toBeInTheDocument()
@@ -376,7 +430,9 @@ describe('G. filtering', () => {
     mount()
     await ready()
     expect(caption()).toMatch(/^0 incidents plotted\./)
-    expect(screen.getAllByText('No incidents in this range.').length).toBeGreaterThan(0)
+    fireEvent.click(screen.getByRole('tab',{name:'Analytics & Insights'}))
+    expect(await screen.findByText('No incidents were recorded for this selection.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab',{name:'Patrol Coverage'}))
     expect(screen.getByText(/No location has more than one recorded incident/))
       .toBeInTheDocument()
   })

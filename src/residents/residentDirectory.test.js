@@ -1,11 +1,45 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import ResidentDirectory from './ResidentDirectory'
 import { supabase } from '../supabase/supabaseClient'
+import { PUROKS } from '../constants/barangay'
 jest.mock('../supabase/supabaseClient', () => ({supabase:{rpc:jest.fn()}}))
 const row={id:'resident-1',first_name:'Ana',last_name:'Cruz',birth_date:'1960-02-29',mobile_number:'09171234567',purok:'Zone A',resident_status:'active',profile_id:null}
 beforeEach(() => { supabase.rpc.mockReset();supabase.rpc.mockResolvedValue({data:[row],error:null}) })
+
+test('unspecified management permission fails closed',async()=>{
+ render(<ResidentDirectory canManage={undefined}/>)
+ await screen.findByRole('button',{name:'Ana Cruz'})
+ expect(screen.queryByRole('button',{name:'Add Resident'})).not.toBeInTheDocument()
+ expect(supabase.rpc).toHaveBeenCalledWith('community_credit_resident_directory')
+ expect(screen.queryByText('With Mobile Number')).not.toBeInTheDocument()
+})
+
+test('purok dropdown uses existing choices and preserves legacy values without any save on cancel',async()=>{
+ render(<ResidentDirectory canManage />)
+ await screen.findByRole('button',{name:'Ana Cruz'})
+ fireEvent.click(screen.getByRole('button',{name:'Actions for Ana Cruz'}))
+ fireEvent.click(screen.getByRole('menuitem',{name:/Edit resident/}))
+ const select=screen.getByRole('combobox',{name:'Purok (optional)'})
+ expect(select).toHaveValue('Zone A')
+ for(const value of PUROKS)expect(within(select).getByRole('option',{name:value})).toHaveValue(value)
+ expect(within(select).getByRole('option',{name:'Zone A (current recorded value)'})).toBeInTheDocument()
+ fireEvent.change(select,{target:{value:PUROKS[0]}})
+ fireEvent.click(screen.getByRole('button',{name:'Cancel'}))
+ expect(supabase.rpc).toHaveBeenCalledTimes(1)
+ expect(screen.getByRole('button',{name:'Ana Cruz'}).closest('tr')).toHaveTextContent('Zone A')
+})
+
+test('other officials receive only a view action from the read-only directory surface',async()=>{
+ render(<ResidentDirectory canManage={false}/>)
+ await screen.findByRole('button',{name:'Ana Cruz'})
+ expect(supabase.rpc).toHaveBeenCalledWith('community_credit_resident_directory')
+ expect(screen.queryByRole('button',{name:'Add Resident'})).not.toBeInTheDocument()
+ fireEvent.click(screen.getByRole('button',{name:'Actions for Ana Cruz'}))
+ expect(screen.getByRole('menuitem',{name:/View resident profile/})).toBeInTheDocument()
+ expect(screen.queryByRole('menuitem',{name:/Edit|Not Resident|Reactivate/})).not.toBeInTheDocument()
+})
 test('loads directory, views calendar date, Escape returns focus to opener', async () => {
-  render(<ResidentDirectory />)
+  render(<ResidentDirectory canManage />)
   const view=await screen.findByRole('button',{name:'Ana Cruz'});view.focus();fireEvent.click(view)
   const dialog=screen.getByRole('dialog',{name:'Resident Profile'})
   expect(within(dialog).getByText('February 29, 1960')).toBeInTheDocument()
@@ -13,7 +47,7 @@ test('loads directory, views calendar date, Escape returns focus to opener', asy
   fireEvent.keyDown(document,{key:'Escape'});expect(screen.queryByRole('dialog')).not.toBeInTheDocument();expect(view).toHaveFocus()
 })
 test('adds resident without account and preserves raw mobile/date payload', async () => {
-  render(<ResidentDirectory />);await screen.findByRole('button',{name:'Ana Cruz'})
+  render(<ResidentDirectory canManage />);await screen.findByRole('button',{name:'Ana Cruz'})
   fireEvent.click(screen.getByRole('button',{name:'Add Resident'}))
   fireEvent.change(screen.getByLabelText('First name'),{target:{value:'Ben'}})
   fireEvent.change(screen.getByLabelText('Last name'),{target:{value:'Reyes'}})
@@ -26,7 +60,7 @@ test('adds resident without account and preserves raw mobile/date payload', asyn
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 })
 test('invalid mobile stays open; failed save stays open; cancel closes', async () => {
-  render(<ResidentDirectory />);await screen.findByRole('button',{name:'Ana Cruz'});fireEvent.click(screen.getByRole('button',{name:'Actions for Ana Cruz'}));fireEvent.click(screen.getByRole('menuitem',{name:/Edit resident/}))
+  render(<ResidentDirectory canManage />);await screen.findByRole('button',{name:'Ana Cruz'});fireEvent.click(screen.getByRole('button',{name:'Actions for Ana Cruz'}));fireEvent.click(screen.getByRole('menuitem',{name:/Edit resident/}))
   fireEvent.change(screen.getByLabelText('Mobile number (optional)'),{target:{value:'invalid'}})
   fireEvent.click(screen.getByRole('button',{name:'Save resident'}));expect(screen.getByRole('alert')).toHaveTextContent('Philippine mobile')
   expect(supabase.rpc).toHaveBeenCalledTimes(1)
@@ -36,7 +70,7 @@ test('invalid mobile stays open; failed save stays open; cancel closes', async (
   fireEvent.click(screen.getByRole('button',{name:'Cancel'}));expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 })
 test('search and filters use directory records only', async () => {
-  render(<ResidentDirectory />);await screen.findByRole('button',{name:'Ana Cruz'})
+  render(<ResidentDirectory canManage />);await screen.findByRole('button',{name:'Ana Cruz'})
   fireEvent.change(screen.getByLabelText('Resident status'),{target:{value:'inactive'}})
   expect(screen.queryByRole('button',{name:'Ana Cruz'})).not.toBeInTheDocument();expect(screen.getByText(/No residents match the current filters/)).toBeInTheDocument()
   fireEvent.change(screen.getByLabelText('Resident status'),{target:{value:''}})
@@ -44,6 +78,6 @@ test('search and filters use directory records only', async () => {
 })
 test('authorization/missing migration failure is explicit and add disabled', async () => {
   supabase.rpc.mockResolvedValue({data:null,error:{message:'permission denied'}})
-  render(<ResidentDirectory />);await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Resident directory unavailable'))
+  render(<ResidentDirectory canManage />);await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Resident directory unavailable'))
   expect(screen.getByRole('button',{name:'Add Resident'})).toBeDisabled()
 })
